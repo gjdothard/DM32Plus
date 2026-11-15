@@ -985,11 +985,16 @@ backup and restore behavior on the radio before any erase. The CPS installer and
 write the application in internal flash. A full SPI backup can capture the gap, but the existing
 codeplug restore does not restore it. The original firmware may write there after rollback.
 
-The larger window at `0x720000–0xEFFFFF` is addressable by the CPS and includes codeplug data, voice prompts,
-and capacity for the DMR ID database. Allocating more space there would require explicitly reducing the
-database or CPS window and enforcing the revised boundary in the firmware and tools. The native codeplug
-and AES journal already occupy the defined allocation at the top of flash. Program-flash headroom is for firmware
-growth because the updater erases the application region.
+The CPS flash-image window ends at `0xE80000` (exclusive). This leaves a 512 KiB reserve at
+`0xE80000–0xEFFFFF` for conversation storage. The ID database may use up to about 6.9 MiB across its two
+standard areas. The firmware ignores databases whose declared extent exceeds the new limit. Save a
+full SPI backup or export the database with the previous CPS before upgrading if the old database may
+cross this boundary. Build a smaller database by selecting fewer regions or shorter text, then write it
+from CPS. Channels, talkgroups, and saved contacts have separate records.
+
+The reserve may still contain bytes from an older ID database. Initialize it only as part of a journal
+migration. Older firmware and CPS versions can write through this region, so verify rollback behavior
+before storing conversations there. The native codeplug and AES journal remain above the reserve.
 
 ---
 
@@ -1229,7 +1234,7 @@ Runs on a radio: `docs/testing/dm32-bringup.md` is the bring-up checklist and li
 | Host link | UART0 115200 (divisor 46): debug link, CPS, MMDVM hotspot, PPP. Receive by interrupt into a 1,024-byte ring, transmit by polling. No USB: the radio has no USB data port (the USB-C socket is on the battery pack and only charges it; 3.11), so `CONFIG_USB=n`, `CONFIG_HOSTLINK=y` | `platform/hrc7000/uart.c` |
 | Display | 240x320 in 16 colors (a 37.5 KB frame buffer of palette indexes); MADCTL 0xC0, inversion on | `boards/dm32/display_dm32.c`, `drivers/display/st7789` |
 | Keys | matrix 5x4 on LCD DB0-DB4 / GPIO 0x31-0x34 under the LCD bus lock; SK1 / SK2 as column-to-ground keys; encoder on the GPIO B interrupt (B edges, acked); every other input without interrupts | `input_dm32.c`, `drivers/input/keymatrix` |
-| Data flash | SPI0 + manual CS; any JEDEC ID with a known capacity (GD25Q128, Puya); writes and erases below 0x700000 refused. The core's areas (`hal_flash_map_t`): open-firmware EEPROM image 0x700000, settings ring 0x711000 (8 sectors), journal 0x719000 (2 sectors), open-firmware flash image 0x720000 to 0xF00000, native codeplug 0xF00000..0xFFEFFF (1 MB minus one sector); AES journal 0xFFD000..0xFFEFFF; final stock metadata sector 0xFFF000..0xFFFFFF preserved; no calibration window, no TFTP staging area | `flash_dm32.c` |
+| Data flash | SPI0 + manual CS; any JEDEC ID with a known capacity (GD25Q128, Puya); writes and erases below 0x700000 refused. Open-firmware EEPROM image at 0x700000, settings ring at 0x711000 (8 sectors), journal at 0x719000 (2 sectors), open-firmware flash image at 0x720000–0xE7FFFF, conversation reserve at 0xE80000–0xEFFFFF, native codeplug and AES journal at 0xF00000–0xFFEFFF, and preserved stock metadata at 0xFFF000–0xFFFFFF. No calibration window or TFTP staging area | `flash_dm32.c` |
 | Calibration | 11, read only; a decoded copy at 0x710000 as a fallback; UHF below 400 MHz clamps to the first point | `drivers/cal/baofeng/baofeng_cal.c` |
 | Radio | FD6818 bit-banged (each frame with interrupts off: the DMR interrupts switch it per burst); C7000 FM and TX sub-audio, FD6818 RX sub-audio; PA drive on DAC B from the calibration | `radio_dm32.c`, `drivers/rf/fd6818`, `drivers/modem/hrc7000` |
 | DMR | the HR_C7000 slot engine behind `hal_dmr_modem.h` (`modem-hrc7000.md` 3, 5, 6); FD6818 idle -> TX at the RF TX interrupt, PA keyed 28 ms after each burst is armed, off at the first tick 20 ms after the RF TX interrupt | `drivers/modem/hrc7000/hrc7000_dmr.c`, `platform/hrc7000/dmr_glue.c`, `boards/dm32/radio_dm32.c` (the RF and PA hooks) |

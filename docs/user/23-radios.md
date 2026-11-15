@@ -377,6 +377,11 @@ Installing: [Moving from stock DM-32UV firmware](19-moving-from-stock-dm32.md).
 
 ### DM32Plus
 
+DM32Plus reserves 512 KiB for future conversation history. If your caller-name database exceeds the new
+CPS limit, keep a copy before upgrading and rebuild it with fewer regions or shorter text in **DMR ID
+Database**. The limit applies to caller-name lookups. Channels, talkgroups, and saved contacts have their
+own records.
+
 The DM32Plus offshoot publishes its firmware on [GitHub Releases](https://github.com/gjdothard/DM32Plus/releases).
 
 1. Open the portable CPS with `Start CPS.cmd` using Chrome or Edge, then choose **Install DM32Plus**

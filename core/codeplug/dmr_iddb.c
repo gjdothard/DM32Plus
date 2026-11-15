@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // DMR ID database lookup (see dmr_iddb.h). Layout from docs/spec/open-firmware-cps.md 7.5: a 12-byte header
 // ("Id", format, record size + 0x4A, version, LE record count) at the start of area 1, records sorted by ID, area 1
 // holding as many whole records as fit in 256 KB with the header, the rest from the start of area 2. With
@@ -48,6 +49,16 @@ static struct {
 static bool rd(uint32_t addr, void *buf, uint32_t len)
 {
 	return board.flash != NULL && board.flash->size != 0 && board.flash->read(addr, buf, len);
+}
+
+static uint32_t iddb_end(void)
+{
+	const hal_flash_map_t *m = board.flash->map;
+	uint32_t end = board.flash->size;
+	if (m != NULL && m->openfw_end != 0 && m->openfw_end < end) {
+		end = m->openfw_end;
+	}
+	return end;
 }
 
 // 6-bit packed text: 4 characters in 3 bytes, most significant first, alphabet space 0-9 A-Z a-z .
@@ -105,7 +116,7 @@ static bool c_read(uint32_t off, uint8_t *buf, uint32_t len)
 	return true;
 }
 
-static bool compact_init(void)
+static bool compact_init(uint32_t end)
 {
 	uint8_t h[C_HEADER];
 	if (!rd(IDDB_AREA1, h, sizeof(h)) || h[4] != 1u) {
@@ -113,7 +124,10 @@ static bool compact_init(void)
 	}
 	uint32_t count = le(h + 8, 4), size = le(h + 12, 4), index = le(h + 16, 4), table = le(h + 24, 4);
 	uint32_t strings = le(h + 28, 4), pages = le(h + 20, 2), dict = le(h + 22, 2);
-	uint32_t space = board.flash->size > IDDB_AREA2 ? IDDB_AREA1_SIZE + (board.flash->size - IDDB_AREA2) : IDDB_AREA1_SIZE;
+	uint32_t space = end < IDDB_AREA1 + IDDB_AREA1_SIZE ? end - IDDB_AREA1 : IDDB_AREA1_SIZE;
+	if (end > IDDB_AREA2) {
+		space += end - IDDB_AREA2;
+	}
 	// each section's length against the room after its offset, so no sum can wrap
 	if (count == 0u || count > 0x400000u || pages == 0u || dict > C_DICT_MAX || size > space || size % C_PAGE != 0u ||
 		index < C_PAGE || index > size || 5u * pages > size - index || table < C_PAGE || table > size ||
@@ -324,10 +338,14 @@ bool dmr_iddb_init(void)
 	if (!rd(IDDB_AREA1, h, sizeof(h)) || h[0] != 'I' || h[1] != 'd') {
 		return false;
 	}
+	uint32_t end = iddb_end();
+	if (end < IDDB_AREA1 + sizeof(h)) {
+		return false;
+	}
 	db.format = (char)h[2];
 #if CONFIG_IDDB_COMPACT
 	if (h[2] == 'C' && h[3] == 0u) {
-		return compact_init();
+		return compact_init(end);
 	}
 #endif
 	if (h[3] < 0x4Au) {	// format C to a build without it: no database (iddb-compact.md 3.1)
@@ -341,8 +359,14 @@ bool dmr_iddb_init(void)
 		db.count = 0;
 		return false;
 	}
-	db.per_area1 = (IDDB_AREA1_SIZE - IDDB_HEADER) / db.rec;
+	uint32_t area1_bytes = end < IDDB_AREA1 + IDDB_AREA1_SIZE ? end - IDDB_AREA1 : IDDB_AREA1_SIZE;
+	db.per_area1 = (area1_bytes - IDDB_HEADER) / db.rec;
 	db.area2 = h[2] == 'n' ? IDDB_AREA2_VP : IDDB_AREA2;
+	uint32_t area2_records = end > db.area2 ? (end - db.area2) / db.rec : 0;
+	if (db.count > db.per_area1 + area2_records) {
+		db.count = 0;
+		return false;
+	}
 	db.valid = true;
 	return true;
 }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The codeplug editor's decoder and encoder (static/js/codeplug/), checked against the radio's own codeplug code on
 // the host: tests/host/cpsSim stores a codeplug and lists what the radio reads (--detail), both ways. Fixtures from
 // site/tests/fixtures.py; run with site/tests/run.sh.
@@ -271,7 +272,7 @@ import { updateFor } from "../static/js/flasher/version.js";
 
 const RADIOS = [
 	{ id: "dm1701", codeplug: { base: 0, end: 0xE00000, names: ["DM-1701", "dm1701"] } },
-	{ id: "dm32", codeplug: { base: 0x700000, end: 0xF00000, names: ["DM-32UV", "dm32"] } },
+	{ id: "dm32", codeplug: { base: 0x700000, end: 0xE80000, names: ["DM-32UV", "dm32"] } },
 	{ id: "sim", codeplug: { base: 0, end: 0xE00000, names: ["sim"] } },
 ];
 
@@ -311,7 +312,7 @@ const flashImage = (flash) => CodeplugImage.from(flash.slice(0, CODEPLUG_SPAN));
 
 test("a radio with its codeplug at a base reads and writes at that base", async () => {
 	const start = encode(rich());
-	const radio = new FakeCpsRadio({ board: "DM-32UV", base: 0x700000, end: 0xF00000, image: start.bytes, cable: true });
+	const radio = new FakeCpsRadio({ board: "DM-32UV", base: 0x700000, end: 0xE80000, image: start.bytes, cable: true });
 	radio.spi.fill(0x5A, 0x700000 + 0x604B, 0x700000 + 0x6100);	// the radio's own settings block
 	const tr = new CpsSerial(radio.stream(), { cable: true });
 	const { radio: r } = await tr.identify(RADIOS);
@@ -332,6 +333,21 @@ test("a radio with its codeplug at a base reads and writes at that base", async 
 	assert.equal(radio.reloads, 1);
 	assert.ok(radio.spi.subarray(0x700000 + 0x604B, 0x700000 + 0x6100).every((x) => x === 0x5A), "settings block kept");
 	assert.equal(detail(decode(await tr.read())), detail(m));
+});
+
+test("the reduced database limit refuses an oversized write before changing flash", async () => {
+	const start = encode(rich());
+	const radio = new FakeCpsRadio({ board: "DM-32UV", base: 0x700000, end: 0xE80000, image: start.bytes, cable: true });
+	const tr = new CpsSerial(radio.stream(), { cable: true });
+	await tr.identify(RADIOS);
+	assert.equal(tr.end, 0x780000);
+	const want = start.clone();
+	const rec = 15;
+	const count = iddb.capacity(rec, tr.end) + 1;
+	want.bytes.set([0x49, 0x64, 0x4E, 0x4A + rec, 0, 0, 0, 0], iddb.AREA1);
+	new DataView(want.bytes.buffer).setUint32(iddb.AREA1 + 8, count, true);
+	await assert.rejects(tr.write(want, start, { iddb: true }), { message: "iddb_too_big" });
+	assert.equal(radio.writes.length, 0);
 });
 
 test("the radio's release reaches the editor, which offers a newer one (editor update notice)", async () => {

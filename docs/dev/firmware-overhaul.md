@@ -44,6 +44,10 @@ talkgroup.
 The target build reports 16 bytes of headroom in its primary RAM region. Reuse existing
 storage-path buffers and account for stack and RAM costs before enabling a journal on a board.
 
+The CPS and firmware now enforce a smaller DMR ID database boundary, leaving a 512 KiB reserve.
+Treat that reserve as previously used until the journal migration, and account for older firmware
+that still allows CPS writes there.
+
 The hardware flash audit identifies a 20 KiB candidate outside the active application allocations.
 Follow the conversation storage section of the board's hardware reference before allocating it.
 First confirm ownership across install, update, restore, and rollback. Then prototype a journal

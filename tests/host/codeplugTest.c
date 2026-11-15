@@ -438,6 +438,16 @@ static void test_iddb(void)
 	codeplug_reload();
 	CHECK(dmr_iddb_count() == 1);
 
+	// The chip can still read past the codeplug limit, but the database must fit inside it.
+	const hal_flash_map_t limit = { .openfw_end = FL + 0xB8000u + 24u };
+	flash.map = &limit;
+	uint32_t count = (0x40000u - 12u) / 24u + 1u;
+	put_iddb_header('-', 24, count);
+	CHECK(dmr_iddb_init() && dmr_iddb_count() == count);
+	put_iddb_header('-', 24, count + 1u);
+	CHECK(!dmr_iddb_init() && dmr_iddb_count() == 0);
+	flash.map = NULL;
+
 	// The old "ID" tag is rejected
 	image[FL + 0x30001] = 'D';
 	CHECK(!dmr_iddb_init());
@@ -579,6 +589,13 @@ static void test_iddb_compact(void)
 	CHECK(!dmr_iddb_lookup(3200001, text, sizeof(text)));		// an unused token: the page stops there
 	char small[10];
 	CHECK(dmr_iddb_lookup(3101234, small, sizeof(small)) && strcmp(small, "N0CALL Sp") == 0);
+
+	hal_flash_map_t limit = { .openfw_end = FL + 0xB8000u + 0x1000u };
+	flash.map = &limit;
+	CHECK(dmr_iddb_init());
+	limit.openfw_end--;
+	CHECK(!dmr_iddb_init() && dmr_iddb_count() == 0);
+	flash.map = NULL;
 
 	// A header that doesn't hold together is no database
 	h[4] = 2;
