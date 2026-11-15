@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Keys and Navigation
 
@@ -11,6 +12,11 @@ Each key does the same kind of thing on every screen.
 2. **Back** goes back one level. On Home it undoes one temporary change per press. Holding **Back** returns to Home
    from anywhere.
 3. **\*** opens quick settings for what you are doing. Holding **\*** locks or unlocks the keys.
+
+On displays with the card layout, **Quick Controls** shows nine numbered tiles for the current mode.
+The cyan outline marks the focused tile and turns amber while editing a value. Use the corresponding
+number key to open a tile directly. On an FM memory channel, the Offset tile shows the stored split.
+Use the VFO's TX frequency control to edit a split while operating in VFO.
 4. **#** opens the actions for the thing with the focus, such as a person, a talkgroup, a message or the last caller.
    Holding **#** opens Recent.
 5. **PTT** talks to the person or talkgroup with the focus in any list, once. With nothing focused, it talks to the

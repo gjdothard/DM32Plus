@@ -1351,9 +1351,19 @@ int main(void)
 	run_flow(&card_home, sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
 	static const flow_t card_dual = {
 		"Tall color Dual Watch shows the per-channel state",
-		"", "branded-home quick 7 ctx 3 2 ok wait:3000", "screen=home shows=IDLE shows=RECENT_ACTIVITY", 6, false,
+		"", "branded-home quick 3 ctx 3 2 ok wait:3000", "screen=home shows=IDLE shows=RECENT_ACTIVITY", 6, false,
 	};
 	run_flow(&card_dual, sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+	static const flow_t card_quick[] = {
+		{ "Tall color DMR Quick Controls", "", "branded-home quick", "screen=quick shows=Quick_Controls shows=GPS", 1, false },
+		{ "Tall color FM Quick Controls", "", "branded-home down quick 4 up", "screen=quick sq=6 shows=Quick_Controls", 4, false },
+		{ "Talk to keeps all seven digits beside a long name", "",
+			"branded-home worst call:3109999,9100091,g quick 4", "screen=picker shows=TG_9100091", 2, false },
+		{ "Talk to tile fits a seven-digit group", "",
+			"branded-home call:3101234,1234567,g quick 4 ok wait:3000 quick", "screen=quick shows=TG_1234567", 4, false },
+	};
+	for (size_t i = 0; i < sizeof card_quick / sizeof card_quick[0]; i++)
+		run_flow(&card_quick[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
 #endif
 
 	crawl(sim_geom_find("160x120i5"), SIM_MAP_K, "K DM-1701");

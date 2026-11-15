@@ -15,6 +15,12 @@ Recent activity starts each row with the pane letter, using the same colors as t
 The selected card shows the saved talkgroup name prominently and keeps the ID, slot, color code, and power on
 its detail row. Single-channel operation shows one card. Entry and large-text views retain their existing layouts.
 
+On the same tall dark display, Quick Controls uses a 3×3 card grid with numbered tiles and a separate
+value row. Cyan indicates focus and amber indicates an open editor. The DMR and FM Memory grids keep
+their mode-specific controls. VFO retains its mode and TX frequency controls.
+The Talk to tile fits the `TG` prefix and seven digits. The picker shortens a long talkgroup name from
+the end to keep the leading ID visible.
+
 | Contents | |
 |---|---|
 | 1, 2 | File layout, screens and the stack |

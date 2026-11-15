@@ -5730,6 +5730,7 @@ static void picker_item(uint16_t i, ui_item_t *it)
 		if (codeplug_contact_find(entry->id, true, &contact))
 			str_copy(target.name, sizeof target.name, contact.name);
 		ui_sb_target(it->label, sizeof it->label, &target);
+		it->flags |= UI_ITEM_PREVIEW;	// keep the leading TG ID when a long contact name needs ellipsis
 		str_copy(it->value, sizeof it->value, entry->timeslot == 2 ? "TS2" : "TS1");
 		return;
 	}
@@ -5739,6 +5740,8 @@ static void picker_item(uint16_t i, ui_item_t *it)
 		return;
 	}
 	ui_sb_target(it->label, sizeof it->label, &picks[i].t);
+	if (picks[i].t.group)
+		it->flags |= UI_ITEM_PREVIEW;
 	sbuf_t b;	// the tag, left out where the target needs the room
 	sb_init(&b, it->value, sizeof it->value);
 	sb_str(&b, TEXT_ALT_OPEN);

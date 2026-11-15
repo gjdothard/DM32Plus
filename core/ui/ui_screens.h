@@ -202,7 +202,7 @@ void ui_draw_banner(const ui_state_t *s);
 #define UI_ITEM_WARN	0x04u
 #define UI_ITEM_EDIT	0x08u	// the row's inline editor is open
 #define UI_ITEM_INFO	0x10u	// a text line, not something to pick (never focused)
-#define UI_ITEM_PREVIEW	0x20u	// the label is the start of a longer text (a message): shortened at its end, not the middle
+#define UI_ITEM_PREVIEW	0x20u	// preserve the start of the label when shortening it
 
 typedef struct {
 	char label[36];

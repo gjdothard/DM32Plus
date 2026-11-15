@@ -3034,7 +3034,7 @@ uint8_t ui_quick_kind(int pos, const radio_view_t *v)
 	};
 	if (pos < 0 || pos >= UI_QUICK_TILES)
 		return QT_POWER;
-	if (CONFIG_DMR_TALKGROUP_ENTRIES && gfx_width() >= 220 && !v->vfo) {
+	if ((board.home_brand || CONFIG_DMR_TALKGROUP_ENTRIES) && gfx_width() >= 220 && !v->vfo) {
 		static const uint8_t wide_fm[UI_QUICK_TILES] = {
 			QT_POWER, QT_ZONE_SCAN, QT_SCAN, QT_SQUELCH, QT_TONE, QT_SPLIT, QT_MONITOR, QT_BANDWIDTH, QT_GPS,
 		};
@@ -3196,8 +3196,11 @@ bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *l
 			sb_u32(&b, v->dmr.target_id, 1);
 		else if (v->dmr.target_id == 0xFFFFFFu)
 			sb_str(&b, TR("All"));
-		else
+		else {
+			if (board.home_brand)
+				sb_str(&b, "TG ");
 			sb_u32(&b, v->dmr.target_id, 1);
+		}
 		return true;
 #endif
 	default:
@@ -3329,8 +3332,70 @@ static void __attribute__((noinline)) draw_quick_tiles(const radio_view_t *v, co
 		ui_draw_hint(TR("0 All settings  Hold OK save"), false);
 }
 
+#if CONFIG_DUAL_WATCH
+static void __attribute__((noinline)) draw_quick_cards(const radio_view_t *v, const ui_state_t *s)
+{
+	const font_t *meta = &font_6x12;
+	const font_t *value_font = ui_layout.small;
+	int width = gfx_width(), top = 57, bottom = ui_layout.hint_y - 4;
+	char label[40], value[16], fit[32];
+	gfx_clear(CARD_INK);
+	card_status(s);
+	gfx_fill(0, 27, width, 24, CARD_SURFACE);
+	const char *title = TR("Quick Controls");
+	gfx_text(value_font, 5, 29, title, ui_col.focus);
+	const char *mode = mode_word(v);
+	gfx_text(meta, width - 5 - gfx_text_width(meta, mode), 33, mode, ui_col.fg);
+	for (int i = 0; i < UI_QUICK_TILES; i++) {
+		int column = i % 3, row = i / 3;
+		int x = width * column / 3, w = width * (column + 1) / 3 - x - (column < 2 ? 4 : 0);
+		int y = top + (bottom - top) * row / 3;
+		int h = top + (bottom - top) * (row + 1) / 3 - y - (row < 2 ? 4 : 0);
+		bool available = ui_quick_tile(i, v, s, label, sizeof label, value, sizeof value);
+		bool focus = i == s->quick_focus, editing = focus && s->quick_edit;
+		color_t edge = editing ? ui_col.warn : focus ? ui_col.focus : CARD_EDGE;
+		color_t fg = available ? ui_col.fg : ui_col.dim;
+		gfx_round_fill(x, y, w, h, edge);
+		gfx_round_fill(x + 1, y + 1, w - 2, h - 2, focus ? CARD_SELECTED : CARD_SURFACE);
+		char key[] = { label[0], 0 };
+		gfx_round_fill(x + 4, y + 4, 12, 13, edge);
+		gfx_text(meta, x + 7, y + 4, key, focus ? CARD_INK : ui_col.fg);
+		const char *tile = !v->vfo && ui_quick_kind(i, v) == QT_SPLIT ? TR("Offset") : label + 1;
+		gfx_text_fit(meta, tile, w - 8, fit, sizeof fit);
+		gfx_text(meta, x + (w - gfx_text_width(meta, fit)) / 2, y + h / 2 - meta->h, fit, fg);
+
+		int value_width = w - (editing ? 22 : 8);
+		const font_t *font = gfx_text_width(value_font, value) <= value_width ? value_font : meta;
+		gfx_text_fit(font, value, value_width, fit, sizeof fit);
+		int value_y = y + h - 5 - value_font->h + (value_font->h - font->h) / 2;
+		gfx_round_fill(x + 4, y + h - 7 - value_font->h, w - 8, value_font->h + 4, CARD_INK);
+		gfx_text(font, x + (w - gfx_text_width(font, fit)) / 2, value_y, fit, fg);
+		if (editing) {
+			gfx_text(meta, x + 5, value_y, "<", edge);
+			gfx_text(meta, x + w - 5 - meta->w, value_y, ">", edge);
+		}
+	}
+	ui_draw_banner(s);
+	const char *hint = quick_split_hint(v, s, label, sizeof label);
+	if (s->toast || hint) {
+		ui_draw_hint(s->toast ? s->toast : hint, s->toast != NULL);
+	} else {
+		const char *keys = TR("0 All settings  Hold OK save");
+		gfx_hline(0, bottom + 2, width, CARD_EDGE);
+		gfx_text_fit(meta, keys, width - 10, fit, sizeof fit);
+		gfx_text(meta, (width - gfx_text_width(meta, fit)) / 2, bottom + 7, fit, ui_col.dim);
+	}
+}
+#endif
+
 void ui_draw_quick(const radio_view_t *v, const ui_state_t *s)
 {
+#if CONFIG_DUAL_WATCH
+	if (card_home_available(s)) {
+		draw_quick_cards(v, s);
+		return;
+	}
+#endif
 	if (gfx_width() < 150)
 		draw_quick_list(v, s);
 	else

@@ -3641,6 +3641,14 @@ msgid "0 All settings  Hold OK save"
 msgstr "0 Tutte impost.  Tieni OK salva"
 
 #: core/ui/ui_screens.c
+msgid "Quick Controls"
+msgstr "Controlli rapidi"
+
+#: core/ui/ui_screens.c
+msgid "Offset"
+msgstr "Scarto"
+
+#: core/ui/ui_screens.c
 msgid "* more  Back"
 msgstr "* altro  Indietro"
 
