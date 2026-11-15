@@ -605,10 +605,12 @@ static void handle_event(const ui_event_t *ev)
 		{
 			// The banner shows two lines of the message: more than the event carries, from the inbox
 			ui_msg_t m;
-			bool got = ui_svc_msg_get(ev->index, &m);
+			bool got = ui_svc_msg_by_token(ev->index, &m) >= 0;
 			banner(UI_BANNER_MESSAGE, false, ev->id, title, got ? m.text : ev->text);
 		}
 		ui_st.banner.msg = ev->index;
+		if (stack[sp].scr == SCR_MESSAGE)
+			update_focus_target();
 		if (ui_st.message_tone)
 			ui_svc_beep(UI_BEEP_MESSAGE);
 		vibrate(UI_VIBE_MESSAGE);
@@ -747,8 +749,12 @@ static void banner_open(void)
 	uint8_t kind = b->kind;
 	uint16_t msg = b->msg;
 	b->kind = UI_BANNER_NONE;
-	if (kind == UI_BANNER_MESSAGE)
-		ui_push(SCR_MESSAGE, msg);
+	if (kind == UI_BANNER_MESSAGE) {
+		if (ui_svc_msg_by_token(msg, NULL) >= 0)
+			ui_push(SCR_MESSAGE, msg);
+		else
+			ui_toast(TR("Message deleted"));
+	}
 #if CONFIG_ZONE_SHARE
 	else if (kind == UI_BANNER_ZONE_OFFER)
 		ui_push(SCR_OFFER, 0);

@@ -67,6 +67,8 @@ static const flow_t flows[] = {
 #endif
 	{ "7 read message, banner up", "msg:3101234,Meet_at_the_north_lot", "ctx", "screen=message", 1, false },
 	{ "7 read message later", "msg:3101234,Meet_at_the_north_lot wait:9000", "ok 2 ok", "screen=message", 3, false },
+	{ "7 opening a message keeps its text when another arrives", "msg:3101234,First_message ctx",
+	  "msg:3105678,New_message wait:9000", "screen=message shows=First_message hides=New_message", 0, false },
 #if CONFIG_ZONE_SHARE
 	// An offer's banner has no timer: it waits for #, BACK or the offer's end (zone-share.md 5.2)
 	{ "zone offer banner still up a minute later", "zoneoffer:3101234", "wait:60000", "shows=Zone_from", 0, false },

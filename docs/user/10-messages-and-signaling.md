@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Messages, Call Alert and Radio Check
 
@@ -27,17 +28,19 @@ Messages.
 
    | Row | Does |
    |---|---|
-   | Reply "OK" | Sends "OK" to the sender |
-   | Reply "On my way" | Sends "On my way" to the sender |
-   | Call | Makes the sender the talk target for now |
+   | Reply "OK" | Sends "OK" to the message's reply target |
+   | Reply "On my way" | Sends "On my way" to the message's reply target |
+   | Call | Temporarily selects the message's reply target for voice |
    | Delete | Deletes the message. There is no undo |
 
-**#** on a message opens the actions for its sender. **PTT** in an open message calls the sender.
+The reply target is the sender for a private message and the destination talkgroup for a group message.
+**#** opens actions for that target. **PTT** calls that target from the open message.
 
 <img src="../ux/screens/160x120i5/messages.png" width="200" alt="Messages">
 <img src="../ux/screens/160x120i5/message_view.png" width="200" alt="A message">
 
-The radio keeps the last 4 messages received, in memory. They are lost when the radio turns off.
+The radio keeps the last 4 messages received, in memory. If an open message drops out of the inbox,
+the screen reports that the message is gone. The inbox is cleared when the radio turns off.
 
 ## Sending a message
 

@@ -141,6 +141,8 @@ void ui_svc_dtmf_block(bool blocked);
 #define UI_MSG_TEXT_MAX	143
 typedef struct {
 	uint32_t src;		// sender (or, for sent ones, recipient)
+	uint32_t dst;
+	uint16_t token;		// stable until this inbox record is removed
 	bool group;		// sent to a talkgroup
 	bool unread;
 	bool sent;		// one we sent
@@ -151,8 +153,9 @@ typedef struct {
 uint16_t ui_svc_msg_count(void);		// inbox, newest first
 uint16_t ui_svc_msg_unread(void);
 bool ui_svc_msg_get(uint16_t i, ui_msg_t *out);
-void ui_svc_msg_read(uint16_t i);		// mark read
-bool ui_svc_msg_delete(uint16_t i);
+int ui_svc_msg_by_token(uint16_t token, ui_msg_t *out);	// current list index, -1 when absent
+void ui_svc_msg_read(uint16_t token);
+bool ui_svc_msg_delete(uint16_t token);
 // Queue a text message; the result comes back as a ui_notify() event
 bool ui_svc_msg_send(uint32_t dst, bool group, const char *text);
 bool ui_svc_radio_check(uint32_t id);
@@ -342,7 +345,7 @@ int32_t ui_svc_reply_shown(const radio_settings_t *s);
 
 // --- Inbound: events other packages hand to the UI (any task; the UI picks them up on its next pass) ---
 typedef enum {
-	UI_EV_MESSAGE,		// a message arrived: index (inbox), id, name, text
+	UI_EV_MESSAGE,		// a message arrived: index holds the inbox token, plus id, name, text
 	UI_EV_MESSAGE_SENT,	// ok = delivered (confirmed; index 1: sent, the format or a group has no confirmation) /
 				// failed after retries
 	UI_EV_CALL_ALERT,	// call alert received from id

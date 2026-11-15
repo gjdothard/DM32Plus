@@ -64,6 +64,7 @@ WEAK void ui_svc_apply(uint8_t id, int32_t value) { (void)id; (void)value; }
 WEAK uint16_t ui_svc_msg_count(void) { return 0; }
 WEAK uint16_t ui_svc_msg_unread(void) { return 0; }
 WEAK bool ui_svc_msg_get(uint16_t i, ui_msg_t *out) { (void)i; (void)out; return false; }
+WEAK int ui_svc_msg_by_token(uint16_t token, ui_msg_t *out) { (void)token; (void)out; return -1; }
 WEAK void ui_svc_msg_read(uint16_t i) { (void)i; }
 WEAK bool ui_svc_msg_delete(uint16_t i) { (void)i; return false; }
 WEAK bool ui_svc_msg_send(uint32_t dst, bool group, const char *text) { (void)dst; (void)group; (void)text; return false; }

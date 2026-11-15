@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 # Baofeng DM-32UV hardware
 
 This page covers what is needed to bring up the DM-32UV: SoC, memory, peripherals, pins, RF chip, audio, flash,
@@ -973,6 +974,22 @@ For the USB audio design ([usb-audio.md](usb-audio.md) 2). Not measured.
 
 The vendor CPS protocol on UART0 (115200) is a raw 24-bit window on this flash: `52 addr3 len2` reads, `57 addr3 00 10
 <4096 bytes>` writes, entered with `PSEARCH` / `PASSSTA` / `SYSINFO` and `FF FF FF FF 0C "PROGRAM"`. The full command set of the radio's programming task is in [dm32-stock-cps.md](dm32-stock-cps.md).
+
+### Conversation storage candidate
+
+The board map leaves five 4 KiB sectors from `0x71B000` through `0x71FFFF` between the settings-sector journal
+and the open-firmware flash image. This 20 KiB gap lies outside the open-firmware CPS write windows. It is the
+first candidate for an opt-in message journal. Four data sectors and one spare sector would hold about 80
+192-byte records before allowing for deletion records or other journal overhead. Verify ownership and
+backup and restore behavior on the radio before any erase. The CPS installer and stock rollback
+write the application in internal flash. A full SPI backup can capture the gap, but the existing
+codeplug restore does not restore it. The original firmware may write there after rollback.
+
+The larger window at `0x720000–0xEFFFFF` is addressable by the CPS and includes codeplug data, voice prompts,
+and capacity for the DMR ID database. Allocating more space there would require explicitly reducing the
+database or CPS window and enforcing the revised boundary in the firmware and tools. The native codeplug
+and AES journal already occupy the defined allocation at the top of flash. Program-flash headroom is for firmware
+growth because the updater erases the application region.
 
 ---
 

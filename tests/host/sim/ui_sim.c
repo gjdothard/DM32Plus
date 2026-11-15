@@ -1677,10 +1677,27 @@ bool ui_svc_msg_get(uint16_t i, ui_msg_t *out)
 	out->age_ms = now_ms - inbox[i].at;
 	return true;
 }
-void ui_svc_msg_read(uint16_t i) { if (i < n_inbox) inbox[i].m.unread = false; }
-bool ui_svc_msg_delete(uint16_t i)
+int ui_svc_msg_by_token(uint16_t token, ui_msg_t *out)
 {
-	if (i >= n_inbox)
+	for (uint16_t i = 0; i < n_inbox; i++) {
+		if (inbox[i].m.token == token) {
+			if (out != NULL)
+				ui_svc_msg_get(i, out);
+			return i;
+		}
+	}
+	return -1;
+}
+void ui_svc_msg_read(uint16_t token)
+{
+	int i = ui_svc_msg_by_token(token, NULL);
+	if (i >= 0)
+		inbox[i].m.unread = false;
+}
+bool ui_svc_msg_delete(uint16_t token)
+{
+	int i = ui_svc_msg_by_token(token, NULL);
+	if (i < 0)
 		return false;
 	memmove(&inbox[i], &inbox[i + 1], (n_inbox - i - 1u) * sizeof inbox[0]);
 	n_inbox--;
@@ -1784,12 +1801,16 @@ uint8_t ui_svc_crash_tx_state(void)
 
 static void add_message(uint32_t src, const char *text)
 {
+	static uint16_t next_token;
 	if (n_inbox == 8)
 		n_inbox--;
 	memmove(&inbox[1], &inbox[0], n_inbox * sizeof inbox[0]);
 	n_inbox++;
 	memset(&inbox[0], 0, sizeof inbox[0]);
 	inbox[0].m.src = src;
+	if (++next_token == 0)
+		++next_token;
+	inbox[0].m.token = next_token;
 	inbox[0].m.unread = true;
 	inbox[0].at = now_ms;
 	strcpy(inbox[0].m.name, contact_name(src, false));
@@ -1798,7 +1819,7 @@ static void add_message(uint32_t src, const char *text)
 	memset(&ev, 0, sizeof ev);
 	ev.kind = UI_EV_MESSAGE;
 	ev.id = src;
-	ev.index = 0;
+	ev.index = inbox[0].m.token;
 	strcpy(ev.name, inbox[0].m.name);
 	strncpy(ev.text, text, sizeof ev.text - 1);
 	ui_notify(&ev);

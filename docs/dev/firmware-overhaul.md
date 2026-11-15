@@ -13,7 +13,8 @@ path while consolidating the radio UI and aligning it with the CPS.
 |---|---|---|
 | Shared card header for Home, Quick Controls, Main Menu, and directory screens | Complete | Ten screenshots match the baseline byte for byte. Color and monochrome UI flows, the target build, and the static task-stack check passed |
 | Shared list and selection behavior | Complete | All ten reference renders match. Color and monochrome UI flows, the target build, and the static task-stack check passed |
-| Remaining screen designs | Pending | Start with Messages and identify which conversation behaviors the current message store supports |
+| Stable message selection | Complete | Color and monochrome UI flows, three DMR service configurations, the target build, and the static task-stack check passed. Ten reference renders match |
+| Conversation storage and Messages redesign | Pending | See the flash audit below |
 | CPS and codeplug changes | Pending | Inventory existing records and test compatibility before adding persisted data such as Favorites |
 
 The first slice is in [the screen renderer](../../core/ui/ui_screens.c). It factors out status and title
@@ -33,17 +34,21 @@ List pages use the same item initialization for initial focus, scrolling, and nu
 Keep the existing screenshots as the baseline for refactors and document intended visual changes
 when a screen design changes.
 
-## Next slice: Messages
+## Next slice: conversation storage
 
-The [DMR data service](../../core/dmr/dmrDataService.h) keeps a four-entry volatile inbox with sender,
-destination, and receive time. The [UI adapter](../../core/ui/ui_svc_data.c) currently exposes the
-sender and unread state. It receives send-result events, and the message list is populated from
-received records. Opening a message uses its newest-first list index, which can shift when a new
-message arrives.
+The [DMR data service](../../core/dmr/dmrDataService.h) gives each record in its four-entry RAM inbox
+a session-local token. The [UI adapter](../../core/ui/ui_svc_data.c) resolves the token for the
+banner and open message. Private replies target the sender, and group replies target the destination
+talkgroup.
 
-Start by exposing the destination and choosing a message identity that survives inbox insertions.
-Group private messages by sender and group messages by destination talkgroup. Check read, delete,
-and reply with an intervening arrival before building the conversation screen. Outgoing history
-and durable conversations need a separately verified storage design.
+The target build reports 16 bytes of headroom in its primary RAM region. Reuse existing
+storage-path buffers and account for stack and RAM costs before enabling a journal on a board.
+
+The hardware flash audit identifies a 20 KiB candidate outside the active application allocations.
+Follow the conversation storage section of the board's hardware reference before allocating it.
+First confirm ownership across install, update, restore, and rollback. Then prototype a journal
+over the board storage interface with a feature switch, power-loss and rollover tests, and a
+separate spare erase sector. Use durable record IDs for conversation history and group entries by
+private peer or destination talkgroup. Capture outgoing messages with their send status.
 
 For test commands and screenshots, see [Testing](testing.md) and the [UI specification](../spec/ui.md).

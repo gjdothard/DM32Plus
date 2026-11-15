@@ -701,25 +701,32 @@ static void msgs_item(uint16_t i, ui_item_t *it)
 static void msgs_select(uint16_t i, bool hold)
 {
 	(void)hold;
-	ui_push(SCR_MESSAGE, i);
+	ui_msg_t m;
+	if (ui_svc_msg_get(i, &m))
+		ui_push(SCR_MESSAGE, m.token);
 }
 
-static void msg_target_of(uint16_t i, ui_target_t *t)
+static void msg_target_from(const ui_msg_t *m, ui_target_t *t)
 {
-	ui_msg_t m;
 	memset(t, 0, sizeof *t);
-	if (ui_svc_msg_get(i, &m)) {
-		t->id = m.src;
-		strcpy(t->name, m.name);
-		t->saved = m.name[0] != 0;
+	t->group = m->group;
+	t->id = m->group && !m->sent ? m->dst : m->src;
+	if (t->group) {
+		t->saved = ui_contact_name(t->id, true, t->name);
+	} else {
+		strcpy(t->name, m->name);
+		t->saved = m->name[0] != 0;
 	}
 }
 
 static void msgs_context(uint16_t i)
 {
+	ui_msg_t m;
 	ui_target_t t;
-	msg_target_of(i, &t);
-	ui_open_actions(&t);
+	if (ui_svc_msg_get(i, &m)) {
+		msg_target_from(&m, &t);
+		ui_open_actions(&t);
+	}
 }
 
 static const ui_scr_def_t messages_screen = {
@@ -748,10 +755,32 @@ static void msg_item(uint16_t i, ui_item_t *it)
 		it->flags |= UI_ITEM_DIM;
 }
 
+static bool msg_target(uint16_t i, ui_target_t *t)
+{
+	(void)i;
+	ui_msg_t m;
+	if (ui_svc_msg_by_token(ui_frame()->arg, &m) < 0)
+		return false;
+	msg_target_from(&m, t);
+	return t->id != 0;
+}
+
+static void msg_context(uint16_t i)
+{
+	ui_target_t t;
+	if (msg_target(i, &t))
+		ui_open_actions(&t);
+	else
+		ui_toast(TR("Message deleted"));
+}
+
 static void msg_select(uint16_t i, bool hold)
 {
 	(void)hold;
-	msg_target_of(ui_frame()->arg, &ui_target);
+	if (i != MV_DELETE && !msg_target(i, &ui_target)) {
+		ui_toast(TR("Message deleted"));
+		return;
+	}
 	switch (i) {
 	case MV_REPLY_OK:
 	case MV_REPLY_WAY:
@@ -773,19 +802,15 @@ static void msg_select(uint16_t i, bool hold)
 	}
 }
 
-static bool msg_target(uint16_t i, ui_target_t *t)
-{
-	(void)i;
-	msg_target_of(ui_frame()->arg, t);
-	return t->id != 0;
-}
-
 static const char *msg_title(void)
 {
 	static char t[24];
+	int i = ui_svc_msg_by_token(ui_frame()->arg, NULL);
+	if (i < 0)
+		return NULL;
 	sbuf_t b;
 	sb_init(&b, t, sizeof t);
-	sb_u32(&b, ui_frame()->arg + 1u, 1);
+	sb_u32(&b, (uint32_t)i + 1u, 1);
 	sb_str(&b, TR(" of "));
 	sb_u32(&b, ui_svc_msg_count(), 1);
 	return t;
@@ -795,7 +820,7 @@ static const char *msg_body(void)
 {
 	static char t[UI_MSG_TEXT_MAX + 48];
 	ui_msg_t m;
-	if (!ui_svc_msg_get(ui_frame()->arg, &m))
+	if (ui_svc_msg_by_token(ui_frame()->arg, &m) < 0)
 		return TR("Message deleted");
 	// "From Joe Smith, 2m ago" (the ID where there is no name; # gives the station's actions), then the text
 	sbuf_t b;
@@ -814,7 +839,7 @@ static const char *msg_body(void)
 
 static const ui_scr_def_t message_screen = {
 	.name = "message", .flags = SF_LIST | SF_FIELD, .prefix = TRN("Message"), .hint = TRN("OK choose  # more  Back"),
-	.count = msg_count, .item = msg_item, .select = msg_select, .context = msgs_context, .target = msg_target,
+	.count = msg_count, .item = msg_item, .select = msg_select, .context = msg_context, .target = msg_target,
 	.title = msg_title, .body = msg_body, .enter = msg_enter,
 };
 

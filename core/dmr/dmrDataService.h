@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 /*
  * DMR data service: text messages (ETSI IP text, ETSI defined short data and, with CONFIG_DMR_TMS, Motorola TMS)
  * with their ACKs, ETSI responses to
@@ -29,6 +30,7 @@ typedef struct
 	uint32_t src;
 	uint32_t dst;
 	uint32_t receivedAt;					// the service's clock (ms)
+	uint16_t token;						// nonzero, stable while a message is in the inbox
 	bool     group;
 	uint8_t  seq;							// TMS sequence number, to spot a sender's retries
 	bool     unread;						// not shown on the radio yet
@@ -104,6 +106,7 @@ typedef struct
 {
 	uint32_t serial;						// bumped with every event
 	uint8_t  kind;							// dmrDataEventKind_t
+	uint16_t message_token;					// SMS_RECEIVED only
 	uint32_t id;
 	uint32_t atMs;
 } dmrDataEvent_t;

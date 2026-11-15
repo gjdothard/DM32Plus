@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The ui_svc.h calls for text messages, call alert and radio check, on the DMR data service's API
 // (core/dmr/dmr_data_api.h, safe from any task). Its events are polled (dmr_data_serial) and handed to the UI as
 // ui_notify events, which become banners. Built only with the data core; otherwise the weak stubs stay.
@@ -42,30 +43,43 @@ uint16_t ui_svc_msg_unread(void)
 	return (uint16_t)(n < 0 ? 0 : n);
 }
 
-bool ui_svc_msg_get(uint16_t i, ui_msg_t *out)
+static int msg_lookup(uint16_t key, bool stable, ui_msg_t *out)
 {
 	static dmrDataMessage_t m;	// too big for the UI task's stack
-	if (!sms_inbox_get(i, &m))
-		return false;
+	int i = stable ? sms_inbox_get_token(key, out ? &m : NULL) : sms_inbox_get(key, &m) ? key : -1;
+	if (i < 0 || out == NULL)
+		return i;
 	memset(out, 0, sizeof *out);
 	out->src = m.src;
+	out->dst = m.dst;
+	out->token = m.token;
 	out->group = m.group;
 	out->unread = m.unread;
 	out->age_ms = hal_millis() - m.receivedAt;
 	contact_name(m.src, false, out->name, sizeof out->name);
 	strncpy(out->text, m.text, UI_MSG_TEXT_MAX);
 	out->text[UI_MSG_TEXT_MAX] = 0;
-	return true;
+	return i;
 }
 
-void ui_svc_msg_read(uint16_t i)
+bool ui_svc_msg_get(uint16_t i, ui_msg_t *out)
 {
-	sms_inbox_mark_read(i);
+	return msg_lookup(i, false, out) >= 0;
 }
 
-bool ui_svc_msg_delete(uint16_t i)
+int ui_svc_msg_by_token(uint16_t token, ui_msg_t *out)
 {
-	return sms_inbox_delete(i);
+	return msg_lookup(token, true, out);
+}
+
+void ui_svc_msg_read(uint16_t token)
+{
+	sms_inbox_mark_read_token(token);
+}
+
+bool ui_svc_msg_delete(uint16_t token)
+{
+	return sms_inbox_delete_token(token);
 }
 
 bool ui_svc_msg_send(uint32_t dst, bool group, const char *text)
@@ -123,8 +137,8 @@ void ui_svc_poll(void)
 	case DMR_DATA_EV_SMS_RECEIVED: {
 		ui_msg_t m;
 		ev.kind = UI_EV_MESSAGE;
-		ev.index = 0;	// the newest
-		if (ui_svc_msg_get(0, &m)) {
+		ev.index = d.message_token;
+		if (ui_svc_msg_by_token(ev.index, &m) >= 0) {
 			strncpy(ev.text, m.text, sizeof ev.text - 1);
 		}
 		break;

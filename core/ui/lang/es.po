@@ -160,6 +160,10 @@ msgstr " canales, solo RX"
 msgid "Zone not imported"
 msgstr "Zona no importada"
 
+#: core/ui/ui_app.c core/ui/ui_menus.c
+msgid "Message deleted"
+msgstr "Mensaje borrado"
+
 #: core/ui/ui_app.c
 msgid "Bands: "
 msgstr "Bandas: "
@@ -1327,10 +1331,6 @@ msgstr "Llamar"
 #: core/ui/ui_menus.c
 msgid "Delete"
 msgstr "Borrar"
-
-#: core/ui/ui_menus.c
-msgid "Message deleted"
-msgstr "Mensaje borrado"
 
 #: core/ui/ui_menus.c
 msgid "Couldn't delete: try again"

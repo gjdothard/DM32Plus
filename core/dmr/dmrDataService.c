@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 /*
  * DMR data service, see dmrDataService.h. Single task (the host's, the radio task in the firmware), except the
  * dmr_data_api.h calls at the end, which only touch the mailbox and copies under the lock.
@@ -229,12 +230,14 @@ static bool arsQueryReceived = false;
 DMR_DATA_BUFFER static dmrDataMessage_t inbox[DMR_DATA_INBOX_SIZE];
 static uint8_t inboxNewest = 0;
 static uint8_t inboxUsed = 0;
+static uint16_t inboxToken;
 
-static void post(uint8_t kind, uint32_t id)
+static void post_message(uint8_t kind, uint32_t id, uint16_t token)
 {
 	lock();
 	lastEvent.serial++;
 	lastEvent.kind = kind;
+	lastEvent.message_token = token;
 	lastEvent.id = id;
 	lastEvent.atMs = now;
 	dataSerial++;
@@ -244,6 +247,11 @@ static void post(uint8_t kind, uint32_t id)
 	{
 		env.notify(&copy, env.ctx);
 	}
+}
+
+static void post(uint8_t kind, uint32_t id)
+{
+	post_message(kind, id, 0);
 }
 
 static bool canTransmit(void)
@@ -2482,6 +2490,10 @@ static void handlePacket(const dmrDataPacket_t *packet)
 	lock();
 	uint8_t next = (inboxUsed == 0) ? 0 : ((inboxNewest + 1) % DMR_DATA_INBOX_SIZE);// replaces the oldest when full
 	dmrDataMessage_t *message = &inbox[next];
+	if (++inboxToken == 0)
+		++inboxToken;
+	message->token = inboxToken;
+	uint16_t token = message->token;
 	message->src = packet->src;
 	message->dst = packet->dst;
 	message->group = packet->group;
@@ -2499,7 +2511,7 @@ static void handlePacket(const dmrDataPacket_t *packet)
 	stats.smsReceived++;
 	stats.etsiSmsReceived += (format == DMR_SMS_FORMAT_ETSI) ? 1 : 0;
 	stats.ipTextReceived += (format == DMR_SMS_FORMAT_ETSI_IP) ? 1 : 0;
-	post(DMR_DATA_EV_SMS_RECEIVED, packet->src);
+	post_message(DMR_DATA_EV_SMS_RECEIVED, packet->src, token);
 }
 
 static uint32_t getId(const uint8_t *p)
@@ -2845,9 +2857,26 @@ bool sms_inbox_get(int i, dmrDataMessage_t *out)
 	return m != NULL;
 }
 
-void sms_inbox_mark_read(int i)
+static int inbox_find_locked(uint16_t token)
+{
+	for (int i = 0; token != 0 && i < inboxUsed; i++)
+		if (dmrDataServiceMessage(i)->token == token)
+			return i;
+	return -1;
+}
+
+int sms_inbox_get_token(uint16_t token, dmrDataMessage_t *out)
 {
 	lock();
+	int i = inbox_find_locked(token);
+	if (i >= 0 && out != NULL)
+		*out = *dmrDataServiceMessage(i);
+	unlock();
+	return i;
+}
+
+static void inbox_mark_read_locked(int i)
+{
 	dmrDataMessage_t *m = (dmrDataMessage_t *)dmrDataServiceMessage(i);
 
 	if ((m != NULL) && m->unread)
@@ -2855,14 +2884,25 @@ void sms_inbox_mark_read(int i)
 		m->unread = false;
 		dataSerial++;
 	}
+}
+
+void sms_inbox_mark_read(int i)
+{
+	lock();
+	inbox_mark_read_locked(i);
 	unlock();
 }
 
-bool sms_inbox_delete(int i)
+void sms_inbox_mark_read_token(uint16_t token)
+{
+	lock();
+	inbox_mark_read_locked(inbox_find_locked(token));
+	unlock();
+}
+
+static bool inbox_delete_locked(int i)
 {
 	bool ok = false;
-
-	lock();
 	if ((i >= 0) && (i < inboxUsed))
 	{
 		// Logical index k is inbox[(newest - k) mod N]: each older message moves one place towards the newest, the
@@ -2876,6 +2916,21 @@ bool sms_inbox_delete(int i)
 		dataSerial++;
 		ok = true;
 	}
+	return ok;
+}
+
+bool sms_inbox_delete(int i)
+{
+	lock();
+	bool ok = inbox_delete_locked(i);
+	unlock();
+	return ok;
+}
+
+bool sms_inbox_delete_token(uint16_t token)
+{
+	lock();
+	bool ok = inbox_delete_locked(inbox_find_locked(token));
 	unlock();
 	return ok;
 }

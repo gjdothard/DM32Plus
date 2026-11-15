@@ -632,7 +632,9 @@ HIL: `tests/hil/test_ui.py` (`tests/hil/README.md`) replays the main sequences o
 - Switching USB to network has no confirmation (P7: reversible); the info page says what stops and how to get back.
 - A failed message isn't kept for a retry: the banner says "Not delivered: send it again".
 - Compose offers canned texts ("OK", "On my way", "Call me", "Can't talk now"), sent in the language in use (2.5). Write... opens the keypad editor for a custom message.
-- Deleting a message has no undo (`sms_inbox_delete` removes it from the RAM inbox).
+- The open message follows its inbox token across new arrivals. If the record is evicted, the
+  view reports that it is gone. Deleting a message removes that token from the RAM inbox.
+- Reply and call target the sender of a private message or the destination talkgroup of a group message.
 - Save to channel and the permanent talk target write the codeplug as a storage job on the housekeeping task, so the
   UI no longer stalls for the flash write. A permanent target must be a stored contact: a typed ID is set for now at
   once and the job then says "Not a stored contact: for now only".

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 /*
  * Host unit test for the DMR data service (core/dmr/dmrDataService.c): the reply queue and retried message handling,
@@ -886,14 +887,19 @@ static void testOurSms(void)
 	// goes in front of the rest
 	reset();
 	static const char *const texts[] = { "m0", "m1", "m2", "m3", "m4" };
+	uint16_t opened = 0;
 	for (int i = 0; i < 5; i++)
 	{
 		receiveTMS(RADIO_A, texts[i], (uint8_t)(40 + i));
 		runMainTask(500);
+		if (i == 3)
+			opened = dmr_data_last_event().message_token;
 	}
 	CHECK(sms_inbox_count() == DMR_DATA_INBOX_SIZE);	// m4 m3 m2 m1 (m0 dropped)
+	CHECK(opened != 0 && sms_inbox_get_token(opened, &m) == 1 && strcmp(m.text, "m3") == 0);
 	serial = dmr_data_serial();
-	CHECK(sms_inbox_delete(1));				// m3
+	CHECK(sms_inbox_delete_token(opened));			// m3, which moved after the next arrival
+	CHECK(sms_inbox_get_token(opened, NULL) < 0 && !sms_inbox_delete_token(opened));
 	CHECK(dmr_data_serial() != serial);
 	CHECK(sms_inbox_count() == 3);
 	const char *const after[] = { "m4", "m2", "m1" };
