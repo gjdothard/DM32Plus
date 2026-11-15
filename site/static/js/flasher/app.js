@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The web flasher: a step-by-step page over the modules beside it. Three tasks:
 //
 //   update    a radio that runs RadioFoundry: connect once, keep its build (or edit it), write the current release
@@ -23,6 +24,7 @@ import * as stockfw from "./stockfw.js";
 import { openVendorFile, describe as describeVendorFile, analysisCandidate, offerFile, logId, whyNot } from "./vendorfile.js";
 import { pickProblem, errorProblem, vendorContext, supportedFiles, foldSupported, keepNote, nowFor, nowChoice, OFFER } from "./explain.js";
 import { confirmNoCodec } from "./nocodec.js";
+import { PRODUCT, bundledRelease, loadBundledRelease, supportsBundledFirmware } from "./dm32plus-release.js";
 import { makePlan, KEEP, MERGE } from "./plan.js";
 import { radioPicture, holdKeys } from "./radiotop.js";
 import { validRef, refShort, defaultRef, firmwareName, betaLink } from "./version.js";
@@ -211,7 +213,7 @@ async function api(method, path, body) {
 // from the radio. problem (explain.js): what went wrong; for a fault in the page its message goes with the user's note.
 // Not offered in a simulation
 function analysisOffer(cand, boardId, problem = null) {
-	if (!cand || S.sim) return null;
+	if (!cand || S.sim || bundledMode()) return null;
 	const internal = problem?.problem === "internal";
 	const dump = problem?.problem === "dump";
 	const status = h("p", { class: "small" });
@@ -292,7 +294,7 @@ async function noAnswer(link, { written = null } = {}) {
 }
 
 // One id per use: the custom build requests and the write that follows share it; each write ends the use
-const useId = () => (FLASH_LOG && !S.sim ? (S.useId ||= crypto.randomUUID()) : undefined);
+const useId = () => (FLASH_LOG && !bundledMode() && !S.sim ? (S.useId ||= crypto.randomUUID()) : undefined);
 // The browser's language preferences, for the flash log only (the backend keeps at most 10 tags of 35 characters)
 const browserLanguages = () => (navigator.languages?.length ? [...navigator.languages].slice(0, 5) : (navigator.language ? [navigator.language] : []));
 
@@ -388,10 +390,14 @@ async function loadData() {
 }
 
 const fb = () => (S.sim ? S.sim.fb : S.data.fb);
+const bundledMode = () => S.data?.site.firmware_product === PRODUCT;
+const releaseForRadio = () => bundledRelease(S.data.releases, S.radio.id);
 // Every image comes from the build service, so a radio needs only a backend the page has for it (backends.js)
 // In the practice mode only the simulated radio: S.sim (its key, stock file, fake radio) is that radio's, and another
 // one picked on the radio step met a missing stock file at the codec step (OPENDIGITALRADIO-22)
-const available = (r, task) => (!S.sim?.radio || r.id === S.sim.radio) && backendOf(r).available(r, fb(), task);
+const available = (r, task) => (!S.sim?.radio || r.id === S.sim.radio) &&
+	(!bundledMode() || !["install", "update"].includes(task) || supportsBundledFirmware(r.id)) &&
+	backendOf(r).available(r, fb(), task);
 
 // The STM32 radios: stock firmware is reached through the AnyRoad bootloader (dfu.js), which takes
 // the key from the stock file; a radio running RadioFoundry with stub entry also updates and backs up through the STM32F4
@@ -815,7 +821,7 @@ function simLinks() {
 // update: a radio that runs RadioFoundry, reached once, its build kept
 
 // The newest release of the radio (or the version link's): what the update installs
-const updateVersion = () => VERSION_REF ? versionShort()
+const updateVersion = () => bundledMode() ? (releaseForRadio()?.version ?? PRODUCT) : VERSION_REF ? versionShort()
 	: S.data.releases.filter((x) => x.board === S.radio.id).at(-1)?.version || defaultRef(S.data.site.branch);
 
 // One port chooser for every radio: RadioFoundry's USB port or a programming cable. Whatever answers names the radio, and
@@ -839,6 +845,7 @@ async function connectForUpdate(status) {
 		if (!p) throw await noAnswer(link);
 		r = S.data.radios.find((x) => S.data.fb.boards[x.flash.board]?.debuglink_names.includes(p.board));
 		if (!r) throw new Error(t("flash.err.unknown_board", { board: p.board }));
+		if (bundledMode() && !supportsBundledFirmware(r.id)) throw new Error(t("flash.dm32plus.board_only"));
 	} catch (e) {
 		// the port isn't S.link's or the cable session's yet, so dropSerial and dropC7 can't close it: the next Connect
 		// would find it open
@@ -863,7 +870,7 @@ async function connectForUpdate(status) {
 	S.decided = {};
 	planUpdate(S.current, S.selection, S.decided);
 	// a build the radio doesn't say: the build step, starting from the closest variant
-	S.editBuild = S.current.kind === "unknown";
+	S.editBuild = !bundledMode() && S.current.kind === "unknown";
 	diag.note("update: radio", { board: p.board, git: p.git, build: S.current.kind, preset: S.current.preset || S.current.guess || null });
 }
 
@@ -894,7 +901,8 @@ function updateView() {
 		}
 		const p = S.now.probe, cur = S.current;
 		// the radio's own build, unless the build step has the selection (edits kept when the user comes back)
-		const plan = S.editBuild ? { preset: S.selection.matches(startCode), added: [], ask: [], ready: true } : planUpdate(cur, S.selection, S.decided);
+		const bundled = bundledMode();
+		const plan = bundled || S.editBuild ? { preset: bundled ? "full" : S.selection.matches(startCode), added: [], ask: [], ready: true } : planUpdate(cur, S.selection, S.decided);
 		// an image built for another selection no longer applies
 		if (S.firmware?.selection && S.firmware.selection !== selectionKey(S.selection)) S.firmware = null;
 		const vtitle = (id) => (t(`variant.${id}.title`) !== `variant.${id}.title` ? t(`variant.${id}.title`) : S.data.variants.find((v) => v.id === id)?.title || id);
@@ -925,8 +933,8 @@ function updateView() {
 			h("dl", { class: "kv-list" },
 				h("dt", {}, t("flash.update.radio")), h("dd", {}, S.radio.name),
 				h("dt", {}, t("flash.update.version")), h("dd", {}, t("flash.update.from_to", { from: firmwareName(p.version), to: updateVersion() })),
-				h("dt", {}, t("flash.update.build")), h("dd", {}, buildText, " ", cur.kind === "unknown" ? null : edit)),
-			cur.kind === "unknown" ? notice(t("flash.update.unknown_text", { variant: vtitle(cur.guess) }), "info") : null,
+				h("dt", {}, t("flash.update.build")), h("dd", {}, bundled ? PRODUCT : buildText, " ", bundled || cur.kind === "unknown" ? null : edit)),
+			bundled ? notice(t("flash.dm32plus.bundled"), "info") : cur.kind === "unknown" ? notice(t("flash.update.unknown_text", { variant: vtitle(cur.guess) }), "info") : null,
 			S.editBuild ? null : asks, S.editBuild ? null : added, backup, backupPanel, image, status));
 		const busy = building && !S.build.error;
 		const go = async () => {
@@ -964,6 +972,8 @@ function radioView() {
 			if (!p) throw await noAnswer(link);
 			const r = S.data.radios.find((x) => S.data.fb.boards[x.flash.board]?.debuglink_names.includes(p.board));
 			if (!r) throw new Error(t("flash.err.unknown_board", { board: p.board }));
+			if (bundledMode() && S.task === "install" && !supportsBundledFirmware(r.id))
+				throw new Error(t("flash.dm32plus.board_only"));
 			selectRadio(r);
 			optionsFromProbe(p);
 			S.now = await rfoundryNow(link, p);
@@ -1006,6 +1016,7 @@ function selectRadio(r) {
 // install: the build (variant, a la carte)
 
 function buildView() {
+	if (bundledMode() && !S.sim) return bundledBuildView();
 	const sel = S.selection;
 	const wrap = h("div", { class: "flasher" });
 	const vtitle = (v) => (t(`variant.${v.id}.title`) !== `variant.${v.id}.title` ? t(`variant.${v.id}.title`) : v.title);
@@ -1185,6 +1196,23 @@ function buildView() {
 	return wrap;
 }
 
+function bundledBuildView() {
+	const out = h("div", { class: "flasher" });
+	const draw = () => {
+		const release = releaseForRadio();
+		const busy = S.build && !S.build.error;
+		out.replaceChildren(panel(t("flash.build.title"), h("p", {}, t("flash.dm32plus.bundled")),
+			release ? h("p", {}, `${PRODUCT} ${release.version} · ${S.radio.name}`) : notice(t("flash.build.no_image"), "bad"),
+			S.build?.error ? buildErrorNotice(S.build.error) : busy ? h("p", { role: "status" }, spinner(), S.build.text) : null));
+		S.forward(button(t("flash.dm32plus.continue"), async () => {
+			if (!S.firmware) await requestBuild(draw);
+			if (S.firmware) next();
+		}, { primary: true, disabled: !release || !!busy }));
+	};
+	draw();
+	return out;
+}
+
 // Escape closes the open ⓘ bubble (on the document: a redraw can leave the focus on the body)
 let tipEscape = () => {};
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") tipEscape(); });
@@ -1250,6 +1278,15 @@ async function requestBuild(redraw) {
 	S.build = { selection: key, text: t("flash.build.sending") };
 	redraw();
 	try {
+		if (bundledMode()) {
+			const firmware = await loadBundledRelease(releaseForRadio(), ROOT, fb());
+			if (current()) {
+				S.firmware = firmware;
+				S.build = null;
+				redraw();
+			}
+			return;
+		}
 		const rels = S.data.releases.filter((x) => x.board === S.radio.id);
 		if (VERSION_REF && !validRef(VERSION_REF)) throw new Error(t("flash.version.bad", { ref: VERSION_REF }));
 		const id = useId();
@@ -2745,7 +2782,6 @@ function kitView(api) {
 
 async function main() {
 	showBetaNotice();	// before the data loads: the first thing a visitor reads, once per session
-	initReporting({ tool: "flasher", context: reportContext, attachments: reportAttachments, backend: { api: API, meta: reportMeta, practice: () => !!S.sim || SIM_HASH.test(location.hash) } });
 	if (!FLASH_LOG) document.getElementById("flash-log-off")?.replaceWith(t("flash.log.is_off"));
 	// the privacy contact is put together here, so address scrapers don't find it in the page or the repository
 	const mail = ["tseuqer-ycavirp-rdo", "moc.relwofrecneps"].map((x) => [...x].reverse().join("")).join("@");
@@ -2758,6 +2794,9 @@ async function main() {
 		app.replaceChildren(notice(t("flash.err.load"), "bad"), reportLine());
 		return;
 	}
+	if (!bundledMode())
+		initReporting({ tool: "flasher", context: reportContext, attachments: reportAttachments,
+			backend: { api: API, meta: reportMeta, practice: () => !!S.sim || SIM_HASH.test(location.hash) } });
 	c7ui.init({ S, next, render, reset, helpLink, manualKitLine, fb, flashStarted, flashFinished, flashMark, noteReadout, errorText, analysisOffer, problemNotice, failureNotice, useAdapter,
 		stubJson: () => fetch(`${ROOT}data/c7000-stub.json`).then((r) => r.json()) });
 	// #sim=<board>[-stock|-romfail|-slowcable|-openfw|-openfw-nocodec]: that board, running RadioFoundry, its stock firmware or another

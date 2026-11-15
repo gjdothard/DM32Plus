@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """Builds the RadioFoundry web site from the repository (docs/dev/website.md).
 
     python3 site/build.py                         build/site/
@@ -22,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from rfoundrysite import repo  # noqa: E402
 
-DEFAULT_REPO = "https://github.com/radiofoundry/radiofoundry"
+DEFAULT_REPO = "https://github.com/gjdothard/DM32Plus"
 
 
 def main(argv=None):

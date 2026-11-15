@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """Everything the site shows, read from the repository: radios (the board registry, tools/boards.py), feature
 switches, variants, the UI gallery, the flash layouts rfoundry uses. Nothing here is hand-copied into the site; when
 a source changes, the next build shows it (docs/dev/website.md "Sources").
@@ -399,7 +400,8 @@ def releases(dist):
 	out = []
 	if not dist:
 		return out
-	for p in sorted(glob.glob(os.path.join(dist, "**", "rfoundry-*.json"), recursive=True)):
+	for p in sorted(p for prefix in ("rfoundry", "dm32plus")
+			for p in glob.glob(os.path.join(dist, "**", prefix + "-*.json"), recursive=True)):
 		with open(p, encoding="utf-8") as f:
 			m = json.load(f)
 		img = os.path.join(os.path.dirname(p), m.get("image", {}).get("file", ""))

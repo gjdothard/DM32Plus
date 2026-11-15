@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """Package built firmware images as release artifacts (docs/dev/release.md "Release artifacts").
 
     tools/release.py --board ID --version v26.11 [--bin build/ID/rfoundry_ID.bin] [--out dist]
@@ -84,6 +85,7 @@ def check_no_codec(board, image):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--board", required=True)
+    ap.add_argument("--product", choices=["DM32Plus"], help="mark the full DM-32UV image as a DM32Plus release")
     ap.add_argument("--version", required=True, help="the release tag, e.g. v26.11")
     ap.add_argument("--variant", help="a release variant (config/variants/<name>.mk); default: the full build")
     ap.add_argument("--build-option", action="append", default=[], metavar="NAME=VALUE",
@@ -96,6 +98,8 @@ def main(argv=None):
     ap.add_argument("--features", help="feature list (default: make print-config)")
     ap.add_argument("--toolchain", help="compiler version line (default: the board's compiler --version)")
     args = ap.parse_args(argv)
+    if args.product and (args.board != "dm32" or args.variant not in (None, "", "full") or args.build_option):
+        ap.error("DM32Plus publishes only the full DM-32UV build")
 
     try:
         board = boards.get(args.board)
@@ -132,11 +136,16 @@ def main(argv=None):
     name_id = board.release_id(options, variant)
     bin_name = mf.image_name(name_id, args.version)
     json_name = mf.image_name(name_id, args.version, "json")
+    if args.product:
+        bin_name = bin_name.replace("rfoundry-", "dm32plus-", 1)
+        json_name = json_name.replace("rfoundry-", "dm32plus-", 1)
     try:
         man = mf.generate(board, image, args.version, commit, feats, tc, file_name=bin_name)
     except mf.ManifestError as e:
         raise SystemExit("release: %s" % e)
     man["variant"] = variant or "full"
+    if args.product:
+        man["product"] = args.product
     # every switch the build has off: with features, the switches this release knew, so the web flasher's update tells
     # a feature added since from one a custom build left on (site/static/js/flasher/update.js)
     if args.features is None:

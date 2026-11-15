@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # The Web Site
 
@@ -36,6 +37,14 @@ editing and radio programming work offline; database downloads, cloud builds, an
 The package includes runtime and project licenses, build information, and file checksums. It includes no personal
 codeplug or browser data. The launcher and server are in `tools/offline_cps/`; the HTTP tests are in
 `site/tests/offline_cps_test.py`.
+
+### Bundling a DM32Plus release
+
+Build the full application for the release tag, package it with `tools/release.py --product DM32Plus`,
+and pass its output directory to `site/build.py --firmware` before packaging the offline CPS.
+Both **Install DM32Plus** and **Upgrade to DM32Plus** load and verify that local release.
+The package contains the application and manifest. The installer obtains a compatible codec locally
+from the radio or a stock firmware file supplied by the operator.
 
 Cloudflare Pages builds and deploys it (see [Hosting](#hosting)):
 

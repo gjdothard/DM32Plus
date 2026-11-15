@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """Builds the static site into one directory (docs/dev/website.md).
 
 Layout of the output:
@@ -142,6 +143,10 @@ class Site:
 			if f["group"] not in self.groups:
 				self.groups.append(f["group"])
 		self.releases = repo.releases(self.firmware)
+		self.firmware_product = "DM32Plus" if self.repo_url.rstrip("/").lower() == "https://github.com/gjdothard/dm32plus" else None
+		if self.firmware_product:
+			self.releases = [(m, image) for m, image in self.releases
+					 if m.get("product") == self.firmware_product and m["board"] == "dm32"]
 		self.release, self.beta = release_and_beta([m["version"] for m, _ in self.releases], self.beta)
 
 	def feature_state(self, board, name, variant="full"):
@@ -173,7 +178,7 @@ class Site:
 			    for f in self.features]
 		return {
 			"site.json": {"format": "rfoundry-site/1", "git": self.git, "version": self.version, "built": self.built,
-				      "release": self.release, "beta": self.beta,
+				      "release": self.release, "beta": self.beta, "firmware_product": self.firmware_product,
 				      "branch": self.branch, "repo": self.repo_url, "community": COMMUNITY_URL, "languages": self.i18n.languages, "default_language": self.i18n.default,
 				      "reports": {"sentry_dsn": self.sentry_dsn}, "tool": self.tool},
 			"radios.json": {"radios": radios, "planned": planned},
@@ -205,6 +210,7 @@ class Site:
 		out = []
 		for m, img in self.releases:
 			out.append({"board": m["board"], "variant": m.get("variant", "full"), "version": m["version"],
+				    "product": m.get("product"),
 				    "git": m.get("git"), "git_time": m.get("git_time") or self.commit_time(m.get("git_full")),
 				    "features": m.get("features", ""), "off": m.get("off"),
 				    "image": "firmware/%s/%s" % (m["board"], m["image"]["file"]),
