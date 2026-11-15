@@ -33,6 +33,9 @@
 #ifndef CONFIG_DMR_SMS
 #define CONFIG_DMR_SMS			1
 #endif
+#ifndef CONFIG_MESSAGE_JOURNAL
+#define CONFIG_MESSAGE_JOURNAL		0
+#endif
 #ifndef CONFIG_DMR_TMS
 #define CONFIG_DMR_TMS			CONFIG_DMR_SMS
 #endif

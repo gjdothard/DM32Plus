@@ -327,6 +327,11 @@ run-core: radioCoreTest radioCoreTestNoVfoDmr radioFeaturesTest radioFeaturesTes
 
 # The read-only codeplug (open-firmware layout and built-in channels), on fake flash images
 FLASH_HAL := -I$(ROOT)/hal -Wshadow
+TESTS   += messageJournalTest
+
+messageJournalTest: messageJournalTest.c $(CORE)/storage/message_journal.c $(CORE)/storage/message_journal.h $(CORE)/storage/storage.c
+	$(CC) $(CFLAGS) $(FLASH_HAL) -DCONFIG_MESSAGE_JOURNAL=1 -o $@ messageJournalTest.c $(CORE)/storage/message_journal.c $(CORE)/storage/storage.c
+
 TESTS   += codeplugTest
 
 codeplugTest: codeplugTest.c $(CORE)/codeplug/codeplug.c $(CORE)/codeplug/codeplug.h $(CORE)/codeplug/dmr_iddb.c $(CORE)/codeplug/dmr_iddb.h $(CORE)/storage/storage.c
@@ -351,7 +356,8 @@ calCurveTest: calCurveTest.c $(CORE)/radio/cal_curve.h
 	$(CC) $(CFLAGS) -Wshadow -o $@ calCurveTest.c
 
 run: run-flash
-run-flash: codeplugTest codeplugNoCompactTest calCurveTest codeplugPower2Test codeplugPower3Test codeplugPower9Test
+run-flash: codeplugTest codeplugNoCompactTest calCurveTest codeplugPower2Test codeplugPower3Test codeplugPower9Test messageJournalTest
+	./messageJournalTest
 	./codeplugPower2Test
 	./codeplugPower3Test
 	./codeplugPower9Test

@@ -14,6 +14,7 @@ path while consolidating the radio UI and aligning it with the CPS.
 | Shared card header for Home, Quick Controls, Main Menu, and directory screens | Complete | Ten screenshots match the baseline byte for byte. Color and monochrome UI flows, the target build, and the static task-stack check passed |
 | Shared list and selection behavior | Complete | All ten reference renders match. Color and monochrome UI flows, the target build, and the static task-stack check passed |
 | Stable message selection | Complete | Color and monochrome UI flows, three DMR service configurations, the target build, and the static task-stack check passed. Ten reference renders match |
+| Conversation journal engine | Complete | Host tests exercise rollover, power cuts, unknown sectors, and corrupt records |
 | Conversation storage and Messages redesign | Pending | See the flash audit below |
 | CPS and codeplug changes | Pending | Inventory existing records and test compatibility before adding persisted data such as Favorites |
 
@@ -48,11 +49,22 @@ The CPS and firmware now enforce a smaller DMR ID database boundary, leaving a 5
 Treat that reserve as previously used until the journal migration, and account for older firmware
 that still allows CPS writes there.
 
-The hardware flash audit identifies a 20 KiB candidate outside the active application allocations.
-Follow the conversation storage section of the board's hardware reference before allocating it.
-First confirm ownership across install, update, restore, and rollback. Then prototype a journal
-over the board storage interface with a feature switch, power-loss and rollover tests, and a
-separate spare erase sector. Use durable record IDs for conversation history and group entries by
-private peer or destination talkgroup. Capture outgoing messages with their send status.
+The [message journal engine](../spec/message-journal.md) mounts read-only and keeps a spare erase
+sector for rollover. The firmware switch defaults off. Next, verify ownership across install,
+update, restore, and rollback, then add a storage job that borrows the shared sector buffer and
+persists explicit reclamation permission. Group entries by private peer or destination talkgroup
+and capture outgoing messages with their send status.
+
+### Hardware gates
+
+1. Before testing the journal, take and verify a full SPI backup on the owner's radio. Read the
+   reserved range from that backup and record its state. With the boundary build, verify normal
+   channel and caller-name behavior and confirm CPS reports the new size limit.
+2. Once migration and the storage job are available, check that an unknown reserve stays intact
+   until it is explicitly claimed. Write a few private and group messages, reboot, and verify
+   their order and destinations. Test interrupted writes and first rollover with a lab-sized
+   reserve before filling the complete reserve.
+3. Verify the recovery path from a backup and the effect of rolling back to firmware with the
+   older CPS boundary. Keep hardware observations in the bring-up record.
 
 For test commands and screenshots, see [Testing](testing.md) and the [UI specification](../spec/ui.md).
