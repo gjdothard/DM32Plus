@@ -12,7 +12,7 @@ path while consolidating the radio UI and aligning it with the CPS.
 | Slice | Status | Verification |
 |---|---|---|
 | Shared card header for Home, Quick Controls, Main Menu, and directory screens | Complete | Ten screenshots match the baseline byte for byte. Color and monochrome UI flows, the target build, and the static task-stack check passed |
-| Shared list and selection behavior | Pending | Exercise keypad filtering, focus, Back, and PTT targets |
+| Shared list and selection behavior | Complete | All ten reference renders match. Color and monochrome UI flows, the target build, and the static task-stack check passed |
 | Remaining screen designs | Pending | Start with Messages and identify which conversation behaviors the current message store supports |
 | CPS and codeplug changes | Pending | Inventory existing records and test compatibility before adding persisted data such as Favorites |
 
@@ -28,8 +28,22 @@ Dual Watch, VFO, DMR and FM Quick Controls, Main Menu, Zones, Channels, Talkgrou
 3. Record completed work, checks, and the next concrete task here before stopping. Keep observed
    hardware results separate from simulator and build results.
 
-The next slice starts with the card lists and Main Menu footer. Review the focus and row helpers before
-changing navigation. Keep the existing screenshots as the baseline for refactors and document intended
-visual changes when a screen design changes.
+The list slice shares row backgrounds and footer drawing between Main Menu and the card lists.
+List pages use the same item initialization for initial focus, scrolling, and numbered selection.
+Keep the existing screenshots as the baseline for refactors and document intended visual changes
+when a screen design changes.
+
+## Next slice: Messages
+
+The [DMR data service](../../core/dmr/dmrDataService.h) keeps a four-entry volatile inbox with sender,
+destination, and receive time. The [UI adapter](../../core/ui/ui_svc_data.c) currently exposes the
+sender and unread state. It receives send-result events, and the message list is populated from
+received records. Opening a message uses its newest-first list index, which can shift when a new
+message arrives.
+
+Start by exposing the destination and choosing a message identity that survives inbox insertions.
+Group private messages by sender and group messages by destination talkgroup. Check read, delete,
+and reply with an intervening arrival before building the conversation screen. Outgoing history
+and durable conversations need a separately verified storage design.
 
 For test commands and screenshots, see [Testing](testing.md) and the [UI specification](../spec/ui.md).

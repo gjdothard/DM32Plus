@@ -145,6 +145,14 @@ static void update_focus_target(void)
 		ui_svc_focus_target(0, false);
 }
 
+static void list_item(const ui_scr_def_t *d, uint16_t i, ui_item_t *it)
+{
+	it->label[0] = it->value[0] = 0;
+	it->num = 0;
+	it->flags = 0;
+	d->item(i, it);
+}
+
 void ui_push(uint8_t scr, uint16_t arg)
 {
 	if (sp + 1 >= UI_STACK_MAX)
@@ -166,10 +174,7 @@ void ui_push(uint8_t scr, uint16_t arg)
 		uint16_t n = d->count();
 		while (stack[sp].focus < n) {
 			ui_item_t it;
-			it.flags = 0;
-			it.label[0] = it.value[0] = 0;
-			it.num = 0;
-			d->item(stack[sp].focus, &it);
+			list_item(d, stack[sp].focus, &it);
 			if (!(it.flags & UI_ITEM_INFO))
 				break;
 			stack[sp].focus++;
@@ -1676,14 +1681,6 @@ static void hotspot_key(const input_event_t *ev)
 
 // --- the generic list screen ---
 
-static void list_item(const ui_scr_def_t *d, uint16_t i, ui_item_t *it)
-{
-	it->label[0] = it->value[0] = 0;
-	it->num = 0;
-	it->flags = 0;
-	d->item(i, it);
-}
-
 static void list_move(const ui_scr_def_t *d, int8_t dir)
 {
 	ui_frame_t *f = &stack[sp];
@@ -1729,10 +1726,7 @@ static inline __attribute__((always_inline)) bool list_key(const ui_scr_def_t *d
 				if (it.num == '0' + dg) {
 					f->focus = i;
 					update_focus_target();
-					if (it.flags & UI_ITEM_DIM)
-						d->select(i, false);	// explains why it isn't available
-					else
-						d->select(i, false);
+					d->select(i, false);	// also lets the screen explain a dim item
 					return true;
 				}
 			}

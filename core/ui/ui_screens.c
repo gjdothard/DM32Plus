@@ -3419,6 +3419,33 @@ void ui_draw_quick(const radio_view_t *v, const ui_state_t *s)
 }
 
 #if CONFIG_UI_CARD_MENU
+static void card_list_row(int y, int width, int height, color_t edge, color_t interior)
+{
+	gfx_round_fill(0, y, width, height, edge);
+	if (interior != edge)
+		gfx_round_fill(1, y + 1, width - 2, height - 2, interior);
+}
+
+static void card_list_footer(const ui_state_t *s, int y, const char *keys, const char *back,
+	char *fit, size_t len)
+{
+	ui_draw_banner(s);
+	if (s->toast) {
+		ui_draw_hint(s->toast, true);
+	} else if (s->hints) {
+		const font_t *font = &font_6x12;
+		int width = gfx_width();
+		gfx_hline(0, y, width, CARD_EDGE);
+		if (back) {
+			gfx_text(font, 0, y + 3, keys, ui_col.dim);
+			gfx_text(font, width - gfx_text_width(font, back), y + 3, back, ui_col.dim);
+		} else {
+			gfx_text_fit(font, keys, width - 4, fit, len);
+			gfx_text(font, 2, y + 3, fit, ui_col.dim);
+		}
+	}
+}
+
 void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kind_t kind)
 {
 	const font_t *sm = ui_layout.small, *meta = &font_6x12;
@@ -3463,9 +3490,8 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		bool focus = i == l->focus;
 		color_t fg = focus ? CARD_INK : ui_col.fg;
 		color_t value = focus ? fg : item.flags & UI_ITEM_TEMP ? ui_col.warn : ui_col.dim;
-		gfx_round_fill(0, yy, width - 5, step - 3, focus ? ui_col.focus : CARD_EDGE);
-		if (!focus)
-			gfx_round_fill(1, yy + 1, width - 7, step - 5, CARD_SURFACE);
+		card_list_row(yy, width - 5, step - 3, focus ? ui_col.focus : CARD_EDGE,
+			      focus ? ui_col.focus : CARD_SURFACE);
 		int x = 7;
 		if (item.flags & UI_ITEM_FOLDER) {
 			color_t icon = focus ? fg : ui_col.focus;
@@ -3494,17 +3520,10 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		gfx_fill(width - 3, y, 3, 2, ui_col.focus);
 	if (top + rows < l->count)
 		gfx_fill(width - 3, y + rows * step - 4, 3, 2, ui_col.focus);
-	ui_draw_banner(s);
-	if (s->toast) {
-		ui_draw_hint(s->toast, true);
-	} else if (s->hints) {
-		const char *keys = directory ? TR("P1/P2 tabs  OK talk  # more  Back") :
-			channels ? (CONFIG_ZONE_EDIT ? TR("OK go  # actions  Back") : TR("OK go  Back")) :
-			TR("OK/# open  Hold OK go  Back");
-		gfx_hline(0, footer, width, CARD_EDGE);
-		gfx_text_fit(meta, keys, width - 4, fit, sizeof fit);
-		gfx_text(meta, 2, footer + 3, fit, ui_col.dim);
-	}
+	const char *keys = directory ? TR("P1/P2 tabs  OK talk  # more  Back") :
+		channels ? (CONFIG_ZONE_EDIT ? TR("OK go  # actions  Back") : TR("OK go  Back")) :
+		TR("OK/# open  Hold OK go  Back");
+	card_list_footer(s, footer, keys, NULL, fit, sizeof fit);
 }
 
 void ui_draw_main_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l)
@@ -3526,8 +3545,7 @@ void ui_draw_main_menu(const radio_view_t *v, const ui_state_t *s, const ui_list
 			bool focus = l->focus == i;
 			color_t edge = focus ? ui_col.focus : CARD_EDGE;
 			color_t fg = item.flags & UI_ITEM_DIM ? ui_col.dim : ui_col.fg;
-			gfx_round_fill(0, y, width, step - 2, edge);
-			gfx_round_fill(1, y + 1, width - 2, step - 4, focus ? CARD_SELECTED : CARD_SURFACE);
+			card_list_row(y, width, step - 2, edge, focus ? CARD_SELECTED : CARD_SURFACE);
 			char key[] = { item.num, 0 };
 			int ky = y + (step - meta->h) / 2;
 			gfx_round_fill(5, ky - 1, 15, meta->h + 2, edge);
@@ -3543,15 +3561,7 @@ void ui_draw_main_menu(const radio_view_t *v, const ui_state_t *s, const ui_list
 			gfx_text_fit(label, item.label, right - 28, fit, sizeof fit);
 			gfx_text(label, 25, text_y + (sm->h - label->h) / 2, fit, fg);
 		}
-		ui_draw_banner(s);
-		if (s->toast)
-			ui_draw_hint(s->toast, true);
-		else if (s->hints) {
-			gfx_hline(0, footer, width, CARD_EDGE);
-			gfx_text(meta, 0, footer + 3, TR("OK Select"), ui_col.dim);
-			const char *back = TR("Back");
-			gfx_text(meta, width - gfx_text_width(meta, back), footer + 3, back, ui_col.dim);
-		}
+		card_list_footer(s, footer, TR("OK Select"), TR("Back"), fit, sizeof fit);
 		return;
 	}
 #endif
