@@ -548,11 +548,42 @@ void codeplug_openfw_encode(const channel_t *ch, uint8_t *r)
 static uint32_t ch_errors;	// a used channel that couldn't be read or decoded (codeplug_channel_errors)
 
 #if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
-#define TALKGROUP_RECORD_SIZE	(4u * CODEPLUG_TALKGROUP_MAX)
+#define TALKGROUP_INLINE	4u
+#define TALKGROUP_RECORD_SIZE	(4u * TALKGROUP_INLINE)
+#define TALKGROUP_OVERFLOW	EE(0xF000u)
+#define TALKGROUP_POOL		EE(0xF808u)
+#define TALKGROUP_POOL_MAX	510u
+static const uint8_t talkgroup_magic[8] = { 'R', 'F', 'T', 'G', 2, 0, 0, 0 };
 
 static uint32_t talkgroup_address(uint16_t number)
 {
 	return EE(0xB000u + (number - 1u) * TALKGROUP_RECORD_SIZE);
+}
+
+static bool append_talkgroup(const uint8_t entry[4], codeplug_talkgroup_t *out, uint8_t count)
+{
+	uint32_t id = entry[0] | (uint32_t)entry[1] << 8 | (uint32_t)entry[2] << 16;
+	if (!id || id == 0xFFFFFFu || (entry[3] != 0xA0 && entry[3] != 0xA1))
+		return false;
+	uint8_t timeslot = (uint8_t)(entry[3] - 0xA0u + 1u);
+	for (uint8_t i = 0; i < count; i++) {
+		if (out[i].id == id && out[i].timeslot == timeslot)
+			return false;
+	}
+	out[count] = (codeplug_talkgroup_t){ .id = id, .timeslot = timeslot };
+	return true;
+}
+
+static uint32_t talkgroup_descriptor(uint16_t number)
+{
+	return TALKGROUP_OVERFLOW + sizeof talkgroup_magic + 2u * (number - 1u);
+}
+
+static bool talkgroup_has_overflow(void)
+{
+	uint8_t header[sizeof talkgroup_magic];
+	return flash_read(TALKGROUP_OVERFLOW, header, sizeof header) &&
+	       !memcmp(header, talkgroup_magic, sizeof header);
 }
 
 static uint8_t read_talkgroups(uint16_t number, codeplug_talkgroup_t out[CODEPLUG_TALKGROUP_MAX])
@@ -571,16 +602,23 @@ static uint8_t read_talkgroups(uint16_t number, codeplug_talkgroup_t out[CODEPLU
 			}
 			break;
 		}
-		uint32_t id = entry[0] | (uint32_t)entry[1] << 8 | (uint32_t)entry[2] << 16;
-		if (!id || id == 0xFFFFFFu || (entry[3] != 0xA0 && entry[3] != 0xA1))
+		if (!append_talkgroup(entry, out, count))
 			return 0;
-		uint8_t timeslot = (uint8_t)(entry[3] - 0xA0u + 1u);
-		for (uint8_t j = 0; j < count; j++) {
-			if (out[j].id == id && out[j].timeslot == timeslot)
-				return 0;
-		}
-		out[count++] = (codeplug_talkgroup_t){ .id = id, .timeslot = timeslot };
+		count++;
 	}
+	if (count != TALKGROUP_INLINE || !talkgroup_has_overflow() ||
+	    !flash_read(talkgroup_descriptor(number), bytes, 2))
+		return count;
+	unsigned descriptor = bytes[0] | (unsigned)bytes[1] << 8;
+	unsigned start = descriptor & 0x1FFu, extra = descriptor >> 9;
+	if (!extra || extra > CODEPLUG_TALKGROUP_MAX - TALKGROUP_INLINE || start + extra > TALKGROUP_POOL_MAX)
+		return count;
+	for (unsigned i = 0; i < extra; i++) {
+		if (!flash_read(TALKGROUP_POOL + 4u * (start + i), bytes, 4) ||
+		    !append_talkgroup(bytes, out, (uint8_t)(count + i)))
+			return count;
+	}
+	count = (uint8_t)(count + extra);
 	return count;
 }
 
@@ -601,6 +639,8 @@ static bool clear_talkgroups(uint16_t number)
 		return true;
 	uint8_t erased[TALKGROUP_RECORD_SIZE];
 	memset(erased, 255, sizeof erased);
+	if (talkgroup_has_overflow() && !flash_write(talkgroup_descriptor(number), erased, 2))
+		return false;
 	return flash_write(talkgroup_address(number), erased, sizeof erased);
 }
 #endif

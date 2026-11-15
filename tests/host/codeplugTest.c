@@ -690,6 +690,18 @@ static void test_talkgroup_records(void)
 	CHECK(codeplug_talkgroups(2, entries) == 3);	// same ID on a different slot
 	record[11] = 0xA2;
 	CHECK(codeplug_talkgroups(2, entries) == 0);	// unknown tag
+
+	const uint8_t tail[] = { 91, 0, 0, 0xA0, 9, 0, 0, 0xA1 };
+	memcpy(record + 8, tail, sizeof tail);
+	const uint8_t header[] = { 'R', 'F', 'T', 'G', 2, 0, 0, 0 };
+	memcpy(&image[EE + 0xF000], header, sizeof header);
+	put16(&image[EE + 0xF00A], 1u << 9);
+	const uint8_t fifth[] = { 13, 0, 0, 0xA1 };
+	memcpy(&image[EE + 0xF808], fifth, sizeof fifth);
+	CHECK(codeplug_talkgroups(2, entries) == 5);
+	CHECK(entries[4].id == 13 && entries[4].timeslot == 2);
+	put16(&image[EE + 0xF00A], (1u << 9) | 511u);
+	CHECK(codeplug_talkgroups(2, entries) == 4);
 }
 #endif
 

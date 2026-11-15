@@ -361,11 +361,17 @@ range without letting them corrupt the live settings. It can ignore the range, o
 | 0x8010 | 0x20 | Zone in-use bitmap: bit j of byte i means zone slot (i x 8 + j) is in use. 68 slots are used |
 | 0x8030 | 68 x 0xB0 | Zone records (7.3.4), 80 channels each, to 0xAEF0. Open-firmware 16-channel layout: 68 x 0x30 |
 | 0xB000 | 1024 x 16 | RadioFoundry operating talkgroups. One record per channel number, four entries per record |
+| 0xF000 | 4096 | RadioFoundry extended operating talkgroups. Optional shared storage for another 510 entries |
 
 Each operating talkgroup is a three-byte little-endian group ID followed by one tag byte (0xA0 for TS1,
 0xA1 for TS2). Unused entries are 0xFF in all four bytes and follow the used entries. The all-call ID, zero,
 and repeated ID/slot pairs are invalid. An empty record uses the channel's legacy timeslot and contact.
 The RadioFoundry CPS includes the extension in binary and CSV exports. qdmr YAML does not carry it.
+The optional sector starts with the eight bytes `52 46 54 47 02 00 00 00`, then 1024 little-endian
+16-bit descriptors by channel number. An erased descriptor means no extra entries. Otherwise the low
+nine bits are a zero-based index in the pool at 0xF808, and the high seven bits give the count (1–12).
+The pool uses the same four-byte entries as the first four. Invalid descriptors or extra entries leave
+the four inline entries in effect.
 
 Zone layout detection: the firmware reads the 16 bytes at 0x8060 and looks at the last one (0x806F). In the 16-channel
 layout, 0x806F is the last byte of the second zone's name, so it is 0xFF. In the 80-channel layout, it is the high byte

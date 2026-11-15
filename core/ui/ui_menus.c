@@ -5618,7 +5618,15 @@ typedef struct {
 	ui_target_t t;
 	const char *tag;
 } pick_t;
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+static union {
+	pick_t normal[PICK_MAX];
+	codeplug_talkgroup_t operating[CODEPLUG_TALKGROUP_MAX];
+} picker_entries;
+#define picks picker_entries.normal
+#else
 static pick_t picks[PICK_MAX];
+#endif
 static uint8_t n_picks;
 
 #if CONFIG_DMR
@@ -5644,14 +5652,7 @@ static void picker_enter(void)
 	contact_t c;
 #if CONFIG_DMR_TALKGROUP_ENTRIES
 	if (ui_frame()->arg == 1) {
-		codeplug_talkgroup_t entries[CODEPLUG_TALKGROUP_MAX];
-		n_picks = codeplug_talkgroups(v->channel_number, entries);
-		for (uint8_t i = 0; i < n_picks; i++) {
-			picks[i].t = (ui_target_t){ .id = entries[i].id, .group = true };
-			if (codeplug_contact_find(entries[i].id, true, &c))
-				str_copy(picks[i].t.name, sizeof picks[i].t.name, c.name);
-			picks[i].tag = entries[i].timeslot == 2 ? "TS2" : "TS1";
-		}
+		n_picks = codeplug_talkgroups(v->channel_number, picker_entries.operating);
 		ui_frame()->focus = v->talkgroup_index < n_picks ? v->talkgroup_index : 0;
 		return;
 	}
@@ -5721,6 +5722,18 @@ static uint16_t picker_count(void) { return (uint16_t)(n_picks + (ui_frame()->ar
 
 static void picker_item(uint16_t i, ui_item_t *it)
 {
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+	if (ui_frame()->arg == 1 && i < n_picks) {
+		const codeplug_talkgroup_t *entry = &picker_entries.operating[i];
+		ui_target_t target = { .id = entry->id, .group = true };
+		contact_t contact;
+		if (codeplug_contact_find(entry->id, true, &contact))
+			str_copy(target.name, sizeof target.name, contact.name);
+		ui_sb_target(it->label, sizeof it->label, &target);
+		str_copy(it->value, sizeof it->value, entry->timeslot == 2 ? "TS2" : "TS1");
+		return;
+	}
+#endif
 	if (i >= n_picks) {
 		str_copy(it->label, sizeof it->label, TR("Type a number..."));
 		return;

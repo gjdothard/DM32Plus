@@ -146,7 +146,8 @@ channel it stopped on is the one copied).
 A zone contains channels. A DMR channel can contain an ordered list of operating entries. Each entry
 contains a timeslot (1 or 2) and a group ID. The channel supplies the RX and TX frequencies, color
 code, power, encryption, and other shared settings. A matching group contact supplies the display
-name. A contact's timeslot override does not apply to an operating entry.
+name. The codeplug editor uses the contact's timeslot override when assigning an entry, or the
+channel's timeslot when the contact has no override. The radio uses the stored entry's timeslot.
 The first entry is the default when entering the channel. Cycling the entries does not write to the codeplug.
 
 Selecting an entry changes the base receive timeslot and the normal PTT destination and timeslot

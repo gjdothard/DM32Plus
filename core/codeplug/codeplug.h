@@ -150,7 +150,7 @@ void codeplug_openfw_encode(const channel_t *ch, uint8_t *rec);
 
 #if CONFIG_DMR
 #if CONFIG_DMR_TALKGROUP_ENTRIES
-#define CODEPLUG_TALKGROUP_MAX	4
+#define CODEPLUG_TALKGROUP_MAX	16
 typedef struct {
 	uint32_t id;
 	uint8_t timeslot;
