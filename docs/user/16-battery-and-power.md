@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Battery and Power
 
@@ -51,7 +52,8 @@ Power levels use the radio's factory calibration. Use the lowest power that reac
 
 ## Backlight
 
-**Settings > Display > Brightness** sets the backlight level. Quick settings has it too (**\***, **9**).
+**Settings > Display > Brightness** sets the backlight level. The standard grid and VFO also have a
+**Bright** tile (**\***, **9**). Tile **9** on the Memory card grid controls GPS.
 
 **Settings > Display > Backlight Dim/Off** sets two times: when the backlight dims to a fifth of the brightness, and
 when it goes off. `30s/2m` dims after 30 s and goes off after 2 minutes. Any key brings it back.

@@ -74,7 +74,12 @@ A permanent talk target must be a contact in the codeplug. A typed number is use
 
 ### The talk target picker
 
-Press **Talk target** on a DMR channel (or **\***, **8**). The picker lists, in order:
+Press **Talk target** on a DMR channel or open **Talk to** under **\*** (**4** on the Memory card grid,
+**8** on the standard grid). On a channel with operating talkgroups, the **Talk to** tile opens the
+assigned entries with their timeslots. Press **OK** to select one. Both the tile and picker show
+all seven digits, and the picker shortens a long name at the end to keep the ID visible.
+
+The general talk target picker lists, in order:
 
 | Row | Tag |
 |---|---|
@@ -195,6 +200,13 @@ While you talk, the top line says "Private" and the screen shows the contact's n
 
 On a DMR channel, **\*** opens these tiles:
 
+On the Memory card grid, the keys are **1** Power, **2** Scan, **3** Dual watch, **4** Talk to,
+**5** Timeslot, **6** Color, **7** Digital monitor, **8** Privacy, and **9** GPS. **0** opens Settings.
+
+<img src="../ux/screens/240x320i10x5/quick_dmr.png" width="200" alt="DMR Memory Quick Controls card grid">
+
+The standard grid and VFO use the following key positions.
+
 <img src="../ux/screens/160x120i5/quick_dmr.png" width="200" alt="Quick settings on a DMR channel">
 
 | Key | Tile | What it does |
@@ -202,7 +214,7 @@ On a DMR channel, **\*** opens these tiles:
 | **1** | Power | Steps through the radio's lowest level, its default and its highest ([power levels](16-battery-and-power.md#transmit-power)) |
 | **2** | Slot | Switches between timeslot 1 and 2, for now |
 | **3** | Color | Opens the color code editor |
-| **4** | Mode | Shows DMR. Press it to listen and talk in FM on the same frequencies, for now |
+| **4** | Copy to VFO / Mode | Copies a Memory channel to the VFO. In VFO, switches between FM and DMR when both modes are available |
 | **5** | DMon | Digital monitor on or off |
 | **6** | Privacy | Privacy on or off. In the VFO this tile is TX freq ([Split](07-channels-zones-vfo.md#split-repeater-offset)) |
 | **7** | Dual | Dual watch on or off |
@@ -210,7 +222,8 @@ On a DMR channel, **\*** opens these tiles:
 | **9** | Bright | Opens the brightness editor |
 | **0** | | Opens Settings |
 
-To change the color code, press **\***, **3**. Press **Up** or **Down**, or type the code (0 to 15). Press **OK** to
+To change the color code, press **\*** and select **Color** (**6** on the Memory card grid, **3** on the standard grid).
+Press **Up** or **Down**, or type the code (0 to 15). Press **OK** to
 apply it. The new
 color code takes effect when the editor closes.
 
@@ -236,7 +249,7 @@ Digital monitor plays every talkgroup on this frequency, timeslot and color code
 
 - Press **Monitor** on a DMR channel (a short press; it acts when you let go). The radio shows "Digital monitor on" and
   the chips show "DMon". Press it again to turn it off. On an FM channel the same key opens the squelch while you hold it.
-- Or **\***, **5**.
+- Or use the **Digital monitor** quick tile (**7** on the Memory card grid, **5** on the standard grid).
 
 Digital monitor stays on until you turn it off, change the channel or the mode, or press **Back** on Home. While it
 is on, the reply window lets you answer any call you heard with **PTT**.
@@ -252,9 +265,11 @@ been checked against another radio yet ([Radio reference](23-radios.md)).
 
 - The radio plays an encrypted call only when it has the matching key. Without the key the call shows as
   "Encrypted: not played".
-- Calls with stronger encryption (they send a PI header) are never played.
-- **\***, **6** turns privacy on for your calls ("Privacy on for now"). Home shows "Priv". **Back** on Home turns it
-  off again.
+- A build with basic privacy only skips calls that require a stronger encryption mode. See the AES-256 section
+  below for builds that support it.
+- The **Privacy** quick tile switches basic privacy on for your calls (**8** on the Memory card grid, **6** on the
+  standard Memory grid). Home shows "Priv" or the yellow **PRIVACY** badge. An active **AES-256** binding is shown on
+  the Memory card grid's Privacy tile and is managed in the codeplug. **Back** on Home turns temporary basic privacy off.
 
 To set the key on the radio, open **Settings > Privacy** (**OK**, **7**, **4**).
 

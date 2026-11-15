@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Settings
 
@@ -47,7 +48,7 @@ Some settings are on the menu before the feature behind them exists, or don't ap
 
 | Setting | Values | Default | What it does | Status |
 |---|---|---|---|---|
-| Brightness | 10 to 100 %, steps of 10 | 100 % | Backlight brightness. Also in quick settings, tile 9 | Works |
+| Brightness | 10 to 100 %, steps of 10 | 100 % | Backlight brightness. Also tile 9 of the standard quick grid and VFO | Works |
 | Backlight Dim/Off | 5s/20s, 10s/40s, 30s/2m, 1m/4m, 2m/8m, Never | 30s/2m | Without a key press, the backlight dims to a fifth after the first time and goes off after the second | Works |
 | Theme | Dark, Light, High contrast | Dark | The screen colors. Not on radios with a monochrome screen | Works |
 | Highlight color | Default, Red, Orange, Yellow, Teal, Light blue, Purple, Pink | Default | The color of the selected row or tile and of the channel number on Home. Not on radios with a monochrome screen | Works |

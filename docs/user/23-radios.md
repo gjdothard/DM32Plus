@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Radio Reference
 
@@ -373,6 +374,34 @@ A handheld for 136-174 and 400-480 MHz with a keypad, left and right arrow keys,
 FM and DMR voice both ways, CTCSS and DCS, APRS, GPS data, the hotspot and the battery saver work on the radio.
 As a [standalone SFR](14-hotspot.md#standalone-sfr) repeater it repeats calls on air 90 ms later and sends its CW ID; its repeated voice carries more bit errors than the original, though it plays.
 Installing: [Moving from stock DM-32UV firmware](19-moving-from-stock-dm32.md).
+
+### DM32Plus
+
+The DM32Plus offshoot publishes its firmware on [GitHub Releases](https://github.com/gjdothard/DM32Plus/releases).
+
+1. Open the portable CPS with `Start CPS.cmd` using Chrome or Edge, then choose **Install DM32Plus**
+   or **Upgrade to DM32Plus**. See the [portable CPS instructions](../../tools/offline_cps/README.md).
+2. Choose a **Release channel**. **Development** checks for the newest published prerelease.
+   **Stable** checks for the newest published stable release. **Bundled (offline)** uses the image
+   included in the CPS package.
+3. Review the target version before proceeding. If the installer was open when a new release appeared,
+   use **Check Again**. When an online channel has no compatible release, select another channel.
+
+The CPS validates the firmware manifest and image checksum before use. The portable CPS is distributed
+separately from the firmware assets. The **Release channel** menu requires a CPS build with channel selection.
+Older portable packages use the image bundled with that package.
+
+For the redesigned display, see [Home](06-home-screen.md#card-layout), [Dual Watch](12-scan.md#read-home),
+and the [DMR](09-dmr.md#timeslot-and-color-code) and [FM](08-fm.md#quick-settings-on-an-fm-channel) Quick Controls
+grids. The [operating talkgroup instructions](09-dmr.md#choosing-a-talk-target) show how to assign and select
+talkgroups for a repeater.
+
+Pushing to `Development` runs the [DM32Plus firmware workflow](../../.github/workflows/dm32plus-firmware.yml).
+It assigns the next calendar prerelease version, builds the DM-32UV application, and checks task-stack usage.
+When those checks pass, it tags the built commit and publishes the image, manifest, and SHA-256 checksums used
+by the CPS Development channel. The release image excludes the proprietary voice codec.
+
+Development prerelease **v26.11b4** was confirmed working on a physical DM-32UV by the radio owner.
 
 ### Installing on the DM-32UV
 

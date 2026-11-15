@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # The Home Screen
 
@@ -26,6 +27,18 @@ A field changed for now (a temporary change) is drawn in a highlight color on Ho
 <img src="../ux/screens/160x120i5/home_temporary.png" width="200" alt="Home with a temporary power change">
 
 The battery percentage turns to the warning color at the low battery warning level (15 % by default) and below.
+
+## Card layout
+
+The card layout has a graphic battery gauge, an envelope with a dot when messages are unread, and a
+satellite on GPS-equipped builds. The satellite is green with a fix, yellow while acquiring, and gray
+when fix status is unavailable.
+
+The zone name or **VFO MODE** sits above the channel cards. In Memory, the DMR card shows the named
+talkgroup and its ID, slot, and color code. In VFO, the card emphasizes frequency. The power label stays
+inside the channel card. On radios with H, M, and L power labels, those levels appear in red, amber, and blue.
+**PRIVACY** appears in yellow for basic privacy and **AES-256** in green when
+the active channel uses its AES key. Recent calls appear below the cards.
 
 ## Hint row messages
 

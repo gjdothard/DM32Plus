@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Scan and Dual Watch
 
@@ -65,11 +66,13 @@ VFO. It is two frequencies, not the two timeslots of one DMR frequency.
 ### Start it
 
 1. Go to the channel you want as A.
-2. Press **\***, then **7** (the **Dual watch** quick tile). The first time, B is the next channel in A's zone
+2. Press **\*** and choose **Dual watch**. It is tile **3** on the Memory card grid and usually tile **7** on
+   the standard grid and in VFO. The first time, B is the next channel in A's zone
    (in a zone of one channel: the first channel of the next zone, or the VFO). Later it starts with the last B. Two
    presses are all it takes. Holding the **A/B** key does the same.
 
-Home shows both channels, A over B, and "DUAL" in the status strip.
+Home shows both channels, A over B. The standard status strip shows "DUAL". On the card layout, the
+selected channel has a larger cyan-outlined card.
 
 If dual watch is on when you switch the radio off, it starts again when you switch it on. The radio also keeps the
 last B when you switch it off. It is found again by its channel number: in A's zone first, then in
@@ -95,6 +98,12 @@ then the zones. Pick a zone to see its channels, or **VFO** to watch a VFO frequ
 ### Read Home
 
 <img src="../ux/screens/240x320/home_dual_rx_b.png" width="200" alt="Dual watch Home, a call coming in on B">
+
+<img src="../ux/screens/240x320i10x5/home_dual_rx_b.png" width="200" alt="Dual Watch channel cards with A selected and B receiving">
+
+On the card layout, the larger cyan-outlined card marks where **PTT** will talk. Each card shows its
+own **IDLE**, **RX**, or **TX** badge, and recent calls begin with the letter of the channel that heard them.
+The following table describes the standard layout.
 
 Each channel has a letter, its name, what **PTT** talks to (the talkgroup, or the frequency on FM), its frequency and
 its zone. The selected channel has an arrow under its letter.
@@ -168,7 +177,7 @@ the same, and the knob still steps the channel.
 
 Press **Back** twice on Home. The first press says "Press Back again to stop dual watch", so a stray press doesn't stop
 it. If you entered a frequency or changed a setting for now, **Back** clears that first. The radio stays on the
-selected channel ("Dual watch off: on B"). These stop it too: **\***, **7**; holding the **A/B** key; **#**, **5**; and a side
+selected channel ("Dual watch off: on B"). These stop it too: the **Dual watch** quick tile; holding the **A/B** key; **#**, **5**; and a side
 key set to **Dual watch**. Starting a scan (**OK**, **6**, **1**, or the **Scan** key) stops it, staying on the selected
 channel. Nothing else stops it. If the radio can't go on with a channel (it was deleted, for example), Home says where
 the radio is: "Dual watch off: on COUNTY DMR".
