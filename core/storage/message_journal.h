@@ -3,6 +3,7 @@
 #ifndef RFOUNDRY_MESSAGE_JOURNAL_H
 #define RFOUNDRY_MESSAGE_JOURNAL_H
 
+#include "config.h"
 #include "hal_flash.h"
 
 #define MESSAGE_JOURNAL_TEXT 144u
@@ -28,5 +29,24 @@ bool message_journal_append(message_journal_t *j, const message_journal_record_t
 			    uint8_t scratch[MESSAGE_JOURNAL_SCRATCH], uint32_t *id);
 bool message_journal_read(const message_journal_t *j, uint32_t id, uint8_t scratch[MESSAGE_JOURNAL_SCRATCH],
 			  message_journal_record_t *record);
+
+#if CONFIG_MESSAGE_JOURNAL
+typedef enum {
+	MESSAGE_JOB_OK,
+	MESSAGE_JOB_BUSY,
+	MESSAGE_JOB_UNAVAILABLE,
+	MESSAGE_JOB_FAILED,
+} message_journal_result_t;
+
+typedef struct {
+	message_journal_record_t record;
+	void (*complete)(message_journal_result_t result, uint32_t id);
+	bool reclaim;
+} message_journal_job_t;
+
+// Submit from the single storage-job producer. Keep the request unchanged and alive until its
+// callback runs on the housekeeping task. Reclaim must come from explicit migration permission.
+bool message_journal_submit(message_journal_job_t *job);
+#endif
 
 #endif

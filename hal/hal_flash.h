@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Data flash (external SPI NOR on most radios)
 #ifndef HAL_FLASH_H
 #define HAL_FLASH_H
@@ -32,6 +33,9 @@ typedef struct {
 	// docs/spec/tftp.md 4): outside every area above, never written by the open-firmware CPS. 0 size: no staged writes
 	uint32_t staging_addr;
 	uint32_t staging_size;
+	// Reserved for the optional message journal. Zero size disables it.
+	uint32_t message_addr;
+	uint32_t message_size;
 } hal_flash_map_t;
 
 typedef struct {

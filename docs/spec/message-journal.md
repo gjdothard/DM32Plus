@@ -5,8 +5,13 @@
 
 The append-only journal operates on a caller-owned range of at least two 4 KiB NOR erase sectors.
 The caller serializes access with other flash users and supplies a 192-byte scratch buffer. Mount
-reads the sector headers and never programs flash. The firmware does not mount or write this
-journal until the storage job and migration are wired up.
+reads the sector headers and never programs flash.
+
+The housekeeping adapter appends through the existing storage job slot. It refuses an
+unavailable or overlapping board reserve and borrows the existing sector buffer for scratch.
+If another caller holds the buffer, the job reports busy without touching flash. Requests
+belong to the single job producer until the completion callback. No message-service caller
+is wired up yet.
 
 Each sector contains a 16-byte header followed by 21 slots of 192 bytes. All multibyte fields
 are little endian. The header contains the four bytes `RMG1`, a 32-bit generation, a CRC-32 of

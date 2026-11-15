@@ -15,6 +15,7 @@ path while consolidating the radio UI and aligning it with the CPS.
 | Shared list and selection behavior | Complete | All ten reference renders match. Color and monochrome UI flows, the target build, and the static task-stack check passed |
 | Stable message selection | Complete | Color and monochrome UI flows, three DMR service configurations, the target build, and the static task-stack check passed. Ten reference renders match |
 | Conversation journal engine | Complete | Host tests exercise rollover, power cuts, unknown sectors, and corrupt records |
+| Deferred journal append | Implemented | Host tests cover a busy job slot, a busy buffer, overlapping allocations, and permission to reclaim previous contents |
 | Conversation storage and Messages redesign | Pending | See the flash audit below |
 | CPS and codeplug changes | Pending | Inventory existing records and test compatibility before adding persisted data such as Favorites |
 
@@ -50,10 +51,10 @@ Treat that reserve as previously used until the journal migration, and account f
 that still allows CPS writes there.
 
 The [message journal engine](../spec/message-journal.md) mounts read-only and keeps a spare erase
-sector for rollover. The firmware switch defaults off. Next, verify ownership across install,
-update, restore, and rollback, then add a storage job that borrows the shared sector buffer and
-persists explicit reclamation permission. Group entries by private peer or destination talkgroup
-and capture outgoing messages with their send status.
+sector for rollover. The deferred append job borrows the shared sector buffer. The firmware switch
+defaults off. Next, connect the message service to the job and persist explicit reclamation
+permission. Group entries by private peer or destination talkgroup and capture outgoing messages
+with their send status.
 
 ### Hardware gates
 
@@ -66,5 +67,9 @@ and capture outgoing messages with their send status.
    reserve before filling the complete reserve.
 3. Verify the recovery path from a backup and the effect of rolling back to firmware with the
    older CPS boundary. Keep hardware observations in the bring-up record.
+
+Baseline backup verified on November 15, 2026. Its 512 KiB reserve is all erased. The 20 KiB
+service gap contains programmed bytes and is excluded. The installed 315,996-record database
+fits the lower boundary. Restore and the boundary build are still untested on hardware.
 
 For test commands and screenshots, see [Testing](testing.md) and the [UI specification](../spec/ui.md).

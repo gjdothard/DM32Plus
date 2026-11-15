@@ -186,4 +186,53 @@ bool message_journal_read(const message_journal_t *j, uint32_t id, uint8_t scrat
 	memcpy(record->text, scratch + TEXT_OFFSET, MESSAGE_JOURNAL_TEXT);
 	return true;
 }
+
+static bool overlaps(uint32_t base, uint32_t size, uint32_t addr, uint32_t length)
+{
+	return length != 0 && (addr >= base ? addr - base < size : base - addr < length);
+}
+
+static bool reserve_valid(const hal_flash_map_t *m)
+{
+	uint32_t base = m->message_addr, size = m->message_size;
+	return size != 0 && m->openfw_end >= m->openfw_flash &&
+	       !overlaps(base, size, m->openfw_flash, m->openfw_end - m->openfw_flash) &&
+	       !overlaps(base, size, m->openfw_eeprom, 0x10000u) &&
+	       !overlaps(base, size, m->settings_addr, m->settings_size) &&
+	       !overlaps(base, size, m->journal_addr, 2u * SECTOR) &&
+	       !overlaps(base, size, m->calibration_addr, m->calibration_size) &&
+	       !overlaps(base, size, m->native_addr, m->native_size) &&
+	       !overlaps(base, size, m->staging_addr, m->staging_size);
+}
+
+static void append_job(void *ctx)
+{
+	const message_journal_job_t *job = ctx;
+	const hal_flash_map_t *m = storage_map();
+	if (!m || !reserve_valid(m)) {
+		job->complete(MESSAGE_JOB_UNAVAILABLE, 0);
+		return;
+	}
+	uint8_t *scratch = storage_buffer_acquire();
+	if (!scratch) {
+		job->complete(MESSAGE_JOB_BUSY, 0);
+		return;
+	}
+	message_journal_t journal;
+	uint32_t id = 0;
+	storage_lock();
+	message_journal_result_t result = MESSAGE_JOB_UNAVAILABLE;
+	if (storage_ready() && message_journal_mount(&journal, board.flash, m->message_addr, m->message_size)) {
+		result = message_journal_append(&journal, &job->record, job->reclaim, scratch, &id)
+			? MESSAGE_JOB_OK : MESSAGE_JOB_FAILED;
+	}
+	storage_unlock();
+	storage_buffer_release();
+	job->complete(result, id);
+}
+
+bool message_journal_submit(message_journal_job_t *job)
+{
+	return job && job->complete && storage_job_post(append_job, job);
+}
 #endif

@@ -8,18 +8,19 @@
 
 #define SECTORS 3u
 #define BYTES (SECTORS * STORAGE_SECTOR)
+#define FLASH_BYTES 0x20000u
+#define RESERVE_BASE 0x10000u
 #define SLOTS 21u
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "FAIL line %d: %s\n", __LINE__, #c); exit(1); } } while (0)
 
-static uint8_t data[BYTES], snapshot[BYTES], scratch[MESSAGE_JOURNAL_SCRATCH];
+static uint8_t data[FLASH_BYTES], snapshot[BYTES], scratch[MESSAGE_JOURNAL_SCRATCH];
 static unsigned budget;
-const board_t board = {0};
 void storage_lock(void) {}
 void storage_unlock(void) {}
 
 static bool read_flash(uint32_t addr, void *out, uint32_t len)
 {
-	CHECK(addr <= BYTES && len <= BYTES - addr);
+	CHECK(addr <= FLASH_BYTES && len <= FLASH_BYTES - addr);
 	memcpy(out, data + addr, len);
 	return true;
 }
@@ -27,7 +28,7 @@ static bool read_flash(uint32_t addr, void *out, uint32_t len)
 static bool write_flash(uint32_t addr, const void *buf, uint32_t len)
 {
 	const uint8_t *p = buf;
-	CHECK(addr <= BYTES && len <= BYTES - addr);
+	CHECK(addr <= FLASH_BYTES && len <= FLASH_BYTES - addr);
 	while (len-- > 0) {
 		if (budget == 0) {
 			return false;
@@ -41,7 +42,7 @@ static bool write_flash(uint32_t addr, const void *buf, uint32_t len)
 
 static bool erase_flash(uint32_t addr)
 {
-	CHECK(addr < BYTES && addr % STORAGE_SECTOR == 0);
+	CHECK(addr < FLASH_BYTES && addr % STORAGE_SECTOR == 0);
 	unsigned bytes = budget < STORAGE_SECTOR ? budget : STORAGE_SECTOR;
 	memset(data + addr, 0xFF, bytes);
 	budget -= bytes;
@@ -52,6 +53,15 @@ static const hal_flash_t flash = {
 	.size = BYTES, .erase_size = STORAGE_SECTOR,
 	.read = read_flash, .write = write_flash, .erase = erase_flash,
 };
+static hal_flash_map_t job_map = {
+	.settings_addr = 0x14000u, .settings_size = 2u * STORAGE_SECTOR, .journal_addr = 0x16000u,
+	.message_addr = RESERVE_BASE, .message_size = BYTES,
+};
+static const hal_flash_t job_flash = {
+	.size = FLASH_BYTES, .erase_size = STORAGE_SECTOR, .map = &job_map,
+	.read = read_flash, .write = write_flash, .erase = erase_flash,
+};
+const board_t board = { .flash = &job_flash };
 static const message_journal_record_t entry = {
 	.src = 1002003u, .dst = 1234567u, .time = 1770000000u, .flags = 5, .text = "Test message",
 };
@@ -99,6 +109,53 @@ static void cut_rollover(uint32_t next, uint32_t first_live, unsigned erase_byte
 	memcpy(data, snapshot, BYTES);
 }
 
+static unsigned completions;
+static message_journal_result_t completion;
+static uint32_t committed_id;
+
+static void complete(message_journal_result_t result, uint32_t id)
+{
+	completions++;
+	completion = result;
+	committed_id = id;
+}
+
+static void run_job(message_journal_job_t *job, message_journal_result_t expected)
+{
+	unsigned before = completions;
+	CHECK(message_journal_submit(job));
+	CHECK(!message_journal_submit(job) && completions == before);
+	storage_job_poll();
+	CHECK(completions == before + 1 && completion == expected && !storage_job_busy());
+}
+
+static void test_deferred_append(void)
+{
+	message_journal_job_t job = { .record = entry, .complete = complete };
+	memset(data, 0xFF, sizeof(data));
+	budget = FLASH_BYTES;
+	run_job(&job, MESSAGE_JOB_UNAVAILABLE);
+	CHECK(storage_init());
+
+	job_map.openfw_flash = 0x8000u;
+	job_map.openfw_end = RESERVE_BASE + STORAGE_SECTOR;
+	run_job(&job, MESSAGE_JOB_UNAVAILABLE);
+	job_map.openfw_end = RESERVE_BASE;
+
+	CHECK(storage_buffer_acquire());
+	run_job(&job, MESSAGE_JOB_BUSY);
+	storage_buffer_release();
+
+	data[RESERVE_BASE + STORAGE_SECTOR - 1u] = 0x42;
+	run_job(&job, MESSAGE_JOB_FAILED);
+	CHECK(data[RESERVE_BASE + STORAGE_SECTOR - 1u] == 0x42 && committed_id == 0);
+	job.reclaim = true;
+	run_job(&job, MESSAGE_JOB_OK);
+	message_journal_t j;
+	CHECK(message_journal_mount(&j, &job_flash, RESERVE_BASE, BYTES));
+	CHECK(committed_id == 1 && readable(&j, committed_id));
+}
+
 int main(void)
 {
 	message_journal_t j;
@@ -142,6 +199,7 @@ int main(void)
 	mount(&j);
 	CHECK(message_journal_read(&j, id, scratch, &out));
 	CHECK(memcmp(out.text, longest.text, sizeof(out.text)) == 0);
+	test_deferred_append();
 	puts("# messageJournalTest PASSED");
 	return 0;
 }
