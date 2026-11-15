@@ -2278,6 +2278,21 @@ static void card_status(const ui_state_t *s)
 	ui_strip_draws++;
 }
 
+static void card_header(const ui_state_t *s, int band_height)
+{
+	gfx_clear(CARD_INK);
+	card_status(s);
+	gfx_fill(0, 27, gfx_width(), band_height, CARD_SURFACE);
+}
+
+static void card_center_title(const char *title, int padding, char *fit, size_t len)
+{
+	const font_t *font = ui_layout.small;
+	int width = gfx_width();
+	gfx_text_fit(font, title, width - 2 * padding, fit, len);
+	gfx_text(font, (width - gfx_text_width(font, fit)) / 2, 29, fit, ui_col.focus);
+}
+
 static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool tx, bool denied, bool dual)
 {
 	const font_t *sm = ui_layout.small;
@@ -2411,12 +2426,8 @@ static void draw_card_home(const radio_view_t *v, const ui_state_t *s)
 	const font_t *sm = ui_layout.small;
 	int width = gfx_width(), footer = gfx_height() - sm->h - 2;
 	char fit[48];
-	gfx_clear(CARD_INK);
-	card_status(s);
-	gfx_fill(0, 27, width, 23, CARD_SURFACE);
-	const char *zone = v->vfo ? TR("VFO MODE") : v->zone_name;
-	gfx_text_fit(sm, zone, width - 12, fit, sizeof fit);
-	gfx_text(sm, (width - gfx_text_width(sm, fit)) / 2, 29, fit, ui_col.focus);
+	card_header(s, 23);
+	card_center_title(v->vfo ? TR("VFO MODE") : v->zone_name, 6, fit, sizeof fit);
 	int recent = 155;
 	if (s->dual.on) {
 		bool a = s->dual.sel == 0;
@@ -3346,9 +3357,7 @@ static void __attribute__((noinline)) draw_quick_cards(const radio_view_t *v, co
 	const font_t *value_font = ui_layout.small;
 	int width = gfx_width(), top = 57, bottom = ui_layout.hint_y - 4;
 	char label[40], value[16], fit[32];
-	gfx_clear(CARD_INK);
-	card_status(s);
-	gfx_fill(0, 27, width, 24, CARD_SURFACE);
+	card_header(s, 24);
 	const char *title = TR("Quick Controls");
 	gfx_text(value_font, 5, 29, title, ui_col.focus);
 	const char *mode = mode_word(v);
@@ -3418,12 +3427,9 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 	bool directory = kind == UI_CARD_TALKGROUPS || kind == UI_CARD_CONTACTS;
 	bool channels = kind == UI_CARD_ZONE_CHANNELS;
 	char fit[40];
-	gfx_clear(CARD_INK);
-	card_status(s);
-	gfx_fill(0, 27, width, 24, CARD_SURFACE);
+	card_header(s, 24);
 	const char *title = directory ? TR("Contacts & Talkgroups") : channels ? l->name : TR("Channels & Zones");
-	gfx_text_fit(sm, title, width - 14, fit, sizeof fit);
-	gfx_text(sm, (width - gfx_text_width(sm, fit)) / 2, 29, fit, ui_col.focus);
+	card_center_title(title, 7, fit, sizeof fit);
 	if (directory) {
 		const char *tabs[] = { TR("Talkgroups"), TR("Contacts") };
 		for (int i = 0; i < 2; i++) {
@@ -3510,11 +3516,8 @@ void ui_draw_main_menu(const radio_view_t *v, const ui_state_t *s, const ui_list
 		const int width = gfx_width(), top = 55, footer = gfx_height() - 19;
 		const int step = (footer - top - 3) / l->count;
 		char fit[40];
-		gfx_clear(CARD_INK);
-		card_status(s);
-		gfx_fill(0, 27, width, 24, CARD_SURFACE);
-		gfx_text_fit(sm, l->prefix, width - 10, fit, sizeof fit);
-		gfx_text(sm, (width - gfx_text_width(sm, fit)) / 2, 29, fit, ui_col.focus);
+		card_header(s, 24);
+		card_center_title(l->prefix, 5, fit, sizeof fit);
 		for (uint16_t i = 0; i < l->count; i++) {
 			ui_item_t item = { 0 };
 			l->item(i, &item);
