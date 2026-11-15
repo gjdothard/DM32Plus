@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The Codeplug Editor's record forms (static/js/editor/views.js): what a field shows and what typing into it stores.
 // Run with site/tests/run.sh.
 
@@ -12,6 +13,25 @@ import { Grid } from "../static/js/editor/grid.js";
 
 const t = (k) => (k === "editor.tot.default" ? "Radio Default" : k);
 const field = (key) => channelForm(empty(), t).find((f) => f.key === key);
+
+test("operating talkgroups use saved group contacts and preserve per-entry timeslots", () => {
+	const model = empty();
+	model.contacts.push(
+		{ id: 3100, name: "Nationwide", type: "group", timeslot: 2 },
+		{ id: 91, name: "Worldwide", type: "group", timeslot: 0 },
+		{ id: 3100, name: "Duplicate alias", type: "group" },
+		{ id: 1234567, name: "Private", type: "private" },
+		{ id: 0xFFFFFF, name: "All call", type: "all" },
+	);
+	const f = channelForm(model, t).find((item) => item.key === "talkGroups");
+	assert.deepEqual([...f.choices], [[3100, { label: "Nationwide · TG 3100", timeslot: 2 }],
+		[91, { label: "Worldwide · TG 91", timeslot: 0 }]]);
+	const channel = { timeslot: 1 };
+	const entries = f.resolve([3100, 91], f.choices, channel);
+	assert.equal(f.parse(channel, f.key, entries), undefined);
+	assert.deepEqual(channel.talkGroups, [{ id: 3100, timeslot: 2 }, { id: 91, timeslot: 1 }]);
+	assert.equal(f.parse(channel, f.key, [entries[0], entries[0]]), "editor.err.talkgroups");
+});
 
 test("channel TX timeout: 0 shows as the radio default, the rest in the 15 s steps the record stores", () => {
 	const f = field("tot");

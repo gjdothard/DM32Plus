@@ -53,7 +53,9 @@ On a DMR memory channel with **Operating talkgroups** assigned in the Codeplug E
 to cycle through those entries and press Up or Down to change channels. Each entry supplies the timeslot and
 talkgroup together. The first entry is the default. The repeater frequencies, color code, power, and privacy
 settings come from the channel. The RX Group List still controls which additional talkgroups you hear.
-In the Codeplug Editor, enter up to four pairs as `slot:ID`, for example `1:3100, 2:3100000`.
+In the Codeplug Editor, open **Operating talkgroups** and check up to 16 saved group contacts.
+Each contact uses its own timeslot override, or the channel's timeslot if it has none.
+Lists with more than four entries require firmware with extended operating talkgroup support.
 
 Hold **#** on a DMR channel to open the talk target picker: the channel's default, the reply target, the RX group
 list's talkgroups, recent talkgroups, and "Type a number..." to dial an ID or talkgroup by hand. The **Talk target**

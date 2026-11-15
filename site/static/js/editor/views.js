@@ -9,7 +9,7 @@ import { h, button } from "../flasher/dom.js";
 import { parseFreq, parseTone, mhz } from "../codeplug/fields.js";
 import { LIMITS, POWER_NAMES } from "../codeplug/records.js";
 import { refNumber, listenBand } from "../codeplug/model.js";
-import { TALK_GROUP_MAX, parseTalkGroups, formatTalkGroups } from "../codeplug/talkgroups.js";
+import { TALK_GROUP_MAX, validTalkGroups } from "../codeplug/talkgroups.js";
 
 // --- Parsers shared by the columns and the forms ---
 
@@ -258,11 +258,7 @@ export function channelForm(m, t) {
 		dmr({ group: t("editor.form.digital") }),
 		dmr(sel("colorCode", "editor.col.cc", () => [...Array(16).keys()].map((n) => [n, String(n)]))),
 		dmr(sel("timeslot", "editor.col.ts", () => [[1, "1"], [2, "2"]])),
-		dmr(txt("talkGroups", "editor.col.talkgroups", (r, key, value) => {
-			const entries = parseTalkGroups(value);
-			if (!entries) return t("editor.err.talkgroups", { max: TALK_GROUP_MAX });
-			r[key] = entries;
-		}, (entries) => formatTalkGroups(entries || []))),
+		dmr(operatingTalkgroups(m.contacts, t)),
 		dmr(sel("privacySlot", "editor.col.encryption", (r) => encryptionOptions(t, r?.privacySlot))),
 		dmr(sel("contact", "editor.col.contact", () => refOptions(m.contacts, t))),
 		dmr(sel("rxList", "editor.col.rx_list", () => refOptions(m.rxLists, t))),
@@ -300,6 +296,58 @@ const coord = (t, max) => (r, k, v) => {
 	r[k] = n;
 };
 
+function operatingTalkgroups(contacts, t) {
+	const options = new Map();
+	for (const { id, name, type, timeslot } of contacts) {
+		if (type === "group" && Number.isInteger(id) && id > 0 && id < 0xFFFFFF && !options.has(id))
+			options.set(id, { label: name ? `${name} · TG ${id}` : `TG ${id}`, timeslot });
+	}
+	const resolve = (ids, choices, channel) => [...ids].map((tg) => {
+		const slot = choices.get(tg).timeslot;
+		return { id: tg, timeslot: slot === 1 || slot === 2 ? slot : channel.timeslot === 2 ? 2 : 1 };
+	});
+	return {
+		key: "talkGroups",
+		label: t("editor.col.talkgroups"),
+		choices: options,
+		resolve,
+		render(id, entries = []) {
+			const menu = h("details", { id, class: "operating-talkgroups", "aria-labelledby": id + "-label" });
+			const summary = h("summary");
+			const choices = new Map(options);
+			const selected = new Set(entries.map((entry) => entry.id));
+			for (const entry of entries) {
+				if (!choices.has(entry.id)) choices.set(entry.id, { label: `TG ${entry.id}`, timeslot: entry.timeslot });
+			}
+			const list = h("div", { class: "operating-talkgroup-list" });
+			const checks = new Map();
+			const update = () => {
+				summary.textContent = selected.size ? `${t("editor.col.talkgroups")} · ${selected.size}/${TALK_GROUP_MAX}`
+					: t("editor.col.talkgroups");
+				for (const [tg, check] of checks) check.disabled = !selected.has(tg) && selected.size >= TALK_GROUP_MAX;
+			};
+			for (const [tg, { label, timeslot }] of choices) {
+				const check = h("input", { type: "checkbox", checked: selected.has(tg), onchange: () => {
+					if (check.checked) selected.add(tg);
+					else selected.delete(tg);
+					update();
+				} });
+				checks.set(tg, check);
+				list.append(h("label", {}, check, label, timeslot === 1 || timeslot === 2 ? ` · TS${timeslot}` : ""));
+			}
+			menu.readTalkGroups = (channel) => resolve(selected, choices, channel);
+			update();
+			menu.append(summary, list);
+			return menu;
+		},
+		read(input, channel) { return input.readTalkGroups(channel); },
+		parse(record, key, entries) {
+			if (!validTalkGroups(entries)) return t("editor.err.talkgroups", { max: TALK_GROUP_MAX });
+			record[key] = entries;
+		},
+	};
+}
+
 // A form in a dialog over a working copy of the record; Save hands the copy back
 export function formDialog(title, fields, record, t, onSave) {
 	const work = { ...record };
@@ -311,7 +359,9 @@ export function formDialog(title, fields, record, t, onSave) {
 		const id = "f-" + f.key;
 		const get = f.get || ((r) => r[f.key]);
 		let input;
-		if (f.type === "bool") {
+		if (f.render) {
+			input = f.render(id, get(work));
+		} else if (f.type === "bool") {
 			input = h("input", { type: "checkbox", id });
 			input.checked = !!get(work);
 		} else if (f.type === "select") {
@@ -323,7 +373,8 @@ export function formDialog(title, fields, record, t, onSave) {
 			const v = get(work);
 			input = h("input", { type: "text", id, value: f.format ? f.format(v ?? "") : v ?? "", spellcheck: "false" });
 		}
-		const label = h("label", { for: id }, typeof f.label === "function" ? f.label(work) : f.label);
+		const label = h(f.render ? "span" : "label", f.render ? { id: id + "-label" } : { for: id },
+			typeof f.label === "function" ? f.label(work) : f.label);
 		const row = h("div", { class: "form-row" + (f.type === "bool" ? " form-check" : "") }, label, input);
 		rows.push({ f, input, row, label });
 		return row;
@@ -403,7 +454,7 @@ export function formDialog(title, fields, record, t, onSave) {
 				f.set ? f.set(work, v) : (work[f.key] = v);
 				continue;
 			}
-			const err = f.parse ? f.parse(work, f.key, input.value) : ((work[f.key] = input.value), null);
+			const err = f.parse ? f.parse(work, f.key, f.read ? f.read(input, work) : input.value) : ((work[f.key] = input.value), null);
 			if (err) bad.push(`${typeof f.label === "function" ? f.label(work) : f.label}: ${err}`);
 		}
 		if (bad.length) {

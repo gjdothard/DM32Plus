@@ -310,8 +310,10 @@ export class CpsSerial {
 
 	// Write the plan; throws when the radio refuses a sector
 	async write(want, have, { iddb = false, progress = () => {}, signal } = {}) {
-		if (!String(this.probe?.features || "").split(",").includes("DMR_TALKGROUP_ENTRIES") &&
-			Array.from({ length: 1024 }, (_, i) => decodeTalkGroups(want.bytes, i + 1)).some((entries) => entries.length))
+		const features = String(this.probe?.features || "").split(",");
+		const largest = Math.max(...Array.from({ length: 1024 }, (_, i) => decodeTalkGroups(want.bytes, i + 1).length));
+		if ((largest && !features.includes("DMR_TALKGROUP_ENTRIES")) ||
+			(largest > 4 && !features.includes("DMR_TALKGROUP_OVERFLOW")))
 			throw new TransportError("talkgroups_firmware");
 		if (this.probe?.version?.aes_channel_keys !== "1" &&
 			Array.from({ length: 1024 }, (_, i) => channelKeySlot(want.bytes, i + 1)).some((s) => s !== 0))

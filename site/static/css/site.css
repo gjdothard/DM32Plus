@@ -557,6 +557,10 @@ dialog.beta-notice .confirm-actions { position: sticky; bottom: calc(-1 * var(--
 }
 
 .editor { padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius); }
+.operating-talkgroups { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.operating-talkgroups summary { cursor: pointer; padding: var(--space-2); }
+.operating-talkgroup-list { max-height: 15rem; overflow: auto; padding: var(--space-2); }
+.operating-talkgroup-list label { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1); }
 .ed-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); }
 .ed-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: center; }
 .ed-group { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }

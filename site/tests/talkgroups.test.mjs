@@ -34,3 +34,15 @@ test("duplicate pairs, invalid slots and unknown records are rejected", () => {
 	model.channels.push(repeater);
 	assert.throws(() => encode(model), /unknown EEPROM record/);
 });
+
+test("operating lists beyond four round-trip independently and can be shortened", () => {
+	const model = empty();
+	const entries = Array.from({ length: 16 }, (_, index) => ({ id: 3100 + index, timeslot: 1 + index % 2 }));
+	model.channels.push(newChannel({ number: 1, name: "One", mode: "dmr", talkGroups: entries }));
+	model.channels.push(newChannel({ number: 1024, name: "Last", mode: "dmr", talkGroups: entries.slice(0, 7) }));
+	const read = decode(encode(model));
+	assert.deepEqual(read.channels.map((channel) => channel.talkGroups.length), [16, 7]);
+	assert.deepEqual(read.channels[0].talkGroups, entries);
+	read.channels[0].talkGroups.length = 4;
+	assert.deepEqual(decode(encode(read)).channels.map((channel) => channel.talkGroups.length), [4, 7]);
+});
