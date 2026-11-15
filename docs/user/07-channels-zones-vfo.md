@@ -27,13 +27,22 @@ Changing the channel ends temporary changes, the reply window, digital monitor a
 
 - Press **Next zone** or **Previous zone** ([Key roles](23-radios.md#key-roles) shows which keys these are on your
   radio). The radio shows "Zone:" and the name.
-- Or press **OK**, **4** (Zones). The list opens with the current zone focused ("here"). Focus another zone and press
+- Or press **OK**, **4** (Zones). The list opens with the current zone focused ("here"). On the standard list, focus another zone and press
   **OK**. The radio switches to it and returns to Home.
 - Or type the zone's name on Home. Find lists zones too.
 
 <img src="../ux/screens/160x120i5/zones.png" width="200" alt="Zones: the VFO and the zones">
 
 The Zones list shows the VFO first, then every zone with its number of channels. Type letters to filter it.
+
+On the card layout, **OK**, **4** opens **Channels & Zones**. In **Select zone**, press **OK** or **#**
+on a zone to see **Select channel**. Press **OK** on a channel to tune it, or **#** for its actions on
+builds with zone editing. Hold **OK** on a zone to tune that zone directly. The VFO and **Create New Zone**
+rows open their usual controls.
+The folder with a dot marks the zone the radio is already using.
+
+<img src="../ux/screens/240x320i10x5/zones.png" width="200" alt="Select a zone in Channels and Zones">
+<img src="../ux/screens/240x320i10x5/zone_channels.png" width="200" alt="Select a channel in the chosen zone">
 
 ## Making a zone
 

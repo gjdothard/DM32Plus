@@ -110,6 +110,7 @@ bool ui_try_save_channel(void);
 void ui_dirty(void);
 // The focused row changed: tell the radio what PTT would talk to now
 void ui_focus_changed(void);
+bool ui_contact_tabs_available(void);
 // Open the actions for a target (SCR_ACTIONS)
 void ui_open_actions(const ui_target_t *t);
 #if CONFIG_CONTACT_EDIT

@@ -2819,6 +2819,20 @@ int ui_list_rows(const ui_list_t *l)
 	return n < 1 ? 1 : n;
 }
 
+static uint16_t list_window(const ui_list_t *l, int rows)
+{
+	uint16_t top = l->top != NULL ? *l->top : 0;
+	if (l->focus < top)
+		top = l->focus;
+	if (l->focus >= top + rows)
+		top = (uint16_t)(l->focus - rows + 1);
+	if (top + rows > l->count)
+		top = (uint16_t)(l->count > rows ? l->count - rows : 0);
+	if (l->top != NULL)
+		*l->top = top;
+	return top;
+}
+
 void ui_draw_list(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l)
 {
 	const ui_layout_t *L = &ui_layout;
@@ -2838,15 +2852,7 @@ void ui_draw_list(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l
 	int rows = (y_end - y) / L->row_h;
 	if (rows < 1)
 		rows = 1;
-	uint16_t top = l->top != NULL ? *l->top : 0;
-	if (l->focus < top)
-		top = l->focus;
-	if (l->focus >= top + rows)
-		top = (uint16_t)(l->focus - rows + 1);
-	if (top + rows > l->count)
-		top = (uint16_t)(l->count > rows ? l->count - rows : 0);
-	if (l->top != NULL)
-		*l->top = top;
+	uint16_t top = list_window(l, rows);
 	if (l->count == 0 && l->empty != NULL)
 		wrap_text(f, l->empty, y + 1, y_end, true, ui_col.dim);
 	int pad = (L->row_h - f->h) / 2;
@@ -3404,6 +3410,97 @@ void ui_draw_quick(const radio_view_t *v, const ui_state_t *s)
 }
 
 #if CONFIG_UI_CARD_MENU
+void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kind_t kind)
+{
+	const font_t *sm = ui_layout.small, *meta = &font_6x12;
+	const int width = gfx_width(), footer = gfx_height() - 19;
+	const int step = 28;
+	bool directory = kind == UI_CARD_TALKGROUPS || kind == UI_CARD_CONTACTS;
+	bool channels = kind == UI_CARD_ZONE_CHANNELS;
+	char fit[40];
+	gfx_clear(CARD_INK);
+	card_status(s);
+	gfx_fill(0, 27, width, 24, CARD_SURFACE);
+	const char *title = directory ? TR("Contacts & Talkgroups") : channels ? l->name : TR("Channels & Zones");
+	gfx_text_fit(sm, title, width - 14, fit, sizeof fit);
+	gfx_text(sm, (width - gfx_text_width(sm, fit)) / 2, 29, fit, ui_col.focus);
+	if (directory) {
+		const char *tabs[] = { TR("Talkgroups"), TR("Contacts") };
+		for (int i = 0; i < 2; i++) {
+			bool active = (kind == UI_CARD_CONTACTS) == (i == 1);
+			int x = i * (width / 2) + 2, w = width / 2 - 5;
+			gfx_round_fill(x, 55, w, 19, active ? ui_col.focus : CARD_SURFACE);
+			gfx_text(meta, x + (w - gfx_text_width(meta, tabs[i])) / 2, 58, tabs[i],
+				 active ? CARD_INK : ui_col.fg);
+		}
+	} else {
+		const char *stage = channels ? TR("2  Select channel") : TR("1  Select zone");
+		int stage_w = gfx_text_width(meta, stage) + 16;
+		int stage_x = (width - stage_w) / 2;
+		gfx_round_fill(stage_x, 57, stage_w, 16, ui_col.focus);
+		gfx_round_fill(stage_x + 1, 58, stage_w - 2, 14, CARD_INK);
+		gfx_text(meta, stage_x + 8, 59, stage, ui_col.focus);
+	}
+	int y = 79;
+	if (l->header) {
+		gfx_text_fit(sm, l->header, width - 12, fit, sizeof fit);
+		gfx_text(sm, 6, y, fit, ui_col.fg);
+		y += sm->h + 4;
+	}
+	int rows = (footer - y - 4) / step;
+	uint16_t top = list_window(l, rows);
+	for (int row = 0; row < rows && top + row < l->count; row++) {
+		uint16_t i = (uint16_t)(top + row);
+		ui_item_t item = { 0 };
+		l->item(i, &item);
+		int yy = y + row * step;
+		bool focus = i == l->focus;
+		color_t fg = focus ? CARD_INK : ui_col.fg;
+		color_t value = focus ? fg : item.flags & UI_ITEM_TEMP ? ui_col.warn : ui_col.dim;
+		gfx_round_fill(0, yy, width - 5, step - 3, focus ? ui_col.focus : CARD_EDGE);
+		if (!focus)
+			gfx_round_fill(1, yy + 1, width - 7, step - 5, CARD_SURFACE);
+		int x = 7;
+		if (item.flags & UI_ITEM_FOLDER) {
+			color_t icon = focus ? fg : ui_col.focus;
+			gfx_rect(7, yy + 9, 13, 9, icon);
+			gfx_hline(7, yy + 7, 6, icon);
+			gfx_pixel(7, yy + 8, icon);
+			if (item.flags & UI_ITEM_TEMP)
+				gfx_fill(12, yy + 12, 3, 3, focus ? fg : ui_col.warn);
+			x = 26;
+		}
+		if (directory) {
+			const int name_x = 79;
+			gfx_text(meta, x, yy + (step - 3 - meta->h) / 2, item.label, focus ? fg : ui_col.focus);
+			int room = width - 11 - name_x;
+			const font_t *font = gfx_text_width(sm, item.value) <= room ? sm : meta;
+			fit_end(font, item.value, room, fit, sizeof fit);
+			gfx_text(font, name_x, yy + (step - 3 - font->h) / 2, fit, fg);
+		} else {
+			row_text(sm, x, yy + (step - 3 - sm->h) / 2, width - 11, item.label, item.value, fg, value,
+				 (item.flags & UI_ITEM_PREVIEW) != 0);
+		}
+	}
+	if (l->count == 0 && l->empty)
+		wrap_text(sm, l->empty, y, footer, true, ui_col.dim);
+	if (top)
+		gfx_fill(width - 3, y, 3, 2, ui_col.focus);
+	if (top + rows < l->count)
+		gfx_fill(width - 3, y + rows * step - 4, 3, 2, ui_col.focus);
+	ui_draw_banner(s);
+	if (s->toast) {
+		ui_draw_hint(s->toast, true);
+	} else if (s->hints) {
+		const char *keys = directory ? TR("P1/P2 tabs  OK talk  # more  Back") :
+			channels ? (CONFIG_ZONE_EDIT ? TR("OK go  # actions  Back") : TR("OK go  Back")) :
+			TR("OK/# open  Hold OK go  Back");
+		gfx_hline(0, footer, width, CARD_EDGE);
+		gfx_text_fit(meta, keys, width - 4, fit, sizeof fit);
+		gfx_text(meta, 2, footer + 3, fit, ui_col.dim);
+	}
+}
+
 void ui_draw_main_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l)
 {
 #if CONFIG_DUAL_WATCH

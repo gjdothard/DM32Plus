@@ -203,6 +203,7 @@ void ui_draw_banner(const ui_state_t *s);
 #define UI_ITEM_EDIT	0x08u	// the row's inline editor is open
 #define UI_ITEM_INFO	0x10u	// a text line, not something to pick (never focused)
 #define UI_ITEM_PREVIEW	0x20u	// preserve the start of the label when shortening it
+#define UI_ITEM_FOLDER	0x40u	// a zone row in the card layout
 
 typedef struct {
 	char label[36];
@@ -245,6 +246,8 @@ void ui_draw_quick(const radio_view_t *v, const ui_state_t *s);
 bool ui_card_layout(const ui_state_t *s);
 #if CONFIG_UI_CARD_MENU
 void ui_draw_main_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l);
+typedef enum { UI_CARD_ZONES, UI_CARD_ZONE_CHANNELS, UI_CARD_TALKGROUPS, UI_CARD_CONTACTS } ui_card_list_kind_t;
+void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kind_t kind);
 #endif
 #if CONFIG_HOTSPOT
 // Hotspot mode (hostlink in MMDVM mode): frequencies, color code, TX / RX, last call, how to leave

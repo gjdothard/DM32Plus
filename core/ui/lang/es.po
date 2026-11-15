@@ -920,7 +920,7 @@ msgstr "Zona para"
 msgid "OK pick  Back"
 msgstr "OK elegir  Atrás"
 
-#: core/ui/ui_find.c core/ui/ui_menus.c
+#: core/ui/ui_find.c core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Contacts"
 msgstr "Contactos"
 
@@ -3671,6 +3671,42 @@ msgstr "0 Ajustes  Mant OK guardar"
 #: core/ui/ui_screens.c
 msgid "Offset"
 msgstr "Desvío"
+
+#: core/ui/ui_screens.c
+msgid "Contacts & Talkgroups"
+msgstr "Contactos y grupos"
+
+#: core/ui/ui_screens.c
+msgid "Channels & Zones"
+msgstr "Canales y zonas"
+
+#: core/ui/ui_screens.c
+msgid "Talkgroups"
+msgstr "Grupos"
+
+#: core/ui/ui_screens.c
+msgid "2  Select channel"
+msgstr "2  Elegir canal"
+
+#: core/ui/ui_screens.c
+msgid "1  Select zone"
+msgstr "1  Elegir zona"
+
+#: core/ui/ui_screens.c
+msgid "P1/P2 tabs  OK talk  # more  Back"
+msgstr "P1/P2 grupos  OK usar  # más  Atrás"
+
+#: core/ui/ui_screens.c
+msgid "OK go  # actions  Back"
+msgstr "OK ir  # acciones  Atrás"
+
+#: core/ui/ui_screens.c
+msgid "OK go  Back"
+msgstr "OK ir  Atrás"
+
+#: core/ui/ui_screens.c
+msgid "OK/# open  Hold OK go  Back"
+msgstr "OK/# abrir  Mantén OK ir  Atrás"
 
 #: core/ui/ui_screens.c
 msgid "OK Select"

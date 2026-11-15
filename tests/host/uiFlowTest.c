@@ -1372,6 +1372,14 @@ int main(void)
 		{ "Main Menu direct Messages", "branded-home", "ok 2", "screen=messages", 2, false },
 		{ "Main Menu direct Contacts", "branded-home", "ok 3", "screen=contacts", 2, false },
 		{ "Main Menu direct Zones", "branded-home", "ok 4", "screen=zones", 2, false },
+		{ "Zone cards show counts and open the current zone", "branded-home",
+			"ok 4 expect:shows=Select_zone expect:shows=(16) ok", "screen=zone shows=Select_channel", 3, false },
+		{ "Zone cards keep the channel shortcut", "branded-home",
+			"ok 4 ctx", "screen=zone shows=Select_channel", 3, false },
+		{ "Zone cards keep direct tuning with held OK", "branded-home",
+			"ok 4 down long:ok", "screen=home zone=1", 4, false },
+		{ "Zone cards keep keypad filtering", "branded-home",
+			"ok 4 7", "screen=zones shows=Find", 3, false },
 		{ "Main Menu Scan opens before starting", "branded-home", "ok 5", "screen=scan shows=Start_scan", 2, false },
 		{ "Main Menu Scan can start", "branded-home", "ok 5 1", "screen=home scanning=1", 3, false },
 		{ "Main Menu Activity opens Recent", "branded-home", "ok 6", "screen=recent", 2, false },
@@ -1381,6 +1389,20 @@ int main(void)
 	};
 	for (size_t i = 0; i < sizeof card_menu / sizeof card_menu[0]; i++)
 		run_flow(&card_menu[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+#if CONFIG_DMR
+	static const flow_t card_directory[] = {
+		{ "Talkgroups show the full saved ID", "branded-home worst", "ok 3",
+			"screen=contacts shows=TG_9100091 hides=PC_3109999", 2, false },
+		{ "The Contacts tab shows private calls only", "branded-home", "ok 3 right",
+			"screen=contacts shows=PC_3101234 hides=TG_3100", 3, false },
+		{ "The Contacts tab filters and opens actions", "branded-home", "ok 3 right 5 6 ctx",
+			"screen=actions", 6, false },
+		{ "Tab changes the focused private-call target", "branded-home", "ok 3 right ptt",
+			"txid=3101234 txpriv=1", 4, false },
+	};
+	for (size_t i = 0; i < sizeof card_directory / sizeof card_directory[0]; i++)
+		run_flow(&card_directory[i], sim_geom_find("240x320i10x5"), SIM_MAP_M, "Tall color");
+#endif
 #endif
 #endif
 

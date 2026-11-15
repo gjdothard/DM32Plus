@@ -24,6 +24,13 @@ the end to keep the leading ID visible.
 With `CONFIG_UI_CARD_MENU`, the tall dark display replaces the seven-entry Hub with a nine-entry Main Menu.
 Radio opens Quick Controls and the all-channels list. GPS / APRS opens the existing Position and APRS pages.
 Scan opens its own control before starting a scan. Activity / Logs opens the Recent activity list.
+Zones / Channels uses a two-step zone and channel list. The zone row shows its channel count and marks
+the active zone. OK and CONTEXT open its channels, and held OK tunes the zone directly on boards with CONTEXT.
+Filtering and channel and zone edits use the same list and editor handlers as the standard layout.
+Contacts & Talkgroups uses separate group and private-call tabs on the same filtered contacts list.
+The horizontal actions change tabs and keep the filter text. The first two assignable side keys supply
+those actions while the directory is open. The ID has a dedicated column, and a long name can shorten.
+The standard combined list is used when neither the side-key pair nor left and right keys are available.
 
 | Contents | |
 |---|---|

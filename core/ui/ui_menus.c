@@ -554,10 +554,17 @@ static const ui_scr_def_t compose_screen = {
 #if CONFIG_DMR
 static uint16_t contacts_raw_count(void) { return CODEPLUG_CONTACTS_MAX; }
 
+static bool contacts_card_active(void)
+{
+	return CONFIG_UI_CARD_MENU && ui_frame()->scr == SCR_CONTACTS && ui_contact_tabs_available();
+}
+
 static bool contacts_raw_label(uint16_t raw, char *buf, uint8_t len)
 {
 	contact_t c;
 	if (!codeplug_contact((uint16_t)(raw + 1u), &c))
+		return false;
+	if (contacts_card_active() && ((c.type == CONTACT_PRIVATE) != (ui_frame()->arg != 0)))
 		return false;
 	sbuf_t b;
 	sb_init(&b, buf, len);
@@ -589,6 +596,16 @@ static void contacts_item(uint16_t i, ui_item_t *it)
 	sb_init(&b, it->label, sizeof it->label);
 	sbuf_t vb;
 	sb_init(&vb, it->value, sizeof it->value);
+	if (contacts_card_active()) {
+		if (t.id == 0xFFFFFFu) {
+			sb_str(&b, TR("All call"));
+		} else {
+			sb_str(&b, t.group ? "TG " : "PC ");
+			sb_u32(&b, t.id, 1);
+			sb_str(&vb, t.name[0] ? t.name : TR("(no name)"));
+		}
+		return;
+	}
 	sb_str(&b, t.name[0] ? t.name : TR("(no name)"));
 	if (t.id == 0xFFFFFFu) {
 		sb_str(&vb, TR("All call"));
@@ -618,12 +635,34 @@ static void contacts_context(uint16_t i)
 		ui_open_actions(&t);
 }
 
+#if CONFIG_UI_CARD_MENU
+static bool contacts_key(const input_event_t *ev)
+{
+	if (!contacts_card_active() || ev->gesture != GESTURE_PRESS ||
+	    (ev->action != ACT_NAV_LEFT && ev->action != ACT_NAV_RIGHT))
+		return false;
+	ui_frame_t *f = ui_frame();
+	uint16_t tab = ev->action == ACT_NAV_RIGHT ? 1 : 0;
+	if (f->arg != tab) {
+		f->arg = tab;
+		f->top = f->focus = 0;
+		ui_filter_rebuild();
+		ui_focus_changed();
+		ui_dirty();
+	}
+	return true;
+}
+#endif
+
 static const ui_scr_def_t contacts_screen = {
 	.name = "contacts", .flags = SF_LIST | SF_FILTER | SF_FIELD, .prefix = TRN("Contacts"),
 	.hint = TRN(TEXT_ALT_OPEN "0-9 find  OK talk  # more" TEXT_ALT_NEXT "0-9  OK talk  # more" TEXT_ALT_CLOSE),
 	.empty = TRN("No contacts: add them in qdmr"),
 	.count = ui_filter_count, .item = contacts_item, .select = contacts_select, .context = contacts_context,
 	.target = contacts_target, .raw_count = contacts_raw_count, .raw_label = contacts_raw_label,
+#if CONFIG_UI_CARD_MENU
+	.key = contacts_key,
+#endif
 };
 #else
 static uint16_t none_count(void) { return 0; }
@@ -925,6 +964,17 @@ static void chans_item(uint16_t i, ui_item_t *it)
 	// The zone's name whole; beside it "Here" for the zone in use and the channel count, as much as fits:
 	// "Here, 16 channels", "Here, 16 ch", "Here" (or "16 channels", "16 ch", nothing)
 	bool here = !v->vfo && zi == v->zone_index;
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		it->flags |= UI_ITEM_FOLDER;
+		if (here)
+			it->flags |= UI_ITEM_TEMP;
+		sb_chr(&vb, '(');
+		sb_u32(&vb, z.count, 1);
+		sb_chr(&vb, ')');
+		return;
+	}
+#endif
 	sb_str(&vb, TEXT_ALT_OPEN);
 	for (int form = 0; form < 3; form++) {
 		if (form)
@@ -965,6 +1015,12 @@ static void chans_select(uint16_t i, bool hold)
 		return;
 	}
 	uint16_t zi = (uint16_t)(raw - CH_VFO);
+#if CONFIG_UI_CARD_MENU
+	if (!hold && ui_card_layout(&ui_st)) {
+		ui_push(SCR_ZONE, zi);
+		return;
+	}
+#endif
 	if (v->vfo)
 		radio_req_vfo(false);
 	radio_req_zone(zi);

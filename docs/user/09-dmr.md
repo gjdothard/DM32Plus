@@ -157,11 +157,15 @@ it permanent. **#** opens its actions.
 
 ## Contacts
 
-**OK**, **1** lists the codeplug's contacts and talkgroups. Type letters of the name, or digits of the ID, to filter.
+**OK**, **1** on the standard Hub lists the codeplug's contacts and talkgroups. On the card layout,
+**OK**, **3** opens **Contacts & Talkgroups**. Use the first or second assignable side key to switch
+between **Talkgroups** and **Contacts**. **TG** marks group calls and **PC** marks private calls.
+Type letters of the name or digits of the ID to filter the current tab.
 **OK** talks to the focused entry for now. Holding **OK** makes it the channel's default. **PTT** talks to it once.
 **#** opens its actions.
 
 <img src="../ux/screens/160x120i5/contacts.png" width="200" alt="Contacts">
+<img src="../ux/screens/240x320i10x5/contacts.png" width="200" alt="Talkgroups tab on the card layout">
 <img src="../ux/screens/160x120i5/contact_actions.png" width="200" alt="Actions for a contact">
 
 ### New contact
@@ -188,7 +192,7 @@ into the CPS first.
 
 ## Private calls
 
-- From a contact: **OK**, **1**, find the person, **#**, **2** (Private call), then **PTT**. Or focus the person and
+- From a contact: open **Contacts**, find the person, press **#**, **2** (Private call), then **PTT**. Or focus the person and
   press **PTT**.
 - By ID: type the ID on Home, focus "Private call ..." and press **PTT**.
 - To answer a private call, press **PTT** during the reply window.

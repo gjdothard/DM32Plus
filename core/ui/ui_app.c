@@ -122,11 +122,20 @@ static void set_locked(bool locked)
 	dirty = true;
 }
 
+bool ui_contact_tabs_available(void)
+{
+	return CONFIG_UI_CARD_MENU && CONFIG_DMR && ui_card_layout(&ui_st) &&
+	       ((CONFIG_KEY_ASSIGN && board.side_key_count >= 2) ||
+		(ui_has_action(ACT_NAV_LEFT) && ui_has_action(ACT_NAV_RIGHT)));
+}
+
 // The talk target the radio uses if PTT is pressed now with this screen's focus
 static void update_focus_target(void)
 {
 #if CONFIG_KEY_ASSIGN
-	ui_svc_quick_keys(gfx_width() >= 220 && stack[sp].scr == SCR_QUICK);
+	bool lateral_keys = gfx_width() >= 220 && stack[sp].scr == SCR_QUICK;
+	lateral_keys |= stack[sp].scr == SCR_CONTACTS && ui_contact_tabs_available();
+	ui_svc_quick_keys(lateral_keys);
 #endif
 	const ui_scr_def_t *d = ui_scr[stack[sp].scr];
 	ui_target_t t;
@@ -1801,6 +1810,18 @@ static void list_draw(const ui_scr_def_t *d)
 		sb_chr(&b, '_');
 		l.header = header;
 	}
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		if (f->scr == SCR_ZONES || f->scr == SCR_ZONE) {
+			ui_draw_card_list(&ui_st, &l, f->scr == SCR_ZONE ? UI_CARD_ZONE_CHANNELS : UI_CARD_ZONES);
+			return;
+		}
+		if (f->scr == SCR_CONTACTS && ui_contact_tabs_available()) {
+			ui_draw_card_list(&ui_st, &l, f->arg ? UI_CARD_CONTACTS : UI_CARD_TALKGROUPS);
+			return;
+		}
+	}
+#endif
 	ui_draw_list(view, &ui_st, &l);
 }
 

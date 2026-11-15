@@ -525,14 +525,17 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 		return false;
 	if (c == 0) {
 		snprintf(name, nlen, "%s", gallery[i].name);
-		if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "home_dual_fm"))
+		if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "contacts"))
+			snprintf(script, slen, "branded-home ok 3");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "home_dual_fm"))
 			snprintf(script, slen, "branded-home quick 3%s call:1001,3100,g,K4EXM msg:1001,Hello power:8 wait:11000",
 				 gallery[i].script + strlen("quick 7"));
 		else if (!strcmp(g->name, "240x320i10x5") &&
 			 (!strcmp(name, "home_dual_on_b") || !strcmp(name, "home_dual_rx_b")))
 			snprintf(script, slen, "branded-home quick 3%s", gallery[i].script + strlen("quick 7"));
 		else if (!strcmp(g->name, "240x320i10x5") &&
-			 (!strcmp(name, "quick_dmr") || !strcmp(name, "quick_fm") || !strcmp(name, "hub")))
+			 (!strcmp(name, "quick_dmr") || !strcmp(name, "quick_fm") || !strcmp(name, "hub") ||
+			  !strcmp(name, "zones") || !strcmp(name, "zone_channels")))
 			snprintf(script, slen, "branded-home %s", gallery[i].script);
 		else
 			snprintf(script, slen, "%s", gallery[i].script);
