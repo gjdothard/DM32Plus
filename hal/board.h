@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The board descriptor: everything the core may know about the radio it runs on.
 // Core code reads this at run time; it never tests a radio define.
 #ifndef HAL_BOARD_H
@@ -48,6 +49,7 @@ enum {
 
 typedef struct {
 	const char *name;
+	const char *home_brand;		// optional label for the tall color Home layout
 	uint32_t caps;
 	const band_t *bands;
 	uint8_t band_count;

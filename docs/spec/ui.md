@@ -1,10 +1,16 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # The user interface
 
 How `core/ui` implements the first-principles UX in `docs/ux` (`principles.md`, `information-architecture.md`,
 `task-flows.md`, `wireframes/`, `usability-tests.md`). The UX documents say what the radio does; this page says how
 the code is laid out, who owns the data behind each screen, and how the UI is tested without a radio.
+
+A board can supply a Home brand to opt into the tall color card layout. It uses a status row, a zone or VFO
+heading, channel cards, recent activity, and a key legend. A and B keep their positions in dual watch.
+The selected card shows the saved talkgroup name prominently and keeps the ID, slot, color code, and power on
+its detail row. Single-channel operation shows one card. Entry and large-text views retain their existing layouts.
 
 | Contents | |
 |---|---|

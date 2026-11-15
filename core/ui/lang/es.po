@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
-# Copyright (c) 2026 Garrett Dothard
 #
 # The radio's strings in Español (es; docs/dev/translating.md). Kept in step with the source by
 # tools/i18n.py --sync: translate the empty msgstr lines; an empty one shows the English.
@@ -3478,12 +3477,28 @@ msgid "# options  Back stop"
 msgstr "# opciones  Atrás parar"
 
 #: core/ui/ui_screens.c
-msgid "# Open"
-msgstr "# Abrir"
+msgid "VFO MODE"
+msgstr "MODO VFO"
+
+#: core/ui/ui_screens.c
+msgid "RECENT ACTIVITY"
+msgstr "ACTIVIDAD RECIENTE"
+
+#: core/ui/ui_screens.c
+msgid "* Quick"
+msgstr "* Rápido"
 
 #: core/ui/ui_screens.c
 msgid "# Actions"
 msgstr "# Acciones"
+
+#: core/ui/ui_screens.c
+msgid "OK Menu"
+msgstr "OK Menú"
+
+#: core/ui/ui_screens.c
+msgid "# Open"
+msgstr "# Abrir"
 
 #: core/ui/ui_screens.c
 msgid "Back hide"

@@ -1,9 +1,14 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Channels, Zones and the VFO
 
 A **channel** is a saved frequency with its mode (FM or DMR) and settings. A **zone** is a named list of channels.
 The **VFO** tunes any frequency by hand. Channels and zones come from the codeplug ([Programming the radio](04-programming.md)).
+
+On displays with the card layout, Home gives the selected channel the larger card. Dual Watch shows A
+above B. On a DMR channel, the highlighted card shows the talkgroup name when saved, plus its ID, timeslot,
+and color code. The power label stays within the card.
 
 ## Changing the channel
 

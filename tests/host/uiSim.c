@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // The UI host simulator's command line (docs/spec/ui.md 7):
 //
@@ -524,7 +525,11 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 		return false;
 	if (c == 0) {
 		snprintf(name, nlen, "%s", gallery[i].name);
-		snprintf(script, slen, "%s", gallery[i].script);
+		if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "home_dual_fm"))
+			snprintf(script, slen, "branded-home %s call:1001,3100,g,K4EXM msg:1001,Hello power:8 wait:11000",
+				 gallery[i].script);
+		else
+			snprintf(script, slen, "%s", gallery[i].script);
 	} else {
 		const char *v = theme ? sim_themes[c - gal_ncolors] : gal_colors[c - 1];
 		snprintf(name, nlen, "%s__%s", gallery[i].name, v);

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The UI host simulator (ui_sim.h). Everything core/ui needs from the firmware is simulated here: the board
 // descriptor, hal_millis, the radio core (radio_get_view / radio_req_*), the codeplug, the host link and the
 // services other packages own (ui_svc.h; the settings store is the weak one from ui_svc_stub.c).
@@ -1861,6 +1862,7 @@ static void advance(uint32_t ms)
 
 void sim_reset(const sim_geom_t *g, sim_map_t map)
 {
+	board.home_brand = NULL;
 	sim_no_fix = false;
 	sim_lat = 423601000;
 	sim_lon = -710589000;
@@ -2322,6 +2324,13 @@ static bool run_token(char *t, char *err, size_t len)
 	}
 	if (strcmp(t, "wait") == 0) {
 		advance(arg != NULL ? (uint32_t)atoi(arg) : 1000u);
+		return true;
+	}
+	if (strcmp(t, "branded-home") == 0) {
+		static const char *const levels[] = { "L-", "L", "L+", "L++", "M", "M+", "M++", "H-", "H" };
+		board.home_brand = "DM32";
+		board.power_names = levels;
+		advance(1000);
 		return true;
 	}
 	if (strcmp(t, "rx") == 0 || strcmp(t, "call") == 0) {

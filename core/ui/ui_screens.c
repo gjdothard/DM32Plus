@@ -1708,9 +1708,23 @@ static void draw_home_large(const radio_view_t *v, const ui_state_t *s)
 	gfx_text(f, 0, y, fit, v->state == RS_TX ? ui_col.tx : v->state == RS_RX ? ui_col.rx : ui_col.fg);
 }
 
+#if CONFIG_DUAL_WATCH
+static bool card_home_available(const ui_state_t *s)
+{
+	return CONFIG_UI_COLOR && board.home_brand && gfx_bpp() != 1 && gfx_width() >= 220 && gfx_height() >= 300 &&
+	       ui_theme == 0 && !s->large_text && !s->entry;
+}
+
+static void draw_card_home(const radio_view_t *v, const ui_state_t *s);
+#endif
+
 void ui_draw_home(const radio_view_t *v, const ui_state_t *s)
 {
 #if CONFIG_DUAL_WATCH
+	if (card_home_available(s)) {
+		draw_card_home(v, s);
+		return;
+	}
 	if (s->dual.on) {
 		ui_draw_home_dual(v, s);
 		return;
@@ -2202,6 +2216,230 @@ static const char *dual_hint(const radio_view_t *v, const ui_state_t *s)
 		return d->last ? TR(TEXT_ALT_OPEN "# 1 talk on B  Back stop" TEXT_ALT_NEXT "# 1 talk on B" TEXT_ALT_CLOSE) :
 			TR(TEXT_ALT_OPEN "# 1 talk on A  Back stop" TEXT_ALT_NEXT "# 1 talk on A" TEXT_ALT_CLOSE);
 	return TR("# options  Back stop");
+}
+
+// Card Home on tall color displays. Keep the palette small enough for indexed displays and use the same
+// renderer for Memory and VFO, so changing the selected pane moves the emphasis without swapping A and B.
+#define CARD_INK	RGB565(5, 9, 14)
+#define CARD_SURFACE	RGB565(16, 30, 41)
+#define CARD_SELECTED	RGB565(18, 54, 65)
+#define CARD_EDGE	RGB565(48, 70, 83)
+#define CARD_YELLOW	RGB565(255, 226, 92)
+
+static void card_status(const ui_state_t *s)
+{
+	const font_t *f = ui_layout.small;
+	int right = gfx_width();
+	int y = 3;
+	int brand = gfx_text(f, 0, y, board.home_brand, ui_col.fg);
+	gfx_text(f, brand, y, "+", ui_col.focus);
+	if (!s->no_battery) {
+		char text[6];
+		sbuf_t b;
+		sb_init(&b, text, sizeof text);
+		sb_u32(&b, s->battery_pct, 1);
+		sb_chr(&b, '%');
+		right -= gfx_text_width(f, text);
+		gfx_text(f, right, y, text, ui_col.fg);
+		right -= 22;
+		gfx_icon_battery(right, 7, 19, 9, s->battery_pct, ui_col.dim,
+				 s->battery_pct <= (s->low_batt_pct ? s->low_batt_pct : 15) ? ui_col.tx : ui_col.rx);
+	}
+	if (s->unread) {
+		right -= 23;
+		gfx_rect(right, 6, 15, 11, ui_col.focus);
+		for (int i = 1; i < 7; i++) {
+			gfx_pixel(right + i, 6 + i / 2, ui_col.focus);
+			gfx_pixel(right + 14 - i, 6 + i / 2, ui_col.focus);
+		}
+		gfx_round_fill(right + 13, 3, 5, 5, ui_col.focus);
+	}
+#if CONFIG_GPS
+	if (ui_svc_features() & UI_FEAT_GPS) {
+		ui_position_t position;
+		color_t c = !ui_svc_position(&position) ? ui_col.dim : position.fix ? ui_col.rx : CARD_YELLOW;
+		right -= 21;
+		gfx_rect(right + 1, 4, 4, 4, c);
+		gfx_rect(right + 9, 12, 4, 4, c);
+		gfx_fill(right + 5, 8, 4, 4, c);
+		for (int i = 4; i < 11; i++)
+			gfx_pixel(right + i, 3 + i, c);
+		gfx_pixel(right + 12, 5, c);
+		gfx_pixel(right + 8, 16, c);
+	}
+#endif
+	gfx_hline(0, 22, gfx_width(), CARD_EDGE);
+	ui_strip_draws++;
+}
+
+static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool tx, bool denied)
+{
+	const font_t *sm = ui_layout.small;
+	int w = gfx_width(), h = selected ? 92 : 60;
+	bool dmr = p->mode == RADIO_MODE_DMR;
+	color_t state = denied || tx ? ui_col.tx : p->rx ? ui_col.rx : ui_col.idle;
+	color_t edge = denied || tx || p->rx ? state : selected ? ui_col.focus : CARD_EDGE;
+	int inset = selected ? 2 : 1;
+	gfx_round_fill(0, y, w, h, edge);
+	gfx_round_fill(inset, y + inset, w - 2 * inset, h - 2 * inset, selected ? CARD_SELECTED : CARD_SURFACE);
+	int x = 8, row = y + (selected ? 8 : 4);
+	gfx_round_fill(x, row, sm->w + 5, sm->h, i ? CARD_YELLOW : ui_col.focus);
+	gfx_text(sm, x + 2, row, i ? "B" : "A", CARD_INK);
+	x += sm->w + 10;
+	x = gfx_text(sm, x, row, dmr ? "DMR" : "FM", ui_col.fg) + 5;
+	const char *activity = denied ? TR("NO TX") : tx ? "TX" : p->rx ? "RX" : selected ? TR("IDLE") : "";
+	int right = w - 8 - gfx_text_width(sm, activity);
+	gfx_text(sm, right, row, activity, state);
+	if (dmr && p->protection) {
+		const char *label = p->protection == 2 ? "AES-256" : TR("PRIVACY");
+		color_t c = p->protection == 2 ? ui_col.rx : CARD_YELLOW;
+		if (x + 12 + gfx_text_width(sm, label) + 4 <= right) {
+			gfx_rect(x + 2, row + 3, 6, 6, c);
+			gfx_fill(x, row + 8, 10, 6, c);
+			gfx_text(sm, x + 12, row, label, c);
+		}
+	}
+
+	char line[48], fit[48], power[16];
+	sbuf_t b;
+	const char *primary = p->name;
+	bool target = dmr && p->target[0] && selected;
+	const char *named = target && !strncmp(p->target, "TG ", 3) ? strchr(p->target + 3, ' ') : NULL;
+	if (selected && p->name[0] && (target || p->vfo))
+		gfx_text(sm, 8, row + sm->h, p->name, ui_col.dim);
+	sb_init(&b, line, sizeof line);
+	if (p->vfo) {
+		sb_freq(&b, p->rx_hz);
+		primary = line;
+	} else if (named && named[1]) {
+		sb_str(&b, "TG ");
+		sb_str(&b, named + 1);
+		primary = line;
+	} else if (target) {
+		primary = p->target;
+	}
+	int title_y = selected ? y + 46 : y + 19;
+	int detail_y = y + h - sm->h - 4;
+	const font_t *f = selected ? ui_layout.large : ui_layout.medium;
+	if (f->h > detail_y - title_y || gfx_text_width(f, primary) > w - 16)
+		f = selected ? ui_layout.medium : sm;
+	if (f->h > detail_y - title_y || gfx_text_width(f, primary) > w - 16)
+		f = sm;
+	gfx_text_fit(f, primary, w - 16, fit, sizeof fit);
+	gfx_text(f, 8, title_y, fit, ui_col.fg);
+
+	sb_init(&b, line, sizeof line);
+	if (dmr && !strncmp(p->target, "TG ", 3)) {
+		const char *end = strchr(p->target + 3, ' ');
+		for (const char *c = p->target; *c && c != end; c++)
+			sb_chr(&b, *c);
+		sb_str(&b, "  ");
+	} else if (!dmr && !p->vfo) {
+		sb_freq(&b, p->rx_hz);
+		sb_str(&b, "  ");
+	}
+	sb_str(&b, p->detail);
+	if (!dmr) {
+		char *bandwidth = strrchr(line, ' ');
+		if (bandwidth && (!strcmp(bandwidth, " 25k") || !strcmp(bandwidth, " 12.5k")))
+			*bandwidth = '\0';
+	}
+	sb_init(&b, power, sizeof power);
+	sb_str(&b, "PWR ");
+	sb_str(&b, ui_power_name(p->power));
+	int px = w - 8 - gfx_text_width(sm, power);
+	gfx_text_fit(sm, line, px - 12, fit, sizeof fit);
+	gfx_text(sm, 8, detail_y, fit, ui_col.dim);
+	gfx_text(sm, px, detail_y, power, power_color(p->power, ui_col.fg));
+}
+
+static void __attribute__((noinline)) card_single(const radio_view_t *v, const ui_state_t *s)
+{
+	ui_dual_pane_t pane = { 0 };
+	ui_dual_pane_t *p = &pane;
+	p->mode = v->ch.mode;
+	p->vfo = v->vfo;
+	p->power = v->power;
+	p->rx_hz = v->state == RS_TX && v->vfo ? v->ch.tx_hz : v->ch.rx_hz;
+	p->rx = v->state == RS_RX;
+	str_copy(p->name, sizeof p->name, v->ch.name);
+	sbuf_t b;
+	sb_init(&b, p->detail, sizeof p->detail);
+#if CONFIG_DMR
+	if (p->mode == RADIO_MODE_DMR) {
+		p->protection = s->privacy || v->dmr.privacy ? 1 : 0;
+#if CONFIG_DMR_AES256
+		if (p->protection && v->dmr.aes_key_id && !v->dmr.aes_blocked)
+			p->protection = 2;
+#endif
+		sb_str(&b, "TS");
+		sb_u32(&b, v->dmr.ts ? v->dmr.ts : v->ch.timeslot, 1);
+		sb_str(&b, "  CC");
+		sb_u32(&b, v->ch.color_code, 1);
+		sb_init(&b, p->target, sizeof p->target);
+		if (v->dmr.target_id)
+			sb_target(&b, v->dmr.target_id, v->dmr.target_private, v->dmr.target_name);
+	} else
+#endif
+	{
+		sb_tone(&b, &v->ch.tx_tone);
+	}
+	card_pane(p, 0, 55, true, v->state == RS_TX, v->state == RS_TX_DENIED);
+}
+
+static void draw_card_home(const radio_view_t *v, const ui_state_t *s)
+{
+	const font_t *sm = ui_layout.small;
+	int width = gfx_width(), footer = gfx_height() - sm->h - 2;
+	char fit[48];
+	gfx_clear(CARD_INK);
+	card_status(s);
+	gfx_fill(0, 27, width, 23, CARD_SURFACE);
+	const char *zone = v->vfo ? TR("VFO MODE") : v->zone_name;
+	gfx_text_fit(sm, zone, width - 12, fit, sizeof fit);
+	gfx_text(sm, (width - gfx_text_width(sm, fit)) / 2, 29, fit, ui_col.focus);
+	int recent = 155;
+	if (s->dual.on) {
+		bool a = s->dual.sel == 0;
+		card_pane(&s->dual.pane[0], 0, 55, a, a && v->state == RS_TX, a && v->state == RS_TX_DENIED);
+		card_pane(&s->dual.pane[1], 1, a ? 153 : 121, !a, !a && v->state == RS_TX, !a && v->state == RS_TX_DENIED);
+		recent = 222;
+	} else {
+		card_single(v, s);
+	}
+	gfx_text(sm, 0, recent, TR("RECENT ACTIVITY"), ui_col.fg);
+	int row = recent + sm->h;
+	bool heard = false;
+	if (s->dual.on) {
+		for (uint8_t i = 0; i < s->dual.calls && row + sm->h < footer; i++, row += sm->h) {
+			int x = gfx_text(sm, 0, row, "RX", ui_col.rx) + 4;
+			x = gfx_text(sm, x, row, s->dual.hist[i].pane ? "B" : "A", ui_col.dim) + 4;
+			gfx_text_fit(sm, s->dual.hist[i].caller, width - x, fit, sizeof fit);
+			gfx_text(sm, x, row, fit, ui_col.dim);
+		}
+	}
+#if CONFIG_DMR
+	else if (v->dmr.last_ms && v->ch.mode == RADIO_MODE_DMR) {
+		draw_last_heard(v, s, row);
+		heard = true;
+	}
+#endif
+	if (row == recent + sm->h && !heard)
+		gfx_text(sm, 0, row, TR("No calls heard yet"), ui_col.dim);
+	ui_draw_banner(s);
+	if (s->toast || s->locked || v->state == RS_TX_DENIED) {
+		ui_draw_bottom(s, s->dual.on ? dual_hint(v, s) : home_hint(v, s));
+	} else if (s->hints) {
+		const font_t *keys = &font_6x12;
+		const char *quick = TR("* Quick"), *actions = TR("# Actions");
+		int y = footer + (sm->h - keys->h) / 2;
+		gfx_hline(0, footer - 3, width, CARD_EDGE);
+		gfx_text(keys, 0, y, TR("OK Menu"), ui_col.dim);
+		int x = (width - gfx_text_width(keys, quick)) / 2;
+		gfx_round_fill(x - 3, y, gfx_text_width(keys, quick) + 6, keys->h, CARD_SELECTED);
+		gfx_text(keys, x, y, quick, ui_col.focus);
+		gfx_text(keys, width - gfx_text_width(keys, actions), y, actions, ui_col.dim);
+	}
 }
 
 // The richest layout that fits avail rows: names in the large font first, then fewer rows, never a smaller font for a

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The automated UI checks of docs/ux/usability-tests.md 2, in the host simulator:
 // - press budgets: each task flow of docs/ux/task-flows.md as a script on the reference key maps, at most its budget
 //   (impossible on a key map that should have it = failure);
@@ -1343,6 +1344,12 @@ int main(void)
 	vfo_split_dmr_checks();
 	no_battery_checks();
 	title_row_checks();
+#if CONFIG_UI_COLOR && CONFIG_DUAL_WATCH
+	static const flow_t card_home = {
+		"Tall color Home uses the branded card layout", "", "branded-home", "screen=home shows=RECENT_ACTIVITY", 1, false,
+	};
+	run_flow(&card_home, sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+#endif
 
 	crawl(sim_geom_find("160x120i5"), SIM_MAP_K, "K DM-1701");
 	crawl(sim_geom_find("128x64"), SIM_MAP_M, "M GD-77");

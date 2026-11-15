@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Baofeng DM-32UV: board descriptor, IO mux and reset-time pin levels, key map
 #include "board.h"
 #include "config.h"
@@ -63,6 +64,7 @@ static const char *const side_key_names[] = { "SK1", "SK2" };
 
 const board_t board = {
 	.name = "DM-32UV",
+	.home_brand = "DM32",
 	.caps = CAP_KEYPAD | CAP_ENCODER | (CONFIG_GPS ? CAP_GPS : 0) | (CONFIG_DMR ? CAP_DMR : 0) |
 		(CONFIG_AM_RX ? CAP_AM_RX : 0) | (CONFIG_BCAST_FM ? CAP_BCAST_FM : 0),
 	.bands = bands,
