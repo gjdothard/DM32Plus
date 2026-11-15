@@ -1349,6 +1349,11 @@ int main(void)
 		"Tall color Home uses the branded card layout", "", "branded-home", "screen=home shows=RECENT_ACTIVITY", 1, false,
 	};
 	run_flow(&card_home, sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+	static const flow_t card_dual = {
+		"Tall color Dual Watch shows the per-channel state",
+		"", "branded-home quick 7 ctx 3 2 ok wait:3000", "screen=home shows=IDLE shows=RECENT_ACTIVITY", 6, false,
+	};
+	run_flow(&card_dual, sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
 #endif
 
 	crawl(sim_geom_find("160x120i5"), SIM_MAP_K, "K DM-1701");

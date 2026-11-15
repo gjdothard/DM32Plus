@@ -9,6 +9,9 @@ the code is laid out, who owns the data behind each screen, and how the UI is te
 
 A board can supply a Home brand to opt into the tall color card layout. It uses a status row, a zone or VFO
 heading, channel cards, recent activity, and a key legend. A and B keep their positions in dual watch.
+The status row shows a satellite in green with a fix, yellow while acquiring a fix, and gray when fix status is unavailable.
+The selected card keeps its cyan outline during calls. Each card has a separate state badge and power label.
+Recent activity starts each row with the pane letter, using the same colors as the cards.
 The selected card shows the saved talkgroup name prominently and keeps the ID, slot, color code, and power on
 its detail row. Single-channel operation shows one card. Entry and large-text views retain their existing layouts.
 

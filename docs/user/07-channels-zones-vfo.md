@@ -7,8 +7,9 @@ A **channel** is a saved frequency with its mode (FM or DMR) and settings. A **z
 The **VFO** tunes any frequency by hand. Channels and zones come from the codeplug ([Programming the radio](04-programming.md)).
 
 On displays with the card layout, Home gives the selected channel the larger card. Dual Watch shows A
-above B. On a DMR channel, the highlighted card shows the talkgroup name when saved, plus its ID, timeslot,
-and color code. The power label stays within the card.
+above B. The cyan outline marks the selected channel during receive and transmit. Each card shows its own
+activity and power. On a DMR channel, the highlighted card shows the talkgroup name when saved, plus its
+ID, timeslot, and color code. Recent calls start with the letter of the channel that heard them.
 
 ## Changing the channel
 

@@ -2247,38 +2247,45 @@ static void card_status(const ui_state_t *s)
 	}
 	if (s->unread) {
 		right -= 23;
-		gfx_rect(right, 6, 15, 11, ui_col.focus);
-		for (int i = 1; i < 7; i++) {
-			gfx_pixel(right + i, 6 + i / 2, ui_col.focus);
-			gfx_pixel(right + 14 - i, 6 + i / 2, ui_col.focus);
+		gfx_rect(right, 7, 17, 12, ui_col.focus);
+		for (int i = 0; i < 7; i++) {
+			int fold_y = 8 + (2 * i + 1) / 3;
+			gfx_pixel(right + 1 + i, fold_y, ui_col.focus);
+			gfx_pixel(right + 15 - i, fold_y, ui_col.focus);
 		}
-		gfx_round_fill(right + 13, 3, 5, 5, ui_col.focus);
+		gfx_pixel(right + 8, 13, ui_col.focus);
+		gfx_round_fill(right + 18, 2, 5, 5, ui_col.focus);
 	}
 #if CONFIG_GPS
 	if (ui_svc_features() & UI_FEAT_GPS) {
 		ui_position_t position;
 		color_t c = !ui_svc_position(&position) ? ui_col.dim : position.fix ? ui_col.rx : CARD_YELLOW;
 		right -= 21;
-		gfx_rect(right + 1, 4, 4, 4, c);
-		gfx_rect(right + 9, 12, 4, 4, c);
-		gfx_fill(right + 5, 8, 4, 4, c);
-		for (int i = 4; i < 11; i++)
-			gfx_pixel(right + i, 3 + i, c);
-		gfx_pixel(right + 12, 5, c);
-		gfx_pixel(right + 8, 16, c);
+		/* Solar panels flank the body. The antenna and signal sit below it. */
+		gfx_rect(right, 5, 5, 7, c);
+		gfx_rect(right + 12, 5, 5, 7, c);
+		gfx_hline(right, 8, 17, c);
+		gfx_round_fill(right + 6, 4, 5, 9, c);
+		gfx_vline(right + 8, 12, 3, c);
+		gfx_hline(right + 6, 15, 5, c);
+		gfx_pixel(right + 5, 14, c);
+		gfx_pixel(right + 11, 14, c);
+		gfx_hline(right + 7, 18, 3, c);
 	}
 #endif
 	gfx_hline(0, 22, gfx_width(), CARD_EDGE);
 	ui_strip_draws++;
 }
 
-static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool tx, bool denied)
+static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool tx, bool denied, bool dual)
 {
 	const font_t *sm = ui_layout.small;
+	const font_t *meta = dual ? &font_6x12 : sm;
 	int w = gfx_width(), h = selected ? 92 : 60;
 	bool dmr = p->mode == RADIO_MODE_DMR;
 	color_t state = denied || tx ? ui_col.tx : p->rx ? ui_col.rx : ui_col.idle;
-	color_t edge = denied || tx || p->rx ? state : selected ? ui_col.focus : CARD_EDGE;
+	color_t edge = dual && selected ? ui_col.focus :
+		denied || tx || p->rx ? state : selected ? ui_col.focus : CARD_EDGE;
 	int inset = selected ? 2 : 1;
 	gfx_round_fill(0, y, w, h, edge);
 	gfx_round_fill(inset, y + inset, w - 2 * inset, h - 2 * inset, selected ? CARD_SELECTED : CARD_SURFACE);
@@ -2287,16 +2294,27 @@ static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool
 	gfx_text(sm, x + 2, row, i ? "B" : "A", CARD_INK);
 	x += sm->w + 10;
 	x = gfx_text(sm, x, row, dmr ? "DMR" : "FM", ui_col.fg) + 5;
-	const char *activity = denied ? TR("NO TX") : tx ? "TX" : p->rx ? "RX" : selected ? TR("IDLE") : "";
-	int right = w - 8 - gfx_text_width(sm, activity);
-	gfx_text(sm, right, row, activity, state);
+	const char *activity = denied ? TR("NO TX") : tx ? "TX" : p->rx ? "RX" : selected || dual ? TR("IDLE") : "";
+	int status_w = gfx_text_width(meta, activity);
+	int right = w - 8 - status_w;
+	if (dual) {
+		int badge_w = gfx_text_width(meta, TR("NO TX"));
+		if (badge_w < status_w)
+			badge_w = status_w;
+		right = w - 10 - badge_w;
+		gfx_round_fill(right - 3, row, badge_w + 6, sm->h, state);
+		gfx_text(meta, right + (badge_w - status_w) / 2, row + (sm->h - meta->h) / 2, activity, CARD_INK);
+	} else {
+		gfx_text(sm, right, row, activity, state);
+	}
 	if (dmr && p->protection) {
 		const char *label = p->protection == 2 ? "AES-256" : TR("PRIVACY");
 		color_t c = p->protection == 2 ? ui_col.rx : CARD_YELLOW;
-		if (x + 12 + gfx_text_width(sm, label) + 4 <= right) {
+		const font_t *label_font = dual ? meta : sm;
+		if (x + 12 + gfx_text_width(label_font, label) + 4 <= right) {
 			gfx_rect(x + 2, row + 3, 6, 6, c);
 			gfx_fill(x, row + 8, 10, 6, c);
-			gfx_text(sm, x + 12, row, label, c);
+			gfx_text(label_font, x + 12, row + (sm->h - label_font->h) / 2, label, c);
 		}
 	}
 
@@ -2318,8 +2336,8 @@ static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool
 	} else if (target) {
 		primary = p->target;
 	}
-	int title_y = selected ? y + 46 : y + 19;
-	int detail_y = y + h - sm->h - 4;
+	int title_y = selected ? y + 46 : y + 4 + sm->h;
+	int detail_y = y + h - meta->h - 4;
 	const font_t *f = selected ? ui_layout.large : ui_layout.medium;
 	if (f->h > detail_y - title_y || gfx_text_width(f, primary) > w - 16)
 		f = selected ? ui_layout.medium : sm;
@@ -2339,7 +2357,7 @@ static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool
 		sb_str(&b, "  ");
 	}
 	sb_str(&b, p->detail);
-	if (!dmr) {
+	if (!dmr && !dual) {
 		char *bandwidth = strrchr(line, ' ');
 		if (bandwidth && (!strcmp(bandwidth, " 25k") || !strcmp(bandwidth, " 12.5k")))
 			*bandwidth = '\0';
@@ -2347,10 +2365,10 @@ static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool
 	sb_init(&b, power, sizeof power);
 	sb_str(&b, "PWR ");
 	sb_str(&b, ui_power_name(p->power));
-	int px = w - 8 - gfx_text_width(sm, power);
-	gfx_text_fit(sm, line, px - 12, fit, sizeof fit);
-	gfx_text(sm, 8, detail_y, fit, ui_col.dim);
-	gfx_text(sm, px, detail_y, power, power_color(p->power, ui_col.fg));
+	int px = w - 8 - gfx_text_width(meta, power);
+	gfx_text_fit(meta, line, px - 12, fit, sizeof fit);
+	gfx_text(meta, 8, detail_y, fit, ui_col.dim);
+	gfx_text(meta, px, detail_y, power, power_color(p->power, ui_col.fg));
 }
 
 static void __attribute__((noinline)) card_single(const radio_view_t *v, const ui_state_t *s)
@@ -2384,7 +2402,7 @@ static void __attribute__((noinline)) card_single(const radio_view_t *v, const u
 	{
 		sb_tone(&b, &v->ch.tx_tone);
 	}
-	card_pane(p, 0, 55, true, v->state == RS_TX, v->state == RS_TX_DENIED);
+	card_pane(p, 0, 55, true, v->state == RS_TX, v->state == RS_TX_DENIED, false);
 }
 
 static void draw_card_home(const radio_view_t *v, const ui_state_t *s)
@@ -2401,9 +2419,10 @@ static void draw_card_home(const radio_view_t *v, const ui_state_t *s)
 	int recent = 155;
 	if (s->dual.on) {
 		bool a = s->dual.sel == 0;
-		card_pane(&s->dual.pane[0], 0, 55, a, a && v->state == RS_TX, a && v->state == RS_TX_DENIED);
-		card_pane(&s->dual.pane[1], 1, a ? 153 : 121, !a, !a && v->state == RS_TX, !a && v->state == RS_TX_DENIED);
-		recent = 222;
+		card_pane(&s->dual.pane[0], 0, 55, a, a && v->state == RS_TX, a && v->state == RS_TX_DENIED, true);
+		card_pane(&s->dual.pane[1], 1, a ? 155 : 123, !a, !a && v->state == RS_TX, !a && v->state == RS_TX_DENIED, true);
+		gfx_hline(0, 221, width, CARD_EDGE);
+		recent = 225;
 	} else {
 		card_single(v, s);
 	}
@@ -2412,8 +2431,9 @@ static void draw_card_home(const radio_view_t *v, const ui_state_t *s)
 	bool heard = false;
 	if (s->dual.on) {
 		for (uint8_t i = 0; i < s->dual.calls && row + sm->h < footer; i++, row += sm->h) {
-			int x = gfx_text(sm, 0, row, "RX", ui_col.rx) + 4;
-			x = gfx_text(sm, x, row, s->dual.hist[i].pane ? "B" : "A", ui_col.dim) + 4;
+			bool b = s->dual.hist[i].pane != 0;
+			int x = gfx_text(sm, 0, row, b ? "B" : "A", b ? CARD_YELLOW : ui_col.focus) + 6;
+			x = gfx_text(sm, x, row, "RX", ui_col.rx) + 6;
 			gfx_text_fit(sm, s->dual.hist[i].caller, width - x, fit, sizeof fit);
 			gfx_text(sm, x, row, fit, ui_col.dim);
 		}
