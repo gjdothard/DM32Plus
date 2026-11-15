@@ -205,7 +205,66 @@ static bool reserve_valid(const hal_flash_map_t *m)
 	       !overlaps(base, size, m->staging_addr, m->staging_size);
 }
 
-static void append_job(void *ctx)
+// This marker occupies its own sector, outside the record ring. A new marker is allowed
+// only on an erased reserve, or on a retry of a torn marker with the reserve still blank.
+static const uint8_t activation[] = { 'R', 'F', 'M', 'S', 'G', '1', 0x3C, 0xA5, 0x00 };
+
+static message_journal_result_t activate_reserve(const hal_flash_t *flash, const hal_flash_map_t *m, uint8_t *scratch)
+{
+	uint32_t i = 0;
+	while (i < sizeof(activation) && scratch[i] == activation[i]) {
+		i++;
+	}
+	// A NOR interruption can program some bits in the next byte. Later bytes must be erased.
+	if (i < sizeof(activation) && (scratch[i] & activation[i]) != activation[i]) {
+		return MESSAGE_JOB_FOREIGN;
+	}
+	uint32_t first = i < sizeof(activation) ? i + 1u : i;
+	if (!erased(scratch + first, SECTOR - first)) {
+		return MESSAGE_JOB_FOREIGN;
+	}
+	for (uint32_t offset = SECTOR; offset < m->message_size; offset += SECTOR) {
+		if (!flash->read(m->message_addr + offset, scratch, SECTOR)) {
+			return MESSAGE_JOB_FAILED;
+		}
+		if (!erased(scratch, SECTOR)) {
+			return MESSAGE_JOB_FOREIGN;
+		}
+	}
+	// Program a byte at a time so a cut always leaves a recognizable prefix.
+	for (; i < sizeof(activation); i++) {
+		if (!flash->write(m->message_addr + i, activation + i, 1)) {
+			return MESSAGE_JOB_FAILED;
+		}
+	}
+	return MESSAGE_JOB_OK;
+}
+
+static message_journal_result_t run_job(const hal_flash_map_t *m, const message_journal_job_t *job,
+					       bool activate, uint8_t *scratch, uint32_t *id)
+{
+	message_journal_t journal;
+	const hal_flash_t *flash = board.flash;
+	if (!storage_ready() || m->message_size < 3u * SECTOR ||
+	    m->message_addr > flash->size || m->message_size > flash->size - m->message_addr ||
+	    !message_journal_mount(&journal, flash, m->message_addr + SECTOR, m->message_size - SECTOR)) {
+		return MESSAGE_JOB_UNAVAILABLE;
+	}
+	if (!flash->read(m->message_addr, scratch, activate ? SECTOR : sizeof(activation))) {
+		return MESSAGE_JOB_FAILED;
+	}
+	bool active = memcmp(scratch, activation, sizeof(activation)) == 0;
+	if (activate) {
+		return active ? MESSAGE_JOB_OK : activate_reserve(flash, m, scratch);
+	}
+	if (!active) {
+		return MESSAGE_JOB_INACTIVE;
+	}
+	return message_journal_append(&journal, job->record, false, scratch, id)
+		? MESSAGE_JOB_OK : MESSAGE_JOB_FAILED;
+}
+
+static void journal_job(void *ctx, bool activate)
 {
 	const message_journal_job_t *job = ctx;
 	const hal_flash_map_t *m = storage_map();
@@ -218,21 +277,24 @@ static void append_job(void *ctx)
 		job->complete(MESSAGE_JOB_BUSY, 0);
 		return;
 	}
-	message_journal_t journal;
 	uint32_t id = 0;
 	storage_lock();
-	message_journal_result_t result = MESSAGE_JOB_UNAVAILABLE;
-	if (storage_ready() && message_journal_mount(&journal, board.flash, m->message_addr, m->message_size)) {
-		result = message_journal_append(&journal, &job->record, job->reclaim, scratch, &id)
-			? MESSAGE_JOB_OK : MESSAGE_JOB_FAILED;
-	}
+	message_journal_result_t result = run_job(m, job, activate, scratch, &id);
 	storage_unlock();
 	storage_buffer_release();
 	job->complete(result, id);
 }
 
+static void activation_job(void *ctx) { journal_job(ctx, true); }
+static void append_job(void *ctx) { journal_job(ctx, false); }
+
+bool message_journal_activate(message_journal_job_t *job)
+{
+	return job && job->complete && storage_job_post(activation_job, job);
+}
+
 bool message_journal_submit(message_journal_job_t *job)
 {
-	return job && job->complete && storage_job_post(append_job, job);
+	return job && job->complete && job->record && storage_job_post(append_job, job);
 }
 #endif

@@ -120,40 +120,69 @@ static void complete(message_journal_result_t result, uint32_t id)
 	committed_id = id;
 }
 
-static void run_job(message_journal_job_t *job, message_journal_result_t expected)
+static void run_job(message_journal_job_t *job, bool activate, message_journal_result_t expected)
 {
 	unsigned before = completions;
-	CHECK(message_journal_submit(job));
-	CHECK(!message_journal_submit(job) && completions == before);
+	CHECK(activate ? message_journal_activate(job) : message_journal_submit(job));
+	CHECK(!message_journal_activate(job) && !message_journal_submit(job) && completions == before);
 	storage_job_poll();
 	CHECK(completions == before + 1 && completion == expected && !storage_job_busy());
 }
 
 static void test_deferred_append(void)
 {
-	message_journal_job_t job = { .record = entry, .complete = complete };
+	message_journal_job_t job = { .record = &entry, .complete = complete };
 	memset(data, 0xFF, sizeof(data));
 	budget = FLASH_BYTES;
-	run_job(&job, MESSAGE_JOB_UNAVAILABLE);
+	run_job(&job, true, MESSAGE_JOB_UNAVAILABLE);
 	CHECK(storage_init());
 
 	job_map.openfw_flash = 0x8000u;
 	job_map.openfw_end = RESERVE_BASE + STORAGE_SECTOR;
-	run_job(&job, MESSAGE_JOB_UNAVAILABLE);
+	run_job(&job, true, MESSAGE_JOB_UNAVAILABLE);
 	job_map.openfw_end = RESERVE_BASE;
 
 	CHECK(storage_buffer_acquire());
-	run_job(&job, MESSAGE_JOB_BUSY);
+	run_job(&job, true, MESSAGE_JOB_BUSY);
 	storage_buffer_release();
 
-	data[RESERVE_BASE + STORAGE_SECTOR - 1u] = 0x42;
-	run_job(&job, MESSAGE_JOB_FAILED);
-	CHECK(data[RESERVE_BASE + STORAGE_SECTOR - 1u] == 0x42 && committed_id == 0);
-	job.reclaim = true;
-	run_job(&job, MESSAGE_JOB_OK);
+	run_job(&job, false, MESSAGE_JOB_INACTIVE);
+	data[RESERVE_BASE + BYTES - 1u] = 0x42;
+	unsigned before = budget;
+	run_job(&job, true, MESSAGE_JOB_FOREIGN);
+	CHECK(data[RESERVE_BASE + BYTES - 1u] == 0x42 && budget == before && committed_id == 0);
+	data[RESERVE_BASE + BYTES - 1u] = 0xFF;
+	data[RESERVE_BASE] = 0x00;
+	run_job(&job, true, MESSAGE_JOB_FOREIGN);
+	CHECK(data[RESERVE_BASE] == 0x00 && budget == before);
+
+	// Every torn-marker byte boundary leaves append disabled until activation is retried.
+	for (unsigned cut = 0; cut < 9u; cut++) {
+		memset(data + RESERVE_BASE, 0xFF, BYTES);
+		budget = cut;
+		run_job(&job, true, MESSAGE_JOB_FAILED);
+		run_job(&job, false, MESSAGE_JOB_INACTIVE);
+		budget = FLASH_BYTES;
+		run_job(&job, true, MESSAGE_JOB_OK);
+	}
+	memset(data + RESERVE_BASE, 0xFF, BYTES);
+	data[RESERVE_BASE] = (uint8_t)('R' | 0x80); // a cut with some intended zero bits still set
+	run_job(&job, false, MESSAGE_JOB_INACTIVE);
+	run_job(&job, true, MESSAGE_JOB_OK);
+	CHECK(storage_init());
+	run_job(&job, false, MESSAGE_JOB_OK);
+	CHECK(committed_id == 1);
+	before = budget;
+	run_job(&job, true, MESSAGE_JOB_OK);
+	CHECK(budget == before);
+
 	message_journal_t j;
-	CHECK(message_journal_mount(&j, &job_flash, RESERVE_BASE, BYTES));
-	CHECK(committed_id == 1 && readable(&j, committed_id));
+	CHECK(message_journal_mount(&j, &job_flash, RESERVE_BASE + STORAGE_SECTOR, BYTES - STORAGE_SECTOR));
+	CHECK(readable(&j, 1));
+	// An invalidated ownership marker stops append without erasing the archived record.
+	data[RESERVE_BASE] &= 0xEF;
+	run_job(&job, false, MESSAGE_JOB_INACTIVE);
+	CHECK(readable(&j, 1));
 }
 
 int main(void)

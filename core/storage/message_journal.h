@@ -35,17 +35,20 @@ typedef enum {
 	MESSAGE_JOB_OK,
 	MESSAGE_JOB_BUSY,
 	MESSAGE_JOB_UNAVAILABLE,
+	MESSAGE_JOB_INACTIVE,
+	MESSAGE_JOB_FOREIGN,
 	MESSAGE_JOB_FAILED,
 } message_journal_result_t;
 
 typedef struct {
-	message_journal_record_t record;
+	const message_journal_record_t *record; // used by append only
 	void (*complete)(message_journal_result_t result, uint32_t id);
-	bool reclaim;
 } message_journal_job_t;
 
-// Submit from the single storage-job producer. Keep the request unchanged and alive until its
-// callback runs on the housekeeping task. Reclaim must come from explicit migration permission.
+// Submit only after the owner approves activation. The activation job never erases flash.
+bool message_journal_activate(message_journal_job_t *job);
+// Submit from the single storage-job producer. Keep the request and record unchanged and alive
+// until the callback runs on the housekeeping task.
 bool message_journal_submit(message_journal_job_t *job);
 #endif
 

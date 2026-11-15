@@ -13,6 +13,13 @@ If another caller holds the buffer, the job reports busy without touching flash.
 belong to the single job producer until the completion callback. No message-service caller
 is wired up yet.
 
+Explicit activation takes the first sector of the reserve for an ownership marker. The
+activation job checks that the range is erased and programs `RFMSG1 3C A5 00` (the six ASCII
+bytes followed by three hexadecimal bytes) in order, with the zero commit byte last. A retry
+can complete a recognizable partial marker
+if the rest of the reserve is still erased. Activation never erases flash. An absent or
+invalid marker disables append even if archived records are still present.
+
 Each sector contains a 16-byte header followed by 21 slots of 192 bytes. All multibyte fields
 are little endian. The header contains the four bytes `RMG1`, a 32-bit generation, a CRC-32 of
 those eight bytes, three unused bytes, and a commit byte. Generations start at 1. Generation
@@ -30,8 +37,9 @@ the new sector header after its first record has committed. The oldest generatio
 live window only then. One physical sector is always outside that window. A write or erase
 failure requires remount before retry.
 
-The writer reclaims a committed, expired sector automatically. An unknown, nonblank sector needs
-explicit reclamation permission. That permission also covers a rollover target whose header was
-lost in an interrupted erase or write. Migration must establish that the selected range can be
-reclaimed, including any bytes left by older allocations. For 512 KiB the engine retains at most
-2,667 slots once all 127 live sectors are full, before any future status or deletion records.
+The engine reclaims a committed, expired sector automatically. The housekeeping adapter
+supplies no blanket permission to reclaim unknown bytes. It refuses a nonblank rollover
+target whose header was lost during erase or programming. Recovery for that case still
+needs an explicit action before enabling SMS capture. With a 512 KiB reserve, one sector
+holds the activation marker and one is outside the live window. The remaining 126 sectors
+hold up to 2,646 slots before any future status or deletion records.
