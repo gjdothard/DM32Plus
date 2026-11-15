@@ -196,7 +196,8 @@ class Site:
 		rels = self.repo_url + "/releases"
 		line = '<a href="%s">%s</a>' % (html.escape(rels), html.escape(self.i18n.t(lang, "footer.changelog")))
 		if self.release:
-			line = '<a href="%s/tag/%s">%s</a> · %s' % (html.escape(rels), html.escape(self.release),
+			tag = "dm32plus-" + self.release if self.firmware_product else self.release
+			line = '<a href="%s/tag/%s">%s</a> · %s' % (html.escape(rels), html.escape(tag),
 				html.escape(self.i18n.t(lang, "footer.firmware", version=self.release)), line)
 		return line
 
