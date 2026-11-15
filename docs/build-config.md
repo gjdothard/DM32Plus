@@ -174,6 +174,7 @@ below are for an STM32F4 radio.
 | `CONFIG_LANG_DEFAULT_ES` | n | The radio starts in Spanish until the user picks a language (an empty language setting means the build's default). Needs `CONFIG_LANG_ES`. Off, for every `CONFIG_LANG_DEFAULT_*`: English. With more than one on, the first in `config/features.mk` wins. No flash cost |
 | `CONFIG_LANG_DEFAULT_IT` | n | The radio starts in Italian, as `CONFIG_LANG_DEFAULT_ES`. Needs `CONFIG_LANG_IT` |
 | `CONFIG_UI_COLOR` | y (n on a monochrome radio) | color screen settings: Theme, Highlight color and Filled status bar in Settings > Display (`docs/spec/ui.md` 5, 8). Off: no such rows, the dark theme's colors. About 600 B; off for radios whose only screen is monochrome |
+| `CONFIG_UI_CARD_MENU` | board default | numbered Main Menu on a tall display with the dark card layout. Needs `UI_COLOR` and `DUAL_WATCH`. Off: standard Hub |
 | `CONFIG_AUDIO_PROBE` | n | diagnostics: debug link command 0x10 reads / writes the audio chip's registers and measures the PCM stream, for the USB audio bench tests (`docs/spec/debuglink.md` 3.14); needs DEBUGLINK and DMR; about 2 KB RAM and 2.2 KB flash. Never for a release; CI builds it in one board's `audio-probe` configuration (with `LTO=1`: the default image has no room for it without), not in maximal. A bench image without LTO: add `CONFIG_SNMP=n` |
 | `CONFIG_UI_SETTINGS` | y | the Settings menu on the radio; off: settings keep their stored values and are set with qdmr (`docs/spec/ui.md` 5) |
 

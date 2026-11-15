@@ -196,6 +196,9 @@
 #ifndef CONFIG_DUAL_WATCH
 #define CONFIG_DUAL_WATCH		CONFIG_SCAN
 #endif
+#ifndef CONFIG_UI_CARD_MENU
+#define CONFIG_UI_CARD_MENU		0
+#endif
 #ifndef CONFIG_KEY_ASSIGN
 #define CONFIG_KEY_ASSIGN		1
 #endif

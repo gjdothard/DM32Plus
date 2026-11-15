@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 # DM-32UV feature defaults (config/features.mk lists them all). 880 KB of code space before the codec slot, so RAM is
 # the limit: 211,456 B below the codec's RAM window (boards/dm32/memory.ld, docs/spec/hardware-dm32.md 17.1), the
 # RTOS heap's 32 KB among them (freertos_board.h). Every feature the radio has hardware and glue for is on, and the
@@ -12,6 +13,7 @@
 CONFIG_FONT_XL ?= y
 CONFIG_FONT_AA ?= y
 CONFIG_FONT_BIG ?= y
+CONFIG_UI_CARD_MENU ?= $(if $(and $(filter y,$(CONFIG_UI_COLOR)),$(filter y,$(CONFIG_DUAL_WATCH))),y,n)
 # The bezel hides the panel's edges, in panel pixels: text 6 px from the left or right edge was still clipped on the
 # radio, so 10 px left and right (the 8 px measured on the right leaves no more 8 px columns), 5 px top and bottom
 CONFIG_DISPLAY_INSET_LEFT ?= 10

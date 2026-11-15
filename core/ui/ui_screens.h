@@ -242,6 +242,10 @@ void ui_draw_home(const radio_view_t *v, const ui_state_t *s);
 void ui_draw_home_dual(const radio_view_t *v, const ui_state_t *s);
 #endif
 void ui_draw_quick(const radio_view_t *v, const ui_state_t *s);
+bool ui_card_layout(const ui_state_t *s);
+#if CONFIG_UI_CARD_MENU
+void ui_draw_main_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l);
+#endif
 #if CONFIG_HOTSPOT
 // Hotspot mode (hostlink in MMDVM mode): frequencies, color code, TX / RX, last call, how to leave
 void ui_draw_hotspot(const radio_view_t *v, const hotspot_view_t *h, const ui_state_t *s);

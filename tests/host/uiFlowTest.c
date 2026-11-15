@@ -1364,6 +1364,24 @@ int main(void)
 	};
 	for (size_t i = 0; i < sizeof card_quick / sizeof card_quick[0]; i++)
 		run_flow(&card_quick[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+#if CONFIG_UI_CARD_MENU
+	static const flow_t card_menu[] = {
+		{ "Main Menu opens from Home", "branded-home", "ok", "screen=hub shows=Main_Menu shows=Activity_/_Logs", 1, false },
+		{ "Radio opens Quick Controls", "branded-home", "ok 1 1", "screen=quick", 3, false },
+		{ "Radio keeps the all-channels list", "branded-home", "ok 1 2", "screen=channels", 3, false },
+		{ "Main Menu direct Messages", "branded-home", "ok 2", "screen=messages", 2, false },
+		{ "Main Menu direct Contacts", "branded-home", "ok 3", "screen=contacts", 2, false },
+		{ "Main Menu direct Zones", "branded-home", "ok 4", "screen=zones", 2, false },
+		{ "Main Menu Scan opens before starting", "branded-home", "ok 5", "screen=scan shows=Start_scan", 2, false },
+		{ "Main Menu Scan can start", "branded-home", "ok 5 1", "screen=home scanning=1", 3, false },
+		{ "Main Menu Activity opens Recent", "branded-home", "ok 6", "screen=recent", 2, false },
+		{ "Main Menu GPS / APRS opens APRS", "branded-home", "ok 7 2", "screen=aprs", 3, false },
+		{ "Main Menu direct Tools", "branded-home", "ok 8", "screen=tools", 2, false },
+		{ "Main Menu direct Settings and Back", "branded-home", "ok 9 back", "screen=hub", 3, false },
+	};
+	for (size_t i = 0; i < sizeof card_menu / sizeof card_menu[0]; i++)
+		run_flow(&card_menu[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+#endif
 #endif
 
 	crawl(sim_geom_find("160x120i5"), SIM_MAP_K, "K DM-1701");

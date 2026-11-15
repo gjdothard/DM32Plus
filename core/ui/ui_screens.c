@@ -1708,20 +1708,21 @@ static void draw_home_large(const radio_view_t *v, const ui_state_t *s)
 	gfx_text(f, 0, y, fit, v->state == RS_TX ? ui_col.tx : v->state == RS_RX ? ui_col.rx : ui_col.fg);
 }
 
-#if CONFIG_DUAL_WATCH
-static bool card_home_available(const ui_state_t *s)
+bool ui_card_layout(const ui_state_t *s)
 {
-	return CONFIG_UI_COLOR && board.home_brand && gfx_bpp() != 1 && gfx_width() >= 220 && gfx_height() >= 300 &&
+	return CONFIG_DUAL_WATCH && CONFIG_UI_COLOR && board.home_brand && gfx_bpp() != 1 &&
+	       gfx_width() >= 220 && gfx_height() >= 300 &&
 	       ui_theme == 0 && !s->large_text && !s->entry;
 }
 
+#if CONFIG_DUAL_WATCH
 static void draw_card_home(const radio_view_t *v, const ui_state_t *s);
 #endif
 
 void ui_draw_home(const radio_view_t *v, const ui_state_t *s)
 {
 #if CONFIG_DUAL_WATCH
-	if (card_home_available(s)) {
+	if (ui_card_layout(s)) {
 		draw_card_home(v, s);
 		return;
 	}
@@ -3391,7 +3392,7 @@ static void __attribute__((noinline)) draw_quick_cards(const radio_view_t *v, co
 void ui_draw_quick(const radio_view_t *v, const ui_state_t *s)
 {
 #if CONFIG_DUAL_WATCH
-	if (card_home_available(s)) {
+	if (ui_card_layout(s)) {
 		draw_quick_cards(v, s);
 		return;
 	}
@@ -3401,6 +3402,62 @@ void ui_draw_quick(const radio_view_t *v, const ui_state_t *s)
 	else
 		draw_quick_tiles(v, s);
 }
+
+#if CONFIG_UI_CARD_MENU
+void ui_draw_main_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l)
+{
+#if CONFIG_DUAL_WATCH
+	if (ui_card_layout(s)) {
+		const font_t *sm = ui_layout.small;
+		const font_t *meta = &font_6x12;
+		const int width = gfx_width(), top = 55, footer = gfx_height() - 19;
+		const int step = (footer - top - 3) / l->count;
+		char fit[40];
+		gfx_clear(CARD_INK);
+		card_status(s);
+		gfx_fill(0, 27, width, 24, CARD_SURFACE);
+		gfx_text_fit(sm, l->prefix, width - 10, fit, sizeof fit);
+		gfx_text(sm, (width - gfx_text_width(sm, fit)) / 2, 29, fit, ui_col.focus);
+		for (uint16_t i = 0; i < l->count; i++) {
+			ui_item_t item = { 0 };
+			l->item(i, &item);
+			int y = top + i * step;
+			int text_y = y + (step - sm->h) / 2;
+			bool focus = l->focus == i;
+			color_t edge = focus ? ui_col.focus : CARD_EDGE;
+			color_t fg = item.flags & UI_ITEM_DIM ? ui_col.dim : ui_col.fg;
+			gfx_round_fill(0, y, width, step - 2, edge);
+			gfx_round_fill(1, y + 1, width - 2, step - 4, focus ? CARD_SELECTED : CARD_SURFACE);
+			char key[] = { item.num, 0 };
+			int ky = y + (step - meta->h) / 2;
+			gfx_round_fill(5, ky - 1, 15, meta->h + 2, edge);
+			gfx_text(meta, 9, ky, key, focus ? CARD_INK : ui_col.fg);
+			int right = width - 7 - meta->w;
+			gfx_text(meta, right, ky, ">", edge);
+			if (item.value[0]) {
+				int vw = gfx_text_width(meta, item.value);
+				right -= vw + 6;
+				gfx_text(meta, right, ky, item.value, ui_col.warn);
+			}
+			const font_t *label = gfx_text_width(sm, item.label) <= right - 28 ? sm : meta;
+			gfx_text_fit(label, item.label, right - 28, fit, sizeof fit);
+			gfx_text(label, 25, text_y + (sm->h - label->h) / 2, fit, fg);
+		}
+		ui_draw_banner(s);
+		if (s->toast)
+			ui_draw_hint(s->toast, true);
+		else if (s->hints) {
+			gfx_hline(0, footer, width, CARD_EDGE);
+			gfx_text(meta, 0, footer + 3, TR("OK Select"), ui_col.dim);
+			const char *back = TR("Back");
+			gfx_text(meta, width - gfx_text_width(meta, back), footer + 3, back, ui_col.dim);
+		}
+		return;
+	}
+#endif
+	ui_draw_list(v, s, l);
+}
+#endif
 
 #if CONFIG_DIAG
 static uint8_t diag_lines_per_page;

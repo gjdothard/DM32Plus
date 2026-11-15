@@ -21,6 +21,10 @@ their mode-specific controls. VFO retains its mode and TX frequency controls.
 The Talk to tile fits the `TG` prefix and seven digits. The picker shortens a long talkgroup name from
 the end to keep the leading ID visible.
 
+With `CONFIG_UI_CARD_MENU`, the tall dark display replaces the seven-entry Hub with a nine-entry Main Menu.
+Radio opens Quick Controls and the all-channels list. GPS / APRS opens the existing Position and APRS pages.
+Scan opens its own control before starting a scan. Activity / Logs opens the Recent activity list.
+
 | Contents | |
 |---|---|
 | 1, 2 | File layout, screens and the stack |

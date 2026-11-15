@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // Inside the UI: the navigation stack, the screen table and the helpers the screens share (ui_app.c, ui_menus.c,
 // ui_find.c). Not for other packages.
@@ -36,6 +37,7 @@ typedef enum {
 	SCR_LANGUAGE,			// Settings > Display > Language: every language, those not built dimmed
 	SCR_SMS_TEXT,			// write a custom message (CONFIG_DMR_SMS)
 	SCR_CONTACT_POSITION,		// last reported position of a private contact
+	SCR_MENU_SECTION,		// a Main Menu section (arg: Radio or GPS / APRS)
 	SCR_COUNT
 } ui_scr_t;
 

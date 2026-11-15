@@ -224,6 +224,7 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `UI_SETTINGS` | ● | ● | ● | ● | ● | ● |
 | `SCAN` | ● | ● | ● | ● | ● | ● |
 | `DUAL_WATCH` | ● | ● | ● | ● | ● | ● |
+| `UI_CARD_MENU` | ● | ○ | ○ | ○ | ○ | ○ |
 | `BEEP` | ● | ● | ● | ● | ● | ● |
 | `FM_TX_TONES` | ● | ● | ● | ● | … | ● |
 | `DTMF` | ● | ● | ● | ● | … | ● |

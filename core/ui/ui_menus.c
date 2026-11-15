@@ -61,41 +61,69 @@ void item_num_set(ui_item_t *it, uint16_t n)
 
 // ======================= Hub =======================
 
-enum { HUB_LAST_CALLER, HUB_CONTACTS, HUB_MESSAGES, HUB_RECENT, HUB_ZONES, HUB_CHANNELS, HUB_TOOLS, HUB_SETTINGS };
+enum { HUB_LAST_CALLER, HUB_CONTACTS, HUB_MESSAGES, HUB_RECENT, HUB_ZONES, HUB_CHANNELS, HUB_TOOLS, HUB_SETTINGS,
+       HUB_RADIO, HUB_SCAN, HUB_GPS };
+
+#if CONFIG_UI_CARD_MENU
+static const uint8_t main_entries[] = {
+	HUB_RADIO, HUB_MESSAGES, HUB_CONTACTS, HUB_ZONES, HUB_SCAN, HUB_RECENT, HUB_GPS, HUB_TOOLS, HUB_SETTINGS,
+};
+#endif
 
 static bool hub_has_last(void)
 {
 	return !ui_has_action(ACT_CONTEXT);	// few-key boards: "Last caller" stands in for CONTEXT (7.5)
 }
 
-static uint16_t hub_count(void) { return hub_has_last() ? 8 : 7; }
+static uint16_t hub_count(void)
+{
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st))
+		return sizeof main_entries;
+#endif
+	return hub_has_last() ? 8 : 7;
+}
 
 static uint8_t hub_entry(uint16_t i)
 {
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st))
+		return main_entries[i];
+#endif
 	return (uint8_t)(hub_has_last() ? i : i + 1u);
 }
 
 static void hub_item(uint16_t i, ui_item_t *it)
 {
 	static const char *const names[] = { TRN("Last caller"), TRN("Contacts"), TRN("Messages"), TRN("Recent"),
-					     TRN("Zones"), TRN("Channels"), TRN("Tools"), TRN("Settings") };
+					     TRN("Zones"), TRN("Channels"), TRN("Tools"), TRN("Settings"),
+#if CONFIG_UI_CARD_MENU
+					     TRN("Radio"), TRN("Scan"), TRN("GPS / APRS"),
+#endif
+	};
+	bool main = CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st);
 	uint8_t e = hub_entry(i);
-	str_copy(it->label, sizeof it->label, tr(names[e]));
-	item_num(it, e);
+	const char *label = main && e == HUB_ZONES ? TR("Zones / Channels") :
+		main && e == HUB_RECENT ? TR("Activity / Logs") : tr(names[e]);
+	str_copy(it->label, sizeof it->label, label);
+	item_num(it, main ? i + 1 : e);
 	sbuf_t b;
 	sb_init(&b, it->value, sizeof it->value);
 	if (e == HUB_MESSAGES && ui_st.unread) {
 		sb_u32(&b, ui_st.unread, 1);
 		sb_str(&b, TR(" new"));
 		it->flags |= UI_ITEM_WARN;
-	} else if (e == HUB_ZONES) {
+	} else if (e == HUB_ZONES && !main) {
 		// The zone (or VFO), left out where it doesn't fit beside the label (an empty last alternate)
 		sb_str(&b, TEXT_ALT_OPEN);
 		sb_str(&b, ui_view()->vfo ? "VFO" : ui_view()->zone_name);
 		sb_str(&b, TEXT_ALT_NEXT TEXT_ALT_CLOSE);
-	} else if (e == HUB_TOOLS && ui_st.scanning) {
+	} else if ((e == HUB_SCAN || (e == HUB_TOOLS && !main)) && ui_st.scanning) {
 		sb_str(&b, TR("Scanning"));
 	}
+	if ((e == HUB_SCAN && !(ui_svc_features() & UI_FEAT_SCAN)) ||
+	    (e == HUB_GPS && !(ui_svc_features() & UI_FEAT_GPS) && !CONFIG_APRS))
+		it->flags |= UI_ITEM_DIM;
 }
 
 static void hub_select(uint16_t i, bool hold)
@@ -104,6 +132,22 @@ static void hub_select(uint16_t i, bool hold)
 				       SCR_TOOLS, SCR_SETTINGS };
 	(void)hold;
 	uint8_t e = hub_entry(i);
+#if CONFIG_UI_CARD_MENU
+	if (e == HUB_RADIO || e == HUB_GPS) {
+		if (e == HUB_GPS && !(ui_svc_features() & UI_FEAT_GPS) && !CONFIG_APRS)
+			ui_toast(TR("Not in this build"));
+		else
+			ui_push(SCR_MENU_SECTION, e);
+		return;
+	}
+	if (e == HUB_SCAN) {
+		if (ui_svc_features() & UI_FEAT_SCAN)
+			ui_push(SCR_SCAN, 1);
+		else
+			ui_toast(TR("Scan: not in this build"));
+		return;
+	}
+#endif
 	if (e == HUB_LAST_CALLER) {
 		if (ui_recent_count() == 0) {
 			ui_toast(TR("No calls heard yet"));
@@ -121,10 +165,74 @@ static void hub_select(uint16_t i, bool hold)
 	ui_push(scr[e], 0);
 }
 
+#if CONFIG_UI_CARD_MENU
+static void hub_draw(void)
+{
+	ui_frame_t *f = ui_frame();
+	ui_list_t list = {
+		.prefix = ui_card_layout(&ui_st) ? TR("Main Menu") : NULL,
+		.count = hub_count(), .focus = f->focus, .top = &f->top,
+		.item = hub_item, .hint = TR("1-7 open  Back"),
+	};
+	ui_draw_main_menu(ui_view(), &ui_st, &list);
+}
+#endif
+
 static const ui_scr_def_t hub_screen = {
 	.name = "hub", .flags = SF_LIST | SF_NUMBERED | SF_FIELD, .hint = TRN("1-7 open  Back"),
 	.count = hub_count, .item = hub_item, .select = hub_select,
+#if CONFIG_UI_CARD_MENU
+	.draw = hub_draw,
+#endif
 };
+
+#if CONFIG_UI_CARD_MENU
+static void open_gps_position(void);
+
+static const char *menu_section_title(void)
+{
+	return ui_frame()->arg == HUB_GPS ? TR("GPS / APRS") : TR("Radio");
+}
+
+static bool section_available(uint16_t i)
+{
+	if (ui_frame()->arg == HUB_GPS)
+		return i == 0 ? (ui_svc_features() & UI_FEAT_GPS) != 0 : CONFIG_APRS;
+	return i == 0 || CONFIG_CHANNEL_LIST;
+}
+
+static uint16_t menu_section_count(void) { return 2; }
+
+static void menu_section_item(uint16_t i, ui_item_t *it)
+{
+	const char *label = ui_frame()->arg == HUB_GPS ? (i == 0 ? TR("Position") : "APRS") :
+		(i == 0 ? TR("Quick Controls") : TR("Channels"));
+	str_copy(it->label, sizeof it->label, label);
+	item_num(it, i + 1);
+	if (!section_available(i))
+		it->flags |= UI_ITEM_DIM;
+}
+
+static void menu_section_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	if (!section_available(i)) {
+		ui_toast(TR("Not in this build"));
+	} else if (ui_frame()->arg == HUB_GPS) {
+		if (i == 0)
+			open_gps_position();
+		else
+			ui_push(SCR_APRS, 0);
+	} else {
+		ui_push(i == 0 ? SCR_QUICK : SCR_CHANNELS, 0);
+	}
+}
+
+static const ui_scr_def_t menu_section_screen = {
+	.name = "menu-section", .flags = SF_LIST | SF_NUMBERED | SF_FIELD, .title = menu_section_title,
+	.count = menu_section_count, .item = menu_section_item, .select = menu_section_select,
+};
+#endif
 
 // ======================= Actions on a station or talkgroup =======================
 
@@ -3463,6 +3571,11 @@ static const ui_scr_def_t chpick_screen = {
 enum { INFO_POSITION, INFO_HOTSPOT, INFO_BATTERY, INFO_FIRMWARE, INFO_CODEPLUG, INFO_USB_NET,
        INFO_SFR };
 
+static void open_gps_position(void)
+{
+	ui_push(CONFIG_GPS_SKY ? SCR_GPS : SCR_INFO, INFO_POSITION);
+}
+
 static const char *const info_titles[] = { TRN("Position"), TRN("Hotspot"), TRN("Battery"), TRN("About"),
 					   TRN("Codeplug"), TRN("USB Network"), TRN("Single-Freq Repeater") };
 
@@ -4848,7 +4961,7 @@ static void tools_select(uint16_t row, bool hold)
 			ui_scan_toggle();	// says what scans: the zone, or the band in the VFO (dual watch ends)
 		}
 		break;
-	case T_POSITION: ui_push(CONFIG_GPS_SKY ? SCR_GPS : SCR_INFO, INFO_POSITION); break;
+	case T_POSITION: open_gps_position(); break;
 	case T_HOTSPOT: ui_push(SCR_INFO, INFO_HOTSPOT); break;
 	case T_USB_NET: ui_push(SCR_INFO, INFO_USB_NET); break;
 	case T_SFR: ui_push(SCR_INFO, INFO_SFR); break;
@@ -5796,12 +5909,14 @@ static const ui_scr_def_t picker_screen = {
 
 // ======================= Scan: what to do with the channel that stopped it =======================
 
-static uint16_t scan_count(void) { return 3; }
+static bool scan_start_row(void) { return CONFIG_UI_CARD_MENU && ui_frame()->arg == 1 && !ui_st.scanning; }
+
+static uint16_t scan_count(void) { return scan_start_row() ? 1 : 3; }
 
 static void scan_item(uint16_t i, ui_item_t *it)
 {
 	static const char *const names[] = { TRN("Skip channel for now"), TRN("Stay here"), TRN("Always skip") };
-	str_copy(it->label, sizeof it->label, tr(names[i]));
+	str_copy(it->label, sizeof it->label, scan_start_row() ? TR("Start scan") : tr(names[i]));
 	item_num(it, (uint16_t)(i + 1u));
 	if (i == 2)
 		it->flags |= UI_ITEM_DIM;
@@ -5810,7 +5925,10 @@ static void scan_item(uint16_t i, ui_item_t *it)
 static void scan_select(uint16_t i, bool hold)
 {
 	(void)hold;
-	if (i == 0) {
+	if (scan_start_row()) {
+		ui_go_home();
+		ui_scan_toggle();
+	} else if (i == 0) {
 		ui_go_home();
 		ui_toast(ui_svc_scan_skip() ? TR("Skipped until the scan stops") : TR("Nothing to skip yet"));
 	} else if (i == 1) {
@@ -5824,7 +5942,7 @@ static void scan_select(uint16_t i, bool hold)
 }
 
 static const ui_scr_def_t scan_screen = {
-	.name = "scan", .flags = SF_LIST | SF_NUMBERED | SF_FIELD, .prefix = TRN("Scan"), .hint = TRN("1-3 pick  Back"),
+	.name = "scan", .flags = SF_LIST | SF_NUMBERED | SF_FIELD, .prefix = TRN("Scan"), .hint = TRN("OK pick  Back"),
 	.count = scan_count, .item = scan_item, .select = scan_select,
 };
 
@@ -5888,6 +6006,9 @@ static const ui_scr_def_t lang_screen = {
 
 const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
 	[SCR_HOME] = &home_screen, [SCR_QUICK] = &quick_screen, [SCR_HUB] = &hub_screen,
+#if CONFIG_UI_CARD_MENU
+	[SCR_MENU_SECTION] = &menu_section_screen,
+#endif
 	[SCR_FIND] = &ui_find_screen, [SCR_ACTIONS] = &actions_screen, [SCR_CONTACTS] = &contacts_screen,
 	[SCR_MESSAGES] = &messages_screen, [SCR_MESSAGE] = &message_screen, [SCR_COMPOSE] = &compose_screen,
 #if CONFIG_DMR_SMS

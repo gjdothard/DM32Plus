@@ -1117,6 +1117,26 @@ msgid "Zones"
 msgstr "Zonas"
 
 #: core/ui/ui_menus.c
+msgid "Radio"
+msgstr "Radio"
+
+#: core/ui/ui_menus.c core/ui/ui_screens.c
+msgid "Scan"
+msgstr "Escanear"
+
+#: core/ui/ui_menus.c
+msgid "GPS / APRS"
+msgstr "GPS / APRS"
+
+#: core/ui/ui_menus.c
+msgid "Zones / Channels"
+msgstr "Zonas / Canales"
+
+#: core/ui/ui_menus.c
+msgid "Activity / Logs"
+msgstr "Actividad / Registros"
+
+#: core/ui/ui_menus.c
 msgid " new"
 msgstr " nuevos"
 
@@ -1129,8 +1149,16 @@ msgid "Channels: not in this build"
 msgstr "Canales: no disponible"
 
 #: core/ui/ui_menus.c
+msgid "Main Menu"
+msgstr "Menú principal"
+
+#: core/ui/ui_menus.c
 msgid "1-7 open  Back"
 msgstr "1-7 abrir  Atrás"
+
+#: core/ui/ui_menus.c core/ui/ui_screens.c
+msgid "Quick Controls"
+msgstr "Controles rápidos"
 
 #: core/ui/ui_menus.c
 msgid "Talk to "
@@ -1635,10 +1663,6 @@ msgstr "Alias TS2"
 #: core/ui/ui_menus.c
 msgid "TX time-out"
 msgstr "Límite TX"
-
-#: core/ui/ui_menus.c core/ui/ui_screens.c
-msgid "Scan"
-msgstr "Escanear"
 
 #: core/ui/ui_menus.c
 msgid "Battery saver"
@@ -3081,6 +3105,10 @@ msgid "Always skip"
 msgstr "Saltar siempre"
 
 #: core/ui/ui_menus.c
+msgid "Start scan"
+msgstr "Iniciar escaneo"
+
+#: core/ui/ui_menus.c
 msgid "Skipped until the scan stops"
 msgstr "Ignorado hasta parar escaneo"
 
@@ -3641,12 +3669,12 @@ msgid "0 All settings  Hold OK save"
 msgstr "0 Ajustes  Mant OK guardar"
 
 #: core/ui/ui_screens.c
-msgid "Quick Controls"
-msgstr "Controles rápidos"
-
-#: core/ui/ui_screens.c
 msgid "Offset"
 msgstr "Desvío"
+
+#: core/ui/ui_screens.c
+msgid "OK Select"
+msgstr "OK elegir"
 
 #: core/ui/ui_screens.c
 msgid "* more  Back"
