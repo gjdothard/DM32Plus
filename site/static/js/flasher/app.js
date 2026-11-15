@@ -24,7 +24,7 @@ import * as stockfw from "./stockfw.js";
 import { openVendorFile, describe as describeVendorFile, analysisCandidate, offerFile, logId, whyNot } from "./vendorfile.js";
 import { pickProblem, errorProblem, vendorContext, supportedFiles, foldSupported, keepNote, nowFor, nowChoice, OFFER } from "./explain.js";
 import { confirmNoCodec } from "./nocodec.js";
-import { PRODUCT, bundledRelease, loadBundledRelease, supportsBundledFirmware } from "./dm32plus-release.js";
+import { PRODUCT, CHANNELS, bundledRelease, loadBundledRelease, lookupRelease, supportsBundledFirmware } from "./dm32plus-release.js";
 import { makePlan, KEEP, MERGE } from "./plan.js";
 import { radioPicture, holdKeys } from "./radiotop.js";
 import { validRef, refShort, defaultRef, firmwareName, betaLink } from "./version.js";
@@ -391,7 +391,48 @@ async function loadData() {
 
 const fb = () => (S.sim ? S.sim.fb : S.data.fb);
 const bundledMode = () => S.data?.site.firmware_product === PRODUCT;
-const releaseForRadio = () => bundledRelease(S.data.releases, S.radio.id);
+let releaseChannel = "bundled";
+try {
+	const saved = localStorage.getItem("dm32plus.releaseChannel");
+	if (CHANNELS.includes(saved)) releaseChannel = saved;
+} catch { /* The picker still works without persistent storage. */ }
+let releaseLookup = null;
+const releaseForRadio = () => releaseChannel === "bundled" ?
+	bundledRelease(S.data.releases, S.radio.id) : releaseLookup?.release ?? null;
+
+function releasePicker(draw, busy) {
+	const refresh = () => {
+		if (releaseChannel === "bundled") return;
+		const lookup = { pending: true };
+		releaseLookup = lookup;
+		lookupRelease(releaseChannel).then((release) => { lookup.release = release; },
+			() => { lookup.failed = true; }).finally(() => {
+			lookup.pending = false;
+			if (releaseLookup === lookup) render();
+		});
+	};
+	if (releaseChannel !== "bundled" && !releaseLookup) refresh();
+	const select = h("select", { disabled: busy, onchange: (e) => {
+		releaseChannel = e.target.value;
+		try { localStorage.setItem("dm32plus.releaseChannel", releaseChannel); } catch { /* Optional. */ }
+		releaseLookup = null;
+		S.firmware = S.build = null;
+		draw();
+	} }, ...CHANNELS.map((channel) => h("option", { value: channel, selected: channel === releaseChannel },
+		t(`flash.dm32plus.channel_${channel}`))));
+	const lookup = releaseLookup;
+	return h("div", {},
+		h("label", {}, t("flash.dm32plus.channel"), " ", select),
+		releaseChannel === "bundled" ? notice(t("flash.dm32plus.bundled"), "info") :
+			lookup?.pending ? h("p", { role: "status" }, spinner(), t("flash.dm32plus.checking")) :
+			lookup?.failed ? notice(t("flash.dm32plus.unavailable"), "bad") :
+			!lookup?.release ? notice(t("flash.dm32plus.no_release"), "info") : null,
+		releaseChannel === "bundled" ? null : button(t("flash.dm32plus.refresh"), () => {
+			S.firmware = S.build = null;
+			refresh();
+			draw();
+		}, { quiet: true, disabled: busy || !!lookup?.pending }));
+}
 // Every image comes from the build service, so a radio needs only a backend the page has for it (backends.js)
 // In the practice mode only the simulated radio: S.sim (its key, stock file, fake radio) is that radio's, and another
 // one picked on the radio step met a missing stock file at the codec step (OPENDIGITALRADIO-22)
@@ -781,6 +822,7 @@ async function reset() {
 	// exactly a fresh load: fields set along the way (buildOptions, keyFromRadio, ...) go, the rest start over
 	for (const k of Object.keys(S)) delete S[k];
 	Object.assign(S, initialState(), keep);
+	releaseLookup = null;
 	setAdapter(null);	// the next connect names its own
 	render();
 }
@@ -821,7 +863,7 @@ function simLinks() {
 // update: a radio that runs RadioFoundry, reached once, its build kept
 
 // The newest release of the radio (or the version link's): what the update installs
-const updateVersion = () => bundledMode() ? (releaseForRadio()?.version ?? PRODUCT) : VERSION_REF ? versionShort()
+const updateVersion = () => bundledMode() ? (releaseForRadio()?.version ?? "—") : VERSION_REF ? versionShort()
 	: S.data.releases.filter((x) => x.board === S.radio.id).at(-1)?.version || defaultRef(S.data.site.branch);
 
 // One port chooser for every radio: RadioFoundry's USB port or a programming cable. Whatever answers names the radio, and
@@ -929,14 +971,15 @@ function updateView() {
 			h("span", {}, h("b", {}, t("flash.update.backup")), h("span", { class: "why" }, t("flash.update.backup_text"))), h("span"));
 		// the STM32 radios' backup is the one before an install; the HR_C7000 radios' comes in their check step
 		const backupPanel = S.updateBackup && !c7ui.isC7000(S.radio, fb()) && !S.backupDone ? backupNow({ when: "before", onDone: draw }) : null;
-		out.replaceChildren(panel(t("flash.update.title"),
+		const busy = building && !S.build.error;
+		const picker = bundled ? releasePicker(draw, !!busy) : null;
+		out.replaceChildren(panel(t(bundled ? "flash.dm32plus.upgrade" : "flash.update.title"),
 			h("dl", { class: "kv-list" },
 				h("dt", {}, t("flash.update.radio")), h("dd", {}, S.radio.name),
 				h("dt", {}, t("flash.update.version")), h("dd", {}, t("flash.update.from_to", { from: firmwareName(p.version), to: updateVersion() })),
 				h("dt", {}, t("flash.update.build")), h("dd", {}, bundled ? PRODUCT : buildText, " ", bundled || cur.kind === "unknown" ? null : edit)),
-			bundled ? notice(t("flash.dm32plus.bundled"), "info") : cur.kind === "unknown" ? notice(t("flash.update.unknown_text", { variant: vtitle(cur.guess) }), "info") : null,
+			picker || (cur.kind === "unknown" ? notice(t("flash.update.unknown_text", { variant: vtitle(cur.guess) }), "info") : null),
 			S.editBuild ? null : asks, S.editBuild ? null : added, backup, backupPanel, image, status));
-		const busy = building && !S.build.error;
 		const go = async () => {
 			if (S.editBuild) return next();
 			if (!S.firmware && S.sim) await ensureFirmware();
@@ -944,7 +987,7 @@ function updateView() {
 			if (S.firmware) next();
 		};
 		S.forward(button(busy ? [spinner(), t("flash.nav.building")] : t(S.editBuild ? "flash.update.to_build" : "flash.update.go"), go,
-			{ primary: true, disabled: busy || (!S.editBuild && !plan.ready) || (S.updateBackup && !!backupPanel) }),
+			{ primary: true, disabled: busy || (bundled && !releaseForRadio()) || (!S.editBuild && !plan.ready) || (S.updateBackup && !!backupPanel) }),
 			!S.editBuild && !plan.ready ? t("flash.update.decide_first") : null);
 	};
 	draw();
@@ -1199,10 +1242,12 @@ function buildView() {
 function bundledBuildView() {
 	const out = h("div", { class: "flasher" });
 	const draw = () => {
-		const release = releaseForRadio();
 		const busy = S.build && !S.build.error;
-		out.replaceChildren(panel(t("flash.build.title"), h("p", {}, t("flash.dm32plus.bundled")),
-			release ? h("p", {}, `${PRODUCT} ${release.version} · ${S.radio.name}`) : notice(t("flash.build.no_image"), "bad"),
+		const picker = releasePicker(draw, !!busy);
+		const release = releaseForRadio();
+		out.replaceChildren(panel(t("flash.build.title"), picker,
+			release ? h("p", {}, `${PRODUCT} ${release.version} · ${S.radio.name}`) :
+				releaseChannel === "bundled" ? notice(t("flash.build.no_image"), "bad") : null,
 			S.build?.error ? buildErrorNotice(S.build.error) : busy ? h("p", { role: "status" }, spinner(), S.build.text) : null));
 		S.forward(button(t("flash.dm32plus.continue"), async () => {
 			if (!S.firmware) await requestBuild(draw);

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """Serve the portable CPS on loopback using only the bundled standard library."""
 import argparse
 import functools
@@ -7,6 +8,7 @@ import http.server
 import json
 import os
 from pathlib import Path
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -14,6 +16,7 @@ import webbrowser
 
 APP = "radiofoundry-offline-cps"
 HEALTH = "/__offline_cps_health"
+RELEASE_ASSET = re.compile(r"/_dm32plus_release/(dm32plus-dm32-(v\d{2}\.\d{1,2}(?:\.\d+)?(?:b\d+)?))\.(bin|json)")
 
 
 class LocalHTTPServer(http.server.ThreadingHTTPServer):
@@ -38,7 +41,11 @@ def make_handler(site, package_id):
 			if host not in ("localhost", "127.0.0.1"):
 				self.send_error(403, "Local access only")
 				return
-			if urllib.parse.urlsplit(self.path).path == HEALTH:
+			path = urllib.parse.urlsplit(self.path).path
+			asset = RELEASE_ASSET.fullmatch(path)
+			if asset:
+				self._release_asset(asset, head)
+			elif path == HEALTH:
 				body = json.dumps({"app": APP, "package": package_id}).encode()
 				self.send_response(200)
 				self.send_header("Content-Type", "application/json")
@@ -50,6 +57,26 @@ def make_handler(site, package_id):
 				super().do_HEAD()
 			else:
 				super().do_GET()
+
+		def _release_asset(self, match, head):
+			base, version, extension = match.groups()
+			url = f"https://github.com/gjdothard/DM32Plus/releases/download/dm32plus-{version}/{base}.{extension}"
+			request = urllib.request.Request(url, headers={"User-Agent": "DM32Plus-CPS"})
+			limit = 1024 * 1024 if extension == "bin" else 32 * 1024
+			try:
+				with urllib.request.urlopen(request, timeout=15) as response:
+					body = response.read(limit + 1)
+				if len(body) > limit:
+					raise ValueError("Release asset exceeds its size limit")
+			except (OSError, ValueError):
+				self.send_error(502, "DM32Plus release asset is unavailable")
+				return
+			self.send_response(200)
+			self.send_header("Content-Type", "application/octet-stream" if extension == "bin" else "application/json")
+			self.send_header("Content-Length", str(len(body)))
+			self.end_headers()
+			if not head:
+				self.wfile.write(body)
 
 		def do_GET(self):
 			self._request()

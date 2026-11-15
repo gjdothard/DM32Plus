@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createHash } from "node:crypto";
-import { bundledRelease, loadBundledRelease } from "../static/js/flasher/dm32plus-release.js";
+import { bundledRelease, loadBundledRelease, lookupRelease, newestRelease } from "../static/js/flasher/dm32plus-release.js";
 
 const bytes = Uint8Array.of(72, 3, 26, 1);
 const sha256 = createHash("sha256").update(bytes).digest("hex");
@@ -40,4 +40,41 @@ test("loads only local assets and validates the board, checksum and codec status
 		new Response(url.endsWith(".json") ? JSON.stringify({ ...manifest, codec: { included: true } }) : bytes)), /does not match/);
 	await assert.rejects(loadBundledRelease(release, "../", fb, async (url) =>
 		new Response(url.endsWith(".json") ? JSON.stringify(manifest) : Uint8Array.of(72, 3, 26, 2))), /SHA-256/);
+});
+
+const published = (version, prerelease, draft = false) => ({
+	tag_name: "dm32plus-" + version, prerelease, draft,
+	assets: ["bin", "json"].map((ext) => ({
+		name: `dm32plus-dm32-${version}.${ext}`, state: "uploaded", digest: "sha256:" + sha256,
+	})),
+});
+
+test("chooses the newest complete stable or development version in numerical order", () => {
+	const incomplete = published("v27.1b1", true);
+	incomplete.assets.pop();
+	const releases = [published("v26.11b2", true), published("v26.11b10", true), published("v26.12", false),
+		published("v27.2b1", true, true), incomplete, published("v26.9", false)];
+	assert.equal(newestRelease(releases, "development").version, "v26.11b10");
+	assert.equal(newestRelease(releases, "stable").version, "v26.12");
+	assert.equal(newestRelease([incomplete], "development"), null);
+	assert.equal(newestRelease(releases, "bundled"), null);
+});
+
+test("checks all release pages and uses only the fixed local asset endpoint", async () => {
+	const calls = [];
+	const selected = await lookupRelease("development", async (url) => {
+		calls.push(url);
+		return Response.json(url.endsWith("page=1") ? Array(100).fill(published("v26.10b1", true)) :
+			[published("v26.11b1", true)]);
+	});
+	assert.equal(calls.length, 2);
+	assert.equal(selected.version, "v26.11b1");
+	const requested = [];
+	const fw = await loadBundledRelease(selected, "../", fb, async (url) => {
+		requested.push(url);
+		return new Response(url.endsWith(".json") ? JSON.stringify(manifest) : bytes);
+	});
+	assert.equal(fw.origin, "github");
+	assert.deepEqual(requested, [`../_dm32plus_release/${name}.json`, `../_dm32plus_release/${name}.bin`]);
+	await assert.rejects(lookupRelease("stable", async () => new Response("", { status: 502 })), /unavailable/);
 });
