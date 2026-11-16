@@ -21,11 +21,12 @@ room. The [Radio reference](23-radios.md) lists them and says where APRS is veri
   valid callsign nothing is sent, and the APRS page says why.
 - Sending is off until you turn it on. "Send position now" works at any time.
 
-## GPS / APRS & Data
+## GPS, APRS, and Data
 
 On the dark card layout, press **OK**, **7** on Home. **1** opens Position and shows the fix and satellites used
-beside the card. **2** opens APRS. **3** opens DMR Data Status, including the current ARS registration state.
-ARP has no per-peer resolution status in the firmware. **4** opens LRRP Subscriptions and shows how many remote
+beside the card. **2** opens APRS. **3** opens ARS and shows the current registration status and the configured
+server ID. Select **Server ID**, press **OK**, enter the ID, and press **OK** to save or **Back** to cancel. Enter **0**
+to turn registration off. **4** opens LRRP Subscriptions and shows how many remote
 triggered location reports are active and whether the radio is set to answer GPS requests. This page is read-only.
 Change **Answer GPS requests** in **Settings > Location**.
 
@@ -121,13 +122,13 @@ Four decimal places put you within about 11 m. You can also type "latitude" or "
 
 **Tools > Position** shows what the radio's GPS is doing, on four pages. Press Up or Down (or turn the knob) for the
 next page, or press 1 to 4. On a radio with a tall screen, Status also shows the grid locator and degrees, minutes and
-seconds, so there are three pages.
+seconds, so there are three pages. The dark card layout shows Status, Sky, and Signal as tabs.
 
 | Page | What it shows |
 |---|---|
 | 1 Status | 3D Fix, 2D Fix (Fix when the receiver doesn't say which) or Searching; satellites used and seen; position, altitude, speed, HDOP (accuracy: good, fair, poor) and the UTC time of the fix |
 | 2 Sky | where each satellite is: the outer ring is the horizon, the middle ring 45 degrees up, north at the top. A filled dot is used in the fix. The colors and the legend show the system: GPS, GLONASS, Galileo, BeiDou, QZSS |
-| 3 Signal | each satellite's signal strength as a bar; filled bars are used in the fix |
+| 3 Signal | each satellite's signal strength as a bar. Filled bars are used in the fix. The dark card layout marks 25 and 50 dB-Hz |
 | 4 Grid | your Maidenhead grid locator (FN42li), and the position in degrees, minutes and seconds |
 
 "No GPS, or it is off" means the radio has no GPS or **Settings > Location > GPS** is off. A first fix outdoors takes

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Tools > Position with CONFIG_GPS_SKY (docs/spec/ui.md 2.3): the board GPS on four pages, Up / Down (the knob, the
 // digits 1-4) to turn them. Status: the fix, satellites, position, altitude, speed, dilution, time. Sky: where each
 // satellite is (a polar plot, north up), filled when the fix uses it. Signal: each satellite with a signal as a bar. Grid:
@@ -154,15 +155,31 @@ static void count_sats(uint8_t used[UI_GNSS_COUNT], uint8_t seen[UI_GNSS_COUNT])
 	}
 }
 
+static bool position_cards(void)
+{
+	return CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st);
+}
+
+static int position_bottom(void)
+{
+	return position_cards() ? gfx_height() - 23 : ui_layout.hint_y;
+}
+
 // "label  value" rows from y; false once the next would run into the hint row
 static bool row(int *y, const char *label, const char *value, color_t vc)
 {
 	const font_t *f = ui_layout.small;
-	if (*y + f->h > ui_layout.hint_y)
+	if (*y + f->h > position_bottom())
 		return false;
-	int x = gfx_text(f, 0, *y, label, ui_col.dim);
+	bool cards = position_cards();
+	int x = gfx_text(f, cards ? 8 : 0, *y, label, ui_col.dim);
+	if (cards) {
+		int right = gfx_width() - 8 - gfx_text_width(f, value);
+		if (right > x + f->w)
+			x = right - f->w;
+	}
 	gfx_text(f, x + f->w, *y, value, vc);
-	*y += f->h + (ui_layout.row_h > f->h ? 1 : 0);
+	*y += f->h + (!cards && ui_layout.row_h > f->h ? 1 : 0);
 	return true;
 }
 
@@ -172,13 +189,17 @@ static void draw_status(const ui_position_t *p, int y)
 	sbuf_t b;
 	const font_t *big = gfx_width() >= 200 ? ui_layout.large : ui_layout.medium;
 	bool grid = page_count() == PG_GRID && p->fix;	// the Grid page's facts here too
-	gfx_text(big, 0, y, fix_word(p), p->fix ? ui_col.rx : ui_col.warn);
+	gfx_text(big, position_cards() ? 8 : 0, y, fix_word(p), p->fix ? ui_col.rx : ui_col.warn);
 	if (grid) {
 		char loc[7];
 		locator(loc, p->lat_e7, p->lon_e7);
 		gfx_text(big, gfx_width() - gfx_text_width(big, loc) - 2, y, loc, ui_col.fg);
 	}
 	y += big->h + 1;
+	if (position_cards()) {
+		gfx_hline(8, y + 2, gfx_width() - 16, ui_col.line);
+		y += 5;
+	}
 	sb_init(&b, buf, sizeof buf);
 	sb_u32(&b, p->sats, 1);
 	sb_str(&b, TR(" used, "));
@@ -261,7 +282,7 @@ static void legend(int x, int y, int cols, int col_w, const uint8_t used[], cons
 		sb_chr(&b, '/');
 		sb_u32(&b, seen[s], 1);
 		int ly = y + (k / cols) * (f->h + 1);
-		if (ly + f->h > ui_layout.hint_y)
+		if (ly + f->h > position_bottom())
 			return;
 		gfx_text(f, x + (k % cols) * col_w, ly, buf, sys_color(s));
 		k++;
@@ -315,7 +336,7 @@ static bool label_clear(uint8_t i, uint32_t labeled, uint32_t left, int lx, int 
 
 static void draw_sky(const ui_position_t *p, int y)
 {
-	int w = gfx_width(), h = ui_layout.hint_y - y - 1;
+	int w = gfx_width(), h = position_bottom() - y - 1;
 	uint8_t used[UI_GNSS_COUNT], seen[UI_GNSS_COUNT];
 	count_sats(used, seen);
 	int systems = 0;
@@ -326,7 +347,7 @@ static void draw_sky(const ui_position_t *p, int y)
 	int legend_h = (systems + 1) / 2 * (ui_layout.small->h + 1) + 3;
 	if (below && side > h - legend_h)
 		side = h - legend_h;
-	int r = side / 2 - 1;
+	int r = side / 2 - (position_cards() ? 5 : 1);
 	int cx = below ? w / 2 : r + 1, cy = y + r + 1;
 	const font_t *t = ui_layout.tiny;
 	circle(cx, cy, r, ui_col.line);
@@ -385,15 +406,26 @@ static void draw_signal(const ui_position_t *p, int y)
 	sb_str(&b, TR(" of "));
 	sb_u32(&b, p->in_view, 1);
 	sb_str(&b, TR(" in the fix"));
-	gfx_text(ui_layout.small, 0, y, buf, ui_col.fg);
-	y += ui_layout.small->h + 2;
+	bool cards = position_cards();
+	if (cards) {
+		gfx_text(t, 8, y, buf, ui_col.fg);
+		gfx_text(t, w - 8 - gfx_text_width(t, "dB-Hz"), y, "dB-Hz", ui_col.dim);
+		y += t->h + 5;
+	} else {
+		gfx_text(ui_layout.small, 0, y, buf, ui_col.fg);
+		y += ui_layout.small->h + 2;
+	}
 	ui_gps_sat_t s;
 	uint8_t n = 0;		// bars: the satellites with a signal (one without has no bar to show)
 	for (uint8_t i = 0; ui_svc_gps_sat(i, &s); i++)
 		n += s.snr > 0;
-	if (n == 0)
+	if (n == 0) {
+		if (cards)
+			gfx_text(ui_layout.small, 8, y, TR("No signal"), ui_col.dim);
 		return;
-	int pitch = w / n;
+	}
+	int inset = cards ? 8 + gfx_text_width(t, "50") : 0;
+	int pitch = (w - inset) / n;
 	if (pitch > 24)
 		pitch = 24;
 	if (pitch < 3)
@@ -402,15 +434,21 @@ static void draw_signal(const ui_position_t *p, int y)
 	// then has two bars' width), else none
 	int need = t->w * 2 + 2;
 	int rows = pitch >= need ? 1 : 2 * pitch >= need ? 2 : 0;
-	int base = ui_layout.hint_y - 2 - rows * t->h;
+	int base = position_bottom() - 2 - rows * t->h;
 	int hmax = base - y;
 	if (hmax < 4)
 		return;
+	if (inset) {
+		gfx_hline(inset, y, w - inset, ui_col.line);
+		gfx_hline(inset, base - hmax / 2, w - inset, ui_col.line);
+		gfx_text(t, 2, y, "50", ui_col.dim);
+		gfx_text(t, 2, base - hmax / 2, "25", ui_col.dim);
+	}
 	uint8_t k = 0;
-	for (uint8_t i = 0; k < n && (k + 1) * pitch <= w && ui_svc_gps_sat(i, &s); i++) {
+	for (uint8_t i = 0; k < n && inset + (k + 1) * pitch <= w && ui_svc_gps_sat(i, &s); i++) {
 		if (s.snr == 0)
 			continue;
-		int x = k++ * pitch, bw = pitch - 1;
+		int x = inset + k++ * pitch, bw = pitch - 1;
 		int bh = s.snr * hmax / SNR_FULL;
 		bh = bh > hmax ? hmax : bh < 1 ? 1 : bh;
 		color_t c = sys_color(s.sys);
@@ -427,7 +465,7 @@ static void draw_signal(const ui_position_t *p, int y)
 			gfx_text(t, lx < 0 ? 0 : lx, base + 1 + (rows == 2 && (k & 1) == 0 ? t->h : 0), lb, c);
 		}
 	}
-	gfx_hline(0, base, w, ui_col.line);
+	gfx_hline(inset, base, w - inset, ui_col.line);
 }
 
 static void draw_grid(const ui_position_t *p, int y)
@@ -464,8 +502,16 @@ static void draw_grid(const ui_position_t *p, int y)
 static void gps_draw(void)
 {
 	ui_position_t p;
-	gfx_clear(ui_col.bg);
-	int y = ui_draw_top(ui_view(), &ui_st, "GPS", tr(page_names[page])) + 2;
+	int y;
+#if CONFIG_UI_CARD_MENU
+	if (position_cards())
+		y = ui_draw_position_tabs(&ui_st, page_names, page_count(), page);
+	else
+#endif
+	{
+		gfx_clear(ui_col.bg);
+		y = ui_draw_top(ui_view(), &ui_st, "GPS", tr(page_names[page])) + 2;
+	}
 	if (!ui_svc_position(&p)) {
 		gfx_text(ui_layout.small, 0, y, TR("No GPS, or it is off"), ui_col.warn);
 		gfx_text(ui_layout.small, 0, y + ui_layout.small->h + 2, TR("Settings > Location"), ui_col.dim);
@@ -477,6 +523,12 @@ static void gps_draw(void)
 		default: draw_status(&p, y); break;
 		}
 	}
+#if CONFIG_UI_CARD_MENU
+	if (position_cards()) {
+		ui_draw_position_footer(&ui_st);
+		return;
+	}
+#endif
 	ui_draw_bottom(&ui_st, TR("Up Down page  Back"));
 	ui_draw_banner(&ui_st);
 }

@@ -24,7 +24,7 @@ The Talk to tile fits the `TG` prefix and seven digits. The picker shortens a lo
 the end to keep the leading ID visible.
 
 With `CONFIG_UI_CARD_MENU`, the tall dark display replaces the seven-entry Hub with a nine-entry Main Menu.
-Radio opens Quick Controls and the all-channels list. GPS / APRS opens the existing Position and APRS pages.
+Radio opens Quick Controls and the all-channels list. GPS, APRS, and Data opens Position, APRS, ARS, and LRRP Subscriptions.
 Scan opens its own control before starting a scan. Activity / Logs opens the Recent activity list.
 Zones / Channels uses a two-step zone and channel list. The zone row shows its channel count and marks
 the active zone. OK and CONTEXT open its channels, and held OK tunes the zone directly on boards with CONTEXT.
@@ -272,7 +272,7 @@ they show the change within a fraction of a second.
 ### 2.3 GPS screen
 
 With `CONFIG_GPS_SKY`, Tools > Position (`gps`, `ui_gps.c`) has four pages, three on a panel at least `UI_TALL_PX` tall
-(Status takes in Grid there). Up and Down (the knob) turn them and wrap; the digits go to one. It opens on Status. Every draw reads `ui_svc_position` and the satellites one at a time
+(Status takes in Grid there). The tall dark card layout shows the active tab and a 25/50 dB-Hz scale on Signal. Up and Down (the knob) turn them and wrap; the digits go to one. It opens on Status. Every draw reads `ui_svc_position` and the satellites one at a time
 (`ui_svc_gps_sat`), so the screen keeps one byte, its page.
 
 | Page | Shows |

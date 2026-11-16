@@ -10,7 +10,7 @@
 #include "ui_nav.h"
 #include "ui_svc.h"
 #include "fmt.h"
-#if CONFIG_CONTACT_POSITION
+#if CONFIG_CONTACT_POSITION || CONFIG_DMR_ARS
 #include "dmr/call/dmr_lc.h"
 #endif
 #include "codeplug/codeplug.h"
@@ -106,7 +106,7 @@ static void hub_item(uint16_t i, ui_item_t *it)
 	static const char *const names[] = { TRN("Last caller"), TRN("Contacts"), TRN("Messages"), TRN("Recent"),
 					     TRN("Zones"), TRN("Channels"), TRN("Tools"), TRN("Settings"),
 #if CONFIG_UI_CARD_MENU
-					     TRN("Radio"), TRN("Scan"), TRN("GPS / APRS"),
+					     TRN("Radio"), TRN("Scan"), TRN("GPS, APRS, and Data"),
 #endif
 	};
 	bool main = CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st);
@@ -196,11 +196,22 @@ static const ui_scr_def_t hub_screen = {
 
 #if CONFIG_UI_CARD_MENU
 static void open_gps_position(void);
+#if CONFIG_UI_SETTINGS && CONFIG_DMR_ARS
+static void group_item(uint16_t i, ui_item_t *it);
+static void group_select(uint16_t i, bool hold);
+static bool group_key(const input_event_t *ev);
+static void group_enter(void);
+
+static bool menu_section_key(const input_event_t *ev)
+{
+	return ui_frame()->arg == MENU_SECTION_ARS && group_key(ev);
+}
+#endif
 
 static const char *menu_section_title(void)
 {
-	static const char *const titles[] = { TRN("Radio"), TRN("GPS / APRS & Data"),
-		TRN("DMR Data Status"), TRN("LRRP Subscriptions") };
+	static const char *const titles[] = { TRN("Radio"), TRN("GPS, APRS, and Data"),
+		"ARS", TRN("LRRP Subscriptions") };
 	return tr(titles[ui_frame()->arg]);
 }
 
@@ -210,7 +221,7 @@ static bool section_available(uint16_t arg, uint16_t i)
 		switch (i) {
 		case 0: return (ui_svc_features() & UI_FEAT_GPS) != 0;
 		case 1: return CONFIG_APRS;
-		case 2: return CONFIG_DMR_DATA_CORE;
+		case 2: return CONFIG_DMR_ARS;
 		case 3: return (ui_svc_features() & UI_FEAT_LRRP) != 0;
 		}
 	}
@@ -219,7 +230,11 @@ static bool section_available(uint16_t arg, uint16_t i)
 
 static uint16_t menu_section_count(void)
 {
-	return ui_frame()->arg == MENU_SECTION_GPS ? 4 : 2;
+	switch (ui_frame()->arg) {
+	case MENU_SECTION_GPS: return 4;
+	case MENU_SECTION_ARS: return CONFIG_UI_SETTINGS && CONFIG_DMR_ARS ? 2 : 1;
+	default: return 2;
+	}
 }
 
 static const char *ars_status(void)
@@ -257,7 +272,7 @@ static void menu_section_item(uint16_t i, ui_item_t *it)
 	sb_init(&b, it->value, sizeof it->value);
 	switch (arg) {
 	case MENU_SECTION_GPS: {
-		static const char *const links[] = { TRN("Position"), "APRS", TRN("DMR Data Status"), TRN("LRRP Subscriptions") };
+		static const char *const links[] = { TRN("Position"), "APRS", "ARS", TRN("LRRP Subscriptions") };
 		label = tr(links[i]);
 		if (section_available(arg, i)) {
 			if (i == 0)
@@ -269,9 +284,15 @@ static void menu_section_item(uint16_t i, ui_item_t *it)
 		}
 		break;
 	}
-	case MENU_SECTION_DMR:
-		label = i == 0 ? "ARS" : "ARP";
-		sb_str(&b, i == 0 ? ars_status() : CONFIG_DMR_IP_GATEWAY ? TR("No status") : TR("Not in this build"));
+	case MENU_SECTION_ARS:
+#if CONFIG_UI_SETTINGS && CONFIG_DMR_ARS
+		if (i == 1) {
+			group_item(i, it);
+			return;
+		}
+#endif
+		label = TR("Status");
+		sb_str(&b, ars_status());
 		break;
 	case MENU_SECTION_LRRP:
 		label = i == 0 ? TR("Active reports") : TR("Answer GPS requests");
@@ -285,7 +306,7 @@ static void menu_section_item(uint16_t i, ui_item_t *it)
 		break;
 	}
 	str_copy(it->label, sizeof it->label, label);
-	if (arg == MENU_SECTION_DMR || arg == MENU_SECTION_LRRP) {
+	if (arg == MENU_SECTION_ARS || arg == MENU_SECTION_LRRP) {
 		it->flags |= UI_ITEM_INFO;
 		return;
 	}
@@ -298,7 +319,14 @@ static void menu_section_select(uint16_t i, bool hold)
 {
 	(void)hold;
 	uint16_t arg = ui_frame()->arg;
-	if (arg == MENU_SECTION_DMR || arg == MENU_SECTION_LRRP)
+	if (arg == MENU_SECTION_ARS) {
+#if CONFIG_UI_SETTINGS && CONFIG_DMR_ARS
+		if (i == 1)
+			group_select(i, hold);
+#endif
+		return;
+	}
+	if (arg == MENU_SECTION_LRRP)
 		return;
 	if (!section_available(arg, i)) {
 		ui_toast(TR("Not in this build"));
@@ -306,7 +334,7 @@ static void menu_section_select(uint16_t i, bool hold)
 		switch (i) {
 		case 0: open_gps_position(); break;
 		case 1: ui_push(SCR_APRS, 0); break;
-		case 2: ui_push(SCR_MENU_SECTION, MENU_SECTION_DMR); break;
+		case 2: ui_push(SCR_MENU_SECTION, MENU_SECTION_ARS); break;
 		case 3: ui_push(SCR_MENU_SECTION, MENU_SECTION_LRRP); break;
 		}
 	} else {
@@ -317,6 +345,9 @@ static void menu_section_select(uint16_t i, bool hold)
 static const ui_scr_def_t menu_section_screen = {
 	.name = "menu-section", .flags = SF_LIST | SF_NUMBERED | SF_FIELD, .title = menu_section_title,
 	.count = menu_section_count, .item = menu_section_item, .select = menu_section_select,
+#if CONFIG_UI_SETTINGS && CONFIG_DMR_ARS
+	.key = menu_section_key, .enter = group_enter,
+#endif
 };
 #endif
 
@@ -6121,6 +6152,13 @@ static int32_t set_value;
 
 static const set_item_t *set_item_at(uint16_t i)
 {
+#if CONFIG_UI_CARD_MENU && CONFIG_DMR_ARS
+	static const set_item_t ars_server = {
+		.name = TRN("Server ID"), .id = UI_SET_ARS_SERVER, .type = ST_NUMBER, .step = 1,
+	};
+	if (ui_frame()->scr == SCR_MENU_SECTION && ui_frame()->arg == MENU_SECTION_ARS)
+		return i == 1 ? &ars_server : NULL;
+#endif
 	uint16_t g = ui_frame()->arg;
 	return g < GROUPS ? set_nth((uint8_t)g, i) : NULL;
 }
@@ -6149,6 +6187,10 @@ static void set_value_text(const set_item_t *s, int32_t v, char *out, size_t len
 			break;
 		}
 #endif
+		if (s->id == UI_SET_ARS_SERVER && v == 0) {
+			sb_str(&b, TR("0 (Off)"));
+			break;
+		}
 		sb_i32(&b, v);
 		if (s->unit != NULL)
 			sb_str(&b, s->unit);
@@ -6227,6 +6269,10 @@ static void set_range(const set_item_t *s, int32_t *lo, int32_t *hi)
 {
 	*lo = s->min;
 	*hi = s->max;
+#if CONFIG_DMR_ARS
+	if (s->id == UI_SET_ARS_SERVER)
+		*hi = (int32_t)DMR_ID_MAX - 1;
+#endif
 	if (s->id == UI_SET_PRIVACY_KEY && ui_svc_setting_get(UI_SET_PRIVACY_TYPE) == 2) {
 		*lo = 0;
 		*hi = 65535;
@@ -6357,7 +6403,10 @@ static bool group_key(const input_event_t *ev)
 			(ev->gesture == GESTURE_PRESS || ev->gesture == GESTURE_LONG)) {
 		int32_t d = ev->action - ACT_DIGIT_0;
 		int32_t v = set_typed ? set_value * 10 + d : d;
-		set_value = v > hi ? d : v;
+		if (s->id == UI_SET_ARS_SERVER)
+			set_value = v <= 99999999 ? v : 99999999;	// keep invalid IDs visible for validation on OK
+		else
+			set_value = v > hi ? d : v;
 		set_typed = true;
 		if (set_value < lo && set_value * 10 > hi)
 			set_value = lo;	// can't grow into the range any more

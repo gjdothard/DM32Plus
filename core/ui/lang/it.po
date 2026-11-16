@@ -440,6 +440,14 @@ msgstr "Cerca: "
 msgid "No match: Back deletes a key"
 msgstr "Nessun risultato: Indietro cancella"
 
+#: core/ui/ui_app.c core/ui/ui_aprs.c core/ui/ui_menus.c
+msgid "OK change  Back"
+msgstr "OK cambia  Indietro"
+
+#: core/ui/ui_app.c core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
+msgid "Back"
+msgstr "Indietro"
+
 #: core/ui/ui_app.c
 msgid "Tools & Utilities"
 msgstr "Strumenti e utilità"
@@ -668,7 +676,7 @@ msgstr "SmartBeaconing"
 msgid "Send via"
 msgstr "Invia via"
 
-#: core/ui/ui_aprs.c core/ui/ui_menus.c
+#: core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Position"
 msgstr "Posizione"
 
@@ -748,10 +756,6 @@ msgstr "Non impostato"
 msgid "Up to 90 N/S, 180 E/W"
 msgstr "Fino a 90 N/S, 180 E/O"
 
-#: core/ui/ui_aprs.c core/ui/ui_menus.c
-msgid "OK change  Back"
-msgstr "OK cambia  Indietro"
-
 #: core/ui/ui_aprs.c
 msgid "0-9 pick  Back"
 msgstr "0-9 scegli  Indietro"
@@ -759,10 +763,6 @@ msgstr "0-9 scegli  Indietro"
 #: core/ui/ui_aprs.c
 msgid "Heard"
 msgstr "Sentite"
-
-#: core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
-msgid "Back"
-msgstr "Indietro"
 
 #: core/ui/ui_aprs.c
 msgid "Nothing heard yet"
@@ -1016,7 +1016,7 @@ msgstr "Nessuna azione per questo risultato"
 msgid "PTT talk  OK open  # more"
 msgstr "PTT parla  OK apri  # altro"
 
-#: core/ui/ui_gps.c
+#: core/ui/ui_gps.c core/ui/ui_menus.c
 msgid "Status"
 msgstr "Stato"
 
@@ -1120,7 +1120,7 @@ msgstr "Niente GPS, o spento"
 msgid "Settings > Location"
 msgstr "Impostazioni > Posizione"
 
-#: core/ui/ui_gps.c
+#: core/ui/ui_gps.c core/ui/ui_screens.c
 msgid "Up Down page  Back"
 msgstr "Su Giù pagina  Indietro"
 
@@ -1141,8 +1141,8 @@ msgid "Scan"
 msgstr "Scansione"
 
 #: core/ui/ui_menus.c
-msgid "GPS / APRS"
-msgstr "GPS / APRS"
+msgid "GPS, APRS, and Data"
+msgstr "GPS, APRS e dati"
 
 #: core/ui/ui_menus.c
 msgid "Zones / Channels"
@@ -1173,14 +1173,6 @@ msgid "1-7 open  Back"
 msgstr "1-7 apri  Indietro"
 
 #: core/ui/ui_menus.c
-msgid "GPS / APRS & Data"
-msgstr "GPS / APRS e dati"
-
-#: core/ui/ui_menus.c
-msgid "DMR Data Status"
-msgstr "Stato dati DMR"
-
-#: core/ui/ui_menus.c
 msgid "LRRP Subscriptions"
 msgstr "Iscrizioni LRRP"
 
@@ -1203,10 +1195,6 @@ msgstr "Nessuna risposta"
 #: core/ui/ui_menus.c core/ui/ui_svc_data.c
 msgid "No GPS fix"
 msgstr "Nessuna posizione GPS"
-
-#: core/ui/ui_menus.c
-msgid "No status"
-msgstr "Stato assente"
 
 #: core/ui/ui_menus.c
 msgid "Active reports"
@@ -3083,6 +3071,14 @@ msgstr "Avanzate"
 #: core/ui/ui_menus.c
 msgid "0-9 open  Back"
 msgstr "0-9 apri  Indietro"
+
+#: core/ui/ui_menus.c
+msgid "Server ID"
+msgstr "ID server"
+
+#: core/ui/ui_menus.c
+msgid "0 (Off)"
+msgstr "0 (Disattivato)"
 
 #: core/ui/ui_menus.c
 msgid "Talk permit tone: not in this build"

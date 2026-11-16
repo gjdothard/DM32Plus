@@ -238,8 +238,10 @@ group messages by the talkgroup in either direction.
   The power-off path calls it through the radio core: `radio_req_power_off()` (`RREQ_POWER_OFF`), then
   `core/app/app.c` waits while `radio_power_off_busy()`, at most 3 s, before the settings flush and the latch.
 
-The GPS / APRS & Data menu reads the same ARS state as the debug link. ARP is part of the network gateway,
-which has no per-peer resolution state for this page to report.
+**GPS, APRS, and Data > ARS** reads the same registration state as the debug link. Server ID edits go through
+the existing DMR data settings mailbox and persistence path. The keypad accepts 0 to disable registration and
+IDs 1 through 16777214, including gateway addresses. Back cancels the edit. ARP is part of the network gateway,
+which has no per-peer resolution status.
 
 ## 7. LRRP
 

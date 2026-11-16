@@ -139,6 +139,7 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "tools", "ok 6" },
 #if CONFIG_UI_CARD_MENU
 	{ "gps_data", "branded-home datastatus ok 7" },
+	{ "ars", "branded-home datastatus ok 7 3" },
 #endif
 	{ "position", "ok 6 2" },
 	{ "gps_sky", "ok 6 2 2" },
@@ -521,7 +522,8 @@ static bool gallery_colors(void)
 static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_t nlen, char *script, size_t slen)
 {
 	unsigned flags = gallery_flags(i);
-	if (!strcmp(gallery[i].name, "gps_data") && strcmp(g->name, "240x320i10x5"))
+	if ((!strcmp(gallery[i].name, "gps_data") || !strcmp(gallery[i].name, "ars")) &&
+	    strcmp(g->name, "240x320i10x5"))
 		return false;
 	bool theme = c > gal_ncolors;
 	if (g->bpp == 1 && (c > 0 || (flags & G_COLOR)))
@@ -532,6 +534,10 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 		snprintf(name, nlen, "%s", gallery[i].name);
 		if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "tools"))
 			snprintf(script, slen, "branded-home ok 8");
+		else if (!strcmp(g->name, "240x320i10x5") && (!strcmp(name, "position") ||
+			 !strcmp(name, "gps_sky") || !strcmp(name, "gps_signal")))
+			snprintf(script, slen, "branded-home ok 7 1 %d",
+				 !strcmp(name, "position") ? 1 : !strcmp(name, "gps_sky") ? 2 : 3);
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "settings"))
 			snprintf(script, slen, "branded-home ok 9");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "contacts"))

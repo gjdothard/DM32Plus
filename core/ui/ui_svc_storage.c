@@ -34,6 +34,9 @@
 #endif
 #if CONFIG_DMR_DATA_CORE
 #include "dmr/dmr_data_api.h"
+#if CONFIG_DMR_ARS
+#include "dmr/call/dmr_lc.h"
+#endif
 #endif
 #if CONFIG_TFTP
 #include "net/tftp_codeplug.h"
@@ -296,9 +299,16 @@ int32_t ui_svc_setting_get(uint8_t id)
 	case UI_SET_CHECK_REPLY:
 	case UI_SET_ALERT_ANSWER:
 	case UI_SET_POS_REPLY:
+#if CONFIG_DMR_ARS
+	case UI_SET_ARS_SERVER:
+#endif
 	case UI_SET_MSG_FORMAT: {
 		dmrDataSettings_t ds;
 		dmr_data_get_settings(&ds);
+#if CONFIG_DMR_ARS
+		if (id == UI_SET_ARS_SERVER)
+			return (int32_t)ds.arsServer;
+#endif
 		if (id == UI_SET_MSG_FORMAT)
 			return ds.smsFormat;
 		return id == UI_SET_CHECK_REPLY ? ds.radioCheckReply : id == UI_SET_ALERT_ANSWER ? ds.callAlertAck :
@@ -544,6 +554,17 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 		dmr_data_set_settings(&ds);	// the radio core saves the data service's settings when they change
 		return true;
 	}
+#if CONFIG_DMR_ARS
+	case UI_SET_ARS_SERVER: {
+		if (value < 0 || (uint32_t)value >= DMR_ID_MAX)
+			return false;
+		dmrDataSettings_t ds;
+		dmr_data_get_settings(&ds);
+		ds.arsServer = (uint32_t)value;
+		dmr_data_set_settings(&ds);
+		return true;
+	}
+#endif
 	case UI_SET_MSG_FORMAT: {
 		dmrDataSettings_t ds;
 		if ((value != DMR_SMS_FORMAT_ETSI_IP) && (value != DMR_SMS_FORMAT_ETSI) &&

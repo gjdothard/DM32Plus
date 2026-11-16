@@ -3478,6 +3478,32 @@ static void card_list_footer(const ui_state_t *s, int y, const char *keys, const
 	}
 }
 
+#if CONFIG_GPS_SKY
+int ui_draw_position_tabs(const ui_state_t *s, const char *const *names, uint8_t count, uint8_t active)
+{
+	char fit[32];
+	int width = gfx_width();
+	const font_t *font = &font_6x12;
+	card_header(s, 24);
+	card_center_title(TR("Position"), 6, fit, sizeof fit);
+	for (uint8_t i = 0; i < count; i++) {
+		int x = width * i / count + 2;
+		int w = width * (i + 1) / count - x - 2;
+		bool selected = i == active;
+		gfx_round_fill(x, 55, w, 19, selected ? ui_col.focus : CARD_SURFACE);
+		gfx_text_fit(font, tr(names[i]), w - 6, fit, sizeof fit);
+		gfx_text(font, x + (w - gfx_text_width(font, fit)) / 2, 58, fit, selected ? CARD_INK : ui_col.fg);
+	}
+	return 82;
+}
+
+void ui_draw_position_footer(const ui_state_t *s)
+{
+	char fit[32];
+	card_list_footer(s, gfx_height() - 19, TR("Up Down page  Back"), NULL, fit, sizeof fit);
+}
+#endif
+
 void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kind_t kind)
 {
 	const font_t *sm = ui_layout.small, *meta = &font_6x12;
@@ -3488,9 +3514,10 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 	bool directory = kind == UI_CARD_TALKGROUPS || kind == UI_CARD_CONTACTS;
 	bool channels = kind == UI_CARD_ZONE_CHANNELS;
 	bool scan = kind >= UI_CARD_SCAN && kind <= UI_CARD_SCAN_OPTIONS;
+	bool data = kind == UI_CARD_DATA_STATUS;
 	char fit[40];
 	card_header(s, 24);
-	const char *title = composer ? l->name : messages ? l->prefix : scan ? TR("Scan") :
+	const char *title = composer || data ? l->name : messages ? l->prefix : scan ? TR("Scan") :
 		directory ? TR("Contacts & Talkgroups") : channels ? l->name : TR("Channels & Zones");
 	card_center_title(title, 7, fit, sizeof fit);
 	if (scan) {
@@ -3512,7 +3539,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 			gfx_text(meta, x + (w - gfx_text_width(meta, tabs[i])) / 2, 58, tabs[i],
 				 active ? CARD_INK : ui_col.fg);
 		}
-	} else if (!messages) {
+	} else if (!messages && !data) {
 		const char *stage = channels ? TR("2  Select channel") : TR("1  Select zone");
 		int stage_w = gfx_text_width(meta, stage) + 16;
 		int stage_x = (width - stage_w) / 2;
@@ -3520,7 +3547,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		gfx_round_fill(stage_x + 1, 58, stage_w - 2, 14, CARD_INK);
 		gfx_text(meta, stage_x + 8, 59, stage, ui_col.focus);
 	}
-	int y = messages ? 55 : 79;
+	int y = messages || data ? 55 : 79;
 	if (messages && l->body)
 		y = wrap_text(meta, l->body, y, footer, true, ui_col.dim) + 4;
 	if (kind == UI_CARD_SCAN) {
@@ -3542,12 +3569,13 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		ui_item_t item = { 0 };
 		l->item(i, &item);
 		int yy = y + row * step;
-		bool focus = i == l->focus && (!scan || !(item.flags & UI_ITEM_INFO));
+		bool focus = i == l->focus && (!(scan || data) || !(item.flags & UI_ITEM_INFO));
+		color_t highlight = item.flags & UI_ITEM_EDIT ? ui_col.warn : ui_col.focus;
 		color_t fg = focus ? CARD_INK : ui_col.fg;
 		color_t value = focus ? fg : item.flags & UI_ITEM_TEMP ? ui_col.warn : ui_col.dim;
 		int end = width - 5;
-		card_list_row(yy, end, step - 3, focus ? ui_col.focus : CARD_EDGE,
-			      focus ? ui_col.focus : CARD_SURFACE);
+		card_list_row(yy, end, step - 3, focus ? highlight : CARD_EDGE,
+			      focus ? highlight : CARD_SURFACE);
 		int x = 7;
 		if (item.flags & UI_ITEM_FOLDER) {
 			color_t icon = focus ? fg : ui_col.focus;
@@ -3591,7 +3619,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		gfx_fill(width - 3, y, 3, 2, ui_col.focus);
 	if (top + rows < l->count)
 		gfx_fill(width - 3, y + rows * step - 4, 3, 2, ui_col.focus);
-	const char *keys = messages ? l->hint : kind == UI_CARD_SCAN ? TR("P1/P2 tabs  OK pick  Back") :
+	const char *keys = messages || data ? l->hint : kind == UI_CARD_SCAN ? TR("P1/P2 tabs  OK pick  Back") :
 		scan ? TR("P1/P2 tabs  Back") :
 		directory ? TR("P1/P2 tabs  OK talk  # more  Back") :
 		channels ? (CONFIG_ZONE_EDIT ? TR("OK go  # actions  Back") : TR("OK go  Back")) :

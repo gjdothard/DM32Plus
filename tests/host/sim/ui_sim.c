@@ -2114,6 +2114,7 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	ui_svc_setting_set(UI_SET_ROAM_PROBE, 0);
 	ui_svc_setting_set(UI_SET_CRASH_MODE, UI_CRASH_SEND_OFF);
 	ui_svc_setting_set(UI_SET_CRASH_CONTACT, 0);
+	ui_svc_setting_set(UI_SET_ARS_SERVER, 0);
 	// English, or the language UI_LANG names ("es": a gallery in that language, docs/dev/translating.md)
 	const char *lang = getenv("UI_LANG");
 	ui_svc_setting_set(UI_SET_LANGUAGE, lang != NULL && strlen(lang) == 2 ? (uint8_t)lang[0] << 8 | (uint8_t)lang[1] : 0);
@@ -2636,6 +2637,7 @@ static bool run_token(char *t, char *err, size_t len)
 #if CONFIG_UI_CARD_MENU
 	if (strcmp(t, "datastatus") == 0) {
 		sim_data_status = true;
+		ui_svc_setting_set(UI_SET_ARS_SERVER, 16777213);
 		changed();
 		advance(200);
 		return true;

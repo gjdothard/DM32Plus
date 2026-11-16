@@ -352,6 +352,7 @@ typedef enum {
 	UI_SET_REF_TRIM,	// reference oscillator trim, ppb -10000..+10000 (Settings > Advanced; settings_t.ref_trim_ppb)
 	UI_SET_LANGUAGE,	// the UI's language, i18n.h lang_value: "en" English, 0 never picked (Settings > Display; settings_t.lang)
 	UI_SET_UTC_OFFSET_MIN,	// local time offset, in minutes
+	UI_SET_ARS_SERVER,	// DMR ARS server ID, 0 disables registration
 	UI_SET_COUNT
 } ui_setting_t;
 
