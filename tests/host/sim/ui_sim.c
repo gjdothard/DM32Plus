@@ -1799,7 +1799,7 @@ void ui_svc_history_browse(uint32_t key, uint32_t before)
 	} else if (key & MESSAGE_HISTORY_GROUP_KEY) {
 		sim_history_text = "Group reply";
 		sim_history.flags = MESSAGE_RECORD_GROUP | MESSAGE_RECORD_OUTGOING;
-	} else if (before) {
+	} else if (before && before <= 8) {
 		sim_history_text = "Older private text";
 	} else {
 		sim_history_text = "Private text";
@@ -1808,11 +1808,41 @@ void ui_svc_history_browse(uint32_t key, uint32_t before)
 		sim_history.flags = MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_DELIVERED;
 	}
 }
+void ui_svc_history_thread(uint32_t key, uint32_t anchor, bool forward)
+{
+	uint16_t revision = sim_history.revision + 1u;
+	sim_history = (message_history_view_t){ .key = key, .revision = revision, .status = HISTORY_READY,
+		.timeline = true, .forward = forward, .count = 1 };
+	if (key & MESSAGE_HISTORY_GROUP_KEY) {
+		sim_history.thread[0] = (message_thread_entry_t){ .id = 10, .flags = MESSAGE_RECORD_OUTGOING };
+	} else if (anchor && !forward) {
+		sim_history.thread[0] = (message_thread_entry_t){ .id = 3 };
+		sim_history.flags = MESSAGE_THREAD_NEWER;
+	} else {
+		sim_history.count = 2;
+		sim_history.thread[forward ? 1 : 0] = (message_thread_entry_t){ .id = 8, .time = 756,
+			.flags = MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_DELIVERED };
+		sim_history.thread[forward ? 0 : 1] = (message_thread_entry_t){ .id = 5 };
+		sim_history.flags = MESSAGE_THREAD_OLDER;
+	}
+}
+
 void ui_svc_history_view(message_history_view_t *out, char *text, size_t size)
 {
 	*out = sim_history;
-	if (text && size)
-		snprintf(text, size, "%s", sim_history_text ? sim_history_text : "");
+	if (text && size) {
+		if (sim_history.timeline && size >= MESSAGE_JOURNAL_TEXT) {
+			memset(text, 0, MESSAGE_JOURNAL_TEXT);
+			for (unsigned i = 0; i < sim_history.count; i++) {
+				uint32_t id = sim_history.thread[i].id;
+				const char *preview = id == 10 ? "Group reply" : id == 8 ? "Private text" :
+					id == 5 ? "Older private text" : "Earlier page";
+				snprintf(text + i * MESSAGE_THREAD_PREVIEW, MESSAGE_THREAD_PREVIEW, "%s", preview);
+			}
+		} else {
+			snprintf(text, size, "%s", sim_history_text ? sim_history_text : "");
+		}
+	}
 }
 #endif
 

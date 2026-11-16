@@ -225,6 +225,7 @@ bool ui_svc_message_history_available(void);
 bool ui_svc_message_history_activate(void);
 bool ui_svc_history_active(void);
 void ui_svc_history_browse(uint32_t key, uint32_t before);
+void ui_svc_history_thread(uint32_t key, uint32_t anchor, bool forward);
 void ui_svc_history_view(message_history_view_t *out, char *text, size_t size);
 #endif
 

@@ -1843,6 +1843,10 @@ static void list_draw(const ui_scr_def_t *d)
 			return;
 		}
 #if CONFIG_MESSAGE_JOURNAL
+		if (f->scr == SCR_THREAD) {
+			ui_draw_card_list(&ui_st, &l, UI_CARD_THREAD);
+			return;
+		}
 		if (f->scr == SCR_HISTORY) {
 			ui_draw_card_list(&ui_st, &l, UI_CARD_HISTORY);
 			return;

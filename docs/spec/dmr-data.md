@@ -219,7 +219,9 @@ that form, and it confirms delivery. Motorola TMS ("Motorola") is the format for
 The inbox stamps accepted SMS with the board GPS UTC minute at receipt. The archive stores that same value
 for incoming messages and samples it when an outgoing result is recorded. The existing record time field
 holds the UTC minute of day plus one, with zero for unavailable time and older records. It is independent of
-the monotonic receive timestamp used for duplicate detection.
+the monotonic receive timestamp used for duplicate detection. The tall card conversation view reads pages of up
+to three message previews through the same deferred journal reader. Preview pages reuse the full-message
+buffer. Selecting a preview reads the full record using its journal ID.
 
 ## 6. ARS
 

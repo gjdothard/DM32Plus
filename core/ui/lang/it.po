@@ -1445,6 +1445,10 @@ msgid "Sent"
 msgstr "Inviato"
 
 #: core/ui/ui_menus.c
+msgid "OK read  # newest  Back"
+msgstr "OK leggi  # ultimo  Indietro"
+
+#: core/ui/ui_menus.c
 msgid "OK open  Back"
 msgstr "OK apri  Indietro"
 

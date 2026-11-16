@@ -250,7 +250,7 @@ void ui_draw_numbered_menu(const radio_view_t *v, const ui_state_t *s, const ui_
 typedef enum {
 	UI_CARD_ZONES, UI_CARD_ZONE_CHANNELS, UI_CARD_TALKGROUPS, UI_CARD_CONTACTS,
 	UI_CARD_SCAN, UI_CARD_SCAN_LISTS, UI_CARD_SCAN_OPTIONS,
-	UI_CARD_MESSAGES, UI_CARD_HISTORY,
+	UI_CARD_MESSAGES, UI_CARD_HISTORY, UI_CARD_THREAD,
 } ui_card_list_kind_t;
 void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kind_t kind);
 #endif

@@ -400,6 +400,23 @@ static void test_archive_pages(void)
 	message_history_poll();
 	message_history_view(&view, body, sizeof body);
 	CHECK(view.status == HISTORY_READY && !strcmp(body, "Private out") && (view.flags & MESSAGE_RECORD_OUTGOING));
+	message_history_thread(9, 0, false);
+	message_history_poll();
+	message_history_poll();
+	message_history_view(&view, body, sizeof body);
+	CHECK(view.timeline && !view.forward && view.status == HISTORY_READY && view.count == 2);
+	CHECK(view.thread[0].id == 3 && view.thread[1].id == 2);
+	CHECK(!strcmp(body, "Private in") && !strcmp(body + MESSAGE_THREAD_PREVIEW, "Private out"));
+	message_history_thread(9, view.thread[1].id, true);
+	message_history_poll();
+	message_history_view(&view, body, sizeof body);
+	CHECK(view.forward && view.status == HISTORY_READY && view.count == 1 && view.thread[0].id == 3);
+	message_history_thread(9, 3, true);
+	message_history_poll();
+	message_history_poll();
+	message_history_poll();
+	message_history_view(&view, body, sizeof body);
+	CHECK(view.status == HISTORY_READY && view.thread[0].id == 3 && !(view.flags & MESSAGE_THREAD_NEWER));
 	CHECK(budget == writes);
 
 	page.peer = (message_history_peer_t){0};

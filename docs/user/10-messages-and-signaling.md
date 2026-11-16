@@ -47,9 +47,10 @@ radio's reserved storage. Select **Enable** to confirm. The radio reports whethe
 activate the reserve. If it reports that blank storage is required, the existing bytes are
 preserved. Once enabled, new received messages and outgoing send results are saved in the
 archive. Under **Messages → Conversations**, choose one of the six most recent private or
-talkgroup conversations. The newest saved message opens first. **Older message** walks
-back through that conversation and **Newest message** returns to its latest entry.
-The four-entry live inbox remains below **Conversations**. On the dark card layout, unread messages have a dot
+talkgroup conversations. In the dark card layout, the conversation opens at the newest bubble at the bottom.
+Scroll up for older messages and down for newer ones. **#** jumps to the newest. Press **OK** on a bubble
+to read the entire message. The standard layout opens the newest full message first.
+The four-entry live inbox remains below **Conversations**. On the dark layout, the newest inbox message is at the bottom and is selected on entry. On the dark card layout, unread messages have a dot
 and each inbox card shows the sender, local receipt time, and a short preview. **You** identifies this radio's DMR ID.
 The radio takes UTC from a recent GPS fix and applies **Settings → Location → UTC offset** when it displays
 the time in 24-hour format. If no time was captured, including for older archive entries,

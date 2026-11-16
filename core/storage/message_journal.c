@@ -465,16 +465,20 @@ bool message_history_active(void)
 	return active;
 }
 
-void message_history_browse(uint32_t key, uint32_t before)
+static void browse(uint32_t key, uint32_t anchor, bool timeline, bool forward)
 {
 	storage_quick_lock();
 	if (history && history->active) {
 		uint16_t revision = history->view.revision + 1u;
-		history->view = (message_history_view_t){ .key = key, .revision = revision };
-		history->scan_before = before;
+		history->view = (message_history_view_t){ .key = key, .revision = revision,
+			.before = timeline ? anchor : 0, .timeline = timeline, .forward = forward };
+		history->scan_before = anchor;
 	}
 	storage_quick_unlock();
 }
+
+void message_history_browse(uint32_t key, uint32_t before) { browse(key, before, false, false); }
+void message_history_thread(uint32_t key, uint32_t anchor, bool forward) { browse(key, anchor, true, forward); }
 
 void message_history_view(message_history_view_t *out, char *text, size_t size)
 {
@@ -483,8 +487,13 @@ void message_history_view(message_history_view_t *out, char *text, size_t size)
 	if (text && size) {
 		text[0] = '\0';
 		if (history && out->key && out->status == HISTORY_READY) {
-			strncpy(text, history->view_text, size - 1u);
-			text[size - 1u] = '\0';
+			if (out->timeline) {
+				if (size >= sizeof history->view_text)
+					memcpy(text, history->view_text, sizeof history->view_text);
+			} else {
+				strncpy(text, history->view_text, size - 1u);
+				text[size - 1u] = '\0';
+			}
 		}
 	}
 	storage_quick_unlock();
@@ -527,6 +536,56 @@ static void browser_scan(const message_journal_t *j, message_history_view_t *v, 
 		v->status = v->count ? HISTORY_READY : HISTORY_EMPTY;
 }
 
+#define THREAD_AT_START 0x04u
+#define THREAD_AT_END   0x08u
+
+static void thread_scan(const message_journal_t *j, message_history_view_t *v, uint32_t *cursor, uint8_t *scratch)
+{
+	uint32_t first = first_live(j), last = start_slot(j, 0);
+	uint32_t id = v->forward ? *cursor + 1u : start_slot(j, *cursor);
+	if (v->forward && id < first)
+		id = first;
+	char *previews = (char *)scratch + MESSAGE_JOURNAL_SCRATCH;
+	memset(previews, 0, MESSAGE_JOURNAL_TEXT);
+	for (unsigned scanned = 0; id >= first && id <= last && scanned < PAGE_SCAN_SLOTS;
+	     scanned++, id = v->forward ? id + 1u : id - 1u) {
+		slot_result_t result = read_slot(j, id, scratch);
+		if (result == SLOT_READ_ERROR) {
+			v->status = HISTORY_ERROR;
+			return;
+		}
+		if (result != SLOT_VALID || peer_key(scratch) != v->key)
+			continue;
+		uint32_t time = get32(scratch + 12);
+		unsigned i = v->count++;
+		v->thread[i] = (message_thread_entry_t){ .id = id, .time = time <= 1440u ? (uint16_t)time : 0,
+			.flags = scratch[16] };
+		char *text = previews + i * MESSAGE_THREAD_PREVIEW;
+		strncpy(text, (const char *)scratch + TEXT_OFFSET, MESSAGE_THREAD_PREVIEW - 1u);
+		if (v->count == MESSAGE_THREAD_ROWS)
+			break;
+	}
+	if (v->count) {
+		uint32_t a = v->thread[0].id, b = v->thread[v->count - 1u].id;
+		bool older = !(v->flags & THREAD_AT_START) && (a < b ? a : b) > first;
+		bool newer = v->before && !(v->flags & THREAD_AT_END) && (a > b ? a : b) < last;
+		v->flags = (older ? MESSAGE_THREAD_OLDER : 0) | (newer ? MESSAGE_THREAD_NEWER : 0);
+		v->status = HISTORY_READY;
+	} else if (id < first || id > last) {
+		if (v->before && !(v->flags & (THREAD_AT_START | THREAD_AT_END))) {
+			// Other peers can occupy the remaining slots. Return to the anchor
+			// instead of dropping the visible page when there are no more matches.
+			v->flags = v->forward ? THREAD_AT_END : THREAD_AT_START;
+			v->forward = !v->forward;
+			*cursor = v->forward ? v->before - 1u : v->before + 1u;
+		} else {
+			v->status = HISTORY_EMPTY;
+		}
+	} else {
+		*cursor = v->forward ? id - 1u : id + 1u;
+	}
+}
+
 static void browser_poll(void)
 {
 	storage_quick_lock();
@@ -549,14 +608,19 @@ static void browser_poll(void)
 	if (message_journal_available() && board.flash->read(m->message_addr, scratch, sizeof(activation)) &&
 	    memcmp(scratch, activation, sizeof(activation)) == 0 &&
 	    message_journal_mount(&j, board.flash, m->message_addr + SECTOR, m->message_size - SECTOR))
-		browser_scan(&j, &view, &cursor, scratch);
-	else
+	{
+		if (view.timeline)
+			thread_scan(&j, &view, &cursor, scratch);
+		else
+			browser_scan(&j, &view, &cursor, scratch);
+	} else
 		view.status = HISTORY_ERROR;
 	storage_unlock();
 	storage_quick_lock();
 	if (view.revision == history->view.revision) {
 		if (view.key && view.status == HISTORY_READY)
-			memcpy(history->view_text, scratch + TEXT_OFFSET, sizeof(history->view_text));
+			memcpy(history->view_text, scratch + (view.timeline ? MESSAGE_JOURNAL_SCRATCH : TEXT_OFFSET),
+			       sizeof(history->view_text));
 		view.revision++;
 		history->view = view;
 		history->scan_before = cursor;

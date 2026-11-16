@@ -780,6 +780,19 @@ static void message_time(sbuf_t *b, uint32_t minute)
 
 static uint16_t msgs_count(void) { return ui_svc_msg_count() + msgs_has_history(); }
 
+static unsigned inbox_index(unsigned row)
+{
+	unsigned count = ui_svc_msg_count();
+	return CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) && row < count ? count - 1u - row : row;
+}
+
+static void msgs_enter(void)
+{
+	uint16_t n = msgs_count();
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) && n)
+		ui_frame()->focus = n - 1u;
+}
+
 static void msgs_item(uint16_t i, ui_item_t *it)
 {
 #if CONFIG_MESSAGE_JOURNAL
@@ -789,7 +802,7 @@ static void msgs_item(uint16_t i, ui_item_t *it)
 	}
 #endif
 	ui_msg_t m;
-	if (!ui_svc_msg_get(i, &m))
+	if (!ui_svc_msg_get(inbox_index(i), &m))
 		return;
 	sbuf_t b;
 	sb_init(&b, it->label, sizeof it->label);
@@ -831,7 +844,7 @@ static void msgs_select(uint16_t i, bool hold)
 	}
 #endif
 	ui_msg_t m;
-	if (ui_svc_msg_get(i, &m))
+	if (ui_svc_msg_get(inbox_index(i), &m))
 		ui_push(SCR_MESSAGE, m.token);
 }
 
@@ -856,7 +869,7 @@ static void msgs_context(uint16_t i)
 #endif
 	ui_msg_t m;
 	ui_target_t t;
-	if (ui_svc_msg_get(i, &m)) {
+	if (ui_svc_msg_get(inbox_index(i), &m)) {
 		msg_target_from(&m, &t);
 		ui_open_actions(&t);
 	}
@@ -865,7 +878,7 @@ static void msgs_context(uint16_t i)
 static const ui_scr_def_t messages_screen = {
 	.name = "messages", .flags = SF_LIST | SF_FIELD, .prefix = TRN("Messages"), .hint = TRN("OK open  # reply  Back"),
 	.empty = TRN("No messages yet"),
-	.count = msgs_count, .item = msgs_item, .select = msgs_select, .context = msgs_context,
+	.count = msgs_count, .item = msgs_item, .select = msgs_select, .context = msgs_context, .enter = msgs_enter,
 };
 
 // One message: the text, then canned replies first, call, delete
@@ -1012,6 +1025,13 @@ static void history_select(uint16_t i, bool hold)
 	message_history_view_t v;
 	ui_svc_history_view(&v, NULL, 0);
 	if (v.key == 0 && i < v.count) {
+#if CONFIG_UI_CARD_MENU
+		if (ui_card_layout(&ui_st)) {
+			ui_svc_history_thread(v.peers[i], 0, false);
+			ui_push(SCR_THREAD, 0);
+			return;
+		}
+#endif
 		ui_svc_history_browse(v.peers[i], 0);
 		ui_push(SCR_CONVERSATION, 0);
 	}
@@ -1106,17 +1126,105 @@ static const char *conversation_title(void)
 	return msg_title_text;
 }
 
+#if CONFIG_UI_CARD_MENU
+static unsigned thread_index(const message_history_view_t *v, unsigned row)
+{
+	return v->forward ? row : v->count - 1u - row;
+}
+
+static uint16_t thread_count(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	return v.timeline && v.status == HISTORY_READY ? v.count : 0;
+}
+
+static void thread_item(uint16_t i, ui_item_t *it)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, msg_text, sizeof msg_text);
+	if (!v.timeline || v.status != HISTORY_READY || i >= v.count)
+		return;
+	unsigned index = thread_index(&v, i);
+	const message_thread_entry_t *entry = &v.thread[index];
+	bool outgoing = (entry->flags & MESSAGE_RECORD_OUTGOING) != 0;
+	if (outgoing || (entry->flags & MESSAGE_RECORD_LOCAL_AUTHOR))
+		str_copy(it->label, sizeof it->label, TR("You"));
+	else
+		history_label(v.key, it->label, sizeof it->label);
+	ui_local_time(it->value, entry->time);
+	it->value[5] = '\n';
+	str_copy(it->value + 6, sizeof it->value - 6, msg_text + index * MESSAGE_THREAD_PREVIEW);
+	it->flags |= UI_ITEM_PREVIEW;
+	if (outgoing)
+		it->flags |= UI_ITEM_TEMP;
+}
+
+static void thread_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (v.timeline && v.status == HISTORY_READY && i < v.count) {
+		ui_svc_history_browse(v.key, v.thread[thread_index(&v, i)].id + 1u);
+		ui_push(SCR_CONVERSATION, 0);
+	}
+}
+
+static const char *thread_body(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	return v.timeline ? history_status(&v) : TR("Reading history...");
+}
+
+static bool thread_key(const input_event_t *ev)
+{
+	bool rotary = ev->action == ACT_ENC_STEP && ev->value;
+	if (!rotary && ev->gesture != GESTURE_PRESS && ev->gesture != GESTURE_REPEAT)
+		return false;
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (ev->action == ACT_CONTEXT) {
+		if (v.key)
+			ui_svc_history_thread(v.key, 0, false);
+		return true;
+	}
+	bool up = ev->action == ACT_NAV_UP || (rotary && ev->value < 0);
+	bool down = ev->action == ACT_NAV_DOWN || (rotary && ev->value > 0);
+	if (!v.timeline || v.status != HISTORY_READY || !v.count || (!up && !down))
+		return false;
+	uint16_t row = ui_frame()->focus;
+	if ((up && row == 0) || (down && row == v.count - 1u)) {
+		if (v.flags & (up ? MESSAGE_THREAD_OLDER : MESSAGE_THREAD_NEWER))
+			ui_svc_history_thread(v.key, v.thread[thread_index(&v, row)].id, down);
+		return true;
+	}
+	return false;
+}
+
+static const ui_scr_def_t thread_screen = {
+	.name = "thread", .flags = SF_LIST, .hint = TRN("OK read  # newest  Back"),
+	.count = thread_count, .item = thread_item, .select = thread_select,
+	.title = conversation_title, .body = thread_body, .key = thread_key,
+};
+#endif
+
 void ui_history_tick(void)
 {
 	ui_frame_t *f = ui_frame();
-	if (f->scr != SCR_HISTORY && f->scr != SCR_CONVERSATION)
+	if (f->scr != SCR_HISTORY && f->scr != SCR_CONVERSATION && f->scr != SCR_THREAD)
 		return;
 	message_history_view_t v;
 	ui_svc_history_view(&v, NULL, 0);
 	if (f->scr == SCR_HISTORY && v.key)
 		history_enter();
+	if (f->scr == SCR_THREAD && !v.timeline && v.key)
+		ui_svc_history_thread(v.key, 0, false);
 	if (f->arg != v.revision) {
 		f->arg = v.revision;
+		if (f->scr == SCR_THREAD && v.timeline && v.status == HISTORY_READY && v.count)
+			f->focus = v.forward ? 0 : v.count - 1u;
 		ui_dirty();
 	}
 }
@@ -6534,6 +6642,9 @@ const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
 	[SCR_MESSAGES] = &messages_screen, [SCR_MESSAGE] = &message_screen, [SCR_COMPOSE] = &compose_screen,
 #if CONFIG_MESSAGE_JOURNAL
 	[SCR_HISTORY] = &history_screen, [SCR_CONVERSATION] = &conversation_screen,
+#if CONFIG_UI_CARD_MENU
+	[SCR_THREAD] = &thread_screen,
+#endif
 #endif
 #if CONFIG_DMR_SMS
 	[SCR_SMS_TEXT] = &sms_text_screen,

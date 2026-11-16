@@ -12,6 +12,10 @@
 #define MESSAGE_HISTORY_QUEUE 2u
 #define MESSAGE_HISTORY_PAGE_MAX 4u
 #define MESSAGE_HISTORY_PEERS 6u
+#define MESSAGE_THREAD_ROWS 3u
+#define MESSAGE_THREAD_PREVIEW (MESSAGE_JOURNAL_TEXT / MESSAGE_THREAD_ROWS)
+#define MESSAGE_THREAD_OLDER 0x01u
+#define MESSAGE_THREAD_NEWER 0x02u
 #define MESSAGE_HISTORY_GROUP_KEY 0x80000000u
 #define MESSAGE_RECORD_GROUP 0x01u
 #define MESSAGE_RECORD_OUTGOING 0x02u
@@ -88,20 +92,30 @@ bool message_history_read_page(message_history_page_t *page);
 typedef enum { HISTORY_LOADING, HISTORY_READY, HISTORY_EMPTY, HISTORY_ERROR } message_history_status_t;
 
 typedef struct {
+	uint32_t id;
+	uint16_t time;
+	uint8_t flags;	// MESSAGE_RECORD_*
+} message_thread_entry_t;
+
+typedef struct {
 	uint32_t key;	// 0 is the directory, bit 31 distinguishes a talkgroup
 	union {
 		uint32_t peers[MESSAGE_HISTORY_PEERS]; // directory
 		uint32_t time; // selected message, UTC minute plus one or zero
+		message_thread_entry_t thread[MESSAGE_THREAD_ROWS];
 	};
-	uint32_t before;	// next older page, 0 at the end
+	uint32_t before;	// single record: next older page; timeline: requested anchor
 	uint16_t revision;
 	uint8_t count, flags;
-	message_history_status_t status;
+	uint8_t status;	// message_history_status_t
+	bool timeline, forward;
 } message_history_view_t;
 
 // One UI browser, served on the housekeeping task. Text is copied only for a ready message.
 bool message_history_active(void);
 void message_history_browse(uint32_t key, uint32_t before);
+// Load a page before or after an exclusive record ID. Zero starts at the newest.
+void message_history_thread(uint32_t key, uint32_t anchor, bool forward);
 void message_history_view(message_history_view_t *out, char *text, size_t size);
 
 typedef struct {
