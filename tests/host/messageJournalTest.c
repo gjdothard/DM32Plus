@@ -13,7 +13,7 @@
 #define SLOTS 21u
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "FAIL line %d: %s\n", __LINE__, #c); exit(1); } } while (0)
 
-static uint8_t data[FLASH_BYTES], snapshot[BYTES], scratch[MESSAGE_JOURNAL_SCRATCH];
+static uint8_t data[FLASH_BYTES], snapshot[FLASH_BYTES], scratch[STORAGE_SECTOR];
 static unsigned budget;
 void storage_lock(void) {}
 void storage_unlock(void) {}
@@ -71,11 +71,11 @@ static void mount(message_journal_t *j)
 	CHECK(message_journal_mount(j, &flash, 0, BYTES));
 }
 
-static void append(message_journal_t *j, bool reclaim, uint32_t wanted)
+static void append(message_journal_t *j, uint32_t wanted)
 {
 	uint32_t id = 0;
-	budget = BYTES;
-	CHECK(message_journal_append(j, &entry, reclaim, scratch, &id) && id == wanted);
+	budget = FLASH_BYTES;
+	CHECK(message_journal_append(j, &entry, storage_sector_write, scratch, &id) && id == wanted);
 }
 
 static bool readable(const message_journal_t *j, uint32_t id)
@@ -89,24 +89,49 @@ static bool readable(const message_journal_t *j, uint32_t id)
 	return true;
 }
 
-static void cut_rollover(uint32_t next, uint32_t first_live, unsigned erase_bytes)
+static void cut_rollover(uint32_t next, uint32_t first_live)
 {
-	// Try every program byte boundary and representative points inside the erase.
-	memcpy(snapshot, data, BYTES);
-	for (unsigned cut = 0; cut < erase_bytes + 179u; cut += cut < erase_bytes ? 64u : 1u) {
+	// Cut while staging the replacement, writing J0, erasing and writing the target,
+	// and between the storage and message journal commit marks.
+	const unsigned commit_at = 3u * STORAGE_SECTOR + 16u;
+	const unsigned cuts[] = {
+		0, 17, STORAGE_SECTOR, STORAGE_SECTOR + 53u, 2u * STORAGE_SECTOR + 256u,
+		commit_at - 1u, commit_at, commit_at + 79u, commit_at + STORAGE_SECTOR - 1u,
+		commit_at + STORAGE_SECTOR + 177u, commit_at + 2u * STORAGE_SECTOR,
+		commit_at + 2u * STORAGE_SECTOR + 1u,
+	};
+	memcpy(snapshot, data, sizeof(data));
+	for (unsigned i = 0; i < sizeof(cuts) / sizeof(cuts[0]); i++) {
 		message_journal_t j;
-		memcpy(data, snapshot, BYTES);
+		memcpy(data, snapshot, sizeof(data));
 		mount(&j);
-		budget = cut;
+		budget = cuts[i];
 		uint32_t id;
-		CHECK(!message_journal_append(&j, &entry, true, scratch, &id));
+		CHECK(!message_journal_append(&j, &entry, storage_sector_write, scratch, &id));
+		budget = FLASH_BYTES;
+		CHECK(storage_init());
 		mount(&j);
+		uint32_t addr = (((next - 1u) / SLOTS) % SECTORS) * STORAGE_SECTOR;
+		if (cuts[i] == commit_at) {
+			unsigned before = budget;
+			data[addr + 16u + 17u] ^= 1u;
+			CHECK(!message_journal_append(&j, &entry, storage_sector_write, scratch, &id));
+			CHECK(data[addr + 15u] == 0xFFu && budget == before);
+			data[addr + 16u + 17u] ^= 1u;
+		}
+		if (cuts[i] == commit_at + 2u * STORAGE_SECTOR + 1u) {
+			data[addr + 15u] = 0x80;	// power cut during the last byte's program pulse
+		}
 		CHECK(readable(&j, first_live) && readable(&j, next - 1u) && !readable(&j, next));
-		append(&j, true, next);
+		bool staged = cuts[i] >= commit_at;
+		append(&j, next + staged);
 		mount(&j);
 		CHECK(readable(&j, next) && !readable(&j, first_live));
+		if (staged) {
+			CHECK(readable(&j, next + 1u));
+		}
 	}
-	memcpy(data, snapshot, BYTES);
+	memcpy(data, snapshot, sizeof(data));
 }
 
 static unsigned completions;
@@ -134,7 +159,9 @@ static void test_deferred_append(void)
 	message_journal_job_t job = { .record = &entry, .complete = complete };
 	memset(data, 0xFF, sizeof(data));
 	budget = FLASH_BYTES;
+	job_map.message_size = 0;
 	run_job(&job, true, MESSAGE_JOB_UNAVAILABLE);
+	job_map.message_size = BYTES;
 	CHECK(storage_init());
 
 	job_map.openfw_flash = 0x8000u;
@@ -188,7 +215,9 @@ static void test_deferred_append(void)
 int main(void)
 {
 	message_journal_t j;
-	memset(data, 0xFF, BYTES);
+	memset(data, 0xFF, sizeof(data));
+	budget = FLASH_BYTES;
+	CHECK(storage_init());
 	CHECK(!message_journal_mount(&j, &flash, 1, BYTES - 1u));
 	CHECK(!message_journal_mount(&j, &flash, 0, STORAGE_SECTOR));
 	data[STORAGE_SECTOR - 1u] = 0x42;
@@ -196,24 +225,25 @@ int main(void)
 	CHECK(!readable(&j, 1));
 	uint32_t id;
 	budget = BYTES;
-	CHECK(!message_journal_append(&j, &entry, false, scratch, &id));
+	CHECK(!message_journal_append(&j, &entry, storage_sector_write, scratch, &id));
 	CHECK(data[STORAGE_SECTOR - 1u] == 0x42 && budget == BYTES);
-	append(&j, true, 1);
+	data[STORAGE_SECTOR - 1u] = 0xFF;
+	append(&j, 1);
 	budget = 32;
-	CHECK(!message_journal_append(&j, &entry, false, scratch, &id));
+	CHECK(!message_journal_append(&j, &entry, storage_sector_write, scratch, &id));
 	mount(&j);
 	CHECK(readable(&j, 1) && !readable(&j, 2));
 	for (unsigned n = 3; n <= 2u * SLOTS; n++) {
-		append(&j, false, n);
+		append(&j, n);
 	}
-	cut_rollover(2u * SLOTS + 1u, 1, 0);
+	cut_rollover(2u * SLOTS + 1u, 1);
 	mount(&j);
 	for (unsigned n = 2u * SLOTS + 1u; n <= 3u * SLOTS; n++) {
-		append(&j, false, n);
+		append(&j, n);
 	}
-	cut_rollover(3u * SLOTS + 1u, SLOTS + 1u, STORAGE_SECTOR);
+	cut_rollover(3u * SLOTS + 1u, SLOTS + 1u);
 	mount(&j);
-	append(&j, false, 3u * SLOTS + 1u);
+	append(&j, 3u * SLOTS + 1u);
 	mount(&j);
 	CHECK(!readable(&j, SLOTS + 1u) && readable(&j, 3u * SLOTS + 1u));
 	data[16u + 17u] ^= 0x01;
@@ -222,9 +252,9 @@ int main(void)
 	message_journal_record_t longest = entry, out;
 	memset(longest.text, 'X', sizeof(longest.text));
 	budget = BYTES;
-	CHECK(!message_journal_append(&j, &longest, false, scratch, &id));
+	CHECK(!message_journal_append(&j, &longest, storage_sector_write, scratch, &id));
 	longest.text[sizeof(longest.text) - 1u] = '\0';
-	CHECK(message_journal_append(&j, &longest, false, scratch, &id));
+	CHECK(message_journal_append(&j, &longest, storage_sector_write, scratch, &id));
 	mount(&j);
 	CHECK(message_journal_read(&j, id, scratch, &out));
 	CHECK(memcmp(out.text, longest.text, sizeof(out.text)) == 0);

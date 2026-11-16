@@ -4,8 +4,8 @@
 # Message journal
 
 The append-only journal operates on a caller-owned range of at least two 4 KiB NOR erase sectors.
-The caller serializes access with other flash users and supplies a 192-byte scratch buffer. Mount
-reads the sector headers and never programs flash.
+The caller serializes access with other flash users. Reads need 192 bytes of scratch. Appends
+reuse the shared 4 KiB sector buffer. Mount reads the sector headers and never programs flash.
 
 The housekeeping adapter appends through the existing storage job slot. It refuses an
 unavailable or overlapping board reserve and borrows the existing sector buffer for scratch.
@@ -32,14 +32,17 @@ The remainder is reserved. The commit byte is at the end of the slot. Both commi
 start erased, and the writer programs each to zero only after its contents are written.
 The record ID is `(generation - 1) * 21 + slot_index + 1`, with no wrap.
 
-A partially programmed slot is skipped on the next append. During rollover the writer commits
-the new sector header after its first record has committed. The oldest generation leaves the
-live window only then. One physical sector is always outside that window. A write or erase
-failure requires remount before retry.
+A partially programmed slot is skipped on the next append. During rollover, the existing
+[storage sector journal](settings-store.md) installs a complete replacement sector. It carries
+the first record and a header whose commit byte is left erased. The writer commits that header
+only after the sector replacement succeeds. The oldest generation leaves the live window only
+then. One physical sector is always outside that window.
 
-The engine reclaims a committed, expired sector automatically. The housekeeping adapter
-supplies no blanket permission to reclaim unknown bytes. It refuses a nonblank rollover
-target whose header was lost during erase or programming. Recovery for that case still
-needs an explicit action before enabling SMS capture. With a 512 KiB reserve, one sector
-holds the activation marker and one is outside the live window. The remaining 126 sectors
-hold up to 2,646 slots before any future status or deletion records.
+After a power cut, the storage layer replays a committed sector replacement before messages are
+mounted. If the new header was still uncommitted, the next append validates the prepared first
+record's ID and CRC, finishes the header commit, and writes the new message in slot two.
+
+Rollover can start on an erased sector or on a committed, expired sector. A nonblank target
+with unknown contents is refused. With a 512 KiB reserve, one sector holds the activation
+marker and one is outside the live window. The remaining 126 sectors hold up to 2,646 slots
+before any future status or deletion records.

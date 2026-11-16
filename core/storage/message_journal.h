@@ -24,9 +24,10 @@ typedef struct {
 // The caller owns and serializes access to the selected flash range and scratch buffer.
 // Mount scans headers only and leaves unknown contents alone.
 bool message_journal_mount(message_journal_t *j, const hal_flash_t *flash, uint32_t base, uint32_t size);
-// A previously used sector can be reclaimed only with migration permission. Remount after a failed write.
-bool message_journal_append(message_journal_t *j, const message_journal_record_t *record, bool reclaim,
-			    uint8_t scratch[MESSAGE_JOURNAL_SCRATCH], uint32_t *id);
+// Append needs one erase unit of scratch and a replacement function with reboot recovery.
+// Remount after a failed write. Only erased or expired sectors may start a rollover.
+bool message_journal_append(message_journal_t *j, const message_journal_record_t *record,
+			    bool (*replace)(uint32_t, const uint8_t *), uint8_t *scratch, uint32_t *id);
 bool message_journal_read(const message_journal_t *j, uint32_t id, uint8_t scratch[MESSAGE_JOURNAL_SCRATCH],
 			  message_journal_record_t *record);
 

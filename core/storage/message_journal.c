@@ -34,7 +34,7 @@ static uint32_t sector_addr(const message_journal_t *j, uint32_t generation)
 	return j->base + ((generation - 1u) % j->sectors) * SECTOR;
 }
 
-static bool sector_header(const message_journal_t *j, uint32_t addr, uint32_t *generation)
+static bool sector_header(const message_journal_t *j, uint32_t addr, uint32_t *generation, bool prepared)
 {
 	uint8_t h[HEADER_SIZE];
 	if (!j->flash->read(addr, h, sizeof(h))) {
@@ -43,7 +43,8 @@ static bool sector_header(const message_journal_t *j, uint32_t addr, uint32_t *g
 	uint32_t g = get32(h + 4);
 	*generation = 0;
 	if (g != 0 && g <= MAX_GENERATION && sector_addr(j, g) == addr && get32(h) == MAGIC &&
-	    h[HEADER_SIZE - 1u] == 0 && get32(h + HEADER_CRC) == storage_crc32(0, h, HEADER_CRC)) {
+	    (h[HEADER_SIZE - 1u] != 0) == prepared &&
+	    get32(h + HEADER_CRC) == storage_crc32(0, h, HEADER_CRC)) {
 		*generation = g;
 	}
 	return true;
@@ -59,7 +60,7 @@ bool message_journal_mount(message_journal_t *j, const hal_flash_t *flash, uint3
 	message_journal_t scan = { flash, base, size / SECTOR, 0 };
 	for (uint32_t offset = 0; offset < size; offset += SECTOR) {
 		uint32_t generation;
-		if (!sector_header(&scan, base + offset, &generation)) {
+		if (!sector_header(&scan, base + offset, &generation, false)) {
 			return false;
 		}
 		if (generation > scan.generation) {
@@ -96,10 +97,73 @@ static bool sector_erased(const hal_flash_t *flash, uint32_t addr, uint8_t *scra
 	return true;
 }
 
-bool message_journal_append(message_journal_t *j, const message_journal_record_t *record, bool reclaim,
-			    uint8_t scratch[SLOT], uint32_t *id)
+static void record_encode(uint8_t *dst, const message_journal_record_t *record, uint32_t key)
 {
-	if (!j->flash || !memchr(record->text, '\0', sizeof(record->text))) {
+	memset(dst, 0, RECORD_CRC);
+	put32(dst, key);
+	put32(dst + 4, record->src);
+	put32(dst + 8, record->dst);
+	put32(dst + 12, record->time);
+	dst[16] = record->flags;
+	memcpy(dst + TEXT_OFFSET, record->text, strlen(record->text) + 1u);
+	put32(dst + RECORD_CRC, storage_crc32(0, dst, RECORD_CRC));
+}
+
+static bool record_valid(const uint8_t *data, uint32_t key)
+{
+	return data[SLOT - 1u] == 0 && get32(data) == key &&
+	       memchr(data + TEXT_OFFSET, '\0', MESSAGE_JOURNAL_TEXT) &&
+	       get32(data + RECORD_CRC) == storage_crc32(0, data, RECORD_CRC);
+}
+
+static bool rollover(message_journal_t *j, uint32_t g, const message_journal_record_t *record,
+		     bool (*replace)(uint32_t, const uint8_t *), uint8_t *scratch, bool *recovered)
+{
+	const hal_flash_t *flash = j->flash;
+	uint32_t addr = sector_addr(j, g);
+	uint32_t key = (g - 1u) * SLOTS + 1u;
+	uint32_t pending;
+	if (!sector_header(j, addr, &pending, true)) {
+		return false;
+	}
+	*recovered = pending == g;
+	if (*recovered) {
+		if (!flash->read(addr + HEADER_SIZE, scratch, SLOT) || !record_valid(scratch, key)) {
+			return false;
+		}
+	} else {
+		uint32_t prior;
+		bool blank;
+		if (!sector_header(j, addr, &prior, false) || !sector_erased(flash, addr, scratch, &blank)) {
+			return false;
+		}
+		bool expired = prior != 0 && prior < g && g - prior >= j->sectors;
+		if (!blank && !expired) {
+			return false;
+		}
+		memset(scratch, 0xFF, SECTOR);
+		put32(scratch, MAGIC);
+		put32(scratch + 4, g);
+		put32(scratch + HEADER_CRC, storage_crc32(0, scratch, HEADER_CRC));
+		record_encode(scratch + HEADER_SIZE, record, key);
+		scratch[HEADER_SIZE + SLOT - 1u] = 0;
+		if (!replace(addr, scratch)) {
+			return false;
+		}
+	}
+	// The old live window survives until the replacement's complete first record can be read.
+	uint8_t commit = 0;
+	if (!flash->write(addr + HEADER_SIZE - 1u, &commit, 1)) {
+		return false;
+	}
+	j->generation = g;
+	return true;
+}
+
+bool message_journal_append(message_journal_t *j, const message_journal_record_t *record,
+			    bool (*replace)(uint32_t, const uint8_t *), uint8_t *scratch, uint32_t *id)
+{
+	if (!j->flash || !replace || !memchr(record->text, '\0', sizeof(record->text))) {
 		return false;
 	}
 	const hal_flash_t *flash = j->flash;
@@ -117,46 +181,27 @@ bool message_journal_append(message_journal_t *j, const message_journal_record_t
 			slot--;
 		}
 	}
-	bool rollover = slot == SLOTS;
-	if (rollover) {
+	if (slot == SLOTS) {
 		if (g == MAX_GENERATION) {
 			return false;
 		}
-		addr = sector_addr(j, ++g);
-		uint32_t prior;
-		bool blank;
-		if (!sector_header(j, addr, &prior) || !sector_erased(flash, addr, scratch, &blank)) {
+		bool recovered;
+		if (!rollover(j, ++g, record, replace, scratch, &recovered)) {
 			return false;
 		}
-		bool expired = prior != 0 && prior < g && g - prior >= j->sectors;
-		if (!blank && (!(reclaim || expired) || !flash->erase(addr))) {
-			return false;
+		if (!recovered) {
+			*id = (g - 1u) * SLOTS + 1u;
+			return true;
 		}
-		slot = 0;
+		addr = sector_addr(j, g);
+		slot = 1;
 	}
 	uint32_t key = (g - 1u) * SLOTS + slot + 1u;
 	uint32_t at = addr + HEADER_SIZE + slot * SLOT;
-	memset(scratch, 0, RECORD_CRC);
-	put32(scratch, key);
-	put32(scratch + 4, record->src);
-	put32(scratch + 8, record->dst);
-	put32(scratch + 12, record->time);
-	scratch[16] = record->flags;
-	memcpy(scratch + TEXT_OFFSET, record->text, strlen(record->text) + 1u);
-	put32(scratch + RECORD_CRC, storage_crc32(0, scratch, RECORD_CRC));
+	record_encode(scratch, record, key);
 	uint8_t commit = 0;
 	if (!flash->write(at, scratch, RECORD_CRC + 4u) || !flash->write(at + SLOT - 1u, &commit, 1)) {
 		return false;
-	}
-	if (rollover) {
-		// The new sector becomes visible only after its first record is committed.
-		put32(scratch, MAGIC);
-		put32(scratch + 4, g);
-		put32(scratch + HEADER_CRC, storage_crc32(0, scratch, HEADER_CRC));
-		if (!flash->write(addr, scratch, HEADER_CRC + 4u) || !flash->write(addr + HEADER_SIZE - 1u, &commit, 1)) {
-			return false;
-		}
-		j->generation = g;
 	}
 	*id = key;
 	return true;
@@ -174,9 +219,8 @@ bool message_journal_read(const message_journal_t *j, uint32_t id, uint8_t scrat
 	}
 	uint32_t addr = sector_addr(j, g), actual;
 	uint32_t at = addr + HEADER_SIZE + ((id - 1u) % SLOTS) * SLOT;
-	if (!sector_header(j, addr, &actual) || actual != g || !j->flash->read(at, scratch, SLOT) ||
-	    scratch[SLOT - 1u] != 0 || get32(scratch) != id || !memchr(scratch + TEXT_OFFSET, '\0', MESSAGE_JOURNAL_TEXT) ||
-	    get32(scratch + RECORD_CRC) != storage_crc32(0, scratch, RECORD_CRC)) {
+	if (!sector_header(j, addr, &actual, false) || actual != g || !j->flash->read(at, scratch, SLOT) ||
+	    !record_valid(scratch, id)) {
 		return false;
 	}
 	record->src = get32(scratch + 4);
@@ -260,7 +304,7 @@ static message_journal_result_t run_job(const hal_flash_map_t *m, const message_
 	if (!active) {
 		return MESSAGE_JOB_INACTIVE;
 	}
-	return message_journal_append(&journal, job->record, false, scratch, id)
+	return message_journal_append(&journal, job->record, storage_sector_write, scratch, id)
 		? MESSAGE_JOB_OK : MESSAGE_JOB_FAILED;
 }
 
