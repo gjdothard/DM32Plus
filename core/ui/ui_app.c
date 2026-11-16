@@ -1819,8 +1819,9 @@ static void list_draw(const ui_scr_def_t *d)
 	}
 #if CONFIG_UI_CARD_MENU
 	if (ui_card_layout(&ui_st)) {
-		if (f->scr == SCR_TOOLS) {
-			l.prefix = TR("Tools & Utilities");
+		if (f->scr == SCR_TOOLS || (f->scr == SCR_SETTINGS && CONFIG_UI_SETTINGS)) {
+			if (f->scr == SCR_TOOLS)
+				l.prefix = TR("Tools & Utilities");
 			ui_draw_numbered_menu(view, &ui_st, &l);
 			return;
 		}

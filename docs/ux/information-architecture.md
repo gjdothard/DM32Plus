@@ -157,7 +157,8 @@ DMR channel with no codec installed (any DMR tile, and the VFO's Mode tile switc
 
 ## 6. Settings by intent
 
-Settings has a search field on top (T9). Groups, in this order:
+Find on Home searches Settings (T9). On the dark card layout, Main Menu item 9 opens Settings as numbered cards.
+Both layouts use the same groups, shortcuts, and editors. Groups, in this order:
 
 | Group | Contents |
 |---|---|

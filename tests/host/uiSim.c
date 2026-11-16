@@ -527,6 +527,8 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 		snprintf(name, nlen, "%s", gallery[i].name);
 		if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "tools"))
 			snprintf(script, slen, "branded-home ok 8");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "settings"))
+			snprintf(script, slen, "branded-home ok 9");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "contacts"))
 			snprintf(script, slen, "branded-home ok 3");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "home_dual_fm"))

@@ -1397,6 +1397,15 @@ int main(void)
 		{ "Tools card preserves Scan and Back", "branded-home", "ok 8 back 8 1",
 			"screen=home scanning=1", 5, false },
 		{ "Main Menu direct Settings and Back", "branded-home", "ok 9 back", "screen=hub", 3, false },
+		{ "Settings shows the actual groups", "branded-home", "ok 9",
+			"screen=settings shows=Sound shows=Display shows=Talk_&_listen shows=Privacy shows=Location "
+			"shows=Connections shows=Power shows=Keys shows=My_radio shows=Advanced", 2, false },
+		{ "Settings Display opens the brightness editor", "branded-home", "ok 9 2 ok",
+			"screen=group shows=Brightness", 4, false },
+		{ "Settings Keys keeps its shortcut", "branded-home", "ok 9 8",
+			"screen=group shows=Long_press_time shows=Up/Down_on_Home", 3, false },
+		{ "Settings Advanced keeps its zero shortcut", "branded-home", "ok 9 0",
+			"screen=group shows=About shows=Codeplug shows=Diagnostics", 3, false },
 #if CONFIG_MESSAGE_JOURNAL
 		{ "History activation opens a confirmation", "branded-home", "ok 9 0 up ok",
 			"screen=confirm shows=Message_history shows=Cancel", 5, false },

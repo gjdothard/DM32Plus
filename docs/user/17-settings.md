@@ -3,8 +3,9 @@
 
 # Settings
 
-Open Settings with **OK**, **7**, or with **\***, **0**. Settings are grouped by what they are for. A number key opens
-a group directly. Find also reaches each setting by name: type its first letters on Home.
+On Home, press **OK**, **9** on the dark card layout or **OK**, **7** on the standard layout. The standard quick
+controls also open Settings with **\***, **0**. Both layouts use the same group numbers, from **1** for Sound to **0**
+for Advanced. Find also reaches each setting by name: type its first letters on Home.
 
 <img src="../ux/screens/160x120i5/settings.png" width="200" alt="Settings">
 <img src="../ux/screens/160x120i5/settings_display.png" width="200" alt="Settings, Display">
