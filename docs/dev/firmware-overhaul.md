@@ -82,6 +82,12 @@ activation, message capture, and browsing on hardware using the verification gat
 
 Baseline backup verified on November 15, 2026. Its 512 KiB reserve is all erased. The 20 KiB
 service gap contains programmed bytes and is excluded. The installed 315,996-record database
-fits the lower boundary. Restore and the boundary build are still untested on hardware.
+fits the lower boundary.
+
+Local hardware test build `v26.11b7` at `0f6f4876` installed on November 15, 2026 with the
+journal enabled. The application-only updater verified all 150 written sectors by CRC.
+After reboot, the radio reported the expected build and existing codec, the database
+reported 315,996 records, and the journal diagnostic reported zero drops. Owner activation,
+SMS persistence, and rollback remain untested.
 
 For test commands and screenshots, see [Testing](testing.md) and the [UI specification](../spec/ui.md).
