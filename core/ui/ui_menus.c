@@ -175,7 +175,7 @@ static void hub_draw(void)
 		.count = hub_count(), .focus = f->focus, .top = &f->top,
 		.item = hub_item, .hint = TR("1-7 open  Back"),
 	};
-	ui_draw_main_menu(ui_view(), &ui_st, &list);
+	ui_draw_numbered_menu(ui_view(), &ui_st, &list);
 }
 #endif
 

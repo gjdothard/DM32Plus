@@ -3547,10 +3547,10 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 	card_list_footer(s, footer, keys, NULL, fit, sizeof fit);
 }
 
-void ui_draw_main_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l)
+void ui_draw_numbered_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l)
 {
 #if CONFIG_DUAL_WATCH
-	if (ui_card_layout(s)) {
+	if (ui_card_layout(s) && l->count) {
 		const font_t *sm = ui_layout.small;
 		const font_t *meta = &font_6x12;
 		const int width = gfx_width(), top = 55, footer = gfx_height() - 19;

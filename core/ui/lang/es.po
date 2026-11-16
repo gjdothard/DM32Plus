@@ -440,6 +440,10 @@ msgstr "Buscar: "
 msgid "No match: Back deletes a key"
 msgstr "Sin coincidencia: Atrás borra"
 
+#: core/ui/ui_app.c
+msgid "Tools & Utilities"
+msgstr "Herramientas y utilidades"
+
 #: core/ui/ui_app.c core/ui/ui_menus.c
 msgid "VFO band"
 msgstr "Banda VFO"

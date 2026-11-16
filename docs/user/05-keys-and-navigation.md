@@ -82,7 +82,7 @@ On the standard Hub, **OK**, **6** opens Tools. On the dark card layout, **OK** 
 | **5** | Scan controls. Select **Start scan** to begin |
 | **6** | Activity / Logs, which opens Recent calls |
 | **7** | GPS / APRS, with Position and APRS |
-| **8** | Tools |
+| **8** | Tools & Utilities |
 | **9** | Settings |
 
 <img src="../ux/screens/240x320i10x5/hub.png" width="200" alt="Main Menu on the card layout">

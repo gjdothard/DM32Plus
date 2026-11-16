@@ -1819,6 +1819,11 @@ static void list_draw(const ui_scr_def_t *d)
 	}
 #if CONFIG_UI_CARD_MENU
 	if (ui_card_layout(&ui_st)) {
+		if (f->scr == SCR_TOOLS) {
+			l.prefix = TR("Tools & Utilities");
+			ui_draw_numbered_menu(view, &ui_st, &l);
+			return;
+		}
 		if (f->scr == SCR_ZONES || f->scr == SCR_ZONE) {
 			ui_draw_card_list(&ui_st, &l, f->scr == SCR_ZONE ? UI_CARD_ZONE_CHANNELS : UI_CARD_ZONES);
 			return;

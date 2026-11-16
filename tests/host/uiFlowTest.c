@@ -1390,7 +1390,12 @@ int main(void)
 			"screen=home scanning=0", 6, false },
 		{ "Main Menu Activity opens Recent", "branded-home", "ok 6", "screen=recent", 2, false },
 		{ "Main Menu GPS / APRS opens APRS", "branded-home", "ok 7 2", "screen=aprs", 3, false },
-		{ "Main Menu direct Tools", "branded-home", "ok 8", "screen=tools", 2, false },
+		{ "Main Menu direct Tools", "branded-home", "ok 8",
+			"screen=tools shows=Tools_&_Utilities shows=Diagnostics shows=Battery", 2, false },
+		{ "Tools card preserves the diagnostics shortcut", "branded-home nobattery", "ok 8 7",
+			"screen=diag", 3, false },
+		{ "Tools card preserves Scan and Back", "branded-home", "ok 8 back 8 1",
+			"screen=home scanning=1", 5, false },
 		{ "Main Menu direct Settings and Back", "branded-home", "ok 9 back", "screen=hub", 3, false },
 #if CONFIG_MESSAGE_JOURNAL
 		{ "History activation opens a confirmation", "branded-home", "ok 9 0 up ok",
