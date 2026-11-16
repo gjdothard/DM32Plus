@@ -1,3 +1,5 @@
+<!-- Copyright (c) 2026 Garrett Dothard -->
+
 # DMR data services
 
 Text messages, packet data answers, CSBK call alert and radio check, ARS registration and LRRP location answers on
@@ -226,7 +228,13 @@ that form, and it confirms delivery. Motorola TMS ("Motorola") is the format for
   The power-off path calls it through the radio core: `radio_req_power_off()` (`RREQ_POWER_OFF`), then
   `core/app/app.c` waits while `radio_power_off_busy()`, at most 3 s, before the settings flush and the latch.
 
+The GPS / APRS & Data menu reads the same ARS state as the debug link. ARP is part of the network gateway,
+which has no per-peer resolution state for this page to report.
+
 ## 7. LRRP
+
+The LRRP Subscriptions page reads the number of active triggered reports from the service and displays the
+Answer GPS requests setting. Opening the page sends no packet.
 
 - The Position action sends one unconfirmed private immediate request over UDP 4001. The response must match
   the source radio ID and request ID. The requester waits up to 8 s after transmission for the result.

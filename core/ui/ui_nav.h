@@ -37,12 +37,14 @@ typedef enum {
 	SCR_LANGUAGE,			// Settings > Display > Language: every language, those not built dimmed
 	SCR_SMS_TEXT,			// write a custom message (CONFIG_DMR_SMS)
 	SCR_CONTACT_POSITION,		// last reported position of a private contact
-	SCR_MENU_SECTION,		// a Main Menu section (arg: Radio or GPS / APRS)
+	SCR_MENU_SECTION,		// a Main Menu section (MENU_SECTION_*)
 #if CONFIG_MESSAGE_JOURNAL
 	SCR_HISTORY, SCR_CONVERSATION,
 #endif
 	SCR_COUNT
 } ui_scr_t;
+
+enum { MENU_SECTION_RADIO, MENU_SECTION_GPS, MENU_SECTION_DMR, MENU_SECTION_LRRP };
 
 // Screen flags
 #define SF_LIST		0x01u	// drawn and driven as a list (ui_draw_list)

@@ -13,6 +13,7 @@
 //   mondown ... monup   the monitor key held (FM: the squelch held open)
 //   datatx / dataend    DMR data goes out without PTT (ARS, SMS, IP): the view says TX; it ends
 //   dtmf:<digits>       during TX: the radio core has sent these DTMF digits (the TX screen's DTMF line)
+//   datastatus        simulated ARS registration and two active LRRP reports
 //   wait:<ms>           time passes
 //   reboot              power off and on: the screens start over, the settings stay
 //   receivers:2         a receiver per dual watch channel; rxa:/rxb:<src>,<dst>,g|p a call on A's / B's own,
@@ -65,6 +66,9 @@
 #include "hotspot/hotspot.h"
 #include "stubentry/stub_entry.h"
 #include "ui/ui_svc_aprs.h"
+#if CONFIG_UI_CARD_MENU
+#include "dmr/dmrDataService.h"
+#endif
 
 #define TICK_MS		50
 #define PRESS_MS	150
@@ -1731,6 +1735,11 @@ static const ui_gps_sat_t sim_sats[] = {
 	{ UI_GNSS_GLONASS, 7, 22, 0, 100, false }, { UI_GNSS_GALILEO, 11, 15, 15, 280, false },
 };
 #define SIM_SATS	(sizeof(sim_sats) / sizeof(sim_sats[0]))
+#if CONFIG_UI_CARD_MENU
+static bool sim_data_status;
+uint8_t ui_svc_ars_state(void) { return sim_data_status ? DMR_ARS_STATE_REGISTERED : DMR_ARS_STATE_OFF; }
+uint8_t ui_svc_lrrp_count(void) { return sim_data_status ? 2 : 0; }
+#endif
 static bool sim_no_fix;
 static int32_t sim_lat, sim_lon;
 
@@ -1935,6 +1944,9 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	sim_history_text = NULL;
 #endif
 	board.home_brand = NULL;
+#if CONFIG_UI_CARD_MENU
+	sim_data_status = false;
+#endif
 	sim_no_fix = false;
 	sim_lat = 423601000;
 	sim_lon = -710589000;
@@ -2554,6 +2566,14 @@ static bool run_token(char *t, char *err, size_t len)
 		advance(200);
 		return true;
 	}
+#if CONFIG_UI_CARD_MENU
+	if (strcmp(t, "datastatus") == 0) {
+		sim_data_status = true;
+		changed();
+		advance(200);
+		return true;
+	}
+#endif
 #if CONFIG_CONTACT_POSITION
 	if (strcmp(t, "localnofix") == 0) {
 		sim_no_fix = true;

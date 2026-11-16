@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # APRS
 
@@ -19,6 +20,14 @@ room. The [Radio reference](23-radios.md) lists them and says where APRS is veri
 - Your callsign is the first word of the radio name (Settings > My radio, or the codeplug's radio name). Without a
   valid callsign nothing is sent, and the APRS page says why.
 - Sending is off until you turn it on. "Send position now" works at any time.
+
+## GPS / APRS & Data
+
+On the dark card layout, press **OK**, **7** on Home. **1** opens Position and shows the fix and satellites used
+beside the card. **2** opens APRS. **3** opens DMR Data Status, including the current ARS registration state.
+ARP has no per-peer resolution status in the firmware. **4** opens LRRP Subscriptions and shows how many remote
+triggered location reports are active and whether the radio is set to answer GPS requests. This page is read-only.
+Change **Answer GPS requests** in **Settings > Location**.
 
 ## The APRS page
 

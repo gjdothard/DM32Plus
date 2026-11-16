@@ -173,6 +173,11 @@ bool ui_svc_radio_check(uint32_t id);
 bool ui_svc_position_request(uint32_t id);
 bool ui_svc_call_alert(uint32_t id);
 
+#if CONFIG_UI_CARD_MENU
+uint8_t ui_svc_ars_state(void);	// dmrArsState_t
+uint8_t ui_svc_lrrp_count(void);	// active triggered reports
+#endif
+
 // --- Location ---
 typedef struct {
 	bool fix;

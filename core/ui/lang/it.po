@@ -1048,7 +1048,7 @@ msgstr "Fix 3D"
 msgid "2D Fix"
 msgstr "Fix 2D"
 
-#: core/ui/ui_gps.c
+#: core/ui/ui_gps.c core/ui/ui_menus.c
 msgid "Fix"
 msgstr "Fix"
 
@@ -1167,6 +1167,50 @@ msgstr "Menu principale"
 #: core/ui/ui_menus.c
 msgid "1-7 open  Back"
 msgstr "1-7 apri  Indietro"
+
+#: core/ui/ui_menus.c
+msgid "GPS / APRS & Data"
+msgstr "GPS / APRS e dati"
+
+#: core/ui/ui_menus.c
+msgid "DMR Data Status"
+msgstr "Stato dati DMR"
+
+#: core/ui/ui_menus.c
+msgid "LRRP Subscriptions"
+msgstr "Iscrizioni LRRP"
+
+#: core/ui/ui_menus.c
+msgid "Registering"
+msgstr "Registrazione"
+
+#: core/ui/ui_menus.c
+msgid "Registered"
+msgstr "Registrato"
+
+#: core/ui/ui_menus.c
+msgid "Refused"
+msgstr "Rifiutato"
+
+#: core/ui/ui_menus.c core/ui/ui_svc_data.c
+msgid "No answer"
+msgstr "Nessuna risposta"
+
+#: core/ui/ui_menus.c core/ui/ui_svc_data.c
+msgid "No GPS fix"
+msgstr "Nessuna posizione GPS"
+
+#: core/ui/ui_menus.c
+msgid "No status"
+msgstr "Stato assente"
+
+#: core/ui/ui_menus.c
+msgid "Active reports"
+msgstr "Report attivi"
+
+#: core/ui/ui_menus.c
+msgid "Answer GPS requests"
+msgstr "Rispondi a GPS"
 
 #: core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Quick Controls"
@@ -2901,10 +2945,6 @@ msgid "Send position"
 msgstr "Invia posizione"
 
 #: core/ui/ui_menus.c
-msgid "Answer GPS requests"
-msgstr "Rispondi a GPS"
-
-#: core/ui/ui_menus.c
 msgid "Hotspot allowed"
 msgstr "Hotspot permesso"
 
@@ -3855,14 +3895,6 @@ msgstr "OK scegli"
 #: core/ui/ui_screens.c
 msgid "* more  Back"
 msgstr "* altro  Indietro"
-
-#: core/ui/ui_svc_data.c
-msgid "No answer"
-msgstr "Nessuna risposta"
-
-#: core/ui/ui_svc_data.c
-msgid "No GPS fix"
-msgstr "Nessuna posizione GPS"
 
 #: core/ui/ui_svc_data.c
 msgid "Position request refused"

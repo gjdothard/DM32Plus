@@ -21,6 +21,11 @@ uint32_t ui_svc_feat_data(void)
 	       (CONFIG_ZONE_SHARE ? UI_FEAT_ZONE_SHARE : 0) | (CONFIG_DMR_LRRP ? UI_FEAT_LRRP : 0);
 }
 
+#if CONFIG_UI_CARD_MENU
+uint8_t ui_svc_ars_state(void) { return (uint8_t)dmr_data_ars_state(); }
+uint8_t ui_svc_lrrp_count(void) { return (uint8_t)dmrDataServiceLrrpTriggerCount(); }
+#endif
+
 static void contact_name(uint32_t id, bool group, char *out, size_t len)
 {
 	contact_t c;
