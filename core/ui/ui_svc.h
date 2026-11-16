@@ -14,6 +14,9 @@
 #include "config.h"
 #include "radio/radio.h"
 #include "codeplug/zone_edit.h"
+#if CONFIG_MESSAGE_JOURNAL
+#include "storage/message_journal.h"
+#endif
 
 // --- What is available (screens gray out what isn't, and say why on SELECT) ---
 #define UI_FEAT_TALK_TARGET	(1u << 0)	// ui_svc_talk_to / ui_svc_focus_target (dmr-voice)
@@ -205,6 +208,9 @@ bool ui_svc_factory_reset(void);
 #if CONFIG_MESSAGE_JOURNAL
 bool ui_svc_message_history_available(void);
 bool ui_svc_message_history_activate(void);
+bool ui_svc_history_active(void);
+void ui_svc_history_browse(uint32_t key, uint32_t before);
+void ui_svc_history_view(message_history_view_t *out, char *text, size_t size);
 #endif
 
 // --- The crash log (CONFIG_CRASH_LOG) and its report (CONFIG_CRASH_REPORT; ui_svc_crash.c, docs/spec/crash-log.md) ---

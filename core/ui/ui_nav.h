@@ -38,6 +38,9 @@ typedef enum {
 	SCR_SMS_TEXT,			// write a custom message (CONFIG_DMR_SMS)
 	SCR_CONTACT_POSITION,		// last reported position of a private contact
 	SCR_MENU_SECTION,		// a Main Menu section (arg: Radio or GPS / APRS)
+#if CONFIG_MESSAGE_JOURNAL
+	SCR_HISTORY, SCR_CONVERSATION,
+#endif
 	SCR_COUNT
 } ui_scr_t;
 
@@ -100,6 +103,9 @@ bool ui_contact_position_shown(void);
 
 const radio_view_t *ui_view(void);
 ui_frame_t *ui_frame(void);
+#if CONFIG_MESSAGE_JOURNAL
+void ui_history_tick(void);
+#endif
 uint8_t ui_depth(void);
 void ui_push(uint8_t scr, uint16_t arg);
 void ui_pop(void);

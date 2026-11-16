@@ -384,27 +384,35 @@ bool message_journal_submit(message_journal_job_t *job)
 	return job && job->complete && job->record && storage_job_post(append_job, job);
 }
 
-static bool peer_matches(message_history_peer_t peer, const uint8_t *scratch)
+static uint32_t peer_key(const uint8_t *scratch)
 {
 	uint8_t flags = scratch[16];
 	bool group = (flags & MESSAGE_RECORD_GROUP) != 0;
 	uint32_t target = get32(scratch + (group || (flags & MESSAGE_RECORD_OUTGOING) ? 8u : 4u));
-	return peer.id == 0 || (peer.group == group && peer.id == target);
+	return target | (group ? MESSAGE_HISTORY_GROUP_KEY : 0);
+}
+
+static uint32_t first_live(const message_journal_t *j)
+{
+	return j->generation >= j->sectors ? (j->generation - j->sectors + 1u) * SLOTS + 1u : 1u;
+}
+
+static uint32_t start_slot(const message_journal_t *j, uint32_t before)
+{
+	uint32_t last = j->generation * SLOTS;
+	return before && before <= last ? before - 1u : last;
 }
 
 static bool page_read(const message_journal_t *j, const message_history_page_t *page,
 		      uint8_t *scratch, uint8_t *count, uint32_t *next)
 {
-	if (j->generation == 0)
-		return true;
-	uint32_t last = j->generation * SLOTS;
-	uint32_t first = j->generation >= j->sectors ? (j->generation - j->sectors + 1u) * SLOTS + 1u : 1u;
-	uint32_t id = page->before && page->before <= last ? page->before - 1u : last;
+	uint32_t key = page->peer.id | (page->peer.group ? MESSAGE_HISTORY_GROUP_KEY : 0);
+	uint32_t first = first_live(j), id = start_slot(j, page->before);
 	for (unsigned scanned = 0; id >= first && scanned < PAGE_SCAN_SLOTS && *count < page->capacity; scanned++, id--) {
 		slot_result_t result = read_slot(j, id, scratch);
 		if (result == SLOT_READ_ERROR)
 			return false;
-		if (result == SLOT_VALID && peer_matches(page->peer, scratch)) {
+		if (result == SLOT_VALID && (!page->peer.id || peer_key(scratch) == key)) {
 			message_history_item_t *item = &page->items[(*count)++];
 			item->id = id;
 			record_decode(scratch, &item->record);
@@ -449,10 +457,118 @@ bool message_history_read_page(message_history_page_t *page)
 	       storage_job_post(read_page_job, page);
 }
 
+bool message_history_active(void)
+{
+	storage_quick_lock();
+	bool active = history && history->active;
+	storage_quick_unlock();
+	return active;
+}
+
+void message_history_browse(uint32_t key, uint32_t before)
+{
+	storage_quick_lock();
+	if (history && history->active) {
+		uint16_t revision = history->view.revision + 1u;
+		history->view = (message_history_view_t){ .key = key, .revision = revision };
+		history->scan_before = before;
+	}
+	storage_quick_unlock();
+}
+
+void message_history_view(message_history_view_t *out, char *text, size_t size)
+{
+	storage_quick_lock();
+	*out = history ? history->view : (message_history_view_t){ .status = HISTORY_EMPTY };
+	if (text && size) {
+		text[0] = '\0';
+		if (history && out->key && out->status == HISTORY_READY) {
+			strncpy(text, history->view_text, size - 1u);
+			text[size - 1u] = '\0';
+		}
+	}
+	storage_quick_unlock();
+}
+
+static void browser_scan(const message_journal_t *j, message_history_view_t *v, uint32_t *cursor, uint8_t *scratch)
+{
+	uint32_t first = first_live(j), id = start_slot(j, *cursor);
+	for (unsigned scanned = 0; id >= first && scanned < PAGE_SCAN_SLOTS; scanned++, id--) {
+		slot_result_t result = read_slot(j, id, scratch);
+		if (result == SLOT_READ_ERROR) {
+			v->status = HISTORY_ERROR;
+			return;
+		}
+		if (result != SLOT_VALID)
+			continue;
+		uint32_t key = peer_key(scratch);
+		if (v->key) {
+			if (v->key == key) {
+				v->flags = scratch[16];
+				v->before = id > first ? id : 0;
+				v->status = HISTORY_READY;
+				return;
+			}
+		} else if (key & ~MESSAGE_HISTORY_GROUP_KEY) {
+			unsigned i = 0;
+			while (i < v->count && v->peers[i] != key)
+				i++;
+			if (i == v->count)
+				v->peers[v->count++] = key;
+			if (v->count == MESSAGE_HISTORY_PEERS) {
+				v->status = HISTORY_READY;
+				return;
+			}
+		}
+	}
+	*cursor = id >= first ? id + 1u : 0;
+	if (!*cursor)
+		v->status = v->count ? HISTORY_READY : HISTORY_EMPTY;
+}
+
+static void browser_poll(void)
+{
+	storage_quick_lock();
+	bool pending = history && history->active && history->view.status == HISTORY_LOADING;
+	message_history_view_t view;
+	uint32_t cursor;
+	if (pending) {
+		view = history->view;
+		cursor = history->scan_before;
+	}
+	storage_quick_unlock();
+	if (!pending)
+		return;
+	uint8_t *scratch = storage_buffer_acquire();
+	if (!scratch)
+		return;
+	storage_lock();
+	const hal_flash_map_t *m = storage_map();
+	message_journal_t j;
+	if (message_journal_available() && board.flash->read(m->message_addr, scratch, sizeof(activation)) &&
+	    memcmp(scratch, activation, sizeof(activation)) == 0 &&
+	    message_journal_mount(&j, board.flash, m->message_addr + SECTOR, m->message_size - SECTOR))
+		browser_scan(&j, &view, &cursor, scratch);
+	else
+		view.status = HISTORY_ERROR;
+	storage_unlock();
+	storage_quick_lock();
+	if (view.revision == history->view.revision) {
+		if (view.key && view.status == HISTORY_READY)
+			memcpy(history->view_text, scratch + TEXT_OFFSET, sizeof(history->view_text));
+		view.revision++;
+		history->view = view;
+		history->scan_before = cursor;
+	}
+	storage_quick_unlock();
+	storage_buffer_release();
+}
+
 void message_history_start(message_history_t *state)
 {
 	uint8_t marker[sizeof(activation)];
 	*state = (message_history_t){0};
+	state->view.status = HISTORY_EMPTY;
 	storage_lock();
 	state->active = message_journal_available() &&
 		board.flash->read(storage_map()->message_addr, marker, sizeof(marker)) &&
@@ -494,6 +610,7 @@ uint32_t message_history_dropped(void)
 
 void message_history_poll(void)
 {
+	browser_poll();
 	storage_quick_lock();
 	const message_journal_record_t *record = history && history->count ? &history->pending[history->head] : NULL;
 	storage_quick_unlock();
@@ -510,6 +627,10 @@ void message_history_poll(void)
 		history->dropped += history->count;
 		history->count = 0;
 		history->active = false;
+		history->view.status = HISTORY_ERROR;
+		history->view.count = 0;
+		history->view.before = 0;
+		history->view.revision++;
 	} else {
 		history->head = (history->head + 1u) % MESSAGE_HISTORY_QUEUE;
 		history->count--;

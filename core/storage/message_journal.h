@@ -5,11 +5,14 @@
 
 #include "config.h"
 #include "hal_flash.h"
+#include <stddef.h>
 
 #define MESSAGE_JOURNAL_TEXT 144u
 #define MESSAGE_JOURNAL_SCRATCH 192u
 #define MESSAGE_HISTORY_QUEUE 2u
 #define MESSAGE_HISTORY_PAGE_MAX 4u
+#define MESSAGE_HISTORY_PEERS 6u
+#define MESSAGE_HISTORY_GROUP_KEY 0x80000000u
 #define MESSAGE_RECORD_GROUP 0x01u
 #define MESSAGE_RECORD_OUTGOING 0x02u
 #define MESSAGE_RECORD_FAILED 0x04u
@@ -81,8 +84,27 @@ typedef struct {
 // completion. Continue with next_before, even on an empty page. Zero next_before means the end.
 bool message_history_read_page(message_history_page_t *page);
 
+typedef enum { HISTORY_LOADING, HISTORY_READY, HISTORY_EMPTY, HISTORY_ERROR } message_history_status_t;
+
+typedef struct {
+	uint32_t key;	// 0 is the directory, bit 31 distinguishes a talkgroup
+	uint32_t peers[MESSAGE_HISTORY_PEERS];
+	uint32_t before;	// next older page, 0 at the end
+	uint16_t revision;
+	uint8_t count, flags;
+	message_history_status_t status;
+} message_history_view_t;
+
+// One UI browser, served on the housekeeping task. Text is copied only for a ready message.
+bool message_history_active(void);
+void message_history_browse(uint32_t key, uint32_t before);
+void message_history_view(message_history_view_t *out, char *text, size_t size);
+
 typedef struct {
 	message_journal_record_t pending[MESSAGE_HISTORY_QUEUE];
+	message_history_view_t view;
+	char view_text[MESSAGE_JOURNAL_TEXT];
+	uint32_t scan_before;
 	uint32_t dropped;
 	uint8_t head, count;
 	bool active;

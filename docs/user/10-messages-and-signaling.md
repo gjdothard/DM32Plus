@@ -46,8 +46,10 @@ In builds with the experimental journal, **Settings → Advanced → Message his
 radio's reserved storage. Select **Enable** to confirm. The radio reports whether it could
 activate the reserve. If it reports that blank storage is required, the existing bytes are
 preserved. Once enabled, new received messages and outgoing send results are saved in the
-archive. The Messages screen still shows the four-entry live inbox. Archive browsing is
-pending. Archived text is stored in plaintext.
+archive. Under **Messages → Conversations**, choose one of the six most recent private or
+talkgroup conversations. The newest saved message opens first. **Older message** walks
+back through that conversation and **Newest message** returns to its latest entry.
+The four-entry live inbox remains below **Conversations**. Archived text is stored in plaintext.
 
 ## Sending a message
 

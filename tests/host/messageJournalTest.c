@@ -255,6 +255,7 @@ static void test_capture(void)
 	data[RESERVE_BASE] = 0;
 	message_history_poll();
 	CHECK(!history.active && !history.count && message_history_dropped() == 1);
+	CHECK(history.view.status == HISTORY_ERROR);
 	CHECK(!message_journal_read(&j, 3, scratch, &out));
 }
 
@@ -332,6 +333,29 @@ static void test_archive_pages(void)
 	page.before = 5;
 	read_page(&page, MESSAGE_JOB_OK);
 	CHECK(page_count == 1 && items[0].id == 4 && !next_before);
+
+	unsigned writes = budget;
+	char body[MESSAGE_JOURNAL_TEXT];
+	message_history_view_t view;
+	message_history_browse(0, 0);
+	message_history_poll();
+	message_history_view(&view, NULL, 0);
+	CHECK(view.status == HISTORY_LOADING && view.count == 1 && view.peers[0] == (MESSAGE_HISTORY_GROUP_KEY | 9u));
+	message_history_poll();
+	message_history_view(&view, NULL, 0);
+	CHECK(view.status == HISTORY_READY && view.count == 3 && view.peers[1] == 9 && view.peers[2] == 3);
+	message_history_browse(9, 0);
+	message_history_poll();
+	message_history_view(&view, body, sizeof body);
+	CHECK(view.status == HISTORY_LOADING && !body[0]);
+	message_history_poll();
+	message_history_view(&view, body, sizeof body);
+	CHECK(view.status == HISTORY_READY && !strcmp(body, "Private in") && view.before == 3);
+	message_history_browse(9, view.before);
+	message_history_poll();
+	message_history_view(&view, body, sizeof body);
+	CHECK(view.status == HISTORY_READY && !strcmp(body, "Private out") && (view.flags & MESSAGE_RECORD_OUTGOING));
+	CHECK(budget == writes);
 
 	page.peer = (message_history_peer_t){0};
 	failed_read = RESERVE_BASE + STORAGE_SECTOR + 16u + 3u * MESSAGE_JOURNAL_SCRATCH;

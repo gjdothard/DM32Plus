@@ -675,10 +675,25 @@ static const ui_scr_def_t contacts_screen = {
 
 // ======================= Messages =======================
 
-static uint16_t msgs_count(void) { return ui_svc_msg_count(); }
+static bool msgs_has_history(void)
+{
+#if CONFIG_MESSAGE_JOURNAL
+	return ui_svc_history_active();
+#else
+	return false;
+#endif
+}
+
+static uint16_t msgs_count(void) { return ui_svc_msg_count() + msgs_has_history(); }
 
 static void msgs_item(uint16_t i, ui_item_t *it)
 {
+#if CONFIG_MESSAGE_JOURNAL
+	if (msgs_has_history() && i-- == 0) {
+		str_copy(it->label, sizeof it->label, TR("Conversations"));
+		return;
+	}
+#endif
 	ui_msg_t m;
 	if (!ui_svc_msg_get(i, &m))
 		return;
@@ -701,6 +716,12 @@ static void msgs_item(uint16_t i, ui_item_t *it)
 static void msgs_select(uint16_t i, bool hold)
 {
 	(void)hold;
+#if CONFIG_MESSAGE_JOURNAL
+	if (msgs_has_history() && i-- == 0) {
+		ui_push(SCR_HISTORY, 0);
+		return;
+	}
+#endif
 	ui_msg_t m;
 	if (ui_svc_msg_get(i, &m))
 		ui_push(SCR_MESSAGE, m.token);
@@ -721,6 +742,10 @@ static void msg_target_from(const ui_msg_t *m, ui_target_t *t)
 
 static void msgs_context(uint16_t i)
 {
+#if CONFIG_MESSAGE_JOURNAL
+	if (msgs_has_history() && i-- == 0)
+		return;
+#endif
 	ui_msg_t m;
 	ui_target_t t;
 	if (ui_svc_msg_get(i, &m)) {
@@ -802,29 +827,31 @@ static void msg_select(uint16_t i, bool hold)
 	}
 }
 
+static char msg_title_text[24];
+
 static const char *msg_title(void)
 {
-	static char t[24];
 	int i = ui_svc_msg_by_token(ui_frame()->arg, NULL);
 	if (i < 0)
 		return NULL;
 	sbuf_t b;
-	sb_init(&b, t, sizeof t);
+	sb_init(&b, msg_title_text, sizeof msg_title_text);
 	sb_u32(&b, (uint32_t)i + 1u, 1);
 	sb_str(&b, TR(" of "));
 	sb_u32(&b, ui_svc_msg_count(), 1);
-	return t;
+	return msg_title_text;
 }
+
+static char msg_text[UI_MSG_TEXT_MAX + 48];
 
 static const char *msg_body(void)
 {
-	static char t[UI_MSG_TEXT_MAX + 48];
 	ui_msg_t m;
 	if (ui_svc_msg_by_token(ui_frame()->arg, &m) < 0)
 		return TR("Message deleted");
 	// "From Joe Smith, 2m ago" (the ID where there is no name; # gives the station's actions), then the text
 	sbuf_t b;
-	sb_init(&b, t, sizeof t);
+	sb_init(&b, msg_text, sizeof msg_text);
 	sb_str(&b, m.sent ? TR("To ") : TR("From "));
 	if (m.name[0])
 		sb_str(&b, m.name);
@@ -834,7 +861,7 @@ static const char *msg_body(void)
 	sb_age_long(&b, m.age_ms);
 	sb_chr(&b, '\n');
 	sb_str(&b, m.text);
-	return t;
+	return msg_text;
 }
 
 static const ui_scr_def_t message_screen = {
@@ -842,6 +869,141 @@ static const ui_scr_def_t message_screen = {
 	.count = msg_count, .item = msg_item, .select = msg_select, .context = msg_context, .target = msg_target,
 	.title = msg_title, .body = msg_body, .enter = msg_enter,
 };
+
+#if CONFIG_MESSAGE_JOURNAL
+static void history_enter(void) { ui_svc_history_browse(0, 0); }
+
+static uint16_t history_count(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	return v.key == 0 ? v.count : 0;
+}
+
+static void history_label(uint32_t key, char *buf, size_t size)
+{
+	ui_target_t t = { .id = key & ~MESSAGE_HISTORY_GROUP_KEY,
+			  .group = (key & MESSAGE_HISTORY_GROUP_KEY) != 0 };
+	t.saved = ui_contact_name(t.id, t.group, t.name);
+	ui_sb_target(buf, size, &t);
+}
+
+static void history_item(uint16_t i, ui_item_t *it)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (v.key == 0 && i < v.count)
+		history_label(v.peers[i], it->label, sizeof it->label);
+}
+
+static void history_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (v.key == 0 && i < v.count) {
+		ui_svc_history_browse(v.peers[i], 0);
+		ui_push(SCR_CONVERSATION, 0);
+	}
+}
+
+static const char *history_status(const message_history_view_t *v)
+{
+	switch (v->status) {
+	case HISTORY_LOADING: return TR("Reading history...");
+	case HISTORY_ERROR: return TR("Couldn't read history");
+	case HISTORY_EMPTY: return TR("No messages yet");
+	default: return NULL;
+	}
+}
+
+static const char *history_body(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	return v.key ? TR("Reading history...") : history_status(&v);
+}
+
+static uint16_t conversation_count(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	return v.status == HISTORY_READY && v.before ? 2 : 1;
+}
+
+static void conversation_item(uint16_t i, ui_item_t *it)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	bool older = i == 0 && v.status == HISTORY_READY && v.before;
+	str_copy(it->label, sizeof it->label, older ? TR("Older message") : TR("Newest message"));
+}
+
+static void conversation_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	bool older = i == 0 && v.status == HISTORY_READY && v.before;
+	if (v.key)
+		ui_svc_history_browse(v.key, older ? v.before : 0);
+}
+
+static const char *conversation_body(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (v.status == HISTORY_EMPTY)
+		return TR("No more messages");
+	if (v.status != HISTORY_READY)
+		return history_status(&v);
+	const char *state = !(v.flags & MESSAGE_RECORD_OUTGOING) ? TR("Received message") :
+		v.flags & MESSAGE_RECORD_FAILED ? TR("Send failed") :
+		v.flags & MESSAGE_RECORD_DELIVERED ? TR("Delivered") : TR("Sent");
+	sbuf_t b;
+	sb_init(&b, msg_text, sizeof msg_text);
+	sb_str(&b, state);
+	sb_chr(&b, '\n');
+	size_t n = strlen(msg_text);
+	ui_svc_history_view(&v, msg_text + n, sizeof msg_text - n);
+	return msg_text;
+}
+
+static const char *conversation_title(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	history_label(v.key, msg_title_text, sizeof msg_title_text);
+	return msg_title_text;
+}
+
+void ui_history_tick(void)
+{
+	ui_frame_t *f = ui_frame();
+	if (f->scr != SCR_HISTORY && f->scr != SCR_CONVERSATION)
+		return;
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (f->scr == SCR_HISTORY && v.key)
+		history_enter();
+	if (f->arg != v.revision) {
+		f->arg = v.revision;
+		ui_dirty();
+	}
+}
+
+static const ui_scr_def_t history_screen = {
+	.name = "history", .flags = SF_LIST, .prefix = TRN("Conversations"), .hint = TRN("OK open  Back"),
+	.count = history_count, .item = history_item, .select = history_select, .body = history_body,
+	.enter = history_enter,
+};
+
+static const ui_scr_def_t conversation_screen = {
+	.name = "conversation", .flags = SF_LIST, .prefix = TRN("Conversation"), .hint = TRN("OK choose  Back cancel"),
+	.count = conversation_count, .item = conversation_item, .select = conversation_select,
+	.title = conversation_title, .body = conversation_body,
+};
+#endif
 
 // ======================= Recent =======================
 
@@ -6131,6 +6293,9 @@ const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
 #endif
 	[SCR_FIND] = &ui_find_screen, [SCR_ACTIONS] = &actions_screen, [SCR_CONTACTS] = &contacts_screen,
 	[SCR_MESSAGES] = &messages_screen, [SCR_MESSAGE] = &message_screen, [SCR_COMPOSE] = &compose_screen,
+#if CONFIG_MESSAGE_JOURNAL
+	[SCR_HISTORY] = &history_screen, [SCR_CONVERSATION] = &conversation_screen,
+#endif
 #if CONFIG_DMR_SMS
 	[SCR_SMS_TEXT] = &sms_text_screen,
 #endif

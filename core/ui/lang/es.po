@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
-# Copyright (c) 2026 Garrett Dothard
 #
 # The radio's strings in Español (es; docs/dev/translating.md). Kept in step with the source by
 # tools/i18n.py --sync: translate the empty msgstr lines; an empty one shows the English.
@@ -1310,6 +1309,10 @@ msgid "Contacts: not in this build"
 msgstr "Contactos: no disponible"
 
 #: core/ui/ui_menus.c
+msgid "Conversations"
+msgstr "Conversaciones"
+
+#: core/ui/ui_menus.c
 msgid "OK open  # reply  Back"
 msgstr "OK abrir  # responder  Atrás"
 
@@ -1348,6 +1351,54 @@ msgstr "De "
 #: core/ui/ui_menus.c
 msgid "OK choose  # more  Back"
 msgstr "OK elegir  # más  Atrás"
+
+#: core/ui/ui_menus.c
+msgid "Reading history..."
+msgstr "Leyendo historial..."
+
+#: core/ui/ui_menus.c
+msgid "Couldn't read history"
+msgstr "No se pudo leer el historial"
+
+#: core/ui/ui_menus.c
+msgid "Older message"
+msgstr "Mensaje anterior"
+
+#: core/ui/ui_menus.c
+msgid "Newest message"
+msgstr "Mensaje más reciente"
+
+#: core/ui/ui_menus.c
+msgid "No more messages"
+msgstr "No hay más mensajes"
+
+#: core/ui/ui_menus.c
+msgid "Received message"
+msgstr "Mensaje recibido"
+
+#: core/ui/ui_menus.c
+msgid "Send failed"
+msgstr "Error de envío"
+
+#: core/ui/ui_menus.c
+msgid "Delivered"
+msgstr "Entregado"
+
+#: core/ui/ui_menus.c
+msgid "Sent"
+msgstr "Enviado"
+
+#: core/ui/ui_menus.c
+msgid "OK open  Back"
+msgstr "OK abrir  Atrás"
+
+#: core/ui/ui_menus.c
+msgid "Conversation"
+msgstr "Conversación"
+
+#: core/ui/ui_menus.c
+msgid "OK choose  Back cancel"
+msgstr "OK elegir  Atrás cancelar"
 
 #: core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "To you"
@@ -1992,10 +2043,6 @@ msgstr "? Canales quedan."
 #: core/ui/ui_menus.c
 msgid "Delete Zone"
 msgstr "Borrar zona"
-
-#: core/ui/ui_menus.c
-msgid "OK choose  Back cancel"
-msgstr "OK elegir  Atrás cancelar"
 
 #: core/ui/ui_menus.c
 msgid "TX Contact"

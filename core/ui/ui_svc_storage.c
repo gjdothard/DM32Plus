@@ -921,6 +921,12 @@ bool ui_svc_message_history_activate(void)
 	static const message_journal_job_t request = { .complete = history_activation_result };
 	return message_journal_available() && message_journal_activate(&request);
 }
+bool ui_svc_history_active(void) { return message_history_active(); }
+void ui_svc_history_browse(uint32_t key, uint32_t before) { message_history_browse(key, before); }
+void ui_svc_history_view(message_history_view_t *out, char *text, size_t size)
+{
+	message_history_view(out, text, size);
+}
 #endif
 
 void ui_svc_boot_text(char line1[17], char line2[17])

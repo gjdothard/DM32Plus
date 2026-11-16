@@ -1395,6 +1395,14 @@ int main(void)
 			"screen=group toast=none", 6, false },
 		{ "History activation reports success", "branded-home", "ok 9 0 up ok down ok wait:100",
 			"screen=group toast=Message_history_enabled", 7, false },
+		{ "Messages opens the conversation directory", "branded-home history", "ok 2 ok",
+			"screen=history shows=K1ABC_Joe shows=TG_3100", 3, false },
+		{ "A private conversation opens its most recent message", "branded-home history", "ok 2 ok ok",
+			"screen=conversation shows=Delivered shows=Private_text", 4, false },
+		{ "Browse an older private message", "branded-home history", "ok 2 ok ok ok",
+			"screen=conversation shows=Older_private_text shows=Received_message", 5, false },
+		{ "Talkgroup conversation opens its saved group message", "branded-home history", "ok 2 ok down ok",
+			"screen=conversation shows=Group_reply shows=Sent", 5, false },
 #endif
 	};
 	for (size_t i = 0; i < sizeof card_menu / sizeof card_menu[0]; i++)

@@ -46,6 +46,12 @@ of an outgoing message. A group conversation matches the destination talkgroup i
 both directions. Private and group conversations can use the same number and still
 remain separate. Reads share the storage job and sector buffer with other flash work.
 
+The conversation directory shows the six newest distinct keys. It can display partial results
+while scanning in bounded batches on housekeeping. The message view shows one record at a time,
+with an older cursor and a way back to the newest record. A new browser request supersedes an
+in-flight scan before the previous result can be displayed. The browser state is on the
+housekeeping stack, and the UI shares the existing live-inbox title and body buffers.
+
 Each sector contains a 16-byte header followed by 21 slots of 192 bytes. All multibyte fields
 are little endian. The header contains the four bytes `RMG1`, a 32-bit generation, a CRC-32 of
 those eight bytes, three unused bytes, and a commit byte. Generations start at 1. Generation

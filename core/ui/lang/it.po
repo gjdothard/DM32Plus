@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
-# Copyright (c) 2026 Garrett Dothard
 #
 # The radio's strings in Italiano (it; docs/dev/translating.md). Kept in step with the source by
 # tools/i18n.py --sync: translate the empty msgstr lines; an empty one shows the English.
@@ -1310,6 +1309,10 @@ msgid "Contacts: not in this build"
 msgstr "Contatti: non in questa build"
 
 #: core/ui/ui_menus.c
+msgid "Conversations"
+msgstr "Conversazioni"
+
+#: core/ui/ui_menus.c
 msgid "OK open  # reply  Back"
 msgstr "OK apri  # rispondi  Indietro"
 
@@ -1348,6 +1351,54 @@ msgstr "Da "
 #: core/ui/ui_menus.c
 msgid "OK choose  # more  Back"
 msgstr "OK scegli  # altro  Indietro"
+
+#: core/ui/ui_menus.c
+msgid "Reading history..."
+msgstr "Lettura cronologia..."
+
+#: core/ui/ui_menus.c
+msgid "Couldn't read history"
+msgstr "Impossibile leggere la cronologia"
+
+#: core/ui/ui_menus.c
+msgid "Older message"
+msgstr "Messaggio precedente"
+
+#: core/ui/ui_menus.c
+msgid "Newest message"
+msgstr "Messaggio più recente"
+
+#: core/ui/ui_menus.c
+msgid "No more messages"
+msgstr "Nessun altro messaggio"
+
+#: core/ui/ui_menus.c
+msgid "Received message"
+msgstr "Messaggio ricevuto"
+
+#: core/ui/ui_menus.c
+msgid "Send failed"
+msgstr "Invio non riuscito"
+
+#: core/ui/ui_menus.c
+msgid "Delivered"
+msgstr "Consegnato"
+
+#: core/ui/ui_menus.c
+msgid "Sent"
+msgstr "Inviato"
+
+#: core/ui/ui_menus.c
+msgid "OK open  Back"
+msgstr "OK apri  Indietro"
+
+#: core/ui/ui_menus.c
+msgid "Conversation"
+msgstr "Conversazione"
+
+#: core/ui/ui_menus.c
+msgid "OK choose  Back cancel"
+msgstr "OK scegli  Indietro annulla"
 
 #: core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "To you"
@@ -1992,10 +2043,6 @@ msgstr "? I canali restano."
 #: core/ui/ui_menus.c
 msgid "Delete Zone"
 msgstr "Elimina zona"
-
-#: core/ui/ui_menus.c
-msgid "OK choose  Back cancel"
-msgstr "OK scegli  Indietro annulla"
 
 #: core/ui/ui_menus.c
 msgid "TX Contact"

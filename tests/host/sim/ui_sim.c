@@ -1758,12 +1758,43 @@ bool ui_svc_emergency(bool on) { emergency_on = on; return true; }
 bool ui_svc_emergency_active(void) { return emergency_on; }
 bool ui_svc_factory_reset(void) { return true; }
 #if CONFIG_MESSAGE_JOURNAL
+static bool sim_history_enabled;
+static message_history_view_t sim_history;
+static const char *sim_history_text;
+
 bool ui_svc_message_history_available(void) { return board.home_brand != NULL; }
 bool ui_svc_message_history_activate(void)
 {
 	ui_event_t ev = { .kind = UI_EV_HISTORY_RESULT, .text = "Message history enabled" };
 	ui_notify(&ev);
 	return true;
+}
+
+bool ui_svc_history_active(void) { return sim_history_enabled; }
+void ui_svc_history_browse(uint32_t key, uint32_t before)
+{
+	uint16_t revision = sim_history.revision + 1u;
+	sim_history = (message_history_view_t){ .key = key, .revision = revision, .status = HISTORY_READY };
+	if (!key) {
+		sim_history.peers[0] = 3101234;
+		sim_history.peers[1] = MESSAGE_HISTORY_GROUP_KEY | 3100;
+		sim_history.count = 2;
+	} else if (key & MESSAGE_HISTORY_GROUP_KEY) {
+		sim_history_text = "Group reply";
+		sim_history.flags = MESSAGE_RECORD_GROUP | MESSAGE_RECORD_OUTGOING;
+	} else if (before) {
+		sim_history_text = "Older private text";
+	} else {
+		sim_history_text = "Private text";
+		sim_history.before = 8;
+		sim_history.flags = MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_DELIVERED;
+	}
+}
+void ui_svc_history_view(message_history_view_t *out, char *text, size_t size)
+{
+	*out = sim_history;
+	if (text && size)
+		snprintf(text, size, "%s", sim_history_text ? sim_history_text : "");
 }
 #endif
 
@@ -1892,6 +1923,11 @@ static void advance(uint32_t ms)
 
 void sim_reset(const sim_geom_t *g, sim_map_t map)
 {
+#if CONFIG_MESSAGE_JOURNAL
+	sim_history_enabled = false;
+	sim_history = (message_history_view_t){0};
+	sim_history_text = NULL;
+#endif
 	board.home_brand = NULL;
 	sim_no_fix = false;
 	sim_lat = 423601000;
@@ -2363,6 +2399,12 @@ static bool run_token(char *t, char *err, size_t len)
 		advance(1000);
 		return true;
 	}
+#if CONFIG_MESSAGE_JOURNAL
+	if (strcmp(t, "history") == 0) {
+		sim_history_enabled = true;
+		return true;
+	}
+#endif
 	if (strcmp(t, "rx") == 0 || strcmp(t, "call") == 0) {
 		unsigned src = 0, dst = 0;
 		char kind = 'g', alias[32] = "";
