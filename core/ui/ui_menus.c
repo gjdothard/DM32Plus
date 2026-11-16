@@ -792,10 +792,20 @@ static void msgs_item(uint16_t i, ui_item_t *it)
 		sb_str(&b, m.name);
 	else
 		sb_u32(&b, m.src, 1);
-	sb_str(&b, ": ");
-	sb_str(&b, m.text);
 	ui_sb_age(it->value, sizeof it->value, m.age_ms);
-	it->flags |= UI_ITEM_PREVIEW;	// the start of the message: cut at its end
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		// The card uses separate lines for sender/age and the start of the message.
+		size_t age_end = strlen(it->value);
+		it->value[age_end++] = '\n';
+		str_copy(it->value + age_end, sizeof it->value - age_end, m.text);
+	} else
+#endif
+	{
+		sb_str(&b, ": ");
+		sb_str(&b, m.text);
+	}
+	it->flags |= UI_ITEM_PREVIEW;
 	if (m.unread)
 		it->flags |= UI_ITEM_WARN;
 }

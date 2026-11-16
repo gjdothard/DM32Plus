@@ -1838,6 +1838,16 @@ static void list_draw(const ui_scr_def_t *d)
 			ui_draw_card_list(&ui_st, &l, f->arg ? UI_CARD_CONTACTS : UI_CARD_TALKGROUPS);
 			return;
 		}
+		if (f->scr == SCR_MESSAGES) {
+			ui_draw_card_list(&ui_st, &l, UI_CARD_MESSAGES);
+			return;
+		}
+#if CONFIG_MESSAGE_JOURNAL
+		if (f->scr == SCR_HISTORY) {
+			ui_draw_card_list(&ui_st, &l, UI_CARD_HISTORY);
+			return;
+		}
+#endif
 		if (f->scr == SCR_SCAN && ui_scan_card_active()) {
 			sbuf_t b;
 			sb_init(&b, header, sizeof header);

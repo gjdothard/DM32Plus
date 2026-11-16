@@ -49,7 +49,9 @@ preserved. Once enabled, new received messages and outgoing send results are sav
 archive. Under **Messages → Conversations**, choose one of the six most recent private or
 talkgroup conversations. The newest saved message opens first. **Older message** walks
 back through that conversation and **Newest message** returns to its latest entry.
-The four-entry live inbox remains below **Conversations**. Archived text is stored in plaintext.
+The four-entry live inbox remains below **Conversations**. On the dark card layout, unread messages have a dot
+and each inbox card shows the sender, age, and a short preview. Select the card to read the full message.
+Archived text is stored in plaintext.
 
 ## Sending a message
 

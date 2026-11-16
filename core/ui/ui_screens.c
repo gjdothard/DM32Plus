@@ -3450,13 +3450,14 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 {
 	const font_t *sm = ui_layout.small, *meta = &font_6x12;
 	const int width = gfx_width(), footer = gfx_height() - 19;
-	const int step = 28;
+	bool messages = kind == UI_CARD_MESSAGES || kind == UI_CARD_HISTORY;
+	const int step = kind == UI_CARD_MESSAGES ? 44 : 28;
 	bool directory = kind == UI_CARD_TALKGROUPS || kind == UI_CARD_CONTACTS;
 	bool channels = kind == UI_CARD_ZONE_CHANNELS;
 	bool scan = kind >= UI_CARD_SCAN && kind <= UI_CARD_SCAN_OPTIONS;
 	char fit[40];
 	card_header(s, 24);
-	const char *title = scan ? TR("Scan") :
+	const char *title = messages ? l->prefix : scan ? TR("Scan") :
 		directory ? TR("Contacts & Talkgroups") : channels ? l->name : TR("Channels & Zones");
 	card_center_title(title, 7, fit, sizeof fit);
 	if (scan) {
@@ -3478,7 +3479,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 			gfx_text(meta, x + (w - gfx_text_width(meta, tabs[i])) / 2, 58, tabs[i],
 				 active ? CARD_INK : ui_col.fg);
 		}
-	} else {
+	} else if (!messages) {
 		const char *stage = channels ? TR("2  Select channel") : TR("1  Select zone");
 		int stage_w = gfx_text_width(meta, stage) + 16;
 		int stage_x = (width - stage_w) / 2;
@@ -3486,7 +3487,9 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		gfx_round_fill(stage_x + 1, 58, stage_w - 2, 14, CARD_INK);
 		gfx_text(meta, stage_x + 8, 59, stage, ui_col.focus);
 	}
-	int y = 79;
+	int y = messages ? 55 : 79;
+	if (messages && l->body)
+		y = wrap_text(meta, l->body, y, footer, true, ui_col.dim) + 4;
 	if (kind == UI_CARD_SCAN) {
 		card_list_row(y, width - 5, 49, CARD_EDGE, CARD_SURFACE);
 		gfx_text_fit(sm, l->name, width - 17, fit, sizeof fit);
@@ -3520,7 +3523,21 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 				gfx_fill(12, yy + 12, 3, 3, focus ? fg : ui_col.warn);
 			x = 26;
 		}
-		if (directory) {
+		if (kind == UI_CARD_MESSAGES && (item.flags & UI_ITEM_PREVIEW)) {
+			char *preview = strchr(item.value, '\n');
+			if (preview)
+				*preview++ = 0;
+			if (item.flags & UI_ITEM_WARN) {
+				gfx_round_fill(x, yy + 9, 5, 5, focus ? fg : ui_col.focus);
+				x += 10;
+			}
+			row_text(meta, x, yy + 5, width - 11, item.label, item.value, fg, value, false);
+			if (preview) {
+				preview[strcspn(preview, "\r\n")] = 0;
+				fit_end(meta, preview, width - 19, fit, sizeof fit);
+				gfx_text(meta, 7, yy + 22, fit, focus ? fg : ui_col.dim);
+			}
+		} else if (directory) {
 			const int name_x = 79;
 			gfx_text(meta, x, yy + (step - 3 - meta->h) / 2, item.label, focus ? fg : ui_col.focus);
 			int room = width - 11 - name_x;
@@ -3539,7 +3556,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		gfx_fill(width - 3, y, 3, 2, ui_col.focus);
 	if (top + rows < l->count)
 		gfx_fill(width - 3, y + rows * step - 4, 3, 2, ui_col.focus);
-	const char *keys = kind == UI_CARD_SCAN ? TR("P1/P2 tabs  OK pick  Back") :
+	const char *keys = messages ? l->hint : kind == UI_CARD_SCAN ? TR("P1/P2 tabs  OK pick  Back") :
 		scan ? TR("P1/P2 tabs  Back") :
 		directory ? TR("P1/P2 tabs  OK talk  # more  Back") :
 		channels ? (CONFIG_ZONE_EDIT ? TR("OK go  # actions  Back") : TR("OK go  Back")) :
