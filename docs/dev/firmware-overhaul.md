@@ -59,8 +59,8 @@ that still allows CPS writes there.
 
 The [message journal engine](../spec/message-journal.md) mounts read-only and keeps a spare erase
 sector for rollover. The deferred append job borrows the shared sector buffer. It requires
-an activation marker written only after an explicit request and only into an erased reserve.
-The firmware switch defaults off. Rollover uses the shared sector journal to recover after
+an activation marker written only into an erased reserve. The DM32Plus build enables the journal
+by default and initializes eligible blank storage at startup. Rollover uses the shared sector journal to recover after
 power loss and continues to refuse unknown contents. The activation control lives under
 Settings → Advanced → Message history on boards with a usable reserve and the feature enabled.
 The message service captures accepted SMS and outgoing send results while activation is valid.
@@ -118,3 +118,10 @@ Revisit hardware RTC support in a separate feature branch. Add an optional wall-
 board driver. Verify the RTC validity flag and retention on the radio across power cycles before trusting it.
 Use valid GPS UTC to initialize or correct the RTC. Keep saved timestamps in UTC and apply the user's offset
 only when displaying the clock or a message.
+
+## Conversation inbox
+
+Messages opens directly to the saved conversation directory. Private threads use the other radio ID regardless of
+who started the exchange. Talkgroup threads use the group ID. Opening a thread starts at the newest message.
+The directory shows the six most recent peers with the latest preview and time for each.
+When history is unavailable, the live receive buffer is grouped by peer instead.

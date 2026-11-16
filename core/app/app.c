@@ -91,7 +91,7 @@ static void housekeeping(void)
 {
 #if CONFIG_MESSAGE_JOURNAL
 	message_history_t history;
-	message_history_start(&history);
+	message_history_start(&history, true);
 #endif
 	for (;;) {
 		hal_delay_ms(HOUSEKEEPING_MS);

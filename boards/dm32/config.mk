@@ -13,6 +13,7 @@
 CONFIG_FONT_XL ?= y
 CONFIG_FONT_AA ?= y
 CONFIG_FONT_BIG ?= y
+CONFIG_MESSAGE_JOURNAL ?= $(if $(filter y,$(CONFIG_DMR_SMS)),y,n)
 CONFIG_UI_CARD_MENU ?= $(if $(and $(filter y,$(CONFIG_UI_COLOR)),$(filter y,$(CONFIG_DUAL_WATCH))),y,n)
 # The bezel hides the panel's edges, in panel pixels: text 6 px from the left or right edge was still clipped on the
 # radio, so 10 px left and right (the 8 px measured on the right leaves no more 8 px columns), 5 px top and bottom

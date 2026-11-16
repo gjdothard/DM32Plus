@@ -1361,14 +1361,6 @@ msgid "Contacts: not in this build"
 msgstr "Contactos: no disponible"
 
 #: core/ui/ui_menus.c
-msgid "Conversations"
-msgstr "Conversaciones"
-
-#: core/ui/ui_menus.c
-msgid "You"
-msgstr "Tú"
-
-#: core/ui/ui_menus.c
 msgid "OK open  # reply  Back"
 msgstr "OK abrir  # responder  Atrás"
 
@@ -1405,8 +1397,16 @@ msgid "From "
 msgstr "De "
 
 #: core/ui/ui_menus.c
+msgid "You"
+msgstr "Tú"
+
+#: core/ui/ui_menus.c
 msgid "OK choose  # more  Back"
 msgstr "OK elegir  # más  Atrás"
+
+#: core/ui/ui_menus.c
+msgid "OK open  Back"
+msgstr "OK abrir  Atrás"
 
 #: core/ui/ui_menus.c
 msgid "Reading history..."
@@ -1447,10 +1447,6 @@ msgstr "Enviado"
 #: core/ui/ui_menus.c
 msgid "OK read  # newest  Back"
 msgstr "OK leer  # última  Atrás"
-
-#: core/ui/ui_menus.c
-msgid "OK open  Back"
-msgstr "OK abrir  Atrás"
 
 #: core/ui/ui_menus.c
 msgid "Conversation"

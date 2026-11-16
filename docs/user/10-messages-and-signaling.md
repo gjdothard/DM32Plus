@@ -21,10 +21,9 @@ Messages.
 
 ## Reading messages
 
-1. Press **OK**, **2** (Messages). The newest message is first. Unread messages are highlighted.
-2. Focus a message and press **OK**. The radio shows the sender, how long ago it arrived and the text. It marks the
-   message read.
-3. Below the text:
+1. Press **OK**, **2** (Messages). Each row names the other radio or talkgroup. The dark card layout selects the newest conversation at the bottom.
+2. Press **OK** to open a conversation. On the dark card layout, press **OK** on a bubble to read the full text.
+3. A live received message opened from the banner or the volatile inbox is marked read and has these actions below the text:
 
    | Row | Does |
    |---|---|
@@ -42,16 +41,21 @@ The reply target is the sender for a private message and the destination talkgro
 The radio keeps the last 4 messages received, in memory. If an open message drops out of the inbox,
 the screen reports that the message is gone. The inbox is cleared when the radio turns off.
 
-In builds with the experimental journal, **Settings → Advanced → Message history** prepares the
+Builds with a message history reserve prepare it automatically when it is blank. If the reserve already contains
+the message archive, it is used as-is. With message history active, **Messages** opens directly to one row per
+private contact or talkgroup, including threads you started. The other party or talkgroup names the row.
+The dark card layout shows the latest message preview and its time beneath that conversation name.
+
+If needed, **Settings → Advanced → Message history** retries preparing the
 radio's reserved storage. Select **Enable** to confirm. The radio reports whether it could
 activate the reserve. If it reports that blank storage is required, the existing bytes are
 preserved. Once enabled, new received messages and outgoing send results are saved in the
-archive. Under **Messages → Conversations**, choose one of the six most recent private or
+archive. Under **Messages**, choose one of the six most recent private or
 talkgroup conversations. In the dark card layout, the conversation opens at the newest bubble at the bottom.
 Scroll up for older messages and down for newer ones. **#** jumps to the newest. Press **OK** on a bubble
 to read the entire message. The standard layout opens the newest full message first.
-The four-entry live inbox remains below **Conversations**. On the dark layout, the newest inbox message is at the bottom and is selected on entry. On the dark card layout, unread messages have a dot
-and each inbox card shows the sender, local receipt time, and a short preview. **You** identifies this radio's DMR ID.
+When history is unavailable, Messages groups the four live received messages by the other party or talkgroup. On the dark card layout, unread live messages have a dot
+and each live inbox card shows the other party, local receipt time, and a short preview. Inside a conversation, **You** identifies this radio's DMR ID.
 The radio takes UTC from a recent GPS fix and applies **Settings → Location → UTC offset** when it displays
 the time in 24-hour format. If no time was captured, including for older archive entries,
 the time is shown as `--:--`. Incoming messages show the sender first. Archived outgoing messages show the time first,

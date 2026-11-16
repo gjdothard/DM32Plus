@@ -16,7 +16,8 @@ The Settings → Advanced action appears only when the feature is built and the 
 available. The confirmation defaults to Cancel. Enable queues activation and the UI reports
 the result when the storage task finishes.
 
-Explicit activation takes the first sector of the reserve for an ownership marker. The
+When the feature is built and a reserve is present, startup activates a blank reserve automatically. The Settings action
+can retry activation. Either path takes the first sector of the reserve for an ownership marker. The
 activation job checks that the range is erased and programs `RFMSG1 3C A5 00` (the six ASCII
 bytes followed by three hexadecimal bytes) in order, with the zero commit byte last. A retry
 can complete a recognizable partial marker

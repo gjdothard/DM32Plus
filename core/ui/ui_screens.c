@@ -3483,7 +3483,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 	const font_t *sm = ui_layout.small, *meta = &font_6x12;
 	const int width = gfx_width(), footer = gfx_height() - 19;
 	bool thread = kind == UI_CARD_THREAD;
-	bool messages = kind == UI_CARD_MESSAGES || kind == UI_CARD_HISTORY || thread;
+	bool messages = kind == UI_CARD_MESSAGES || thread;
 	const int step = kind == UI_CARD_MESSAGES || thread ? 44 : 28;
 	bool directory = kind == UI_CARD_TALKGROUPS || kind == UI_CARD_CONTACTS;
 	bool channels = kind == UI_CARD_ZONE_CHANNELS;

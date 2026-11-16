@@ -1831,7 +1831,13 @@ void ui_svc_history_view(message_history_view_t *out, char *text, size_t size)
 {
 	*out = sim_history;
 	if (text && size) {
-		if (sim_history.timeline && size >= MESSAGE_JOURNAL_TEXT) {
+		if (!sim_history.key && size >= MESSAGE_JOURNAL_TEXT) {
+			memset(text, 0, MESSAGE_JOURNAL_TEXT);
+			text[0] = (char)244u;
+			text[1] = 2;
+			snprintf(text + 2, MESSAGE_DIRECTORY_PREVIEW - 2u, "Private text");
+			snprintf(text + MESSAGE_DIRECTORY_PREVIEW + 2u, MESSAGE_DIRECTORY_PREVIEW - 2u, "Group reply");
+		} else if (sim_history.timeline && size >= MESSAGE_JOURNAL_TEXT) {
 			memset(text, 0, MESSAGE_JOURNAL_TEXT);
 			for (unsigned i = 0; i < sim_history.count; i++) {
 				uint32_t id = sim_history.thread[i].id;

@@ -388,7 +388,7 @@ static uint32_t peer_key(const uint8_t *scratch)
 {
 	uint8_t flags = scratch[16];
 	bool group = (flags & MESSAGE_RECORD_GROUP) != 0;
-	uint32_t target = get32(scratch + (group || (flags & MESSAGE_RECORD_OUTGOING) ? 8u : 4u));
+	uint32_t target = get32(scratch + (group || (flags & (MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_LOCAL_AUTHOR)) ? 8u : 4u));
 	return target | (group ? MESSAGE_HISTORY_GROUP_KEY : 0);
 }
 
@@ -486,8 +486,8 @@ void message_history_view(message_history_view_t *out, char *text, size_t size)
 	*out = history ? history->view : (message_history_view_t){ .status = HISTORY_EMPTY };
 	if (text && size) {
 		text[0] = '\0';
-		if (history && out->key && out->status == HISTORY_READY) {
-			if (out->timeline) {
+		if (history && out->status == HISTORY_READY) {
+			if (out->timeline || !out->key) {
 				if (size >= sizeof history->view_text)
 					memcpy(text, history->view_text, sizeof history->view_text);
 			} else {
@@ -523,8 +523,17 @@ static void browser_scan(const message_journal_t *j, message_history_view_t *v, 
 			unsigned i = 0;
 			while (i < v->count && v->peers[i] != key)
 				i++;
-			if (i == v->count)
+			if (i == v->count) {
+				uint8_t *preview = scratch + MESSAGE_JOURNAL_SCRATCH + i * MESSAGE_DIRECTORY_PREVIEW;
+				uint32_t time = get32(scratch + 12);
+				if (time > 1440u)
+					time = 0;
+				preview[0] = (uint8_t)time;
+				preview[1] = (uint8_t)(time >> 8);
+				strncpy((char *)preview + 2, (const char *)scratch + TEXT_OFFSET, MESSAGE_DIRECTORY_PREVIEW - 3u);
+				preview[MESSAGE_DIRECTORY_PREVIEW - 1u] = 0;
 				v->peers[v->count++] = key;
+			}
 			if (v->count == MESSAGE_HISTORY_PEERS) {
 				v->status = HISTORY_READY;
 				return;
@@ -602,6 +611,15 @@ static void browser_poll(void)
 	uint8_t *scratch = storage_buffer_acquire();
 	if (!scratch)
 		return;
+	if (!view.key) {
+		uint8_t *preview = scratch + MESSAGE_JOURNAL_SCRATCH;
+		storage_quick_lock();
+		if (view.count && view.revision == history->view.revision)
+			memcpy(preview, history->view_text, MESSAGE_JOURNAL_TEXT);
+		else
+			memset(preview, 0, MESSAGE_JOURNAL_TEXT);
+		storage_quick_unlock();
+	}
 	storage_lock();
 	const hal_flash_map_t *m = storage_map();
 	message_journal_t j;
@@ -618,8 +636,8 @@ static void browser_poll(void)
 	storage_unlock();
 	storage_quick_lock();
 	if (view.revision == history->view.revision) {
-		if (view.key && view.status == HISTORY_READY)
-			memcpy(history->view_text, scratch + (view.timeline ? MESSAGE_JOURNAL_SCRATCH : TEXT_OFFSET),
+		if (!view.key || view.status == HISTORY_READY)
+			memcpy(history->view_text, scratch + (!view.key || view.timeline ? MESSAGE_JOURNAL_SCRATCH : TEXT_OFFSET),
 			       sizeof(history->view_text));
 		view.revision++;
 		history->view = view;
@@ -629,7 +647,7 @@ static void browser_poll(void)
 	storage_buffer_release();
 }
 
-void message_history_start(message_history_t *state)
+void message_history_start(message_history_t *state, bool enable_by_default)
 {
 	uint8_t marker[sizeof(activation)];
 	*state = (message_history_t){0};
@@ -639,6 +657,10 @@ void message_history_start(message_history_t *state)
 		board.flash->read(storage_map()->message_addr, marker, sizeof(marker)) &&
 		memcmp(marker, activation, sizeof(activation)) == 0;
 	storage_unlock();
+	if (enable_by_default && !state->active && message_journal_available()) {
+		uint32_t unused;
+		state->active = execute_job(NULL, true, &unused) == MESSAGE_JOB_OK;
+	}
 	storage_quick_lock();
 	history = state;
 	storage_quick_unlock();
@@ -688,6 +710,12 @@ void message_history_poll(void)
 	if (result == MESSAGE_JOB_BUSY)
 		return;
 	storage_quick_lock();
+	if (result == MESSAGE_JOB_OK && !history->view.key) {
+		// An open directory follows new messages after they reach flash.
+		uint16_t revision = history->view.revision + 1u;
+		history->view = (message_history_view_t){ .revision = revision, .status = HISTORY_LOADING };
+		history->scan_before = 0;
+	}
 	if (result == MESSAGE_JOB_INACTIVE || result == MESSAGE_JOB_UNAVAILABLE) {
 		history->dropped += history->count;
 		history->count = 0;

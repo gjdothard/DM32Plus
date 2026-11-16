@@ -12,6 +12,7 @@
 #define MESSAGE_HISTORY_QUEUE 2u
 #define MESSAGE_HISTORY_PAGE_MAX 4u
 #define MESSAGE_HISTORY_PEERS 6u
+#define MESSAGE_DIRECTORY_PREVIEW (MESSAGE_JOURNAL_TEXT / MESSAGE_HISTORY_PEERS)
 #define MESSAGE_THREAD_ROWS 3u
 #define MESSAGE_THREAD_PREVIEW (MESSAGE_JOURNAL_TEXT / MESSAGE_THREAD_ROWS)
 #define MESSAGE_THREAD_OLDER 0x01u
@@ -129,7 +130,7 @@ typedef struct {
 } message_history_t;
 
 // The housekeeping task owns this queue for its lifetime and does all flash I/O.
-void message_history_start(message_history_t *history);
+void message_history_start(message_history_t *history, bool enable_by_default);
 void message_history_poll(void);
 // The radio task copies accepted SMS and terminal send results here without waiting on flash.
 void message_history_capture(uint32_t src, uint32_t dst, uint8_t flags, uint16_t utc_minute, const char *text);

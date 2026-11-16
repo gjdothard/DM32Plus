@@ -268,7 +268,7 @@ static void test_capture(void)
 	memset(data, 0xFF, sizeof(data));
 	budget = FLASH_BYTES;
 	CHECK(storage_init());
-	message_history_start(&history);
+	message_history_start(&history, false);
 	message_history_capture(1, 2, 0, 0, "Skipped while off");
 	CHECK(history.count == 0);
 	message_journal_job_t activation = { .complete = complete };
@@ -286,7 +286,7 @@ static void test_capture(void)
 	message_history_poll();
 	CHECK(history.count == 0 && message_history_dropped() == 1);
 	CHECK(storage_init());
-	message_history_start(&history);
+	message_history_start(&history, false);
 	CHECK(history.active);
 	message_journal_t j;
 	message_journal_record_t out;
@@ -331,6 +331,43 @@ static void save_history(uint32_t src, uint32_t dst, uint8_t flags, const char *
 	message_history_poll();
 }
 
+static void test_default_conversations(void)
+{
+	static message_history_t state;
+	memset(data, 0xFF, sizeof(data));
+	budget = FLASH_BYTES;
+	CHECK(storage_init());
+	data[RESERVE_BASE] = 0x00;
+	unsigned foreign_budget = budget;
+	message_history_start(&state, true);
+	CHECK(!message_history_active() && data[RESERVE_BASE] == 0x00 && budget == foreign_budget);
+	data[RESERVE_BASE] = 0xFF;
+	message_history_start(&state, true);
+	CHECK(message_history_active());
+	unsigned writes = budget;
+	message_history_start(&state, true);
+	CHECK(message_history_active() && budget == writes);
+
+	message_history_browse(0, 0);
+	message_history_poll();
+	save_history(1, 9, MESSAGE_RECORD_OUTGOING, "I started");
+	save_history(9, 1, 0, "Reply");
+	save_history(1, 9, MESSAGE_RECORD_LOCAL_AUTHOR, "Echo");
+	save_history(1, 9, MESSAGE_RECORD_GROUP | MESSAGE_RECORD_OUTGOING, "Group started");
+	save_history(3, 9, MESSAGE_RECORD_GROUP, "Group replied");
+	save_history(1, 12, MESSAGE_RECORD_OUTGOING, "Outgoing only");
+	message_history_poll();
+	message_history_view_t directory;
+	char previews[MESSAGE_JOURNAL_TEXT];
+	message_history_view(&directory, previews, sizeof previews);
+	CHECK(directory.status == HISTORY_READY && directory.count == 3);
+	CHECK(directory.peers[0] == 12 && directory.peers[1] == (MESSAGE_HISTORY_GROUP_KEY | 9u) &&
+	      directory.peers[2] == 9);
+	CHECK(!strcmp(previews + 2, "Outgoing only") &&
+	      !strcmp(previews + MESSAGE_DIRECTORY_PREVIEW + 2, "Group replied") &&
+	      !strcmp(previews + 2u * MESSAGE_DIRECTORY_PREVIEW + 2, "Echo"));
+}
+
 static void test_archive_pages(void)
 {
 	static message_history_t state;
@@ -338,7 +375,7 @@ static void test_archive_pages(void)
 	budget = FLASH_BYTES;
 	job_map.message_size = 4u * STORAGE_SECTOR;
 	CHECK(storage_init());
-	message_history_start(&state);
+	message_history_start(&state, false);
 	message_history_item_t items[2];
 	message_history_page_t page = { .items = items, .complete = page_complete, .capacity = 2 };
 	read_page(&page, MESSAGE_JOB_INACTIVE);
@@ -485,6 +522,7 @@ int main(void)
 	test_deferred_append();
 	test_capture();
 	test_archive_pages();
+	test_default_conversations();
 	puts("# messageJournalTest PASSED");
 	return 0;
 }

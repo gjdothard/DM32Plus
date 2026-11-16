@@ -39,8 +39,9 @@ typedef enum {
 	SCR_CONTACT_POSITION,		// last reported position of a private contact
 	SCR_MENU_SECTION,		// a Main Menu section (MENU_SECTION_*)
 #if CONFIG_MESSAGE_JOURNAL
-	SCR_HISTORY, SCR_CONVERSATION, SCR_THREAD,
+	SCR_CONVERSATION, SCR_THREAD,
 #endif
+	SCR_LIVE_THREAD,
 	SCR_COUNT
 } ui_scr_t;
 

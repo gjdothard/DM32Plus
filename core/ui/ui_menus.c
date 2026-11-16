@@ -21,9 +21,8 @@
 #include "hal_time.h"
 #include "radio/tones.h"
 #include "radio/scan.h"
-#if CONFIG_UI_CARD_MENU
 #include "dmr/dmrDataService.h"
-#endif
+#include "storage/message_journal.h"
 #include "radio/mic_gain.h"
 #include "radio/ref_trim.h"
 #include "radio/radio_am.h"
@@ -762,15 +761,6 @@ static const ui_scr_def_t contacts_screen = {
 
 // ======================= Messages =======================
 
-static bool msgs_has_history(void)
-{
-#if CONFIG_MESSAGE_JOURNAL
-	return ui_svc_history_active();
-#else
-	return false;
-#endif
-}
-
 static void message_time(sbuf_t *b, uint32_t minute)
 {
 	char time[6];
@@ -778,99 +768,148 @@ static void message_time(sbuf_t *b, uint32_t minute)
 	sb_str(b, time);
 }
 
-static uint16_t msgs_count(void) { return ui_svc_msg_count() + msgs_has_history(); }
+#if CONFIG_MESSAGE_JOURNAL
+static uint16_t history_count(void);
+static void history_item(uint16_t i, ui_item_t *it);
+static void history_select(uint16_t i, bool hold);
+static void history_context(uint16_t i);
+static const char *history_body(void);
+#endif
 
-static unsigned inbox_index(unsigned row)
+static uint32_t message_peer(const ui_msg_t *m)
 {
-	unsigned count = ui_svc_msg_count();
-	return CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) && row < count ? count - 1u - row : row;
+	uint32_t id = m->group || m->sent || (m->own && m->dst) ? m->dst : m->src;
+	return id | (m->group ? MESSAGE_HISTORY_GROUP_KEY : 0);
+}
+
+static ui_target_t peer_target(uint32_t key)
+{
+	ui_target_t t = { .id = key & ~MESSAGE_HISTORY_GROUP_KEY, .group = (key & MESSAGE_HISTORY_GROUP_KEY) != 0 };
+	t.saved = ui_contact_name(t.id, t.group, t.name);
+	return t;
+}
+
+// Return one live row per peer, or all rows for a selected peer. The service's order is newest first.
+static unsigned live_rows(uint8_t rows[DMR_DATA_INBOX_SIZE], uint32_t only, ui_msg_t *m)
+{
+	uint32_t peers[DMR_DATA_INBOX_SIZE];
+	unsigned n = 0;
+	for (unsigned i = 0; i < DMR_DATA_INBOX_SIZE && ui_svc_msg_get(i, m); i++) {
+		uint32_t key = message_peer(m);
+		if (only && only != key)
+			continue;
+		unsigned j = 0;
+		while (!only && j < n && peers[j] != key)
+			j++;
+		if (only || j == n) {
+			peers[n] = key;
+			rows[n++] = (uint8_t)i;
+		}
+	}
+	return n;
+}
+
+static bool live_row(unsigned row, uint32_t peer, ui_msg_t *m)
+{
+	uint8_t rows[DMR_DATA_INBOX_SIZE];
+	unsigned n = live_rows(rows, peer, m);
+	if (row >= n)
+		return false;
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st))
+		row = n - 1u - row;
+	return ui_svc_msg_get(rows[row], m);
+}
+
+static uint16_t msgs_count(void)
+{
+#if CONFIG_MESSAGE_JOURNAL
+	if (ui_svc_history_active())
+		return history_count();
+#endif
+	uint8_t rows[DMR_DATA_INBOX_SIZE];
+	ui_msg_t m;
+	return (uint16_t)live_rows(rows, 0, &m);
+}
+
+static void newest_focus(uint16_t count)
+{
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) && count)
+		ui_frame()->focus = count - 1u;
 }
 
 static void msgs_enter(void)
 {
-	uint16_t n = msgs_count();
-	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) && n)
-		ui_frame()->focus = n - 1u;
+#if CONFIG_MESSAGE_JOURNAL
+	if (ui_svc_history_active()) {
+		ui_svc_history_browse(0, 0);
+		return;
+	}
+#endif
+	newest_focus(msgs_count());
+}
+
+static void msg_preview(ui_item_t *it, const ui_msg_t *m)
+{
+	ui_local_time(it->value, m->utc_minute);
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st)) {
+		it->value[5] = '\n';
+		str_copy(it->value + 6, sizeof it->value - 6, m->text);
+	}
+	it->flags |= UI_ITEM_PREVIEW;
+	if (m->unread)
+		it->flags |= UI_ITEM_WARN;
 }
 
 static void msgs_item(uint16_t i, ui_item_t *it)
 {
 #if CONFIG_MESSAGE_JOURNAL
-	if (msgs_has_history() && i-- == 0) {
-		str_copy(it->label, sizeof it->label, TR("Conversations"));
+	if (ui_svc_history_active()) {
+		history_item(i, it);
 		return;
 	}
 #endif
 	ui_msg_t m;
-	if (!ui_svc_msg_get(inbox_index(i), &m))
-		return;
-	sbuf_t b;
-	sb_init(&b, it->label, sizeof it->label);
-	if (m.sent)
-		sb_str(&b, GLYPH_ARROW);
-	if (m.own)
-		sb_str(&b, TR("You"));
-	else if (m.name[0])
-		sb_str(&b, m.name);
-	else
-		sb_u32(&b, m.src, 1);
-	sbuf_t clock;
-	sb_init(&clock, it->value, sizeof it->value);
-	message_time(&clock, m.utc_minute);
-#if CONFIG_UI_CARD_MENU
-	if (ui_card_layout(&ui_st)) {
-		// The card uses separate lines for sender/age and the start of the message.
-		size_t age_end = strlen(it->value);
-		it->value[age_end++] = '\n';
-		str_copy(it->value + age_end, sizeof it->value - age_end, m.text);
-	} else
-#endif
-	{
-		sb_str(&b, ": ");
-		sb_str(&b, m.text);
+	if (live_row(i, 0, &m)) {
+		ui_target_t peer = peer_target(message_peer(&m));
+		ui_sb_target(it->label, sizeof it->label, &peer);
+		msg_preview(it, &m);
 	}
-	it->flags |= UI_ITEM_PREVIEW;
-	if (m.unread)
-		it->flags |= UI_ITEM_WARN;
 }
 
 static void msgs_select(uint16_t i, bool hold)
 {
-	(void)hold;
 #if CONFIG_MESSAGE_JOURNAL
-	if (msgs_has_history() && i-- == 0) {
-		ui_push(SCR_HISTORY, 0);
+	if (ui_svc_history_active()) {
+		history_select(i, hold);
 		return;
 	}
 #endif
+	(void)hold;
 	ui_msg_t m;
-	if (ui_svc_msg_get(inbox_index(i), &m))
-		ui_push(SCR_MESSAGE, m.token);
+	if (live_row(i, 0, &m)) {
+		uint16_t token = m.token;
+		uint32_t peer = message_peer(&m);
+		uint8_t rows[DMR_DATA_INBOX_SIZE];
+		ui_push(live_rows(rows, peer, &m) > 1 ? SCR_LIVE_THREAD : SCR_MESSAGE, token);
+	}
 }
 
 static void msg_target_from(const ui_msg_t *m, ui_target_t *t)
 {
-	memset(t, 0, sizeof *t);
-	t->group = m->group;
-	t->id = m->group && !m->sent ? m->dst : m->src;
-	if (t->group) {
-		t->saved = ui_contact_name(t->id, true, t->name);
-	} else {
-		strcpy(t->name, m->name);
-		t->saved = m->name[0] != 0;
-	}
+	*t = peer_target(message_peer(m));
 }
 
 static void msgs_context(uint16_t i)
 {
 #if CONFIG_MESSAGE_JOURNAL
-	if (msgs_has_history() && i-- == 0)
+	if (ui_svc_history_active()) {
+		history_context(i);
 		return;
+	}
 #endif
 	ui_msg_t m;
-	ui_target_t t;
-	if (ui_svc_msg_get(inbox_index(i), &m)) {
-		msg_target_from(&m, &t);
+	if (live_row(i, 0, &m)) {
+		ui_target_t t = peer_target(message_peer(&m));
 		ui_open_actions(&t);
 	}
 }
@@ -879,6 +918,9 @@ static const ui_scr_def_t messages_screen = {
 	.name = "messages", .flags = SF_LIST | SF_FIELD, .prefix = TRN("Messages"), .hint = TRN("OK open  # reply  Back"),
 	.empty = TRN("No messages yet"),
 	.count = msgs_count, .item = msgs_item, .select = msgs_select, .context = msgs_context, .enter = msgs_enter,
+#if CONFIG_MESSAGE_JOURNAL
+	.body = history_body,
+#endif
 };
 
 // One message: the text, then canned replies first, call, delete
@@ -993,8 +1035,66 @@ static const ui_scr_def_t message_screen = {
 	.title = msg_title, .body = msg_body, .enter = msg_enter,
 };
 
+static uint32_t live_thread_peer(ui_msg_t *m)
+{
+	return ui_svc_msg_by_token(ui_frame()->arg, m) >= 0 ? message_peer(m) : 0;
+}
+
+static uint16_t live_thread_count(void)
+{
+	ui_msg_t m;
+	uint32_t peer = live_thread_peer(&m);
+	uint8_t rows[DMR_DATA_INBOX_SIZE];
+	return peer ? (uint16_t)live_rows(rows, peer, &m) : 0;
+}
+
+static void live_thread_item(uint16_t i, ui_item_t *it)
+{
+	ui_msg_t m;
+	uint32_t peer = live_thread_peer(&m);
+	if (!peer || !live_row(i, peer, &m))
+		return;
+	if (m.own || m.sent)
+		str_copy(it->label, sizeof it->label, TR("You"));
+	else if (m.name[0])
+		str_copy(it->label, sizeof it->label, m.name);
+	else {
+		sbuf_t b;
+		sb_init(&b, it->label, sizeof it->label);
+		sb_u32(&b, m.src, 1);
+	}
+	msg_preview(it, &m);
+	if (m.sent)
+		it->flags |= UI_ITEM_TEMP;
+}
+
+static void live_thread_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	ui_msg_t m;
+	uint32_t peer = live_thread_peer(&m);
+	if (peer && live_row(i, peer, &m))
+		ui_push(SCR_MESSAGE, m.token);
+}
+
+static const char *live_thread_title(void)
+{
+	ui_msg_t m;
+	uint32_t peer = live_thread_peer(&m);
+	ui_target_t t = peer_target(peer);
+	ui_sb_target(msg_title_text, sizeof msg_title_text, &t);
+	return msg_title_text;
+}
+
+static void live_thread_enter(void) { newest_focus(live_thread_count()); }
+
+static const ui_scr_def_t live_thread_screen = {
+	.name = "live-thread", .flags = SF_LIST | SF_FIELD, .hint = TRN("OK open  Back"),
+	.count = live_thread_count, .item = live_thread_item, .select = live_thread_select,
+	.title = live_thread_title, .enter = live_thread_enter, .empty = TRN("No messages yet"),
+};
+
 #if CONFIG_MESSAGE_JOURNAL
-static void history_enter(void) { ui_svc_history_browse(0, 0); }
 
 static uint16_t history_count(void)
 {
@@ -1005,34 +1105,65 @@ static uint16_t history_count(void)
 
 static void history_label(uint32_t key, char *buf, size_t size)
 {
-	ui_target_t t = { .id = key & ~MESSAGE_HISTORY_GROUP_KEY,
-			  .group = (key & MESSAGE_HISTORY_GROUP_KEY) != 0 };
-	t.saved = ui_contact_name(t.id, t.group, t.name);
+	ui_target_t t = peer_target(key);
 	ui_sb_target(buf, size, &t);
+}
+
+static uint32_t history_peer(uint16_t i)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (v.key || i >= v.count)
+		return 0;
+	return v.peers[CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) ? v.count - 1u - i : i];
 }
 
 static void history_item(uint16_t i, ui_item_t *it)
 {
-	message_history_view_t v;
-	ui_svc_history_view(&v, NULL, 0);
-	if (v.key == 0 && i < v.count)
-		history_label(v.peers[i], it->label, sizeof it->label);
+	message_history_view_t view;
+	ui_svc_history_view(&view, msg_text, sizeof msg_text);
+	if (view.key || i >= view.count)
+		return;
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st))
+		i = view.count - 1u - i;
+	history_label(view.peers[i], it->label, sizeof it->label);
+	if (view.status == HISTORY_READY && CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st)) {
+		const uint8_t *preview = (const uint8_t *)msg_text + i * MESSAGE_DIRECTORY_PREVIEW;
+		ui_local_time(it->value, preview[0] | ((uint16_t)preview[1] << 8));
+		it->value[5] = '\n';
+		str_copy(it->value + 6, sizeof it->value - 6, (const char *)preview + 2);
+		it->flags |= UI_ITEM_PREVIEW;
+	}
+}
+
+static void history_context(uint16_t i)
+{
+	uint32_t peer = history_peer(i);
+	if (peer) {
+		ui_target_t t = peer_target(peer);
+		ui_open_actions(&t);
+	}
 }
 
 static void history_select(uint16_t i, bool hold)
 {
 	(void)hold;
-	message_history_view_t v;
-	ui_svc_history_view(&v, NULL, 0);
-	if (v.key == 0 && i < v.count) {
+	uint32_t peer = history_peer(i);
+	if (peer) {
+		ui_msg_t m;
+		uint8_t rows[DMR_DATA_INBOX_SIZE];
+		unsigned n = live_rows(rows, peer, &m);
+		for (unsigned j = 0; j < n; j++)
+			if (ui_svc_msg_get(rows[j], &m) && m.unread)
+				ui_svc_msg_read(m.token);
 #if CONFIG_UI_CARD_MENU
 		if (ui_card_layout(&ui_st)) {
-			ui_svc_history_thread(v.peers[i], 0, false);
+			ui_svc_history_thread(peer, 0, false);
 			ui_push(SCR_THREAD, 0);
 			return;
 		}
 #endif
-		ui_svc_history_browse(v.peers[i], 0);
+		ui_svc_history_browse(peer, 0);
 		ui_push(SCR_CONVERSATION, 0);
 	}
 }
@@ -1051,7 +1182,11 @@ static const char *history_body(void)
 {
 	message_history_view_t v;
 	ui_svc_history_view(&v, NULL, 0);
-	return v.key ? TR("Reading history...") : history_status(&v);
+	if (!ui_svc_history_active())
+		return NULL;
+	if (v.key)
+		return TR("Reading history...");
+	return v.status == HISTORY_EMPTY ? NULL : history_status(&v);
 }
 
 static uint16_t conversation_count(void)
@@ -1213,27 +1348,24 @@ static const ui_scr_def_t thread_screen = {
 void ui_history_tick(void)
 {
 	ui_frame_t *f = ui_frame();
-	if (f->scr != SCR_HISTORY && f->scr != SCR_CONVERSATION && f->scr != SCR_THREAD)
+	if (f->scr != SCR_MESSAGES && f->scr != SCR_CONVERSATION && f->scr != SCR_THREAD)
 		return;
 	message_history_view_t v;
 	ui_svc_history_view(&v, NULL, 0);
-	if (f->scr == SCR_HISTORY && v.key)
-		history_enter();
+	if (f->scr == SCR_MESSAGES && ui_svc_history_active() && v.key)
+		ui_svc_history_browse(0, 0);
 	if (f->scr == SCR_THREAD && !v.timeline && v.key)
 		ui_svc_history_thread(v.key, 0, false);
 	if (f->arg != v.revision) {
 		f->arg = v.revision;
+		if (f->scr == SCR_MESSAGES && ui_svc_history_active() && !v.key && v.status == HISTORY_READY)
+			newest_focus(v.count);
 		if (f->scr == SCR_THREAD && v.timeline && v.status == HISTORY_READY && v.count)
 			f->focus = v.forward ? 0 : v.count - 1u;
 		ui_dirty();
 	}
 }
 
-static const ui_scr_def_t history_screen = {
-	.name = "history", .flags = SF_LIST, .prefix = TRN("Conversations"), .hint = TRN("OK open  Back"),
-	.count = history_count, .item = history_item, .select = history_select, .body = history_body,
-	.enter = history_enter,
-};
 
 static const ui_scr_def_t conversation_screen = {
 	.name = "conversation", .flags = SF_LIST, .prefix = TRN("Conversation"), .hint = TRN("OK choose  Back cancel"),
@@ -6639,9 +6771,10 @@ const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
 	[SCR_MENU_SECTION] = &menu_section_screen,
 #endif
 	[SCR_FIND] = &ui_find_screen, [SCR_ACTIONS] = &actions_screen, [SCR_CONTACTS] = &contacts_screen,
+	[SCR_LIVE_THREAD] = &live_thread_screen,
 	[SCR_MESSAGES] = &messages_screen, [SCR_MESSAGE] = &message_screen, [SCR_COMPOSE] = &compose_screen,
 #if CONFIG_MESSAGE_JOURNAL
-	[SCR_HISTORY] = &history_screen, [SCR_CONVERSATION] = &conversation_screen,
+	[SCR_CONVERSATION] = &conversation_screen,
 #if CONFIG_UI_CARD_MENU
 	[SCR_THREAD] = &thread_screen,
 #endif
