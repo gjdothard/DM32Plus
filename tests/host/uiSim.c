@@ -545,7 +545,8 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 		else if (!strcmp(g->name, "240x320i10x5") &&
 			 (!strcmp(name, "quick_dmr") || !strcmp(name, "quick_fm") || !strcmp(name, "hub") ||
 			  !strcmp(name, "zones") || !strcmp(name, "zone_channels") ||
-			  !strcmp(name, "messages") || !strcmp(name, "messages_empty")))
+			  !strcmp(name, "messages") || !strcmp(name, "messages_empty") ||
+			  !strcmp(name, "compose") || !strcmp(name, "sms-write")))
 			snprintf(script, slen, "branded-home %s", gallery[i].script);
 		else
 			snprintf(script, slen, "%s", gallery[i].script);

@@ -227,6 +227,7 @@ bool ui_svc_history_active(void);
 void ui_svc_history_browse(uint32_t key, uint32_t before);
 void ui_svc_history_thread(uint32_t key, uint32_t anchor, bool forward);
 void ui_svc_history_view(message_history_view_t *out, char *text, size_t size);
+void ui_svc_history_thread_text(uint16_t revision, unsigned index, char *text, size_t size);
 #endif
 
 // --- The crash log (CONFIG_CRASH_LOG) and its report (CONFIG_CRASH_REPORT; ui_svc_crash.c, docs/spec/crash-log.md) ---

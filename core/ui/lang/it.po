@@ -444,6 +444,10 @@ msgstr "Nessun risultato: Indietro cancella"
 msgid "Tools & Utilities"
 msgstr "Strumenti e utilità"
 
+#: core/ui/ui_app.c
+msgid "OK reply  Back"
+msgstr "OK rispondi  Indietro"
+
 #: core/ui/ui_app.c core/ui/ui_menus.c
 msgid "VFO band"
 msgstr "Banda VFO"
@@ -1445,8 +1449,8 @@ msgid "Sent"
 msgstr "Inviato"
 
 #: core/ui/ui_menus.c
-msgid "OK read  # newest  Back"
-msgstr "OK leggi  # ultimo  Indietro"
+msgid "OK reply  # newest  Back"
+msgstr "OK risp.  # ultimo  Indietro"
 
 #: core/ui/ui_menus.c
 msgid "Conversation"

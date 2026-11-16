@@ -92,6 +92,14 @@ WEAK bool ui_svc_message_history_activate(void) { return false; }
 WEAK bool ui_svc_history_active(void) { return false; }
 WEAK void ui_svc_history_browse(uint32_t key, uint32_t before) { (void)key; (void)before; }
 WEAK void ui_svc_history_thread(uint32_t key, uint32_t anchor, bool forward) { (void)key; (void)anchor; (void)forward; }
+WEAK void ui_svc_history_thread_text(uint16_t revision, unsigned index, char *text, size_t size)
+{
+	(void)revision;
+	(void)index;
+	if (size)
+		text[0] = 0;
+}
+
 WEAK void ui_svc_history_view(message_history_view_t *out, char *text, size_t size)
 {
 	*out = (message_history_view_t){ .status = HISTORY_EMPTY };

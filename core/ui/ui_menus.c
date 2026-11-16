@@ -887,7 +887,8 @@ static void msgs_select(uint16_t i, bool hold)
 		uint16_t token = m.token;
 		uint32_t peer = message_peer(&m);
 		uint8_t rows[DMR_DATA_INBOX_SIZE];
-		ui_push(live_rows(rows, peer, &m) > 1 ? SCR_LIVE_THREAD : SCR_MESSAGE, token);
+		bool thread = CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st);
+		ui_push(thread || live_rows(rows, peer, &m) > 1 ? SCR_LIVE_THREAD : SCR_MESSAGE, token);
 	}
 }
 
@@ -1060,9 +1061,26 @@ static void live_thread_item(uint16_t i, ui_item_t *it)
 		sb_init(&b, it->label, sizeof it->label);
 		sb_u32(&b, m.src, 1);
 	}
-	msg_preview(it, &m);
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st))
+		ui_local_time(it->value, m.utc_minute);
+	else
+		msg_preview(it, &m);
 	if (m.sent)
 		it->flags |= UI_ITEM_TEMP;
+}
+
+static void thread_reply(uint32_t peer)
+{
+#if CONFIG_DMR_SMS
+	if (peer && (feats() & UI_FEAT_SMS)) {
+		ui_target = peer_target(peer);
+		sms_text_open();
+		return;
+	}
+#else
+	(void)peer;
+#endif
+	ui_toast(TR("Messages: not in this build"));
 }
 
 static void live_thread_select(uint16_t i, bool hold)
@@ -1070,8 +1088,12 @@ static void live_thread_select(uint16_t i, bool hold)
 	(void)hold;
 	ui_msg_t m;
 	uint32_t peer = live_thread_peer(&m);
-	if (peer && live_row(i, peer, &m))
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st)) {
+		if (peer)
+			thread_reply(peer);
+	} else if (peer && live_row(i, peer, &m)) {
 		ui_push(SCR_MESSAGE, m.token);
+	}
 }
 
 static const char *live_thread_title(void)
@@ -1083,7 +1105,25 @@ static const char *live_thread_title(void)
 	return msg_title_text;
 }
 
-static void live_thread_enter(void) { newest_focus(live_thread_count()); }
+static void mark_live_peer_read(uint32_t peer, ui_msg_t *m)
+{
+	uint8_t rows[DMR_DATA_INBOX_SIZE];
+	unsigned n = live_rows(rows, peer, m);
+	for (unsigned i = 0; i < n; i++)
+		if (ui_svc_msg_get(rows[i], m) && m->unread)
+			ui_svc_msg_read(m->token);
+}
+
+static void live_thread_enter(void)
+{
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st)) {
+		ui_msg_t m;
+		uint32_t peer = live_thread_peer(&m);
+		if (peer)
+			mark_live_peer_read(peer, &m);
+	}
+	newest_focus(live_thread_count());
+}
 
 static const ui_scr_def_t live_thread_screen = {
 	.name = "live-thread", .flags = SF_LIST | SF_FIELD, .hint = TRN("OK open  Back"),
@@ -1146,11 +1186,7 @@ static void history_select(uint16_t i, bool hold)
 	uint32_t peer = history_peer(i);
 	if (peer) {
 		ui_msg_t m;
-		uint8_t rows[DMR_DATA_INBOX_SIZE];
-		unsigned n = live_rows(rows, peer, &m);
-		for (unsigned j = 0; j < n; j++)
-			if (ui_svc_msg_get(rows[j], &m) && m.unread)
-				ui_svc_msg_read(m.token);
+		mark_live_peer_read(peer, &m);
 #if CONFIG_UI_CARD_MENU
 		if (ui_card_layout(&ui_st)) {
 			ui_svc_history_thread(peer, 0, false);
@@ -1272,33 +1308,37 @@ static uint16_t thread_count(void)
 static void thread_item(uint16_t i, ui_item_t *it)
 {
 	message_history_view_t v;
-	ui_svc_history_view(&v, msg_text, sizeof msg_text);
+	ui_svc_history_view(&v, NULL, 0);
 	if (!v.timeline || v.status != HISTORY_READY || i >= v.count)
 		return;
 	unsigned index = thread_index(&v, i);
 	const message_thread_entry_t *entry = &v.thread[index];
 	bool outgoing = (entry->flags & MESSAGE_RECORD_OUTGOING) != 0;
-	if (outgoing || (entry->flags & MESSAGE_RECORD_LOCAL_AUTHOR))
+	if (outgoing) {
+		sbuf_t label;
+		sb_init(&label, it->label, sizeof it->label);
+		sb_str(&label, TR("You"));
+		sb_str(&label, "  ");
+		sb_str(&label, entry->flags & MESSAGE_RECORD_FAILED ? TR("Send failed") :
+			   entry->flags & MESSAGE_RECORD_DELIVERED ? TR("Delivered") : TR("Sent"));
+	} else if (entry->flags & MESSAGE_RECORD_LOCAL_AUTHOR) {
 		str_copy(it->label, sizeof it->label, TR("You"));
-	else
+	} else {
 		history_label(v.key, it->label, sizeof it->label);
+	}
 	ui_local_time(it->value, entry->time);
-	it->value[5] = '\n';
-	str_copy(it->value + 6, sizeof it->value - 6, msg_text + index * MESSAGE_THREAD_PREVIEW);
-	it->flags |= UI_ITEM_PREVIEW;
 	if (outgoing)
 		it->flags |= UI_ITEM_TEMP;
 }
 
 static void thread_select(uint16_t i, bool hold)
 {
+	(void)i;
 	(void)hold;
 	message_history_view_t v;
 	ui_svc_history_view(&v, NULL, 0);
-	if (v.timeline && v.status == HISTORY_READY && i < v.count) {
-		ui_svc_history_browse(v.key, v.thread[thread_index(&v, i)].id + 1u);
-		ui_push(SCR_CONVERSATION, 0);
-	}
+	if (v.key)
+		thread_reply(v.key);
 }
 
 static const char *thread_body(void)
@@ -1334,7 +1374,7 @@ static bool thread_key(const input_event_t *ev)
 }
 
 static const ui_scr_def_t thread_screen = {
-	.name = "thread", .flags = SF_LIST, .hint = TRN("OK read  # newest  Back"),
+	.name = "thread", .flags = SF_LIST, .hint = TRN("OK reply  # newest  Back"),
 	.count = thread_count, .item = thread_item, .select = thread_select,
 	.title = conversation_title, .body = thread_body, .key = thread_key,
 };
@@ -3304,7 +3344,8 @@ static void sms_text_open(void)
 
 static uint8_t sms_text_cols(void)
 {
-	int cols = (gfx_width() - 1) / ui_layout.small->w;
+	int inset = CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) ? 17 : 1;
+	int cols = (gfx_width() - inset) / ui_layout.small->w;
 	size_t max = sizeof(((ui_item_t *)0)->label) - 1u;
 	return cols < 1 ? 1 : (size_t)cols > max ? (uint8_t)max : (uint8_t)cols;
 }
@@ -6758,6 +6799,42 @@ static const ui_scr_def_t lang_screen = {
 	.name = "language", .flags = SF_LIST, .prefix = TRN("Language"), .hint = TRN("OK pick  Back"),
 	.count = lang_list_count, .item = lang_list_item, .select = lang_list_select, .enter = lang_list_enter,
 };
+
+#if CONFIG_UI_CARD_MENU
+static const char *thread_display_text(void)
+{
+	unsigned breaks = 0;
+	for (const char *p = msg_text; *p; p++)
+		breaks += *p == '\n';
+	// Very short hard-wrapped lines can exceed the panel. Reflow densely
+	// wrapped messages so every word still fits in the full-size bubble.
+	for (char *p = msg_text; *p; p++)
+		if (*p == '\r' || (breaks > 6 && *p == '\n'))
+			*p = ' ';
+	return msg_text;
+}
+
+const char *ui_thread_text(uint16_t row)
+{
+	msg_text[0] = 0;
+#if CONFIG_MESSAGE_JOURNAL
+	if (ui_frame()->scr == SCR_THREAD) {
+		message_history_view_t view;
+		ui_svc_history_view(&view, NULL, 0);
+		if (view.timeline && view.status == HISTORY_READY && row < view.count)
+			ui_svc_history_thread_text(view.revision, thread_index(&view, row), msg_text, sizeof msg_text);
+		return thread_display_text();
+	}
+#endif
+	ui_msg_t m;
+	uint32_t peer = live_thread_peer(&m);
+	if (peer && live_row(row, peer, &m))
+		str_copy(msg_text, sizeof msg_text, m.text);
+	return thread_display_text();
+}
+
+const char *ui_compose_peer(void) { return compose_title(); }
+#endif
 
 const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
 	[SCR_HOME] = &home_screen, [SCR_QUICK] = &quick_screen, [SCR_HUB] = &hub_screen,

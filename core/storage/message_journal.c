@@ -487,14 +487,28 @@ void message_history_view(message_history_view_t *out, char *text, size_t size)
 	if (text && size) {
 		text[0] = '\0';
 		if (history && out->status == HISTORY_READY) {
-			if (out->timeline || !out->key) {
-				if (size >= sizeof history->view_text)
-					memcpy(text, history->view_text, sizeof history->view_text);
-			} else {
+			if (!out->key) {
+				if (size >= MESSAGE_JOURNAL_TEXT)
+					memcpy(text, history->view_text, MESSAGE_JOURNAL_TEXT);
+			} else if (!out->timeline) {
 				strncpy(text, history->view_text, size - 1u);
 				text[size - 1u] = '\0';
 			}
 		}
+	}
+	storage_quick_unlock();
+}
+
+void message_history_thread_text(uint16_t revision, unsigned index, char *text, size_t size)
+{
+	if (!size)
+		return;
+	storage_quick_lock();
+	text[0] = 0;
+	if (history && history->view.revision == revision && history->view.timeline &&
+	    history->view.status == HISTORY_READY && index < history->view.count) {
+		strncpy(text, history->view_text + index * MESSAGE_JOURNAL_TEXT, size - 1u);
+		text[size - 1u] = 0;
 	}
 	storage_quick_unlock();
 }
@@ -554,8 +568,8 @@ static void thread_scan(const message_journal_t *j, message_history_view_t *v, u
 	uint32_t id = v->forward ? *cursor + 1u : start_slot(j, *cursor);
 	if (v->forward && id < first)
 		id = first;
-	char *previews = (char *)scratch + MESSAGE_JOURNAL_SCRATCH;
-	memset(previews, 0, MESSAGE_JOURNAL_TEXT);
+	uint8_t *messages = scratch + MESSAGE_JOURNAL_SCRATCH;
+	memset(messages, 0, MESSAGE_THREAD_TEXT);
 	for (unsigned scanned = 0; id >= first && id <= last && scanned < PAGE_SCAN_SLOTS;
 	     scanned++, id = v->forward ? id + 1u : id - 1u) {
 		slot_result_t result = read_slot(j, id, scratch);
@@ -569,8 +583,7 @@ static void thread_scan(const message_journal_t *j, message_history_view_t *v, u
 		unsigned i = v->count++;
 		v->thread[i] = (message_thread_entry_t){ .id = id, .time = time <= 1440u ? (uint16_t)time : 0,
 			.flags = scratch[16] };
-		char *text = previews + i * MESSAGE_THREAD_PREVIEW;
-		strncpy(text, (const char *)scratch + TEXT_OFFSET, MESSAGE_THREAD_PREVIEW - 1u);
+		memcpy(messages + i * MESSAGE_JOURNAL_TEXT, scratch + TEXT_OFFSET, MESSAGE_JOURNAL_TEXT);
 		if (v->count == MESSAGE_THREAD_ROWS)
 			break;
 	}
@@ -638,7 +651,7 @@ static void browser_poll(void)
 	if (view.revision == history->view.revision) {
 		if (!view.key || view.status == HISTORY_READY)
 			memcpy(history->view_text, scratch + (!view.key || view.timeline ? MESSAGE_JOURNAL_SCRATCH : TEXT_OFFSET),
-			       sizeof(history->view_text));
+			       view.timeline ? MESSAGE_THREAD_TEXT : MESSAGE_JOURNAL_TEXT);
 		view.revision++;
 		history->view = view;
 		history->scan_before = cursor;

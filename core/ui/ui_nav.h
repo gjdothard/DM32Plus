@@ -14,6 +14,11 @@
 #include "ui_svc.h"
 #include "i18n.h"
 
+#if CONFIG_UI_CARD_MENU
+const char *ui_thread_text(uint16_t row);
+const char *ui_compose_peer(void);
+#endif
+
 typedef enum {
 	SCR_HOME, SCR_QUICK, SCR_HUB, SCR_FIND, SCR_ACTIONS, SCR_CONTACTS, SCR_MESSAGES, SCR_MESSAGE, SCR_COMPOSE,
 	SCR_RECENT, SCR_ZONES, SCR_ZONE, SCR_TOOLS, SCR_SETTINGS, SCR_GROUP, SCR_PICKER, SCR_INFO, SCR_CONFIRM,

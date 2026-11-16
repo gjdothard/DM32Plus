@@ -444,6 +444,10 @@ msgstr "Sin coincidencia: Atrás borra"
 msgid "Tools & Utilities"
 msgstr "Herramientas y utilidades"
 
+#: core/ui/ui_app.c
+msgid "OK reply  Back"
+msgstr "OK responder  Atrás"
+
 #: core/ui/ui_app.c core/ui/ui_menus.c
 msgid "VFO band"
 msgstr "Banda VFO"
@@ -1445,8 +1449,8 @@ msgid "Sent"
 msgstr "Enviado"
 
 #: core/ui/ui_menus.c
-msgid "OK read  # newest  Back"
-msgstr "OK leer  # última  Atrás"
+msgid "OK reply  # newest  Back"
+msgstr "OK resp.  # última  Atrás"
 
 #: core/ui/ui_menus.c
 msgid "Conversation"

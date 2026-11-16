@@ -13,8 +13,8 @@
 #define MESSAGE_HISTORY_PAGE_MAX 4u
 #define MESSAGE_HISTORY_PEERS 6u
 #define MESSAGE_DIRECTORY_PREVIEW (MESSAGE_JOURNAL_TEXT / MESSAGE_HISTORY_PEERS)
-#define MESSAGE_THREAD_ROWS 3u
-#define MESSAGE_THREAD_PREVIEW (MESSAGE_JOURNAL_TEXT / MESSAGE_THREAD_ROWS)
+#define MESSAGE_THREAD_ROWS 2u
+#define MESSAGE_THREAD_TEXT (MESSAGE_JOURNAL_TEXT * MESSAGE_THREAD_ROWS)
 #define MESSAGE_THREAD_OLDER 0x01u
 #define MESSAGE_THREAD_NEWER 0x02u
 #define MESSAGE_HISTORY_GROUP_KEY 0x80000000u
@@ -118,11 +118,12 @@ void message_history_browse(uint32_t key, uint32_t before);
 // Load a page before or after an exclusive record ID. Zero starts at the newest.
 void message_history_thread(uint32_t key, uint32_t anchor, bool forward);
 void message_history_view(message_history_view_t *out, char *text, size_t size);
+void message_history_thread_text(uint16_t revision, unsigned index, char *text, size_t size);
 
 typedef struct {
 	message_journal_record_t pending[MESSAGE_HISTORY_QUEUE];
 	message_history_view_t view;
-	char view_text[MESSAGE_JOURNAL_TEXT];
+	char view_text[MESSAGE_THREAD_TEXT];
 	uint32_t scan_before;
 	uint32_t dropped;
 	uint8_t head, count;

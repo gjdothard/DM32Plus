@@ -220,8 +220,8 @@ The inbox stamps accepted SMS with the board GPS UTC minute at receipt. The arch
 for incoming messages and samples it when an outgoing result is recorded. The existing record time field
 holds the UTC minute of day plus one, with zero for unavailable time and older records. It is independent of
 the monotonic receive timestamp used for duplicate detection. The tall card conversation view reads pages of up
-to three message previews through the same deferred journal reader. Preview pages reuse the full-message
-buffer. Selecting a preview reads the full record using its journal ID. The directory keys an outgoing
+to two full messages through the deferred journal reader. The thread wraps their full text in variable-height
+bubbles, and OK opens the composer addressed to the conversation. The directory keys an outgoing
 or locally authored private message by its recipient, an incoming private message by its sender, and
 group messages by the talkgroup in either direction.
 

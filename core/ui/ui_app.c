@@ -758,7 +758,7 @@ static void banner_open(void)
 	b->kind = UI_BANNER_NONE;
 	if (kind == UI_BANNER_MESSAGE) {
 		if (ui_svc_msg_by_token(msg, NULL) >= 0)
-			ui_push(SCR_MESSAGE, msg);
+			ui_push(CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) ? SCR_LIVE_THREAD : SCR_MESSAGE, msg);
 		else
 			ui_toast(TR("Message deleted"));
 	}
@@ -1838,6 +1838,12 @@ static void list_draw(const ui_scr_def_t *d)
 			ui_draw_card_list(&ui_st, &l, f->arg ? UI_CARD_CONTACTS : UI_CARD_TALKGROUPS);
 			return;
 		}
+		if (f->scr == SCR_COMPOSE || f->scr == SCR_SMS_TEXT) {
+			l.header = f->scr == SCR_SMS_TEXT ? l.name : NULL;
+			l.name = ui_compose_peer();
+			ui_draw_card_list(&ui_st, &l, UI_CARD_COMPOSER);
+			return;
+		}
 		if (f->scr == SCR_MESSAGES) {
 			ui_draw_card_list(&ui_st, &l, UI_CARD_MESSAGES);
 			return;
@@ -1847,7 +1853,9 @@ static void list_draw(const ui_scr_def_t *d)
 		    || f->scr == SCR_THREAD
 #endif
 		   ) {
-			ui_draw_card_list(&ui_st, &l, UI_CARD_THREAD);
+			if (f->scr == SCR_LIVE_THREAD)
+				l.hint = TR("OK reply  Back");
+			ui_draw_card_thread(&ui_st, &l, ui_thread_text);
 			return;
 		}
 		if (f->scr == SCR_SCAN && ui_scan_card_active()) {

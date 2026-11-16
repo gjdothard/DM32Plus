@@ -387,7 +387,9 @@ static void test_archive_pages(void)
 
 	save_history(3, 1, 0, "Old private");
 	save_history(1, 9, MESSAGE_RECORD_OUTGOING, "Private out");
-	save_history(9, 1, 0, "Private in");
+	static const char private_text[] =
+		"Private message with several wrapped lines. Bring the spare battery and meet at the north lot.";
+	save_history(9, 1, 0, private_text);
 	save_history(1, 9, MESSAGE_RECORD_GROUP | MESSAGE_RECORD_OUTGOING, "Group out");
 	for (unsigned n = 5; n <= 23; n++)
 		save_history(4, 9, MESSAGE_RECORD_GROUP, "Group in");
@@ -406,7 +408,7 @@ static void test_archive_pages(void)
 	page.before = next_before;
 	read_page(&page, MESSAGE_JOB_OK);
 	CHECK(page_count == 2 && items[0].id == 3 && items[1].id == 2);
-	CHECK(!strcmp(items[0].record.text, "Private in") && !strcmp(items[1].record.text, "Private out"));
+	CHECK(!strcmp(items[0].record.text, private_text) && !strcmp(items[1].record.text, "Private out"));
 
 	page.before = 0;
 	page.peer.group = true;
@@ -432,7 +434,7 @@ static void test_archive_pages(void)
 	CHECK(view.status == HISTORY_LOADING && !body[0]);
 	message_history_poll();
 	message_history_view(&view, body, sizeof body);
-	CHECK(view.status == HISTORY_READY && !strcmp(body, "Private in") && view.before == 3);
+	CHECK(view.status == HISTORY_READY && !strcmp(body, private_text) && view.before == 3);
 	message_history_browse(9, view.before);
 	message_history_poll();
 	message_history_view(&view, body, sizeof body);
@@ -443,7 +445,12 @@ static void test_archive_pages(void)
 	message_history_view(&view, body, sizeof body);
 	CHECK(view.timeline && !view.forward && view.status == HISTORY_READY && view.count == 2);
 	CHECK(view.thread[0].id == 3 && view.thread[1].id == 2);
-	CHECK(!strcmp(body, "Private in") && !strcmp(body + MESSAGE_THREAD_PREVIEW, "Private out"));
+	message_history_thread_text(view.revision, 0, body, sizeof body);
+	CHECK(!strcmp(body, private_text));
+	message_history_thread_text(view.revision, 1, body, sizeof body);
+	CHECK(!strcmp(body, "Private out"));
+	message_history_thread_text(view.revision - 1u, 0, body, sizeof body);
+	CHECK(!body[0]);
 	message_history_thread(9, view.thread[1].id, true);
 	message_history_poll();
 	message_history_view(&view, body, sizeof body);

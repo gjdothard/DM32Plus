@@ -1827,6 +1827,20 @@ void ui_svc_history_thread(uint32_t key, uint32_t anchor, bool forward)
 	}
 }
 
+void ui_svc_history_thread_text(uint16_t revision, unsigned index, char *text, size_t size)
+{
+	if (revision != sim_history.revision || index >= sim_history.count) {
+		if (size)
+			text[0] = 0;
+		return;
+	}
+	uint32_t id = sim_history.thread[index].id;
+	const char *body = id == 10 ? "Group reply" : id == 8 ?
+		"Private text with several wrapped lines, far longer than a preview. Please bring the spare battery. End of the full message." :
+		id == 5 ? "Older private text" : "Earlier page";
+	snprintf(text, size, "%s", body);
+}
+
 void ui_svc_history_view(message_history_view_t *out, char *text, size_t size)
 {
 	*out = sim_history;
@@ -1837,14 +1851,7 @@ void ui_svc_history_view(message_history_view_t *out, char *text, size_t size)
 			text[1] = 2;
 			snprintf(text + 2, MESSAGE_DIRECTORY_PREVIEW - 2u, "Private text");
 			snprintf(text + MESSAGE_DIRECTORY_PREVIEW + 2u, MESSAGE_DIRECTORY_PREVIEW - 2u, "Group reply");
-		} else if (sim_history.timeline && size >= MESSAGE_JOURNAL_TEXT) {
-			memset(text, 0, MESSAGE_JOURNAL_TEXT);
-			for (unsigned i = 0; i < sim_history.count; i++) {
-				uint32_t id = sim_history.thread[i].id;
-				const char *preview = id == 10 ? "Group reply" : id == 8 ? "Private text" :
-					id == 5 ? "Older private text" : "Earlier page";
-				snprintf(text + i * MESSAGE_THREAD_PREVIEW, MESSAGE_THREAD_PREVIEW, "%s", preview);
-			}
+
 		} else {
 			snprintf(text, size, "%s", sim_history_text ? sim_history_text : "");
 		}

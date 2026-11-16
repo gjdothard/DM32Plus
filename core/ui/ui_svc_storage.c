@@ -935,6 +935,11 @@ bool ui_svc_message_history_activate(void)
 bool ui_svc_history_active(void) { return message_history_active(); }
 void ui_svc_history_browse(uint32_t key, uint32_t before) { message_history_browse(key, before); }
 void ui_svc_history_thread(uint32_t key, uint32_t anchor, bool forward) { message_history_thread(key, anchor, forward); }
+void ui_svc_history_thread_text(uint16_t revision, unsigned index, char *text, size_t size)
+{
+	message_history_thread_text(revision, index, text, size);
+}
+
 void ui_svc_history_view(message_history_view_t *out, char *text, size_t size)
 {
 	message_history_view(out, text, size);

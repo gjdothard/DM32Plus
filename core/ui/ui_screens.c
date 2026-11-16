@@ -3482,15 +3482,15 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 {
 	const font_t *sm = ui_layout.small, *meta = &font_6x12;
 	const int width = gfx_width(), footer = gfx_height() - 19;
-	bool thread = kind == UI_CARD_THREAD;
-	bool messages = kind == UI_CARD_MESSAGES || thread;
-	const int step = kind == UI_CARD_MESSAGES || thread ? 44 : 28;
+	bool composer = kind == UI_CARD_COMPOSER;
+	bool messages = kind == UI_CARD_MESSAGES || composer;
+	const int step = kind == UI_CARD_MESSAGES ? 44 : 28;
 	bool directory = kind == UI_CARD_TALKGROUPS || kind == UI_CARD_CONTACTS;
 	bool channels = kind == UI_CARD_ZONE_CHANNELS;
 	bool scan = kind >= UI_CARD_SCAN && kind <= UI_CARD_SCAN_OPTIONS;
 	char fit[40];
 	card_header(s, 24);
-	const char *title = thread ? l->name : messages ? l->prefix : scan ? TR("Scan") :
+	const char *title = composer ? l->name : messages ? l->prefix : scan ? TR("Scan") :
 		directory ? TR("Contacts & Talkgroups") : channels ? l->name : TR("Channels & Zones");
 	card_center_title(title, 7, fit, sizeof fit);
 	if (scan) {
@@ -3535,8 +3535,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		y += sm->h + 4;
 	}
 	int rows = (footer - y - 4) / step;
-	if (thread && l->count && l->count < rows)
-		y = footer - 4 - l->count * step;
+
 	uint16_t top = list_window(l, rows);
 	for (int row = 0; row < rows && top + row < l->count; row++) {
 		uint16_t i = (uint16_t)(top + row);
@@ -3546,15 +3545,10 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		bool focus = i == l->focus && (!scan || !(item.flags & UI_ITEM_INFO));
 		color_t fg = focus ? CARD_INK : ui_col.fg;
 		color_t value = focus ? fg : item.flags & UI_ITEM_TEMP ? ui_col.warn : ui_col.dim;
-		bool outgoing = thread && (item.flags & UI_ITEM_TEMP);
-		int left = outgoing ? 20 : 0;
-		int end = width - (thread && !outgoing ? 25 : 5);
-		if (left)
-			gfx_round_fill(left, yy, end - left, step - 3, focus ? ui_col.focus : CARD_SELECTED);
-		else
-			card_list_row(yy, end, step - 3, focus ? ui_col.focus : CARD_EDGE,
-				      focus ? ui_col.focus : CARD_SURFACE);
-		int x = left + 7;
+		int end = width - 5;
+		card_list_row(yy, end, step - 3, focus ? ui_col.focus : CARD_EDGE,
+			      focus ? ui_col.focus : CARD_SURFACE);
+		int x = 7;
 		if (item.flags & UI_ITEM_FOLDER) {
 			color_t icon = focus ? fg : ui_col.focus;
 			gfx_rect(7, yy + 9, 13, 9, icon);
@@ -3564,7 +3558,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 				gfx_fill(12, yy + 12, 3, 3, focus ? fg : ui_col.warn);
 			x = 26;
 		}
-		if ((kind == UI_CARD_MESSAGES || thread) && (item.flags & UI_ITEM_PREVIEW)) {
+		if (kind == UI_CARD_MESSAGES && (item.flags & UI_ITEM_PREVIEW)) {
 			char *preview = strchr(item.value, '\n');
 			if (preview)
 				*preview++ = 0;
@@ -3572,12 +3566,11 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 				gfx_round_fill(x, yy + 9, 5, 5, focus ? fg : ui_col.focus);
 				x += 10;
 			}
-						row_text(meta, x, yy + 5, end - 6, outgoing ? item.value : item.label,
-				 outgoing ? item.label : item.value, fg, value, false);
+			row_text(meta, x, yy + 5, end - 6, item.label, item.value, fg, value, false);
 			if (preview) {
 				preview[strcspn(preview, "\r\n")] = 0;
-				fit_end(meta, preview, end - left - 14, fit, sizeof fit);
-				gfx_text(meta, left + 7, yy + 22, fit, focus ? fg : ui_col.dim);
+				fit_end(meta, preview, end - 14, fit, sizeof fit);
+				gfx_text(meta, 7, yy + 22, fit, focus ? fg : ui_col.dim);
 			}
 		} else if (directory) {
 			const int name_x = 79;
@@ -3604,6 +3597,77 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		channels ? (CONFIG_ZONE_EDIT ? TR("OK go  # actions  Back") : TR("OK go  Back")) :
 		TR("OK/# open  Hold OK go  Back");
 	card_list_footer(s, footer, keys, NULL, fit, sizeof fit);
+}
+
+static int thread_lines(const char *text, int x, int y, int width, bool draw, color_t color)
+{
+	const font_t *font = &font_6x12;
+	char line[48];
+	while (*text) {
+		text = wrap_line(font, text, width, line, sizeof line);
+		if (draw)
+			gfx_text(font, x, y, line, color);
+		y += font->h;
+	}
+	return y;
+}
+
+static int bubble_height(const char *text, int width)
+{
+	return 24 + thread_lines(text, 0, 0, width, false, 0);
+}
+
+void ui_draw_card_thread(const ui_state_t *s, const ui_list_t *l, const char *(*text)(uint16_t))
+{
+	const font_t *font = &font_6x12;
+	int width = gfx_width(), bottom = gfx_height() - 23, top = 55;
+	int text_width = width - 40;
+	char fit[40];
+	card_header(s, 24);
+	card_center_title(l->name, 7, fit, sizeof fit);
+	if (l->body)
+		top = wrap_text(font, l->body, top, bottom, true, ui_col.dim) + 4;
+	if (l->count) {
+		uint16_t focus = l->focus < l->count ? l->focus : l->count - 1u;
+		uint16_t first = focus, end = focus + 1u;
+		int height = bubble_height(text(focus), text_width);
+		while (first) {
+			int extra = bubble_height(text(first - 1u), text_width);
+			if (height + extra > bottom - top)
+				break;
+			height += extra;
+			first--;
+		}
+		while (end < l->count) {
+			int extra = bubble_height(text(end), text_width);
+			if (height + extra > bottom - top)
+				break;
+			height += extra;
+			end++;
+		}
+		int y = bottom - height;
+		for (uint16_t i = first; i < end; i++) {
+			ui_item_t item = { 0 };
+			l->item(i, &item);
+			const char *body = text(i);
+			int h = bubble_height(body, text_width);
+			bool outgoing = item.flags & UI_ITEM_TEMP;
+			bool chosen = i == focus;
+			int left = outgoing ? 24 : 0, right = left + width - 26;
+			color_t fg = chosen ? CARD_INK : ui_col.fg;
+			gfx_round_fill(left, y, right - left, h - 4,
+				       chosen ? ui_col.focus : outgoing ? CARD_SELECTED : CARD_SURFACE);
+			row_text(font, left + 7, y + 4, right - 6, outgoing ? item.value : item.label,
+				 outgoing ? item.label : item.value, fg, chosen ? fg : ui_col.dim, false);
+			thread_lines(body, left + 7, y + 18, text_width, true, fg);
+			y += h;
+		}
+		if (l->top)
+			*l->top = first;
+	} else if (!l->body && l->empty) {
+		wrap_text(font, l->empty, top, bottom, true, ui_col.dim);
+	}
+	card_list_footer(s, bottom + 4, l->hint, NULL, fit, sizeof fit);
 }
 
 void ui_draw_numbered_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l)
