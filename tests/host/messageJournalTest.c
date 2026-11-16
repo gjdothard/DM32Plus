@@ -366,6 +366,21 @@ static void test_default_conversations(void)
 	CHECK(!strcmp(previews + 2, "Outgoing only") &&
 	      !strcmp(previews + MESSAGE_DIRECTORY_PREVIEW + 2, "Group replied") &&
 	      !strcmp(previews + 2u * MESSAGE_DIRECTORY_PREVIEW + 2, "Echo"));
+	message_history_thread(9, 0, false);
+	message_history_poll();
+	message_history_poll();
+	message_history_view(&directory, NULL, 0);
+	CHECK(directory.status == HISTORY_READY && directory.count == 3);
+	uint16_t revision = directory.revision;
+	save_history(3, 1, 0, "Different conversation");
+	message_history_view(&directory, NULL, 0);
+	CHECK(directory.revision == revision);
+	save_history(9, 1, 0, "Fresh forecast");
+	message_history_poll();
+	message_history_view(&directory, NULL, 0);
+	CHECK(directory.status == HISTORY_READY && directory.timeline && directory.key == 9 && directory.revision != revision);
+	message_history_thread_text(directory.revision, 0, previews, sizeof previews);
+	CHECK(!strcmp(previews, "Fresh forecast"));
 }
 
 static void test_archive_pages(void)

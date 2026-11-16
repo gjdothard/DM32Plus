@@ -19,6 +19,9 @@ const char *ui_thread_text(uint16_t row);
 const char *ui_compose_peer(void);
 #endif
 
+bool ui_thread_receive(uint16_t token);
+bool ui_open_message_thread(uint16_t token);
+
 typedef enum {
 	SCR_HOME, SCR_QUICK, SCR_HUB, SCR_FIND, SCR_ACTIONS, SCR_CONTACTS, SCR_MESSAGES, SCR_MESSAGE, SCR_COMPOSE,
 	SCR_RECENT, SCR_ZONES, SCR_ZONE, SCR_TOOLS, SCR_SETTINGS, SCR_GROUP, SCR_PICKER, SCR_INFO, SCR_CONFIRM,

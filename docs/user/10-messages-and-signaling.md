@@ -53,7 +53,9 @@ preserved. Once enabled, new received messages and outgoing send results are sav
 archive. Under **Messages**, choose one of the six most recent private or
 talkgroup conversations. In the dark card layout, the conversation opens at the newest bubble at the bottom.
 Scroll up for older messages and down for newer ones. **#** jumps to the newest. **OK** opens the text
-composer for the thread. The standard layout opens the newest full message first.
+composer for the thread. Sending a reply returns to that same thread. New messages for an open conversation
+appear at the bottom automatically. A message from a different conversation still shows its banner.
+The standard layout opens the newest full message first.
 When history is unavailable, Messages groups the four live received messages by the other party or talkgroup. On the dark card layout, unread live messages have a dot
 and each live inbox card shows the other party, local receipt time, and a short preview. Inside a conversation, **You** identifies this radio's DMR ID.
 The radio takes UTC from a recent GPS fix and applies **Settings → Location → UTC offset** when it displays

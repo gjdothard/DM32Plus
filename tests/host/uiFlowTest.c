@@ -1452,9 +1452,13 @@ int main(void)
 		{ "Talkgroup conversation replies to the talkgroup", "branded-home history", "ok 2 down ok ok",
 			"screen=sms-write shows=TG_3100", 5, false },
 		{ "Send a reply to the private peer", "branded-home history", "ok 2 ok ok 4 ok",
-			"sent=1 txid=3101234", 6, false },
+			"sent=1 txid=3101234 screen=thread", 6, false },
 		{ "Send a reply to the talkgroup", "branded-home history", "ok 2 down ok ok 4 ok",
-			"sent=1 txid=3100", 7, false },
+			"sent=1 txid=3100 screen=thread", 7, false },
+		{ "A received message appears in its open thread", "branded-home history ok 2 ok",
+			"msg:3101234,Fresh_forecast", "screen=thread shows=Fresh_forecast banner=none", 0, false },
+		{ "A message from another contact keeps its normal notification", "branded-home history ok 2 ok",
+			"msg:3105678,Other_peer", "screen=thread banner=Message_from_W1XYZ_Jodi", 0, false },
 #endif
 	};
 	for (size_t i = 0; i < sizeof card_menu / sizeof card_menu[0]; i++)

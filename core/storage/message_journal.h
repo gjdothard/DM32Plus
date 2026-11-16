@@ -13,8 +13,8 @@
 #define MESSAGE_HISTORY_PAGE_MAX 4u
 #define MESSAGE_HISTORY_PEERS 6u
 #define MESSAGE_DIRECTORY_PREVIEW (MESSAGE_JOURNAL_TEXT / MESSAGE_HISTORY_PEERS)
-#define MESSAGE_THREAD_ROWS 2u
-#define MESSAGE_THREAD_TEXT (MESSAGE_JOURNAL_TEXT * MESSAGE_THREAD_ROWS)
+#define MESSAGE_THREAD_ROWS 3u
+#define MESSAGE_THREAD_TEXT (MESSAGE_JOURNAL_TEXT * 2u)
 #define MESSAGE_THREAD_OLDER 0x01u
 #define MESSAGE_THREAD_NEWER 0x02u
 #define MESSAGE_HISTORY_GROUP_KEY 0x80000000u
@@ -96,6 +96,7 @@ typedef struct {
 	uint32_t id;
 	uint16_t time;
 	uint8_t flags;	// MESSAGE_RECORD_*
+	uint8_t bytes;	// packed text length including the terminator
 } message_thread_entry_t;
 
 typedef struct {

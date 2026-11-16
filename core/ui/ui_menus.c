@@ -567,7 +567,7 @@ static const ui_scr_def_t actions_screen = {
 // ======================= Message composer =======================
 
 #if CONFIG_DMR_SMS
-static void sms_text_open(void);
+static void sms_text_open(bool reply);
 #endif
 
 // Sent in the language in use (the text goes out as UTF-16, Latin-1 included)
@@ -592,7 +592,7 @@ static void compose_item(uint16_t i, ui_item_t *it)
 	}
 }
 
-static void send_text(const ui_target_t *target, const char *text)
+static void send_text(const ui_target_t *target, const char *text, bool reply)
 {
 	static char msg[40];
 	char name[24];
@@ -605,7 +605,10 @@ static void send_text(const ui_target_t *target, const char *text)
 	sb_init(&b, msg, sizeof msg);
 	sb_str(&b, TR("Sending to "));
 	sb_str(&b, name);
-	ui_go_home();
+	if (reply)
+		ui_pop();
+	else
+		ui_go_home();
 	ui_toast(msg);
 }
 
@@ -613,10 +616,10 @@ static void compose_select(uint16_t i, bool hold)
 {
 	(void)hold;
 	if (i < CANNED_N) {
-		send_text(&ui_target, tr(canned[i]));
+		send_text(&ui_target, tr(canned[i]), false);
 	} else if (i == CANNED_N) {
 #if CONFIG_DMR_SMS
-		sms_text_open();
+		sms_text_open(false);
 #else
 		ui_toast(TR("Typing: not in this build"));
 #endif
@@ -970,7 +973,7 @@ static void msg_select(uint16_t i, bool hold)
 	switch (i) {
 	case MV_REPLY_OK:
 	case MV_REPLY_WAY:
-	send_text(&ui_target, tr(i == MV_REPLY_OK ? canned[0] : canned[1]));
+	send_text(&ui_target, tr(i == MV_REPLY_OK ? canned[0] : canned[1]), false);
 		break;
 	case MV_CALL:
 		ui_talk(&ui_target, false);
@@ -1038,6 +1041,52 @@ static uint32_t live_thread_peer(ui_msg_t *m)
 	return ui_svc_msg_by_token(ui_frame()->arg, m) >= 0 ? message_peer(m) : 0;
 }
 
+bool ui_open_message_thread(uint16_t token)
+{
+#if CONFIG_MESSAGE_JOURNAL && CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st) && ui_svc_history_active()) {
+		ui_msg_t m;
+		if (ui_svc_msg_by_token(token, &m) < 0)
+			return false;
+		ui_svc_msg_read(token);
+		ui_svc_history_thread(message_peer(&m), 0, false);
+		ui_push(SCR_THREAD, 0);
+		return true;
+	}
+#endif
+	if (ui_svc_msg_by_token(token, NULL) < 0)
+		return false;
+	ui_push(CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) ? SCR_LIVE_THREAD : SCR_MESSAGE, token);
+	return true;
+}
+
+bool ui_thread_receive(uint16_t token)
+{
+	ui_frame_t *frame = ui_frame();
+	uint32_t active;
+	ui_msg_t m;
+	if (frame->scr == SCR_LIVE_THREAD) {
+		active = live_thread_peer(&m);
+#if CONFIG_MESSAGE_JOURNAL
+	} else if (frame->scr == SCR_THREAD) {
+		message_history_view_t view;
+		ui_svc_history_view(&view, NULL, 0);
+		active = view.key;
+#endif
+	} else {
+		return false;
+	}
+	if (!active || ui_svc_msg_by_token(token, &m) < 0 || message_peer(&m) != active)
+		return false;
+	ui_svc_msg_read(token);
+	if (frame->scr == SCR_LIVE_THREAD) {
+		uint8_t rows[DMR_DATA_INBOX_SIZE];
+		frame->arg = token;
+		newest_focus((uint16_t)live_rows(rows, active, &m));
+	}
+	return true;
+}
+
 static uint16_t live_thread_count(void)
 {
 	ui_msg_t m;
@@ -1074,7 +1123,7 @@ static void thread_reply(uint32_t peer)
 #if CONFIG_DMR_SMS
 	if (peer && (feats() & UI_FEAT_SMS)) {
 		ui_target = peer_target(peer);
-		sms_text_open();
+		sms_text_open(true);
 		return;
 	}
 #else
@@ -3334,12 +3383,12 @@ static void text_enter(void)
 }
 
 #if CONFIG_DMR_SMS
-static void sms_text_open(void)
+static void sms_text_open(bool reply)
 {
 	sms_target = ui_target;
 	text_target = NULL;
 	text_max = DMR_ETSI_TEXT_MAX;
-	ui_push(SCR_SMS_TEXT, 0);
+	ui_push(SCR_SMS_TEXT, reply);
 }
 
 static uint8_t sms_text_cols(void)
@@ -3493,7 +3542,7 @@ static bool text_key_fn(const input_event_t *ev)
 			if (text_buf[strspn(text_buf, " ")] == '\0')
 				ui_toast(TR("Enter a message"));
 			else
-				send_text(&sms_target, text_buf);
+				send_text(&sms_target, text_buf, ui_frame()->arg != 0);
 		}
 #endif
 #if CONFIG_CHANNEL_EDIT

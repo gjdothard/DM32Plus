@@ -1778,6 +1778,7 @@ bool ui_svc_factory_reset(void) { return true; }
 static bool sim_history_enabled;
 static message_history_view_t sim_history;
 static const char *sim_history_text;
+static char sim_realtime_text[UI_MSG_TEXT_MAX + 1];
 
 bool ui_svc_message_history_available(void) { return board.home_brand != NULL; }
 bool ui_svc_message_history_activate(void)
@@ -1835,7 +1836,7 @@ void ui_svc_history_thread_text(uint16_t revision, unsigned index, char *text, s
 		return;
 	}
 	uint32_t id = sim_history.thread[index].id;
-	const char *body = id == 10 ? "Group reply" : id == 8 ?
+	const char *body = id == UINT32_MAX ? sim_realtime_text : id == 10 ? "Group reply" : id == 8 ?
 		"Private text with several wrapped lines, far longer than a preview. Please bring the spare battery. End of the full message." :
 		id == 5 ? "Older private text" : "Earlier page";
 	snprintf(text, size, "%s", body);
@@ -1918,6 +1919,16 @@ static void add_message(uint32_t src, const char *text)
 
 	strcpy(inbox[0].m.name, contact_name(src, false));
 	strncpy(inbox[0].m.text, text, UI_MSG_TEXT_MAX);
+#if CONFIG_MESSAGE_JOURNAL
+	if (sim_history_enabled && sim_history.timeline && sim_history.key == src) {
+		ui_svc_history_thread(src, 0, false);
+		snprintf(sim_realtime_text, sizeof sim_realtime_text, "%s", text);
+		memmove(&sim_history.thread[1], &sim_history.thread[0],
+			sim_history.count * sizeof sim_history.thread[0]);
+		sim_history.count++;
+		sim_history.thread[0] = (message_thread_entry_t){ .id = UINT32_MAX, .time = 757 };
+	}
+#endif
 	ui_event_t ev;
 	memset(&ev, 0, sizeof ev);
 	ev.kind = UI_EV_MESSAGE;

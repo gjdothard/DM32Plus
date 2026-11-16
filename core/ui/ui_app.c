@@ -603,6 +603,12 @@ static void handle_event(const ui_event_t *ev)
 	name_mark = NULL;	// a mark from an earlier event would point into this same buffer
 	switch (ev->kind) {
 	case UI_EV_MESSAGE:
+		if (ui_thread_receive(ev->index)) {
+			if (ui_st.message_tone)
+				ui_svc_beep(UI_BEEP_MESSAGE);
+			vibrate(UI_VIBE_MESSAGE);
+			break;
+		}
 		sb_str(&b, TR("Message from "));
 		station(&b, ev);
 		{
@@ -757,9 +763,7 @@ static void banner_open(void)
 	uint16_t msg = b->msg;
 	b->kind = UI_BANNER_NONE;
 	if (kind == UI_BANNER_MESSAGE) {
-		if (ui_svc_msg_by_token(msg, NULL) >= 0)
-			ui_push(CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) ? SCR_LIVE_THREAD : SCR_MESSAGE, msg);
-		else
+		if (!ui_open_message_thread(msg))
 			ui_toast(TR("Message deleted"));
 	}
 #if CONFIG_ZONE_SHARE

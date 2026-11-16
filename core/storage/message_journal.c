@@ -384,12 +384,16 @@ bool message_journal_submit(message_journal_job_t *job)
 	return job && job->complete && job->record && storage_job_post(append_job, job);
 }
 
+static uint32_t record_peer(uint32_t src, uint32_t dst, uint8_t flags)
+{
+	bool group = (flags & MESSAGE_RECORD_GROUP) != 0;
+	uint32_t target = group || (flags & (MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_LOCAL_AUTHOR)) ? dst : src;
+	return target | (group ? MESSAGE_HISTORY_GROUP_KEY : 0);
+}
+
 static uint32_t peer_key(const uint8_t *scratch)
 {
-	uint8_t flags = scratch[16];
-	bool group = (flags & MESSAGE_RECORD_GROUP) != 0;
-	uint32_t target = get32(scratch + (group || (flags & (MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_LOCAL_AUTHOR)) ? 8u : 4u));
-	return target | (group ? MESSAGE_HISTORY_GROUP_KEY : 0);
+	return record_peer(get32(scratch + 4), get32(scratch + 8), scratch[16]);
 }
 
 static uint32_t first_live(const message_journal_t *j)
@@ -507,7 +511,10 @@ void message_history_thread_text(uint16_t revision, unsigned index, char *text, 
 	text[0] = 0;
 	if (history && history->view.revision == revision && history->view.timeline &&
 	    history->view.status == HISTORY_READY && index < history->view.count) {
-		strncpy(text, history->view_text + index * MESSAGE_JOURNAL_TEXT, size - 1u);
+		unsigned offset = 0;
+		for (unsigned i = 0; i < index; i++)
+			offset += history->view.thread[i].bytes;
+		strncpy(text, history->view_text + offset, size - 1u);
 		text[size - 1u] = 0;
 	}
 	storage_quick_unlock();
@@ -570,6 +577,7 @@ static void thread_scan(const message_journal_t *j, message_history_view_t *v, u
 		id = first;
 	uint8_t *messages = scratch + MESSAGE_JOURNAL_SCRATCH;
 	memset(messages, 0, MESSAGE_THREAD_TEXT);
+	unsigned used = 0;
 	for (unsigned scanned = 0; id >= first && id <= last && scanned < PAGE_SCAN_SLOTS;
 	     scanned++, id = v->forward ? id + 1u : id - 1u) {
 		slot_result_t result = read_slot(j, id, scratch);
@@ -580,10 +588,14 @@ static void thread_scan(const message_journal_t *j, message_history_view_t *v, u
 		if (result != SLOT_VALID || peer_key(scratch) != v->key)
 			continue;
 		uint32_t time = get32(scratch + 12);
+		unsigned bytes = (unsigned)strlen((const char *)scratch + TEXT_OFFSET) + 1u;
+		if (bytes > MESSAGE_THREAD_TEXT - used)
+			break;
 		unsigned i = v->count++;
 		v->thread[i] = (message_thread_entry_t){ .id = id, .time = time <= 1440u ? (uint16_t)time : 0,
-			.flags = scratch[16] };
-		memcpy(messages + i * MESSAGE_JOURNAL_TEXT, scratch + TEXT_OFFSET, MESSAGE_JOURNAL_TEXT);
+			.flags = scratch[16], .bytes = (uint8_t)bytes };
+		memcpy(messages + used, scratch + TEXT_OFFSET, bytes);
+		used += bytes;
 		if (v->count == MESSAGE_THREAD_ROWS)
 			break;
 	}
@@ -723,10 +735,14 @@ void message_history_poll(void)
 	if (result == MESSAGE_JOB_BUSY)
 		return;
 	storage_quick_lock();
-	if (result == MESSAGE_JOB_OK && !history->view.key) {
-		// An open directory follows new messages after they reach flash.
+	uint32_t key = history->view.key;
+	bool timeline = history->view.timeline;
+	bool refresh = result == MESSAGE_JOB_OK &&
+		(!key || (timeline && key == record_peer(record->src, record->dst, record->flags)));
+	if (refresh) {
 		uint16_t revision = history->view.revision + 1u;
-		history->view = (message_history_view_t){ .revision = revision, .status = HISTORY_LOADING };
+		history->view = (message_history_view_t){ .key = key, .timeline = timeline,
+			.revision = revision, .status = HISTORY_LOADING };
 		history->scan_before = 0;
 	}
 	if (result == MESSAGE_JOB_INACTIVE || result == MESSAGE_JOB_UNAVAILABLE) {
@@ -744,5 +760,7 @@ void message_history_poll(void)
 			history->dropped++;
 	}
 	storage_quick_unlock();
+	if (refresh)
+		browser_poll();
 }
 #endif
