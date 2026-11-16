@@ -99,4 +99,9 @@ The radio stays on the test build. Interrupted-write and rollback checks are pen
 Host fault tests now cover a second cut during sector replay, a temporary read failure,
 and a silent target write error. A physical cut needs an isolated reserve and fixture.
 
+Local test build `v26.11b8` at `5b442dfd` is now installed. The updater verified all 150
+written application sectors by CRC. After boot, the codec and database count matched the
+baseline, and the sampled archive still held the same three records byte for byte. The
+owner chose to move on from live journal testing. Physical fault testing remains a lab task.
+
 For test commands and screenshots, see [Testing](testing.md) and the [UI specification](../spec/ui.md).
