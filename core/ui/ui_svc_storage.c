@@ -215,6 +215,10 @@ int32_t ui_svc_setting_get(uint8_t id)
 	case UI_SET_POS_SEND_S:
 		settings_read(&st);
 		return st.pos_send_s;
+	case UI_SET_UTC_OFFSET_MIN:
+		settings_read(&st);
+		return st.utc_offset_quarters >= -48 && st.utc_offset_quarters <= 56 ?
+			st.utc_offset_quarters * 15 : 0;
 	case UI_SET_LANGUAGE:
 		settings_read(&st);
 		return (int32_t)((uint8_t)st.lang[0] << 8 | (uint8_t)st.lang[1]);
@@ -425,6 +429,13 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 	case UI_SET_REF_TRIM:
 		st = settings_begin();
 		st->ref_trim_ppb = ref_trim_clamp(value);
+		settings_end(hal_millis());
+		return true;
+	case UI_SET_UTC_OFFSET_MIN:
+		if (value < -720 || value > 840 || value % 15 != 0)
+			return false;
+		st = settings_begin();
+		st->utc_offset_quarters = (int8_t)(value / 15);
 		settings_end(hal_millis());
 		return true;
 	case UI_SET_MIC_GAIN:

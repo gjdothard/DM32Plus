@@ -771,6 +771,13 @@ static bool msgs_has_history(void)
 #endif
 }
 
+static void message_time(sbuf_t *b, uint32_t minute)
+{
+	char time[6];
+	ui_local_time(time, minute);
+	sb_str(b, time);
+}
+
 static uint16_t msgs_count(void) { return ui_svc_msg_count() + msgs_has_history(); }
 
 static void msgs_item(uint16_t i, ui_item_t *it)
@@ -788,11 +795,15 @@ static void msgs_item(uint16_t i, ui_item_t *it)
 	sb_init(&b, it->label, sizeof it->label);
 	if (m.sent)
 		sb_str(&b, GLYPH_ARROW);
-	if (m.name[0])
+	if (m.own)
+		sb_str(&b, TR("You"));
+	else if (m.name[0])
 		sb_str(&b, m.name);
 	else
 		sb_u32(&b, m.src, 1);
-	ui_sb_age(it->value, sizeof it->value, m.age_ms);
+	sbuf_t clock;
+	sb_init(&clock, it->value, sizeof it->value);
+	message_time(&clock, m.utc_minute);
 #if CONFIG_UI_CARD_MENU
 	if (ui_card_layout(&ui_st)) {
 		// The card uses separate lines for sender/age and the start of the message.
@@ -946,16 +957,18 @@ static const char *msg_body(void)
 	ui_msg_t m;
 	if (ui_svc_msg_by_token(ui_frame()->arg, &m) < 0)
 		return TR("Message deleted");
-	// "From Joe Smith, 2m ago" (the ID where there is no name; # gives the station's actions), then the text
+
 	sbuf_t b;
 	sb_init(&b, msg_text, sizeof msg_text);
 	sb_str(&b, m.sent ? TR("To ") : TR("From "));
-	if (m.name[0])
+	if (m.own)
+		sb_str(&b, TR("You"));
+	else if (m.name[0])
 		sb_str(&b, m.name);
 	else
 		sb_u32(&b, m.src, 1);
 	sb_str(&b, ", ");
-	sb_age_long(&b, m.age_ms);
+	message_time(&b, m.utc_minute);
 	sb_chr(&b, '\n');
 	sb_str(&b, m.text);
 	return msg_text;
@@ -1059,7 +1072,26 @@ static const char *conversation_body(void)
 		v.flags & MESSAGE_RECORD_DELIVERED ? TR("Delivered") : TR("Sent");
 	sbuf_t b;
 	sb_init(&b, msg_text, sizeof msg_text);
-	sb_str(&b, state);
+	bool outgoing = (v.flags & MESSAGE_RECORD_OUTGOING) != 0;
+	if (outgoing) {
+		message_time(&b, v.time);
+		sb_str(&b, "  ");
+		sb_str(&b, TR("To "));
+	}
+	// The view stores the peer key, even when the author's ID has since changed.
+	char peer[24];
+	history_label(v.key, peer, sizeof peer);
+	sb_str(&b, v.flags & MESSAGE_RECORD_LOCAL_AUTHOR ? TR("You") : peer);
+	if (!outgoing) {
+		sb_str(&b, "  ");
+		message_time(&b, v.time);
+	}
+	sb_chr(&b, '\n');
+	sb_str(&b, outgoing ? TR("You") : state);
+	if (outgoing) {
+		sb_str(&b, "  ");
+		sb_str(&b, state);
+	}
 	sb_chr(&b, '\n');
 	size_t n = strlen(msg_text);
 	ui_svc_history_view(&v, msg_text + n, sizeof msg_text - n);
@@ -5539,6 +5571,9 @@ static const set_item_t s_location[] = {
 	LIST(TRN("Position format"), NULL, UI_SET_POS_FORMAT, v_posfmt, n_posfmt),
 	LIST(TRN("Send position"), "APRS", UI_SET_POS_SEND_S, v_possend, n_possend),
 	TOGGLE(TRN("Answer GPS requests"), "LRRP position location", UI_SET_POS_REPLY),
+#if CONFIG_GPS || CONFIG_DMR_SMS
+	NUMBER(TRN("UTC offset"), "time zone local message time", UI_SET_UTC_OFFSET_MIN, -720, 840, 15, " min"),
+#endif
 };
 static const set_item_t s_connections[] = {
 	TOGGLE(TRN("Hotspot allowed"), "MMDVM", UI_SET_HOTSPOT_AUTO),

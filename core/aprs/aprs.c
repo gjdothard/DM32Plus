@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // The APRS engine (aprs.h). One state block, a: the radio task changes it in aprs_tick / aprs_rf_* / aprs_rx_*, other
 // tasks through the any-task calls; every access is under LOCK() (the scheduler held: short copies only). Settings
@@ -10,6 +11,9 @@
 #include "aprs/aprs_nmea.h"
 #include "aprs/aprs_igate.h"
 #include "aprs/aprs_dmr.h"
+#if CONFIG_DMR_SMS && CONFIG_GPS
+#include "dmr/dmrDataService.h"
+#endif
 #include "aprs/hdlc.h"
 #include "aprs/kiss.h"
 #include "aprs/afsk.h"
@@ -1624,6 +1628,24 @@ void aprs_gps_enable(bool on)
 	}
 	UNLOCK();
 }
+
+#if CONFIG_GPS
+uint16_t aprs_utc_minute(uint32_t now_ms)
+{
+	LOCK();
+	uint32_t age = now_ms - a.gps.ms;
+	uint32_t utc = !a.gps_off && a.gps.valid && age < POS_STALE_MS ? a.gps.utc_hms : UINT32_MAX;
+	UNLOCK();
+	if (utc >= 240000u || utc / 100u % 100u >= 60u || utc % 100u >= 60u)
+		return 0;
+	uint32_t seconds = utc / 10000u * 3600u + utc / 100u % 100u * 60u + utc % 100u;
+	return (uint16_t)(((seconds + age / 1000u) / 60u) % 1440u + 1u);
+}
+
+#if CONFIG_DMR_SMS
+uint16_t dmrDataServiceUtcMinute(uint32_t nowMs) { return aprs_utc_minute(nowMs); }
+#endif
+#endif
 
 bool aprs_gps(aprs_gps_t *out, uint32_t now_ms)
 {

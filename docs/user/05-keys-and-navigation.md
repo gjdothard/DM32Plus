@@ -85,6 +85,9 @@ On the standard Hub, **OK**, **6** opens Tools. On the dark card layout, **OK** 
 | **8** | Tools & Utilities |
 | **9** | Settings |
 
+The 24-hour clock is to the right of the battery percentage on the tall branded display. It uses GPS time and the
+saved **Settings > Location > UTC offset**. It shows `--:--` until GPS time is available and when that time is stale.
+
 <img src="../ux/screens/240x320i10x5/hub.png" width="200" alt="Main Menu on the card layout">
 
 In long lists (Contacts, Channels, a zone's channels) the number keys filter the list by name, the way a phone

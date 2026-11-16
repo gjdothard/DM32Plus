@@ -165,6 +165,8 @@ fields that hold small numbers (`hotspot_allowed`, `usb_mode`) still have free u
 `accent` bits 6-7 are free); `vfo_power` does not (its "not set" is 0xFF). New settings are appended to page 1 as
 plain fields; a page 2 follows when page 1 is full (2.1).
 
+The DMR message display uses `utc_offset_quarters`, a signed count of 15-minute steps from UTC in the former reserved8c byte. An older record reads as UTC, and the settings record size is unchanged.
+
 ### 3.0 Who writes, and storage jobs
 
 The settings are written through `settings_save` (debounced, written by `settings_poll` on the housekeeping task in

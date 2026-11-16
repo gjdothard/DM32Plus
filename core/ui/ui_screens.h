@@ -244,6 +244,7 @@ void ui_draw_home_dual(const radio_view_t *v, const ui_state_t *s);
 #endif
 void ui_draw_quick(const radio_view_t *v, const ui_state_t *s);
 bool ui_card_layout(const ui_state_t *s);
+void ui_local_time(char out[6], uint32_t utc_minute);
 #if CONFIG_UI_CARD_MENU
 void ui_draw_numbered_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l);
 typedef enum {

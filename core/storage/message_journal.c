@@ -505,6 +505,7 @@ static void browser_scan(const message_journal_t *j, message_history_view_t *v, 
 		if (v->key) {
 			if (v->key == key) {
 				v->flags = scratch[16];
+				v->time = get32(scratch + 12);
 				v->before = id > first ? id : 0;
 				v->status = HISTORY_READY;
 				return;
@@ -579,7 +580,7 @@ void message_history_start(message_history_t *state)
 	storage_quick_unlock();
 }
 
-void message_history_capture(uint32_t src, uint32_t dst, uint8_t flags, const char *text)
+void message_history_capture(uint32_t src, uint32_t dst, uint8_t flags, uint16_t utc_minute, const char *text)
 {
 	storage_quick_lock();
 	if (history && history->active) {
@@ -588,7 +589,7 @@ void message_history_capture(uint32_t src, uint32_t dst, uint8_t flags, const ch
 			message_journal_record_t *r = &history->pending[tail];
 			r->src = src;
 			r->dst = dst;
-			r->time = 0;	// no persistent wall clock source
+			r->time = utc_minute;
 			r->flags = flags;
 			strncpy(r->text, text, sizeof(r->text) - 1u);
 			r->text[sizeof(r->text) - 1u] = '\0';

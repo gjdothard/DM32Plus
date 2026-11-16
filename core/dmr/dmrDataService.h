@@ -31,9 +31,10 @@ typedef struct
 	uint32_t dst;
 	uint32_t receivedAt;					// the service's clock (ms)
 	uint16_t token;						// nonzero, stable while a message is in the inbox
-	bool     group;
+	uint16_t utcMinute;					// UTC minute of day plus one, or zero if unknown
+	bool     group : 1;
 	uint8_t  seq;							// TMS sequence number, to spot a sender's retries
-	bool     unread;						// not shown on the radio yet
+	bool     unread : 1, own : 1;						// not shown on the radio yet
 	uint8_t  format;						// dmr_sms_format_t it came in (a reply goes the same way)
 	char     text[sizeof(((dmrDataTMS_t *)0)->text)];
 } dmrDataMessage_t;
@@ -325,6 +326,7 @@ int dmrDataServiceLrrpTriggerCount(void);
 uint32_t dmrDataServiceLocationNeededInMs(void);
 // The platform's position for LRRP (weak: none). Only asked when the settings say hasGps
 bool dmrDataServiceGetPosition(lrrpPosition_t *position);
+uint16_t dmrDataServiceUtcMinute(uint32_t nowMs);	// optional GPS clock, minute plus one
 
 // The inbox: the last DMR_DATA_INBOX_SIZE messages, newest first; a new message replaces the oldest
 int dmrDataServiceMessageCount(void);

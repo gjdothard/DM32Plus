@@ -60,7 +60,8 @@ static int msg_lookup(uint16_t key, bool stable, ui_msg_t *out)
 	out->token = m.token;
 	out->group = m.group;
 	out->unread = m.unread;
-	out->age_ms = hal_millis() - m.receivedAt;
+	out->utc_minute = m.utcMinute;
+	out->own = m.own;
 	contact_name(m.src, false, out->name, sizeof out->name);
 	strncpy(out->text, m.text, UI_MSG_TEXT_MAX);
 	out->text[UI_MSG_TEXT_MAX] = 0;

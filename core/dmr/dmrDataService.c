@@ -947,6 +947,15 @@ static bool ipResponse(const dmrDataPacket_t *packet)
 }
 #endif
 
+#ifndef DMR_DATA_SERVICE_TEST
+__attribute__((weak)) uint16_t dmrDataServiceUtcMinute(uint32_t nowMs)
+{
+	(void)nowMs;
+	return 0;
+}
+
+#endif
+
 // --- Our SMS ---
 
 static void smsFinish(uint8_t state)
@@ -959,7 +968,7 @@ static void smsFinish(uint8_t state)
 		flags |= MESSAGE_RECORD_FAILED;
 	else if (sms.ack)
 		flags |= MESSAGE_RECORD_DELIVERED;
-	message_history_capture(sms.src, sms.dst, flags, sms.text);
+	message_history_capture(sms.src, sms.dst, flags, dmrDataServiceUtcMinute(now), sms.text);
 #endif
 	if (state == DMR_REQ_OK)
 	{
@@ -2003,7 +2012,7 @@ static void takeMailbox(void)
 	{
 #if CONFIG_MESSAGE_JOURNAL
 		message_history_capture(channel.ownId, smsDst, MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_FAILED |
-					(smsGroup ? MESSAGE_RECORD_GROUP : 0), text);
+					(smsGroup ? MESSAGE_RECORD_GROUP : 0), dmrDataServiceUtcMinute(now), text);
 #endif
 		post(DMR_DATA_EV_SMS_FAILED, smsDst);// another one still running
 	}
@@ -2511,6 +2520,8 @@ static void handlePacket(const dmrDataPacket_t *packet)
 		}
 	}
 
+	uint16_t utcMinute = dmrDataServiceUtcMinute(now);
+	bool own = packet->src && packet->src == channel.ownId;
 	lock();
 	uint8_t next = (inboxUsed == 0) ? 0 : ((inboxNewest + 1) % DMR_DATA_INBOX_SIZE);// replaces the oldest when full
 	dmrDataMessage_t *message = &inbox[next];
@@ -2523,6 +2534,8 @@ static void handlePacket(const dmrDataPacket_t *packet)
 	message->group = packet->group;
 	message->seq = tms.seq;
 	message->receivedAt = now;
+	message->utcMinute = utcMinute;
+	message->own = own;
 	message->unread = true;
 	message->format = format;
 	memcpy(message->text, tms.text, sizeof(message->text));
@@ -2533,7 +2546,10 @@ static void handlePacket(const dmrDataPacket_t *packet)
 	}
 	unlock();
 #if CONFIG_MESSAGE_JOURNAL
-	message_history_capture(packet->src, packet->dst, packet->group ? MESSAGE_RECORD_GROUP : 0, tms.text);
+	uint8_t flags = packet->group ? MESSAGE_RECORD_GROUP : 0;
+	if (own)
+		flags |= MESSAGE_RECORD_LOCAL_AUTHOR;
+	message_history_capture(packet->src, packet->dst, flags, utcMinute, tms.text);
 #endif
 	stats.smsReceived++;
 	stats.etsiSmsReceived += (format == DMR_SMS_FORMAT_ETSI) ? 1 : 0;

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // The UI's APRS services over core/aprs (ui_svc_aprs.h)
 #include "config.h"
@@ -39,6 +40,13 @@ void ui_svc_aprs_set_cfg(const aprs_cfg_t *c)
 }
 
 // The Position screen reads the board GPS through APRS, the one place its NMEA goes
+#if CONFIG_GPS
+uint16_t ui_svc_utc_minute(void)
+{
+	return board_has_gps() ? aprs_utc_minute(hal_millis()) : 0;
+}
+#endif
+
 bool ui_svc_position(ui_position_t *out)
 {
 	aprs_gps_t g;

@@ -88,6 +88,9 @@ Some settings are on the menu before the feature behind them exists, or don't ap
 
 ### Location (key 5)
 
+On builds with GPS or DMR messages, **UTC offset** sets the local time shown in the status clock and on messages. Set the difference from UTC
+in 15-minute steps, from −720 to +840 minutes. The default is 0. Change it if your local offset changes.
+
 | Setting | Values | Default | What it does | Status |
 |---|---|---|---|---|
 | GPS | On, Off | On | The GPS receiver, on radios that have one ([Radio reference](23-radios.md)). Off powers the module down and the radio has no fix (APRS and DMR use the computer's or the fixed position); the change takes effect at once. Without GPS the row is dimmed and says "No GPS on this radio" | Dimmed without GPS |

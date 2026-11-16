@@ -157,7 +157,8 @@ typedef struct {
 	bool group;		// sent to a talkgroup
 	bool unread;
 	bool sent;		// one we sent
-	uint32_t age_ms;	// how long ago
+	uint16_t utc_minute;	// minute of day plus one, or zero
+	bool own;		// the author ID is this radio
 	char name[17];		// sender's name if known
 	char text[UI_MSG_TEXT_MAX + 1];
 } ui_msg_t;
@@ -191,6 +192,7 @@ typedef struct {
 	uint16_t speed_kmh, course;	// 0xFFFF unknown
 	uint32_t utc_hms;	// hhmmss, 0xFFFFFFFF unknown
 } ui_position_t;
+uint16_t ui_svc_utc_minute(void);	// current UTC minute plus one, or zero
 bool ui_svc_position(ui_position_t *out);	// false: no GPS on this radio (or off)
 // One satellite for the GPS screen's sky plot and signal bars
 enum { UI_GNSS_GPS, UI_GNSS_GLONASS, UI_GNSS_GALILEO, UI_GNSS_BEIDOU, UI_GNSS_QZSS, UI_GNSS_COUNT };
@@ -347,6 +349,7 @@ typedef enum {
 	UI_SET_DMR_ID,		// the radio's own DMR ID in the codeplug, 1..CODEPLUG_DMR_ID_MAX (a set is a codeplug write job)
 	UI_SET_REF_TRIM,	// reference oscillator trim, ppb -10000..+10000 (Settings > Advanced; settings_t.ref_trim_ppb)
 	UI_SET_LANGUAGE,	// the UI's language, i18n.h lang_value: "en" English, 0 never picked (Settings > Display; settings_t.lang)
+	UI_SET_UTC_OFFSET_MIN,	// local time offset, in minutes
 	UI_SET_COUNT
 } ui_setting_t;
 

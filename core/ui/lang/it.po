@@ -1365,6 +1365,10 @@ msgid "Conversations"
 msgstr "Conversazioni"
 
 #: core/ui/ui_menus.c
+msgid "You"
+msgstr "Tu"
+
+#: core/ui/ui_menus.c
 msgid "OK open  # reply  Back"
 msgstr "OK apri  # rispondi  Indietro"
 
@@ -2943,6 +2947,10 @@ msgstr "Formato posiz."
 #: core/ui/ui_menus.c
 msgid "Send position"
 msgstr "Invia posizione"
+
+#: core/ui/ui_menus.c
+msgid "UTC offset"
+msgstr "Scarto UTC"
 
 #: core/ui/ui_menus.c
 msgid "Hotspot allowed"

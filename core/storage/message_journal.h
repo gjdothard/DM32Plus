@@ -17,6 +17,7 @@
 #define MESSAGE_RECORD_OUTGOING 0x02u
 #define MESSAGE_RECORD_FAILED 0x04u
 #define MESSAGE_RECORD_DELIVERED 0x08u
+#define MESSAGE_RECORD_LOCAL_AUTHOR 0x10u
 
 typedef struct {
 	uint32_t src, dst, time;
@@ -88,7 +89,10 @@ typedef enum { HISTORY_LOADING, HISTORY_READY, HISTORY_EMPTY, HISTORY_ERROR } me
 
 typedef struct {
 	uint32_t key;	// 0 is the directory, bit 31 distinguishes a talkgroup
-	uint32_t peers[MESSAGE_HISTORY_PEERS];
+	union {
+		uint32_t peers[MESSAGE_HISTORY_PEERS]; // directory
+		uint32_t time; // selected message, UTC minute plus one or zero
+	};
 	uint32_t before;	// next older page, 0 at the end
 	uint16_t revision;
 	uint8_t count, flags;
@@ -114,7 +118,7 @@ typedef struct {
 void message_history_start(message_history_t *history);
 void message_history_poll(void);
 // The radio task copies accepted SMS and terminal send results here without waiting on flash.
-void message_history_capture(uint32_t src, uint32_t dst, uint8_t flags, const char *text);
+void message_history_capture(uint32_t src, uint32_t dst, uint8_t flags, uint16_t utc_minute, const char *text);
 uint32_t message_history_dropped(void);
 #endif
 

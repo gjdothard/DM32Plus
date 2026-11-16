@@ -269,14 +269,14 @@ static void test_capture(void)
 	budget = FLASH_BYTES;
 	CHECK(storage_init());
 	message_history_start(&history);
-	message_history_capture(1, 2, 0, "Skipped while off");
+	message_history_capture(1, 2, 0, 0, "Skipped while off");
 	CHECK(history.count == 0);
 	message_journal_job_t activation = { .complete = complete };
 	run_job(&activation, true, MESSAGE_JOB_OK);
 	unsigned before = budget;
-	message_history_capture(3, 9, MESSAGE_RECORD_GROUP, "Incoming");
-	message_history_capture(9, 4, MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_FAILED, "Outgoing");
-	message_history_capture(3, 9, 0, "Dropped");
+	message_history_capture(3, 9, MESSAGE_RECORD_GROUP, 756, "Incoming");
+	message_history_capture(9, 4, MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_FAILED, 0, "Outgoing");
+	message_history_capture(3, 9, 0, 0, "Dropped");
 	CHECK(budget == before && message_history_dropped() == 1);
 	CHECK(storage_buffer_acquire());
 	message_history_poll();
@@ -292,11 +292,11 @@ static void test_capture(void)
 	message_journal_record_t out;
 	CHECK(message_journal_mount(&j, &job_flash, RESERVE_BASE + STORAGE_SECTOR, BYTES - STORAGE_SECTOR));
 	CHECK(message_journal_read(&j, 1, scratch, &out));
-	CHECK(out.src == 3 && out.dst == 9 && out.flags == MESSAGE_RECORD_GROUP && !strcmp(out.text, "Incoming"));
+	CHECK(out.src == 3 && out.dst == 9 && out.flags == MESSAGE_RECORD_GROUP && out.time == 756 && !strcmp(out.text, "Incoming"));
 	CHECK(message_journal_read(&j, 2, scratch, &out));
 	CHECK(out.src == 9 && out.dst == 4 && out.flags == (MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_FAILED));
 	CHECK(!strcmp(out.text, "Outgoing") && !message_journal_read(&j, 3, scratch, &out));
-	message_history_capture(5, 9, 0, "Marker lost");
+	message_history_capture(5, 9, 0, 0, "Marker lost");
 	data[RESERVE_BASE] = 0;
 	message_history_poll();
 	CHECK(!history.active && !history.count && message_history_dropped() == 1);
@@ -327,7 +327,7 @@ static void read_page(message_history_page_t *page, message_journal_result_t exp
 static void save_history(uint32_t src, uint32_t dst, uint8_t flags, const char *text)
 {
 	budget = FLASH_BYTES;
-	message_history_capture(src, dst, flags, text);
+	message_history_capture(src, dst, flags, 0, text);
 	message_history_poll();
 }
 

@@ -111,3 +111,10 @@ preferences. Scan membership remains zone-based and channel skip flags are edite
 The original scan actions remain available.
 
 For test commands and screenshots, see [Testing](testing.md) and the [UI specification](../spec/ui.md).
+
+## Follow-up: hardware RTC
+
+Revisit hardware RTC support in a separate feature branch. Add an optional wall-clock interface and a bounded
+board driver. Verify the RTC validity flag and retention on the radio across power cycles before trusting it.
+Use valid GPS UTC to initialize or correct the RTC. Keep saved timestamps in UTC and apply the user's offset
+only when displaying the clock or a message.

@@ -28,6 +28,35 @@ static bool ui_strip_fill;
 // The red is lighter and pinker than TX's (the TX pill also says TX); there is no green, which would hide the RX
 // pill. Default keeps the theme's blue focus; its filled strip is light gray (white in high contrast). Built without CONFIG_UI_COLOR (radios
 // with only a monochrome screen) the theme's own colors stay
+void ui_local_time(char out[6], uint32_t utc_minute)
+{
+	if (!utc_minute || utc_minute > 1440u) {
+		str_copy(out, 6, "--:--");
+		return;
+	}
+	int32_t offset = ui_svc_setting_get(UI_SET_UTC_OFFSET_MIN);
+	uint32_t local = (uint32_t)((int32_t)(utc_minute - 1u) + offset + 1440) % 1440u;
+	sbuf_t b;
+	sb_init(&b, out, 6);
+	sb_u32(&b, local / 60u, 2);
+	sb_chr(&b, ':');
+	sb_u32(&b, local % 60u, 2);
+}
+
+static bool status_clock_available(void)
+{
+	return board.home_brand != NULL && gfx_width() >= 220;
+}
+
+static int draw_status_clock(const font_t *f, int right, int y, color_t fg)
+{
+	char time[6];
+	ui_local_time(time, ui_svc_utc_minute());
+	right -= gfx_text_width(f, time);
+	gfx_text(f, right, y, time, fg);
+	return right - f->w;
+}
+
 static void accent_apply(void)
 {
 	ui_col.focus_fg = ui_col.fg;
@@ -345,10 +374,12 @@ static int draw_top_as(const radio_view_t *v, radio_state_t st, const ui_state_t
 	}
 	int ty = (ph - f->h + 1) / 2;
 
-	// Right side, right to left: battery %, battery icon, signal bars, unread messages, lock
+	// Right side, right to left: clock, battery %, battery icon, signal bars, unread messages, lock
 	sbuf_t b;
 	int rx = w;
 	if (!merged) {
+		if (status_clock_available())
+			rx = draw_status_clock(&font_6x12, rx, ty + (f->h - font_6x12.h) / 2, sfg);
 		color_t bc = sfg;
 		if (!s->no_battery) {
 			char pct[6];
@@ -2234,6 +2265,7 @@ static void card_status(const ui_state_t *s)
 	int y = 3;
 	int brand = gfx_text(f, 0, y, board.home_brand, ui_col.fg);
 	gfx_text(f, brand, y, "+", ui_col.focus);
+	right = draw_status_clock(f, right, y, ui_col.fg);
 	if (!s->no_battery) {
 		char text[6];
 		sbuf_t b;
@@ -2705,9 +2737,9 @@ int ui_draw_text_page(const radio_view_t *v, const ui_state_t *s, const char *ti
 	int w = gfx_width();
 	char line[64];
 	gfx_clear(ui_col.bg);
-	// No status strip while idle: the page gets the whole height. A call or a transmission brings it back (P2: the
+	// Without the clock, the idle page gets the whole height. A call or a transmission brings the strip back (P2: the
 	// TX / RX pill is never hidden)
-	int y = v->state != RS_IDLE ? ui_draw_top(v, s, NULL, title) : 0;
+	int y = v->state != RS_IDLE || status_clock_available() ? ui_draw_top(v, s, NULL, title) : 0;
 	int y_end = list_bottom(s);
 	int rows = (y_end - y) / f->h;
 	if (rows < 1)

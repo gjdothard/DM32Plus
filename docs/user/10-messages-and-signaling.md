@@ -50,7 +50,12 @@ archive. Under **Messages → Conversations**, choose one of the six most recent
 talkgroup conversations. The newest saved message opens first. **Older message** walks
 back through that conversation and **Newest message** returns to its latest entry.
 The four-entry live inbox remains below **Conversations**. On the dark card layout, unread messages have a dot
-and each inbox card shows the sender, age, and a short preview. Select the card to read the full message.
+and each inbox card shows the sender, local receipt time, and a short preview. **You** identifies this radio's DMR ID.
+The radio takes UTC from a recent GPS fix and applies **Settings → Location → UTC offset** when it displays
+the time in 24-hour format. If no time was captured, including for older archive entries,
+the time is shown as `--:--`. Incoming messages show the sender first. Archived outgoing messages show the time first,
+then the recipient and a **You** label with the send result. The outgoing time is when that result was recorded.
+Select a card to read the full message.
 Archived text is stored in plaintext.
 
 ## Sending a message

@@ -30,15 +30,22 @@ static int failures = 0;
 static message_journal_record_t archived;
 static unsigned archived_count;
 
-void message_history_capture(uint32_t src, uint32_t dst, uint8_t flags, const char *text)
+void message_history_capture(uint32_t src, uint32_t dst, uint8_t flags, uint16_t utc_minute, const char *text)
 {
 	archived.src = src;
 	archived.dst = dst;
 	archived.flags = flags;
+	archived.time = utc_minute;
 	snprintf(archived.text, sizeof(archived.text), "%s", text);
 	archived_count++;
 }
 #endif
+
+uint16_t dmrDataServiceUtcMinute(uint32_t nowMs)
+{
+	(void)nowMs;
+	return 756;
+}
 
 static uint32_t millis = 100000;
 static dmrDataChannel_t ch = { .ownId = OUR_ID, .talkGroup = 9, .rmo = false, .canTransmit = true, .channelKey = 1 };
@@ -2132,7 +2139,7 @@ static void testHistoryCapture(void)
 	archived_count = 0;
 	receiveTMS(RADIO_A, "Archive incoming", 99);
 	CHECK(archived_count == 1 && archived.src == RADIO_A && archived.dst == OUR_ID &&
-	      archived.flags == 0 && strcmp(archived.text, "Archive incoming") == 0);
+	      archived.flags == 0 && archived.time == 756 && strcmp(archived.text, "Archive incoming") == 0);
 	receiveTMS(RADIO_A, "Archive incoming", 99);
 	CHECK(archived_count == 1);
 	sms.src = OUR_ID;

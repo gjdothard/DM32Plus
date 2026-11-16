@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // The APRS engine (docs/spec/aprs.md): who we are, where we are, when to beacon, what to send, and what was heard.
 // It runs in the radio task (aprs_tick from radio_sm_poll); the radio core does the RF part of a transmission
@@ -266,6 +267,9 @@ typedef struct {
 	uint8_t in_view;	// satellites in the table (aprs_gps_sat)
 } aprs_gps_t;
 bool aprs_gps(aprs_gps_t *out, uint32_t now_ms);
+#if CONFIG_GPS
+uint16_t aprs_utc_minute(uint32_t now_ms);	// UTC minute of day plus one, or zero if stale
+#endif
 #if CONFIG_GPS_SKY
 // Satellite i of the board GPS's table (0 .. in_view - 1) and whether the fix uses it; false past the end
 bool aprs_gps_sat(uint8_t i, sky_sat_t *out, bool *used);

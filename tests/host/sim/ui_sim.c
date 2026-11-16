@@ -1254,7 +1254,7 @@ static void rx_end(void)
 
 // ---------------- services other packages own (ui_svc.h) ----------------
 
-typedef struct { ui_msg_t m; uint32_t at; } sim_msg_t;
+typedef struct { ui_msg_t m; } sim_msg_t;
 static sim_msg_t inbox[8];
 static uint16_t n_inbox;
 
@@ -1684,7 +1684,7 @@ bool ui_svc_msg_get(uint16_t i, ui_msg_t *out)
 	if (i >= n_inbox)
 		return false;
 	*out = inbox[i].m;
-	out->age_ms = now_ms - inbox[i].at;
+
 	return true;
 }
 int ui_svc_msg_by_token(uint16_t token, ui_msg_t *out)
@@ -1742,6 +1742,8 @@ uint8_t ui_svc_lrrp_count(void) { return sim_data_status ? 2 : 0; }
 #endif
 static bool sim_no_fix;
 static int32_t sim_lat, sim_lon;
+
+uint16_t ui_svc_utc_minute(void) { return sim_no_fix ? 0 : 20u * 60u + 12u + 1u; }
 
 bool ui_svc_position(ui_position_t *out)
 {
@@ -1801,6 +1803,7 @@ void ui_svc_history_browse(uint32_t key, uint32_t before)
 		sim_history_text = "Older private text";
 	} else {
 		sim_history_text = "Private text";
+		sim_history.time = 756;
 		sim_history.before = 8;
 		sim_history.flags = MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_DELIVERED;
 	}
@@ -1863,11 +1866,13 @@ static void add_message(uint32_t src, const char *text)
 	n_inbox++;
 	memset(&inbox[0], 0, sizeof inbox[0]);
 	inbox[0].m.src = src;
+	inbox[0].m.own = src == 1001;
+	inbox[0].m.utc_minute = 12u * 60u + 35u + 1u;
 	if (++next_token == 0)
 		++next_token;
 	inbox[0].m.token = next_token;
 	inbox[0].m.unread = true;
-	inbox[0].at = now_ms;
+
 	strcpy(inbox[0].m.name, contact_name(src, false));
 	strncpy(inbox[0].m.text, text, UI_MSG_TEXT_MAX);
 	ui_event_t ev;
@@ -2020,6 +2025,7 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	ui_svc_setting_set(UI_SET_TOT_S, 180);
 	ui_svc_setting_set(UI_SET_BACKLIGHT_S, 30);
 	ui_svc_setting_set(UI_SET_REF_TRIM, 0);
+	ui_svc_setting_set(UI_SET_UTC_OFFSET_MIN, 0);
 	ui_svc_setting_set(UI_SET_LONG_PRESS_MS, 600);	// settings a flow changes start from their defaults
 	ui_svc_setting_set(UI_SET_AUTO_LOCK_S, 0);
 	ui_svc_setting_set(UI_SET_PTT_LOCKED, 1);

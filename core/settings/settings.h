@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // The radio's own settings, kept across power cycles (docs/spec/settings-store.md): where the radio was (zone,
 // channel, VFO), the VFO's settings and the user's preferences. Stored as versioned records appended to a ring of
@@ -219,7 +220,7 @@ typedef struct {
 	uint8_t zone_jrn_kind;		// SETTINGS_ZONE_JRN_*
 	char lang[2];			// the radio's language, its ISO 639-1 code (i18n.h lang_value), "\0\0" = never picked: the build's default
 					// (was reserved8b: older records read English)
-	uint8_t reserved8c;
+	int8_t utc_offset_quarters;	// local time offset in 15-minute steps (was reserved8c)
 	// Zone share: the zones imported last, so the same zone sent again updates its import instead of adding a copy
 	// (docs/spec/zone-share.md 5.4); key 0 = unused, the oldest replaced first
 	settings_zs_import_t zs_import[SETTINGS_ZS_IMPORTS];
