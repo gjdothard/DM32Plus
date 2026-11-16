@@ -676,12 +676,16 @@ static void handle_event(const ui_event_t *ev)
 	case UI_EV_HOTSPOT_STARTED:
 		banner(UI_BANNER_INFO, false, 0, TR("Hotspot started by host"), TR("OK stops it"));
 		break;
+#if CONFIG_MESSAGE_JOURNAL
+	case UI_EV_HISTORY_RESULT:
+#endif
 	case UI_EV_SAVE_FAILED: {
 		static char msg[sizeof ev->text];
 		memcpy(msg, ev->text, sizeof msg);
 		msg[sizeof msg - 1] = 0;
 		ui_toast(msg[0] ? tr(msg) : TR("Couldn't save: try again"));	// msg: a TRN text of ui_svc_storage.c
-		ui_menus_save_failed();
+		if (ev->kind == UI_EV_SAVE_FAILED)
+			ui_menus_save_failed();
 		break;
 	}
 	case UI_EV_CALL_ALERT_RESULT:

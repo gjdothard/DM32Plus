@@ -13,6 +13,10 @@ If another caller holds the buffer, the job reports busy without touching flash.
 belong to the single job producer until the completion callback. No message-service caller
 is wired up yet.
 
+The Settings → Advanced action appears only when the feature is built and the reserve is
+available. The confirmation defaults to Cancel. Enable queues activation and the UI reports
+the result when the storage task finishes.
+
 Explicit activation takes the first sector of the reserve for an ownership marker. The
 activation job checks that the range is erased and programs `RFMSG1 3C A5 00` (the six ASCII
 bytes followed by three hexadecimal bytes) in order, with the zero commit byte last. A retry

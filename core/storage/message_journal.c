@@ -332,9 +332,18 @@ static void journal_job(void *ctx, bool activate)
 static void activation_job(void *ctx) { journal_job(ctx, true); }
 static void append_job(void *ctx) { journal_job(ctx, false); }
 
-bool message_journal_activate(message_journal_job_t *job)
+bool message_journal_available(void)
 {
-	return job && job->complete && storage_job_post(activation_job, job);
+	const hal_flash_map_t *m = storage_map();
+	return storage_ready() && m && reserve_valid(m) && m->message_size >= 3u * SECTOR &&
+	       m->message_addr % SECTOR == 0 && m->message_size % SECTOR == 0 &&
+	       m->message_addr <= board.flash->size && m->message_size <= board.flash->size - m->message_addr;
+}
+
+bool message_journal_activate(const message_journal_job_t *job)
+{
+	// The storage queue also takes mutable contexts. This particular job only reads it.
+	return job && job->complete && storage_job_post(activation_job, (void *)job);
 }
 
 bool message_journal_submit(message_journal_job_t *job)

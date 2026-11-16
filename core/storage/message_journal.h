@@ -47,7 +47,8 @@ typedef struct {
 } message_journal_job_t;
 
 // Submit only after the owner approves activation. The activation job never erases flash.
-bool message_journal_activate(message_journal_job_t *job);
+bool message_journal_available(void);
+bool message_journal_activate(const message_journal_job_t *job);
 // Submit from the single storage-job producer. Keep the request and record unchanged and alive
 // until the callback runs on the housekeeping task.
 bool message_journal_submit(message_journal_job_t *job);

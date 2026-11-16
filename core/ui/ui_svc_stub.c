@@ -78,6 +78,10 @@ WEAK bool ui_svc_emergency(bool on) { (void)on; return false; }
 WEAK void ui_svc_emergency_dismiss(void) { }
 WEAK bool ui_svc_emergency_active(void) { return false; }
 WEAK bool ui_svc_factory_reset(void) { return false; }
+#if CONFIG_MESSAGE_JOURNAL
+WEAK bool ui_svc_message_history_available(void) { return false; }
+WEAK bool ui_svc_message_history_activate(void) { return false; }
+#endif
 
 WEAK bool ui_svc_crash_get(ui_crash_t *out) { (void)out; return false; }
 WEAK void ui_svc_crash_seen(void) { }

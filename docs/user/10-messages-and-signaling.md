@@ -42,6 +42,12 @@ The reply target is the sender for a private message and the destination talkgro
 The radio keeps the last 4 messages received, in memory. If an open message drops out of the inbox,
 the screen reports that the message is gone. The inbox is cleared when the radio turns off.
 
+In builds with the experimental journal, **Settings → Advanced → Message history** prepares the
+radio's reserved storage. Select **Enable** to confirm. The radio reports whether it could
+activate the reserve. If it reports that blank storage is required, the existing bytes are
+preserved. This setting prepares storage for a future conversation archive. Messages currently
+continue to use the inbox described above.
+
 ## Sending a message
 
 1. Open the actions for the person or talkgroup. Press **#** on Home for the last caller, or **#** on a contact.

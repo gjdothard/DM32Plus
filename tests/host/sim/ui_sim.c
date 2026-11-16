@@ -1757,6 +1757,15 @@ static bool emergency_on;
 bool ui_svc_emergency(bool on) { emergency_on = on; return true; }
 bool ui_svc_emergency_active(void) { return emergency_on; }
 bool ui_svc_factory_reset(void) { return true; }
+#if CONFIG_MESSAGE_JOURNAL
+bool ui_svc_message_history_available(void) { return board.home_brand != NULL; }
+bool ui_svc_message_history_activate(void)
+{
+	ui_event_t ev = { .kind = UI_EV_HISTORY_RESULT, .text = "Message history enabled" };
+	ui_notify(&ev);
+	return true;
+}
+#endif
 
 // The crash log (ui_svc.h): "crash:on" a record from before this start nobody has seen, "crash:ask" / "crash:auto"
 // the same with the report's mode and the first contact (USA, TG 3100) as its target. A report goes at once;

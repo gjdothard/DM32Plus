@@ -1388,6 +1388,14 @@ int main(void)
 		{ "Main Menu GPS / APRS opens APRS", "branded-home", "ok 7 2", "screen=aprs", 3, false },
 		{ "Main Menu direct Tools", "branded-home", "ok 8", "screen=tools", 2, false },
 		{ "Main Menu direct Settings and Back", "branded-home", "ok 9 back", "screen=hub", 3, false },
+#if CONFIG_MESSAGE_JOURNAL
+		{ "History activation opens a confirmation", "branded-home", "ok 9 0 up ok",
+			"screen=confirm shows=Message_history shows=Cancel", 5, false },
+		{ "History activation defaults to cancel", "branded-home", "ok 9 0 up ok ok",
+			"screen=group toast=none", 6, false },
+		{ "History activation reports success", "branded-home", "ok 9 0 up ok down ok wait:100",
+			"screen=group toast=Message_history_enabled", 7, false },
+#endif
 	};
 	for (size_t i = 0; i < sizeof card_menu / sizeof card_menu[0]; i++)
 		run_flow(&card_menu[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");

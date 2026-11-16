@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 #
 # The radio's strings in Español (es; docs/dev/translating.md). Kept in step with the source by
 # tools/i18n.py --sync: translate the empty msgstr lines; an empty one shows the English.
@@ -2925,6 +2926,10 @@ msgid "Crash log"
 msgstr "Log de fallos"
 
 #: core/ui/ui_menus.c
+msgid "Message history"
+msgstr "Historial de mensajes"
+
+#: core/ui/ui_menus.c
 msgid "Freq trim"
 msgstr "Ajuste frec"
 
@@ -3041,12 +3046,24 @@ msgid ", steps of "
 msgstr ", pasos de "
 
 #: core/ui/ui_menus.c
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: core/ui/ui_menus.c
+msgid "Enable"
+msgstr "Activar"
+
+#: core/ui/ui_menus.c
 msgid "No, keep settings"
 msgstr "No, mantener ajustes"
 
 #: core/ui/ui_menus.c
 msgid "Yes, reset"
 msgstr "Sí, restablecer"
+
+#: core/ui/ui_menus.c core/ui/ui_svc_storage.c
+msgid "Storage busy"
+msgstr "Almacenamiento ocupado"
 
 #: core/ui/ui_menus.c
 msgid "Factory settings restored"
@@ -3055,6 +3072,10 @@ msgstr "Ajustes de fábrica restaurados"
 #: core/ui/ui_menus.c
 msgid "Reset: not in this build"
 msgstr "Restablecer: no disponible"
+
+#: core/ui/ui_menus.c
+msgid "Enable message history on this radio?"
+msgstr "¿Activar el historial de mensajes en esta radio?"
 
 #: core/ui/ui_menus.c
 msgid "Reset all settings to factory defaults? Channels stay. This can't be undone."
@@ -3775,6 +3796,18 @@ msgstr "Restablecer: no se borró el área nativa"
 #: core/ui/ui_svc_storage.c
 msgid "Reset: the settings couldn't be saved"
 msgstr "Restablecer: no se guardaron los ajustes"
+
+#: core/ui/ui_svc_storage.c
+msgid "History activation failed"
+msgstr "No se pudo activar el historial"
+
+#: core/ui/ui_svc_storage.c
+msgid "Message history enabled"
+msgstr "Historial de mensajes activado"
+
+#: core/ui/ui_svc_storage.c
+msgid "History needs blank storage"
+msgstr "El historial necesita espacio vacío"
 
 #: core/ui/ui_svc_storage.c
 msgid "Couldn't save the keys: for now only"

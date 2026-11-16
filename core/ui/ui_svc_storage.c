@@ -20,6 +20,9 @@
 #include "settings/settings.h"
 #include "radio/ref_trim.h"
 #include "storage/storage.h"
+#if CONFIG_MESSAGE_JOURNAL
+#include "storage/message_journal.h"
+#endif
 #include "codeplug/codeplug.h"
 #include "hal_time.h"
 #include "config.h"
@@ -891,6 +894,34 @@ bool ui_svc_factory_reset(void)
 {
 	return storage_job_post(factory_reset_job, NULL);
 }
+
+#if CONFIG_MESSAGE_JOURNAL
+bool ui_svc_message_history_available(void)
+{
+	return message_journal_available();
+}
+
+static void history_activation_result(message_journal_result_t result, uint32_t id)
+{
+	(void)id;
+	const char *message = TRN("History activation failed");
+	switch (result) {
+	case MESSAGE_JOB_OK: message = TRN("Message history enabled"); break;
+	case MESSAGE_JOB_BUSY: message = TRN("Storage busy"); break;
+	case MESSAGE_JOB_FOREIGN: message = TRN("History needs blank storage"); break;
+	default: break;
+	}
+	ui_event_t ev = { .kind = UI_EV_HISTORY_RESULT };
+	strncpy(ev.text, message, sizeof ev.text - 1u);
+	ui_notify(&ev);
+}
+
+bool ui_svc_message_history_activate(void)
+{
+	static const message_journal_job_t request = { .complete = history_activation_result };
+	return message_journal_available() && message_journal_activate(&request);
+}
+#endif
 
 void ui_svc_boot_text(char line1[17], char line2[17])
 {

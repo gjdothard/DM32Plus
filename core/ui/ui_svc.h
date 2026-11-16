@@ -202,6 +202,10 @@ void ui_svc_emergency_dismiss(void);
 // calibration: those would need a second, explicit confirmation), then the radio restarts. Done by the housekeeping
 // task, not the UI's; false if it can't be started (no flash, or a save still going on)
 bool ui_svc_factory_reset(void);
+#if CONFIG_MESSAGE_JOURNAL
+bool ui_svc_message_history_available(void);
+bool ui_svc_message_history_activate(void);
+#endif
 
 // --- The crash log (CONFIG_CRASH_LOG) and its report (CONFIG_CRASH_REPORT; ui_svc_crash.c, docs/spec/crash-log.md) ---
 typedef struct {
@@ -356,6 +360,9 @@ typedef enum {
 	UI_EV_SCAN_STOPPED,	// the scan stopped on a channel
 	UI_EV_CALL_ALERT_RESULT,	// our call alert: ok = the radio answered, else no answer after the retries
 	UI_EV_SAVE_FAILED,	// a save to the codeplug the UI asked for failed later (text: what failed)
+#if CONFIG_MESSAGE_JOURNAL
+	UI_EV_HISTORY_RESULT,	// translated on the UI task (text: activation result)
+#endif
 	UI_EV_POWER_OFF_FAILED,	// auto power off dropped the power latch but the radio is still on (the knob holds it)
 	UI_EV_ZONE_OFFER,	// another radio (id, name) offers a zone or channel (index 1): text "Zone Club, 24 channels"
 	UI_EV_ZONE_SENT,	// our zone to id (index 1: a talkgroup): ok = it went out whole

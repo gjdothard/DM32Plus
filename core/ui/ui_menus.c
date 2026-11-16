@@ -5066,7 +5066,7 @@ static const ui_scr_def_t tools_screen = {
 #if CONFIG_UI_SETTINGS
 
 typedef enum { ST_TOGGLE, ST_LIST, ST_NUMBER, ST_ACTION } set_type_t;
-enum { SA_DIAG, SA_FIRMWARE, SA_CODEPLUG, SA_RESET, SA_MY_RADIO, SA_CRASH, SA_LANGUAGE };
+enum { SA_DIAG, SA_FIRMWARE, SA_CODEPLUG, SA_RESET, SA_MY_RADIO, SA_CRASH, SA_LANGUAGE, SA_MESSAGE_HISTORY };
 
 typedef struct {
 	const char *name;
@@ -5360,6 +5360,9 @@ static const set_item_t s_advanced[] = {
 #if CONFIG_CRASH_SCREEN
 	ACTION(TRN("Crash log"), "crash report fault debug", SA_CRASH),
 #endif
+#if CONFIG_MESSAGE_JOURNAL
+	ACTION(TRN("Message history"), "sms storage", SA_MESSAGE_HISTORY),
+#endif
 #if CONFIG_REF_TRIM
 	NUMBER(TRN("Freq trim"), "frequency offset reference oscillator calibration ppm", UI_SET_REF_TRIM, -REF_TRIM_MAX_PPB,
 	       REF_TRIM_MAX_PPB, REF_TRIM_STEP_PPB, NULL),	// its own page (trim_screen); last: Up from the top
@@ -5384,6 +5387,10 @@ const char *ui_set_group_name(uint8_t g) { return g < GROUPS ? groups[g].name : 
 // shown disabled
 static bool set_hidden(const set_item_t *s)
 {
+#if CONFIG_MESSAGE_JOURNAL
+	if (s->type == ST_ACTION && s->id == SA_MESSAGE_HISTORY)
+		return !ui_svc_message_history_available();
+#endif
 #if CONFIG_KEY_ASSIGN
 	if (s->type != ST_ACTION && s->id >= UI_SET_KEY_FIRST && s->id <= UI_SET_KEY_LAST) {
 		key_labels();
@@ -5660,6 +5667,9 @@ static void group_select(uint16_t i, bool hold)
 		case SA_CODEPLUG: ui_push(SCR_INFO, INFO_CODEPLUG); break;
 		case SA_MY_RADIO: ui_push(SCR_DMR_ID, 0); break;
 		case SA_RESET: ui_push(SCR_CONFIRM, 0); break;
+#if CONFIG_MESSAGE_JOURNAL
+		case SA_MESSAGE_HISTORY: ui_push(SCR_CONFIRM, 1); break;
+#endif
 		case SA_LANGUAGE: ui_push(SCR_LANGUAGE, 0); break;
 #if CONFIG_CRASH_SCREEN
 		case SA_CRASH: ui_push(SCR_CRASH, 0); break;
@@ -5755,6 +5765,12 @@ static uint16_t confirm_count(void) { return 2; }
 
 static void confirm_item(uint16_t i, ui_item_t *it)
 {
+#if CONFIG_MESSAGE_JOURNAL
+	if (ui_frame()->arg == 1) {
+		str_copy(it->label, sizeof it->label, i == 0 ? TR("Cancel") : TR("Enable"));
+		return;
+	}
+#endif
 	str_copy(it->label, sizeof it->label, i == 0 ? TR("No, keep settings") : TR("Yes, reset"));
 	if (i == 1)
 		it->flags |= UI_ITEM_WARN;
@@ -5765,6 +5781,13 @@ static void confirm_select(uint16_t i, bool hold)
 	(void)hold;
 	if (i == 0) {
 		ui_pop();
+#if CONFIG_MESSAGE_JOURNAL
+	} else if (ui_frame()->arg == 1) {
+		if (ui_svc_message_history_activate())
+			ui_pop();
+		else
+			ui_toast(TR("Storage busy"));
+#endif
 	} else if (ui_svc_factory_reset()) {
 		ui_go_home();
 		ui_toast(TR("Factory settings restored"));
@@ -5775,11 +5798,27 @@ static void confirm_select(uint16_t i, bool hold)
 
 static const char *confirm_body(void)
 {
+#if CONFIG_MESSAGE_JOURNAL
+	if (ui_frame()->arg == 1)
+		return TR("Enable message history on this radio?");
+#endif
 	return TR("Reset all settings to factory defaults? Channels stay. This can't be undone.");
 }
 
+#if CONFIG_MESSAGE_JOURNAL
+static const char *confirm_title(void)
+{
+	return ui_frame()->arg == 1 ? TR("Message history") : TR("Factory Reset");
+}
+#endif
+
 static const ui_scr_def_t confirm_screen = {
-	.name = "confirm", .flags = SF_LIST, .prefix = TRN("Factory Reset"), .hint = TRN("OK choose  Back cancel"),
+	.name = "confirm", .flags = SF_LIST, .hint = TRN("OK choose  Back cancel"),
+#if CONFIG_MESSAGE_JOURNAL
+	.title = confirm_title,
+#else
+	.prefix = TRN("Factory Reset"),
+#endif
 	.count = confirm_count, .item = confirm_item, .select = confirm_select, .body = confirm_body,
 };
 #else

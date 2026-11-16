@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 #
 # The radio's strings in Italiano (it; docs/dev/translating.md). Kept in step with the source by
 # tools/i18n.py --sync: translate the empty msgstr lines; an empty one shows the English.
@@ -2925,6 +2926,10 @@ msgid "Crash log"
 msgstr "Log crash"
 
 #: core/ui/ui_menus.c
+msgid "Message history"
+msgstr "Cronologia messaggi"
+
+#: core/ui/ui_menus.c
 msgid "Freq trim"
 msgstr "Trim freq."
 
@@ -3041,12 +3046,24 @@ msgid ", steps of "
 msgstr ", passi di "
 
 #: core/ui/ui_menus.c
+msgid "Cancel"
+msgstr "Annulla"
+
+#: core/ui/ui_menus.c
+msgid "Enable"
+msgstr "Attiva"
+
+#: core/ui/ui_menus.c
 msgid "No, keep settings"
 msgstr "No, tienile"
 
 #: core/ui/ui_menus.c
 msgid "Yes, reset"
 msgstr "Sì, ripristina"
+
+#: core/ui/ui_menus.c core/ui/ui_svc_storage.c
+msgid "Storage busy"
+msgstr "Memoria occupata"
 
 #: core/ui/ui_menus.c
 msgid "Factory settings restored"
@@ -3055,6 +3072,10 @@ msgstr "Impostazioni ripristinate"
 #: core/ui/ui_menus.c
 msgid "Reset: not in this build"
 msgstr "Ripristino: non in questa build"
+
+#: core/ui/ui_menus.c
+msgid "Enable message history on this radio?"
+msgstr "Attivare la cronologia messaggi su questa radio?"
 
 #: core/ui/ui_menus.c
 msgid "Reset all settings to factory defaults? Channels stay. This can't be undone."
@@ -3775,6 +3796,18 @@ msgstr "Ripristino: area nativa non cancellabile"
 #: core/ui/ui_svc_storage.c
 msgid "Reset: the settings couldn't be saved"
 msgstr "Ripristino: impostazioni non salvabili"
+
+#: core/ui/ui_svc_storage.c
+msgid "History activation failed"
+msgstr "Attivazione cronologia non riuscita"
+
+#: core/ui/ui_svc_storage.c
+msgid "Message history enabled"
+msgstr "Cronologia messaggi attivata"
+
+#: core/ui/ui_svc_storage.c
+msgid "History needs blank storage"
+msgstr "La cronologia richiede spazio vuoto"
 
 #: core/ui/ui_svc_storage.c
 msgid "Couldn't save the keys: for now only"

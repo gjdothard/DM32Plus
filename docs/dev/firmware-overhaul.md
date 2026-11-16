@@ -18,6 +18,7 @@ path while consolidating the radio UI and aligning it with the CPS.
 | Deferred journal append | Implemented | Host tests cover a busy job slot, a busy buffer, and overlapping allocations |
 | Persistent journal activation | Implemented | Host tests verify blank-only activation, interrupted marker writes, reboot, and refusal after marker corruption |
 | Interrupted rollover recovery | Implemented | Host tests cut power during sector staging, target erase and program, and the final message commit |
+| On-radio history activation | Implemented | Settings confirmation defaults to Cancel and reports the deferred result |
 | Conversation storage and Messages redesign | Pending | See the flash audit below |
 | CPS and codeplug changes | Pending | Inventory existing records and test compatibility before adding persisted data such as Favorites |
 
@@ -56,8 +57,9 @@ The [message journal engine](../spec/message-journal.md) mounts read-only and ke
 sector for rollover. The deferred append job borrows the shared sector buffer. It requires
 an activation marker written only after an explicit request and only into an erased reserve.
 The firmware switch defaults off. Rollover uses the shared sector journal to recover after
-power loss and continues to refuse unknown contents. Next, expose activation to the owner
-and connect the message service to the job. Group entries by private peer or destination
+power loss and continues to refuse unknown contents. The activation control lives under
+Settings → Advanced → Message history on boards with a usable reserve and the feature enabled.
+Next, connect the message service to the job. Group entries by private peer or destination
 talkgroup and capture outgoing messages with their send status.
 
 ### Hardware gates
