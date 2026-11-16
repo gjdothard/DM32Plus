@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Everyday radio features
 
@@ -55,6 +56,12 @@ codeplugs that wrote 0 for "no time-out" now get the radio's.
 Requests: `radio_req_scan(cmd)` with stop, zone, VFO, dual, cancel, nuisance or toggle; `radio_req_scan_vfo(lo, hi)`;
 `radio_req_scan_dual(pos)`; `radio_req_dual(ref, sel)` (2.1). The view shows `scan` (off / zone / vfo / dual), `scan_phase` and `scan_skipped`; the
 tuned channel or frequency is the core view's as usual.
+
+The card-style Scan screen reads the phase, tuned channel, and zone or VFO source
+from the core view. Its Options tab reads the configured scan settings. The Scan
+Lists tab describes the current zone or band and exposes the total zone channel
+count. Scan membership is still determined by the scan engine and the codeplug's
+channel skip flags.
 
 - **Zone scan** visits the current zone's channels in order, from the one it started on, skipping empty positions and
   channels marked "zone skip" in the codeplug. FM and DMR channels mix freely: each stop tunes the channel as a

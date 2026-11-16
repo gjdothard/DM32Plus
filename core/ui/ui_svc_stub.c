@@ -46,6 +46,9 @@ WEAK bool ui_svc_zone_pending(void) { return false; }
 WEAK bool ui_svc_save_talk_target(uint32_t id, bool private_call) { (void)id; (void)private_call; return false; }
 
 WEAK bool ui_svc_scan(bool on) { (void)on; return false; }
+#if CONFIG_UI_CARD_MENU
+WEAK void ui_svc_scan_prefs(ui_scan_prefs_t *out) { *out = (ui_scan_prefs_t){0}; }
+#endif
 WEAK bool ui_svc_roam(uint8_t cmd) { (void)cmd; return false; }
 WEAK bool ui_svc_scan_skip(void) { return false; }
 WEAK bool ui_svc_dual(const ui_dual_ref_t ref[2], uint8_t sel) { (void)ref; (void)sel; return false; }

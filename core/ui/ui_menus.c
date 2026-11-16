@@ -20,6 +20,7 @@
 #endif
 #include "hal_time.h"
 #include "radio/tones.h"
+#include "radio/scan.h"
 #include "radio/mic_gain.h"
 #include "radio/ref_trim.h"
 #include "radio/radio_am.h"
@@ -6193,10 +6194,102 @@ static const ui_scr_def_t picker_screen = {
 
 static bool scan_start_row(void) { return CONFIG_UI_CARD_MENU && ui_frame()->arg == 1 && !ui_st.scanning; }
 
-static uint16_t scan_count(void) { return scan_start_row() ? 1 : 3; }
+#if CONFIG_UI_CARD_MENU
+bool ui_scan_card_active(void) { return ui_frame()->arg != 0 && ui_card_layout(&ui_st); }
+
+const char *ui_scan_card_status(void)
+{
+	const radio_view_t *v = ui_view();
+	if (!ui_st.scanning)
+		return TR("Scan stopped");
+	if (v->scan_phase == SCAN_PH_PAUSED)
+		return TR("Scan paused");
+	if (v->scan_phase == SCAN_PH_RESUME)
+		return TR("Resume delay");
+	if (v->scan_phase == SCAN_PH_HOLD)
+		return TR("Holding on signal");
+	return TR("Scanning");
+}
+
+static bool scan_card_key(const input_event_t *ev)
+{
+	if (!ui_scan_card_active() || ev->gesture != GESTURE_PRESS ||
+	    (ev->action != ACT_NAV_LEFT && ev->action != ACT_NAV_RIGHT))
+		return false;
+	ui_frame_t *f = ui_frame();
+	if (ev->action == ACT_NAV_LEFT && f->arg > 1)
+		f->arg--;
+	else if (ev->action == ACT_NAV_RIGHT && f->arg < 3)
+		f->arg++;
+	f->top = f->focus = 0;
+	ui_dirty();
+	return true;
+}
+
+static void scan_card_item(uint16_t i, ui_item_t *it)
+{
+	const radio_view_t *v = ui_view();
+	if (ui_frame()->arg == 1) {
+		const char *label = i ? TR("Skip channel for now") : ui_st.scanning ? TR("Stop scan") : TR("Start scan");
+		str_copy(it->label, sizeof it->label, label);
+		item_num(it, (uint16_t)(i + 1u));
+		return;
+	}
+	sbuf_t b;
+	sb_init(&b, it->value, sizeof it->value);
+	it->flags |= UI_ITEM_INFO;
+	if (ui_frame()->arg == 2) {
+		if (i == 0) {
+			str_copy(it->label, sizeof it->label, TR("Scan source"));
+			sb_str(&b, v->vfo ? TR("VFO band") : v->zone_name);
+		} else if (i == 1) {
+			str_copy(it->label, sizeof it->label, TR("Zone channels"));
+			sb_u32(&b, v->zone_size, 1);
+		} else {
+			str_copy(it->label, sizeof it->label, TR("Edit scan skips in CPS"));
+		}
+		return;
+	}
+	ui_scan_prefs_t p;
+	ui_svc_scan_prefs(&p);
+	static const char *const options[] = {
+		TRN("Scan resume"), TRN("Scan dwell"), TRN("Resume delay"), TRN("Priority channel"),
+	};
+	str_copy(it->label, sizeof it->label, tr(options[i]));
+	if (i == 0) {
+		sb_str(&b, p.resume == SCAN_RESUME_TIME ? TR("Timed") :
+			    p.resume == SCAN_RESUME_STOP ? TR("Stop on signal") : TR("Carrier"));
+	} else if (i == 3) {
+		sb_str(&b, p.priority ? TR("On") : TR("Off"));
+	} else {
+		sb_u32(&b, i == 1 ? p.dwell_ms : p.delay_ms, 1);
+		sb_str(&b, " ms");
+	}
+}
+#endif
+
+static uint16_t scan_count(void)
+{
+#if CONFIG_UI_CARD_MENU
+	if (ui_scan_card_active()) {
+		if (ui_frame()->arg == 2)
+			return ui_view()->vfo ? 1 : 3;
+		if (ui_frame()->arg == 3)
+			return 4;
+		return ui_st.scanning ? 2 : 1;
+	}
+#endif
+	return scan_start_row() ? 1 : 3;
+}
 
 static void scan_item(uint16_t i, ui_item_t *it)
 {
+#if CONFIG_UI_CARD_MENU
+	if (ui_scan_card_active()) {
+		scan_card_item(i, it);
+		return;
+	}
+#endif
 	static const char *const names[] = { TRN("Skip channel for now"), TRN("Stay here"), TRN("Always skip") };
 	str_copy(it->label, sizeof it->label, scan_start_row() ? TR("Start scan") : tr(names[i]));
 	item_num(it, (uint16_t)(i + 1u));
@@ -6207,6 +6300,18 @@ static void scan_item(uint16_t i, ui_item_t *it)
 static void scan_select(uint16_t i, bool hold)
 {
 	(void)hold;
+#if CONFIG_UI_CARD_MENU
+	if (ui_scan_card_active()) {
+		if (ui_frame()->arg != 1)
+			return;
+		if (i == 0) {
+			ui_go_home();
+			ui_scan_toggle();
+			return;
+		}
+		i--;
+	}
+#endif
 	if (scan_start_row()) {
 		ui_go_home();
 		ui_scan_toggle();
@@ -6219,13 +6324,16 @@ static void scan_select(uint16_t i, bool hold)
 		ui_go_home();
 		ui_toast(TR("Scan stopped here"));
 	} else {
-		ui_toast(TR("Edit scan lists in qdmr"));
+		ui_toast(TR("Edit scan skips in CPS"));
 	}
 }
 
 static const ui_scr_def_t scan_screen = {
 	.name = "scan", .flags = SF_LIST | SF_NUMBERED | SF_FIELD, .prefix = TRN("Scan"), .hint = TRN("OK pick  Back"),
 	.count = scan_count, .item = scan_item, .select = scan_select,
+#if CONFIG_UI_CARD_MENU
+	.key = scan_card_key,
+#endif
 };
 
 // ======================= Screens with their own drawing =======================

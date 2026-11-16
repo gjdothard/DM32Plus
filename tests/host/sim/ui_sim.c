@@ -1484,6 +1484,12 @@ bool ui_svc_scan(bool on)
 	changed();
 	return true;
 }
+#if CONFIG_UI_CARD_MENU
+void ui_svc_scan_prefs(ui_scan_prefs_t *out)
+{
+	*out = (ui_scan_prefs_t){ .dwell_ms = 150, .delay_ms = 2000, .resume = 1 };
+}
+#endif
 // Roaming as the radio core does it, without sites to search: roam now "moves" at once
 bool ui_svc_roam(uint8_t cmd)
 {

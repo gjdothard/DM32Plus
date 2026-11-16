@@ -3453,11 +3453,23 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 	const int step = 28;
 	bool directory = kind == UI_CARD_TALKGROUPS || kind == UI_CARD_CONTACTS;
 	bool channels = kind == UI_CARD_ZONE_CHANNELS;
+	bool scan = kind >= UI_CARD_SCAN && kind <= UI_CARD_SCAN_OPTIONS;
 	char fit[40];
 	card_header(s, 24);
-	const char *title = directory ? TR("Contacts & Talkgroups") : channels ? l->name : TR("Channels & Zones");
+	const char *title = scan ? TR("Scan") :
+		directory ? TR("Contacts & Talkgroups") : channels ? l->name : TR("Channels & Zones");
 	card_center_title(title, 7, fit, sizeof fit);
-	if (directory) {
+	if (scan) {
+		const char *tabs[] = { TR("Scan"), TR("Scan Lists"), TR("Options") };
+		for (unsigned i = 0; i < 3; i++) {
+			bool active = (unsigned)(kind - UI_CARD_SCAN) == i;
+			int w = width / 3 - 4, x = (int)i * (width / 3) + 2;
+			gfx_round_fill(x, 55, w, 19, active ? ui_col.focus : CARD_SURFACE);
+			gfx_text_fit(meta, tabs[i], w - 4, fit, sizeof fit);
+			gfx_text(meta, x + (w - gfx_text_width(meta, fit)) / 2, 58, fit,
+				 active ? CARD_INK : ui_col.fg);
+		}
+	} else if (directory) {
 		const char *tabs[] = { TR("Talkgroups"), TR("Contacts") };
 		for (int i = 0; i < 2; i++) {
 			bool active = (kind == UI_CARD_CONTACTS) == (i == 1);
@@ -3475,7 +3487,13 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		gfx_text(meta, stage_x + 8, 59, stage, ui_col.focus);
 	}
 	int y = 79;
-	if (l->header) {
+	if (kind == UI_CARD_SCAN) {
+		card_list_row(y, width - 5, 49, CARD_EDGE, CARD_SURFACE);
+		gfx_text_fit(sm, l->name, width - 17, fit, sizeof fit);
+		gfx_text(sm, 8, y + 4, fit, s->scanning ? ui_col.rx : ui_col.dim);
+		row_text(meta, 8, y + 30, width - 18, l->body, l->header, ui_col.fg, ui_col.dim, false);
+		y += 53;
+	} else if (!scan && l->header) {
 		gfx_text_fit(sm, l->header, width - 12, fit, sizeof fit);
 		gfx_text(sm, 6, y, fit, ui_col.fg);
 		y += sm->h + 4;
@@ -3487,7 +3505,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		ui_item_t item = { 0 };
 		l->item(i, &item);
 		int yy = y + row * step;
-		bool focus = i == l->focus;
+		bool focus = i == l->focus && (!scan || !(item.flags & UI_ITEM_INFO));
 		color_t fg = focus ? CARD_INK : ui_col.fg;
 		color_t value = focus ? fg : item.flags & UI_ITEM_TEMP ? ui_col.warn : ui_col.dim;
 		card_list_row(yy, width - 5, step - 3, focus ? ui_col.focus : CARD_EDGE,
@@ -3510,7 +3528,8 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 			fit_end(font, item.value, room, fit, sizeof fit);
 			gfx_text(font, name_x, yy + (step - 3 - font->h) / 2, fit, fg);
 		} else {
-			row_text(sm, x, yy + (step - 3 - sm->h) / 2, width - 11, item.label, item.value, fg, value,
+			const font_t *font = kind == UI_CARD_SCAN_LISTS ? meta : sm;
+			row_text(font, x, yy + (step - 3 - font->h) / 2, width - 11, item.label, item.value, fg, value,
 				 (item.flags & UI_ITEM_PREVIEW) != 0);
 		}
 	}
@@ -3520,7 +3539,9 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		gfx_fill(width - 3, y, 3, 2, ui_col.focus);
 	if (top + rows < l->count)
 		gfx_fill(width - 3, y + rows * step - 4, 3, 2, ui_col.focus);
-	const char *keys = directory ? TR("P1/P2 tabs  OK talk  # more  Back") :
+	const char *keys = kind == UI_CARD_SCAN ? TR("P1/P2 tabs  OK pick  Back") :
+		scan ? TR("P1/P2 tabs  Back") :
+		directory ? TR("P1/P2 tabs  OK talk  # more  Back") :
 		channels ? (CONFIG_ZONE_EDIT ? TR("OK go  # actions  Back") : TR("OK go  Back")) :
 		TR("OK/# open  Hold OK go  Back");
 	card_list_footer(s, footer, keys, NULL, fit, sizeof fit);

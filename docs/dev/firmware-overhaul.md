@@ -104,4 +104,10 @@ written application sectors by CRC. After boot, the codec and database count mat
 baseline, and the sampled archive still held the same three records byte for byte. The
 owner chose to move on from live journal testing. Physical fault testing remains a lab task.
 
+## Scan overview
+
+The card menu shows the live scan state, selected zone or VFO source, and configured scan
+preferences. Scan membership remains zone-based and channel skip flags are edited in CPS.
+The original scan actions remain available.
+
 For test commands and screenshots, see [Testing](testing.md) and the [UI specification](../spec/ui.md).

@@ -135,6 +135,9 @@ static void update_focus_target(void)
 #if CONFIG_KEY_ASSIGN
 	bool lateral_keys = gfx_width() >= 220 && stack[sp].scr == SCR_QUICK;
 	lateral_keys |= stack[sp].scr == SCR_CONTACTS && ui_contact_tabs_available();
+#if CONFIG_UI_CARD_MENU
+	lateral_keys |= stack[sp].scr == SCR_SCAN && ui_scan_card_active();
+#endif
 	ui_svc_quick_keys(lateral_keys);
 #endif
 	const ui_scr_def_t *d = ui_scr[stack[sp].scr];
@@ -1822,6 +1825,20 @@ static void list_draw(const ui_scr_def_t *d)
 		}
 		if (f->scr == SCR_CONTACTS && ui_contact_tabs_available()) {
 			ui_draw_card_list(&ui_st, &l, f->arg ? UI_CARD_CONTACTS : UI_CARD_TALKGROUPS);
+			return;
+		}
+		if (f->scr == SCR_SCAN && ui_scan_card_active()) {
+			sbuf_t b;
+			sb_init(&b, header, sizeof header);
+			if (view->vfo)
+				sb_freq(&b, view->ch.rx_hz);
+			else
+				sb_str(&b, view->ch.name);
+			sb_str(&b, view->ch.mode == RADIO_MODE_DMR ? " DMR" : view->am ? " AM" : " FM");
+			l.name = ui_scan_card_status();
+			l.header = view->vfo ? TR("VFO band") : view->zone_name;
+			l.body = header;
+			ui_draw_card_list(&ui_st, &l, (ui_card_list_kind_t)(UI_CARD_SCAN + f->arg - 1));
 			return;
 		}
 	}

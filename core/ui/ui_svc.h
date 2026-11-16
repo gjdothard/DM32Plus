@@ -96,6 +96,14 @@ bool ui_svc_save_talk_target(uint32_t id, bool private_call);
 
 // --- Scan (radio-features). Whether a scan runs is radio_view_t.scan ---
 bool ui_svc_scan(bool on);			// on: the zone (in the VFO: the band); off: stop where it is
+#if CONFIG_UI_CARD_MENU
+typedef struct {
+	uint16_t dwell_ms, delay_ms;
+	uint8_t resume;
+	bool priority;
+} ui_scan_prefs_t;
+void ui_svc_scan_prefs(ui_scan_prefs_t *out);
+#endif
 bool ui_svc_scan_skip(void);			// nuisance delete of the channel that stopped the scan
 // Dual watch (docs/ux/dual-watch.md): two channels, each a channel of any zone or the VFO. ref[sel] is the selected
 // one: PTT transmits on it (and the watch goes on after), keys and quick settings act on it. NULL refs stop the

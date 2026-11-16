@@ -102,6 +102,10 @@ bool ui_contact_position_shown(void);
 #endif
 
 const radio_view_t *ui_view(void);
+#if CONFIG_UI_CARD_MENU
+bool ui_scan_card_active(void);
+const char *ui_scan_card_status(void);
+#endif
 ui_frame_t *ui_frame(void);
 #if CONFIG_MESSAGE_JOURNAL
 void ui_history_tick(void);

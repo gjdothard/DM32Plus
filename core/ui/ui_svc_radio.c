@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The ui_svc.h calls the radio core answers: the talk target and the one-shot target of the focused row
 // (docs/spec/dmr-voice.md), the temporary channel changes (timeslot, color code, mode), the hear all, monitor and VOX
 // latches, privacy with the stored key, scan, key beeps and the radio's settings (docs/spec/radio-features.md).
@@ -231,6 +232,13 @@ bool ui_svc_scan_skip(void)
 	radio_req_scan(RSCAN_NUISANCE);
 	return true;
 }
+#if CONFIG_UI_CARD_MENU
+void ui_svc_scan_prefs(ui_scan_prefs_t *out)
+{
+	const radio_settings_t *s = rs_copy();
+	*out = (ui_scan_prefs_t){ s->scan_dwell_ms, s->scan_delay_ms, s->scan_resume, s->scan_priority };
+}
+#endif
 #endif
 
 #if CONFIG_DUAL_WATCH

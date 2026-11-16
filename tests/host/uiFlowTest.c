@@ -1384,6 +1384,10 @@ int main(void)
 			"ok 4 7", "screen=zones shows=Find", 3, false },
 		{ "Main Menu Scan opens before starting", "branded-home", "ok 5", "screen=scan shows=Start_scan", 2, false },
 		{ "Main Menu Scan can start", "branded-home", "ok 5 1", "screen=home scanning=1", 3, false },
+		{ "Scan status is visible while scanning", "branded-home", "ok 5 1 ok 5",
+			"screen=scan scanning=1 shows=Scanning shows=Stop_scan", 5, false },
+		{ "Scan keeps its stop shortcut", "branded-home", "ok 5 1 ok 5 1",
+			"screen=home scanning=0", 6, false },
 		{ "Main Menu Activity opens Recent", "branded-home", "ok 6", "screen=recent", 2, false },
 		{ "Main Menu GPS / APRS opens APRS", "branded-home", "ok 7 2", "screen=aprs", 3, false },
 		{ "Main Menu direct Tools", "branded-home", "ok 8", "screen=tools", 2, false },
@@ -1407,6 +1411,14 @@ int main(void)
 	};
 	for (size_t i = 0; i < sizeof card_menu / sizeof card_menu[0]; i++)
 		run_flow(&card_menu[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+	static const flow_t scan_tabs[] = {
+		{ "Scan Lists reports the live zone source", "branded-home", "ok 5 right",
+			"screen=scan shows=Scan_source shows=Zone_channels", 3, false },
+		{ "Scan Options shows the current timing values", "branded-home", "ok 5 right right",
+			"screen=scan shows=Scan_resume shows=Carrier shows=2000_ms", 4, false },
+	};
+	for (size_t i = 0; i < sizeof scan_tabs / sizeof scan_tabs[0]; i++)
+		run_flow(&scan_tabs[i], sim_geom_find("240x320i10x5"), SIM_MAP_M, "Tall color");
 #if CONFIG_DMR
 	static const flow_t card_directory[] = {
 		{ "Talkgroups show the full saved ID", "branded-home worst", "ok 3",

@@ -268,7 +268,7 @@ msgstr "Torna ai canali"
 msgid "Scan: not in this build"
 msgstr "Scansione: non in questa build"
 
-#: core/ui/ui_app.c
+#: core/ui/ui_app.c core/ui/ui_menus.c
 msgid "Scan stopped"
 msgstr "Scansione ferma"
 
@@ -439,6 +439,10 @@ msgstr "Cerca: "
 #: core/ui/ui_app.c core/ui/ui_find.c
 msgid "No match: Back deletes a key"
 msgstr "Nessun risultato: Indietro cancella"
+
+#: core/ui/ui_app.c core/ui/ui_menus.c
+msgid "VFO band"
+msgstr "Banda VFO"
 
 #: core/ui/ui_app.c
 msgid "Emergency: not in this build"
@@ -3161,8 +3165,64 @@ msgid "{PTT once  OK use  Hold OK set|OK use  Hold OK set}"
 msgstr "{PTT una volta  OK usa  Tieni OK imposta|OK usa  Tieni OK imposta}"
 
 #: core/ui/ui_menus.c
+msgid "Scan paused"
+msgstr "Scansione in pausa"
+
+#: core/ui/ui_menus.c
+msgid "Resume delay"
+msgstr "Ritardo ripresa"
+
+#: core/ui/ui_menus.c
+msgid "Holding on signal"
+msgstr "In sosta sul segnale"
+
+#: core/ui/ui_menus.c
 msgid "Skip channel for now"
 msgstr "Salta canale per ora"
+
+#: core/ui/ui_menus.c
+msgid "Stop scan"
+msgstr "Ferma scansione"
+
+#: core/ui/ui_menus.c
+msgid "Start scan"
+msgstr "Avvia scansione"
+
+#: core/ui/ui_menus.c
+msgid "Scan source"
+msgstr "Origine scansione"
+
+#: core/ui/ui_menus.c
+msgid "Zone channels"
+msgstr "Canali zona"
+
+#: core/ui/ui_menus.c
+msgid "Edit scan skips in CPS"
+msgstr "Modifica esclusioni in CPS"
+
+#: core/ui/ui_menus.c
+msgid "Scan resume"
+msgstr "Ripresa scansione"
+
+#: core/ui/ui_menus.c
+msgid "Scan dwell"
+msgstr "Tempo di ascolto"
+
+#: core/ui/ui_menus.c
+msgid "Priority channel"
+msgstr "Canale prioritario"
+
+#: core/ui/ui_menus.c
+msgid "Timed"
+msgstr "A tempo"
+
+#: core/ui/ui_menus.c
+msgid "Stop on signal"
+msgstr "Ferma al segnale"
+
+#: core/ui/ui_menus.c
+msgid "Carrier"
+msgstr "Portante"
 
 #: core/ui/ui_menus.c
 msgid "Stay here"
@@ -3171,10 +3231,6 @@ msgstr "Resta qui"
 #: core/ui/ui_menus.c
 msgid "Always skip"
 msgstr "Salta sempre"
-
-#: core/ui/ui_menus.c
-msgid "Start scan"
-msgstr "Avvia scansione"
 
 #: core/ui/ui_menus.c
 msgid "Skipped until the scan stops"
@@ -3187,10 +3243,6 @@ msgstr "Ancora niente da saltare"
 #: core/ui/ui_menus.c
 msgid "Scan stopped here"
 msgstr "Scansione ferma qui"
-
-#: core/ui/ui_menus.c
-msgid "Edit scan lists in qdmr"
-msgstr "Modifica liste scan in qdmr"
 
 #: core/ui/ui_menus.c
 msgid "In use"
@@ -3749,6 +3801,14 @@ msgid "Channels & Zones"
 msgstr "Canali e zone"
 
 #: core/ui/ui_screens.c
+msgid "Scan Lists"
+msgstr "Liste"
+
+#: core/ui/ui_screens.c
+msgid "Options"
+msgstr "Opzioni"
+
+#: core/ui/ui_screens.c
 msgid "Talkgroups"
 msgstr "Gruppi"
 
@@ -3759,6 +3819,14 @@ msgstr "2  Scegli canale"
 #: core/ui/ui_screens.c
 msgid "1  Select zone"
 msgstr "1  Scegli zona"
+
+#: core/ui/ui_screens.c
+msgid "P1/P2 tabs  OK pick  Back"
+msgstr "P1/P2 schede  OK scegli  Indietro"
+
+#: core/ui/ui_screens.c
+msgid "P1/P2 tabs  Back"
+msgstr "P1/P2 schede  Indietro"
 
 #: core/ui/ui_screens.c
 msgid "P1/P2 tabs  OK talk  # more  Back"
