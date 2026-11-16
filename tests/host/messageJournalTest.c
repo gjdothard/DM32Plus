@@ -16,6 +16,7 @@
 static uint8_t data[FLASH_BYTES], snapshot[FLASH_BYTES], scratch[STORAGE_SECTOR];
 static unsigned budget;
 static uint32_t failed_read = UINT32_MAX;
+static uint32_t corrupt_write = UINT32_MAX;
 void storage_lock(void) {}
 void storage_unlock(void) {}
 void storage_quick_lock(void) {}
@@ -41,6 +42,10 @@ static bool write_flash(uint32_t addr, const void *buf, uint32_t len)
 		budget--;
 		CHECK((data[addr] & *p) == *p);
 		data[addr++] = *p++;
+		if (addr - 1u == corrupt_write) {
+			data[addr - 1u] &= 0xFBu;
+			corrupt_write = UINT32_MAX;
+		}
 	}
 	return true;
 }
@@ -135,6 +140,46 @@ static void cut_rollover(uint32_t next, uint32_t first_live)
 		if (staged) {
 			CHECK(readable(&j, next + 1u));
 		}
+	}
+	memcpy(data, snapshot, sizeof(data));
+}
+
+static void cut_replay(uint32_t next, uint32_t first_live)
+{
+	const unsigned cuts[] = {
+		0, 17, STORAGE_SECTOR, STORAGE_SECTOR + 177u, 2u * STORAGE_SECTOR, FLASH_BYTES, FLASH_BYTES + 1u,
+	};
+	const uint32_t done = job_map.journal_addr + 16u;
+	const uint32_t addr = (((next - 1u) / SLOTS) % SECTORS) * STORAGE_SECTOR;
+	memcpy(snapshot, data, sizeof(data));
+	for (unsigned i = 0; i < sizeof(cuts) / sizeof(cuts[0]); i++) {
+		memcpy(data, snapshot, sizeof(data));
+		message_journal_t j;
+		mount(&j);
+		budget = 3u * STORAGE_SECTOR + 16u; // J0 committed, target not erased
+		uint32_t id;
+		CHECK(!message_journal_append(&j, &entry, storage_sector_write, scratch, &id));
+		CHECK(data[done] == 0xFFu);
+
+		budget = cuts[i];
+		if (cuts[i] == FLASH_BYTES)
+			corrupt_write = addr + 16u + 17u; // silently corrupt the first text byte during replay
+		if (cuts[i] == FLASH_BYTES + 1u)
+			failed_read = job_map.journal_addr + STORAGE_SECTOR;
+		CHECK(!storage_init() && !storage_ready());
+		CHECK(data[done] == 0xFFu && corrupt_write == UINT32_MAX);
+		failed_read = UINT32_MAX;
+		mount(&j);
+		CHECK(readable(&j, first_live) && readable(&j, next - 1u) && !readable(&j, next));
+		budget = FLASH_BYTES;
+		CHECK(!storage_sector_write(addr, scratch) && data[done] == 0xFFu);
+
+		CHECK(storage_init());
+		CHECK(data[done] == 0);
+		mount(&j);
+		append(&j, next + 1u);
+		mount(&j);
+		CHECK(readable(&j, next) && readable(&j, next + 1u) && !readable(&j, first_live));
 	}
 	memcpy(data, snapshot, sizeof(data));
 }
@@ -403,6 +448,7 @@ int main(void)
 		append(&j, n);
 	}
 	cut_rollover(3u * SLOTS + 1u, SLOTS + 1u);
+	cut_replay(3u * SLOTS + 1u, SLOTS + 1u);
 	mount(&j);
 	append(&j, 3u * SLOTS + 1u);
 	mount(&j);

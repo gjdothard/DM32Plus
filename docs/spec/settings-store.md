@@ -1,5 +1,6 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Settings store and safe flash writes
 
@@ -216,9 +217,10 @@ repeatable. It uses two sectors at `journal_addr`:
 5. Program the done byte to 0.
 
 `storage_init()` at boot, before the settings and the codeplug are read: a J0 with a valid header and a pending
-done byte means a cut after step 3. If J1's CRC matches, steps 4 and 5 run again (`storage.replays`). A cut before
-the header is complete leaves the target untouched, because the header is the commit point. A cut during the replay
-is replayed again at the next boot.
+done byte means a cut after step 3. If J1's CRC matches, replay finishes the rewrite (`storage.replays`) and checks
+the target CRC before marking it done. A read error in J1 or a failed target readback leaves the rewrite pending
+for the next boot and blocks new storage writes until recovery succeeds. A cut before the header is complete
+leaves the target untouched.
 
 `storage_write(addr, buf, len)` writes any range (the codeplug editor's records, names and bitmaps). Open-firmware
 channel, zone and contact records don't divide 4 KB, so some cross a sector end; two separate sector rewrites would

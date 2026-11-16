@@ -78,3 +78,21 @@ Rollover can start on an erased sector or on a committed, expired sector. A nonb
 with unknown contents is refused. With a 512 KiB reserve, one sector holds the activation
 marker and one is outside the live window. The remaining 126 sectors hold up to 2,646 slots
 before any future status or deletion records.
+
+## Interrupted-write testing
+
+The host NOR fixture cuts writes before and after the storage journal commit. It also cuts
+power again during reboot replay and simulates a target bit error and a temporary read failure.
+Replay keeps the transaction pending until it can verify the copy.
+
+For a physical power-cut test, use a lab radio and a build with its own empty test reserve.
+Give it one marker sector and three journal sectors. Verify that the test reserve and storage
+transaction sectors do not overlap live conversations, the codeplug, or factory data. A
+generic loader write-test range is insufficient evidence of ownership.
+
+Fill two journal generations with synthetic texts. Make one rollover attempt per checkpoint:
+before the transaction header is committed, during target erase or programming, and after the
+replacement is installed before the message header commit. After each reboot, verify the old
+live records, the transaction completion byte, and the new record checksum. Repeat the test
+with a second cut during boot replay. Keep the verified physical test results separate from
+the host fixture results.

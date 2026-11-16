@@ -96,4 +96,7 @@ connected. The diagnostic link answered and reported no crash record or watchdog
 owner repeated the call successfully with the cable unplugged. The cause is undetermined.
 The radio stays on the test build. Interrupted-write and rollback checks are pending.
 
+Host fault tests now cover a second cut during sector replay, a temporary read failure,
+and a silent target write error. A physical cut needs an isolated reserve and fixture.
+
 For test commands and screenshots, see [Testing](testing.md) and the [UI specification](../spec/ui.md).

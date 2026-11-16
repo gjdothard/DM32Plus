@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The sector journal (storage.h, docs/spec/settings-store.md 4). Two erase units at map->journal_addr:
 //   J0  header: magic, target address, CRC-32 of the copy, header CRC, then a "done" byte (0xFF = pending)
 //   J1  the new content of the target sector
@@ -214,37 +215,43 @@ static bool patch_finish(const hal_flash_map_t *m, uint32_t addr, uint32_t len, 
 }
 
 // A pending journal entry: finish it
-static void replay(void)
+static bool replay(void)
 {
 	const hal_flash_map_t *m = storage_map();
 	uint8_t h[P_DATA];
 	uint32_t crc;
 
 	if (!rd(m->journal_addr, h, sizeof(h))) {
-		return;
+		return false;
 	}
 	if (get32(&h[0]) == P_MAGIC) {
-		if (h[P_ALL] == 0xFF && patch_len(m, h) != 0 && patch_finish(m, get32(&h[4]), get32(&h[8]), buffer)) {
-			stats.replays++;
-		}
-		return;
+		if (h[P_ALL] != 0xFF || patch_len(m, h) == 0)
+			return true;
+		if (!patch_finish(m, get32(&h[4]), get32(&h[8]), buffer))
+			return false;
+		stats.replays++;
+		return true;
 	}
 	if (get32(&h[0]) != J_MAGIC || h[J_DONE] != 0xFF ||
 	    get32(&h[12]) != storage_crc32(0, h, 12) || !target_ok(m, get32(&h[4]))) {
-		return;
+		return true;
 	}
-	if (flash_crc(m->journal_addr + STORAGE_SECTOR, STORAGE_SECTOR, 0, &crc) && crc == get32(&h[8])) {
+	if (!flash_crc(m->journal_addr + STORAGE_SECTOR, STORAGE_SECTOR, 0, &crc)) {
+		return false;
+	}
+	if (crc == get32(&h[8])) {
 		uint32_t target = get32(&h[4]);
 		uint32_t now;
 		if (!flash_crc(target, STORAGE_SECTOR, 0, &now) || now != crc) {
-			if (!copy_sector(target, m->journal_addr + STORAGE_SECTOR)) {
-				return;		// try again at the next boot
+			if (!copy_sector(target, m->journal_addr + STORAGE_SECTOR) ||
+			    !flash_crc(target, STORAGE_SECTOR, 0, &now) || now != crc) {
+				return false;	// try again at the next boot
 			}
 		}
 		stats.replays++;
 	}
 	uint8_t done = 0;
-	wr(m->journal_addr + J_DONE, &done, 1);
+	return wr(m->journal_addr + J_DONE, &done, 1);
 }
 
 storage_slot_t storage_slot_check(const uint8_t r[STORAGE_SLOT_SIZE])
@@ -388,10 +395,10 @@ bool storage_init(void)
 	storage_lock();
 	region = scan_region(m);
 	if (region == STORAGE_REGION_OURS) {
-		replay();
+		ready = replay();
 	}
 	storage_unlock();
-	return region == STORAGE_REGION_OURS;
+	return storage_ready();
 }
 
 bool storage_ready(void)
