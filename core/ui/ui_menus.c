@@ -458,9 +458,10 @@ static void act_item(uint16_t i, ui_item_t *it)
 	}
 }
 
+static char outgoing_toast[40];	// The toast keeps the pointer until it expires.
+
 static void act_select(uint16_t i, bool hold)
 {
-	static char msg[40];
 	uint8_t l[12];
 	uint8_t n = act_list(l);
 	if (i >= n)
@@ -469,7 +470,6 @@ static void act_select(uint16_t i, bool hold)
 	char name[24];
 	ui_sb_target(name, sizeof name, &ui_target);
 	sbuf_t b;
-	sb_init(&b, msg, sizeof msg);
 	switch (l[i]) {
 	case A_TALK:
 		act_target(i, &t);
@@ -491,21 +491,23 @@ static void act_select(uint16_t i, bool hold)
 		break;
 	case A_CHECK:
 		if (ui_svc_radio_check(ui_target.id)) {
+			sb_init(&b, outgoing_toast, sizeof outgoing_toast);
 			sb_str(&b, TR("Checking "));
 			sb_str(&b, name);
 			sb_str(&b, "...");
 			ui_go_home();
-			ui_toast(msg);
+			ui_toast(outgoing_toast);
 		} else {
 			ui_toast(TR("Radio check: not in this build"));
 		}
 		break;
 	case A_ALERT:
 		if (ui_svc_call_alert(ui_target.id)) {
+			sb_init(&b, outgoing_toast, sizeof outgoing_toast);
 			sb_str(&b, TR("Call alert to "));
 			sb_str(&b, name);
 			ui_go_home();
-			ui_toast(msg);
+			ui_toast(outgoing_toast);
 		} else {
 			ui_toast(TR("Call alert: not in this build"));
 		}
@@ -611,7 +613,6 @@ bool ui_thread_send_result(uint32_t id)
 
 static void send_text(const ui_target_t *target, const char *text, bool reply)
 {
-	static char msg[40];
 	char name[24];
 	ui_sb_target(name, sizeof name, target);
 	if (!ui_svc_msg_send(target->id, target->group, text)) {
@@ -619,7 +620,7 @@ static void send_text(const ui_target_t *target, const char *text, bool reply)
 		return;
 	}
 	sbuf_t b;
-	sb_init(&b, msg, sizeof msg);
+	sb_init(&b, outgoing_toast, sizeof outgoing_toast);
 	sb_str(&b, TR("Sending to "));
 	sb_str(&b, name);
 #if CONFIG_MESSAGE_JOURNAL
@@ -629,7 +630,7 @@ static void send_text(const ui_target_t *target, const char *text, bool reply)
 		ui_pop();
 	else
 		ui_go_home();
-	ui_toast(msg);
+	ui_toast(outgoing_toast);
 }
 
 static void compose_select(uint16_t i, bool hold)
