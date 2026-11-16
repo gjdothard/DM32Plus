@@ -26,6 +26,20 @@ static int failures = 0;
 #define RADIO_A		2001
 #define RADIO_B		2002
 
+#if CONFIG_MESSAGE_JOURNAL
+static message_journal_record_t archived;
+static unsigned archived_count;
+
+void message_history_capture(uint32_t src, uint32_t dst, uint8_t flags, const char *text)
+{
+	archived.src = src;
+	archived.dst = dst;
+	archived.flags = flags;
+	snprintf(archived.text, sizeof(archived.text), "%s", text);
+	archived_count++;
+}
+#endif
+
 static uint32_t millis = 100000;
 static dmrDataChannel_t ch = { .ownId = OUR_ID, .talkGroup = 9, .rmo = false, .canTransmit = true, .channelKey = 1 };
 static bool channelClear = true;
@@ -2111,6 +2125,34 @@ static void testTmsOff(void)
 }
 #endif
 
+#if CONFIG_MESSAGE_JOURNAL && CONFIG_DMR_TMS
+static void testHistoryCapture(void)
+{
+	reset();
+	archived_count = 0;
+	receiveTMS(RADIO_A, "Archive incoming", 99);
+	CHECK(archived_count == 1 && archived.src == RADIO_A && archived.dst == OUR_ID &&
+	      archived.flags == 0 && strcmp(archived.text, "Archive incoming") == 0);
+	receiveTMS(RADIO_A, "Archive incoming", 99);
+	CHECK(archived_count == 1);
+	sms.src = OUR_ID;
+	sms.dst = RADIO_B;
+	sms.group = false;
+	sms.ack = true;
+	strcpy(sms.text, "Archive outgoing");
+	smsFinish(DMR_REQ_OK);
+	CHECK(archived_count == 2 && archived.dst == RADIO_B && archived.src == OUR_ID &&
+	      archived.flags == (MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_DELIVERED) &&
+	      strcmp(archived.text, "Archive outgoing") == 0);
+	sms.ack = false;
+	sms.group = true;
+	smsFinish(DMR_REQ_OK);
+	CHECK(archived_count == 3 && archived.flags == (MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_GROUP));
+	smsFinish(DMR_REQ_FAILED);
+	CHECK(archived_count == 4 && archived.flags == (MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_GROUP | MESSAGE_RECORD_FAILED));
+}
+#endif
+
 int main(void)
 {
 	dmrDataServiceInit(&fakeEnv);
@@ -2150,6 +2192,9 @@ int main(void)
 #endif
 #if !CONFIG_DMR_TMS
 	testTmsOff();
+#endif
+#if CONFIG_MESSAGE_JOURNAL && CONFIG_DMR_TMS
+	testHistoryCapture();
 #endif
 
 	printf(failures ? "# FAILED (%d failures)\n" : "# PASSED (%d failures)\n", failures);

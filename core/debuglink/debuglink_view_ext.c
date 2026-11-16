@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The dmr_ext view section (docs/spec/debuglink.md 3.7): DMR emergency (core/dmr/dmr_emergency.h), the ETSI short
 // data counters and settings (core/dmr/dmrDataService.h) and the hotspot's CW ID (core/radio/radio_hotspot.h). Apart
 // from dmr_data so that section keeps fitting one reply.
 #include "config.h"
 #include "debuglink/debuglink.h"
+#if CONFIG_MESSAGE_JOURNAL
+#include "storage/message_journal.h"
+#endif
 #if CONFIG_DMR_DATA_CORE
 #include "dmr/dmr_data_api.h"
 #endif
@@ -31,6 +35,9 @@ static const char *em_mode_key(uint8_t m)
 
 void debuglink_view_dmr_ext(dl_text_t *t)
 {
+#if CONFIG_MESSAGE_JOURNAL
+	dl_text(t, "data.history_dropped=%u\n", (unsigned)message_history_dropped());
+#endif
 #if CONFIG_DMR_DATA_CORE
 	dmrDataStats_t s;
 	dmrDataSettings_t set;

@@ -17,6 +17,8 @@ static uint8_t data[FLASH_BYTES], snapshot[FLASH_BYTES], scratch[STORAGE_SECTOR]
 static unsigned budget;
 void storage_lock(void) {}
 void storage_unlock(void) {}
+void storage_quick_lock(void) {}
+void storage_quick_unlock(void) {}
 
 static bool read_flash(uint32_t addr, void *out, uint32_t len)
 {
@@ -212,6 +214,47 @@ static void test_deferred_append(void)
 	CHECK(readable(&j, 1));
 }
 
+static void test_capture(void)
+{
+	static message_history_t history;
+	memset(data, 0xFF, sizeof(data));
+	budget = FLASH_BYTES;
+	CHECK(storage_init());
+	message_history_start(&history);
+	message_history_capture(1, 2, 0, "Skipped while off");
+	CHECK(history.count == 0);
+	message_journal_job_t activation = { .complete = complete };
+	run_job(&activation, true, MESSAGE_JOB_OK);
+	unsigned before = budget;
+	message_history_capture(3, 9, MESSAGE_RECORD_GROUP, "Incoming");
+	message_history_capture(9, 4, MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_FAILED, "Outgoing");
+	message_history_capture(3, 9, 0, "Dropped");
+	CHECK(budget == before && message_history_dropped() == 1);
+	CHECK(storage_buffer_acquire());
+	message_history_poll();
+	CHECK(history.count == 2 && budget == before);
+	storage_buffer_release();
+	message_history_poll();
+	message_history_poll();
+	CHECK(history.count == 0 && message_history_dropped() == 1);
+	CHECK(storage_init());
+	message_history_start(&history);
+	CHECK(history.active);
+	message_journal_t j;
+	message_journal_record_t out;
+	CHECK(message_journal_mount(&j, &job_flash, RESERVE_BASE + STORAGE_SECTOR, BYTES - STORAGE_SECTOR));
+	CHECK(message_journal_read(&j, 1, scratch, &out));
+	CHECK(out.src == 3 && out.dst == 9 && out.flags == MESSAGE_RECORD_GROUP && !strcmp(out.text, "Incoming"));
+	CHECK(message_journal_read(&j, 2, scratch, &out));
+	CHECK(out.src == 9 && out.dst == 4 && out.flags == (MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_FAILED));
+	CHECK(!strcmp(out.text, "Outgoing") && !message_journal_read(&j, 3, scratch, &out));
+	message_history_capture(5, 9, 0, "Marker lost");
+	data[RESERVE_BASE] = 0;
+	message_history_poll();
+	CHECK(!history.active && !history.count && message_history_dropped() == 1);
+	CHECK(!message_journal_read(&j, 3, scratch, &out));
+}
+
 int main(void)
 {
 	message_journal_t j;
@@ -259,6 +302,7 @@ int main(void)
 	CHECK(message_journal_read(&j, id, scratch, &out));
 	CHECK(memcmp(out.text, longest.text, sizeof(out.text)) == 0);
 	test_deferred_append();
+	test_capture();
 	puts("# messageJournalTest PASSED");
 	return 0;
 }

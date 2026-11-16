@@ -385,6 +385,11 @@ ifneq ($(call feature_on,DMR_TMS),)
     $(error CONFIG_DMR_TMS=y needs CONFIG_DMR_SMS=y)
   endif
 endif
+ifneq ($(call feature_on,MESSAGE_JOURNAL),)
+  ifeq ($(call feature_on,DMR_SMS),)
+    $(error CONFIG_MESSAGE_JOURNAL=y needs CONFIG_DMR_SMS=y)
+  endif
+endif
 ifneq ($(call feature_on,DMR_CONTROL_STATION),)
   ifeq ($(call feature_on,DMR_IP_GATEWAY),)
     $(error CONFIG_DMR_CONTROL_STATION=y needs CONFIG_DMR_IP_GATEWAY=y)

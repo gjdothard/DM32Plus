@@ -10,8 +10,7 @@ reuse the shared 4 KiB sector buffer. Mount reads the sector headers and never p
 The housekeeping adapter appends through the existing storage job slot. It refuses an
 unavailable or overlapping board reserve and borrows the existing sector buffer for scratch.
 If another caller holds the buffer, the job reports busy without touching flash. Requests
-belong to the single job producer until the completion callback. No message-service caller
-is wired up yet.
+belong to the single job producer until the completion callback.
 
 The Settings → Advanced action appears only when the feature is built and the reserve is
 available. The confirmation defaults to Cancel. Enable queues activation and the UI reports
@@ -23,6 +22,17 @@ bytes followed by three hexadecimal bytes) in order, with the zero commit byte l
 can complete a recognizable partial marker
 if the rest of the reserve is still erased. Activation never erases flash. An absent or
 invalid marker disables append even if archived records are still present.
+
+After activation, accepted received SMS and terminal outgoing results enter a two-record
+queue on the housekeeping stack. The radio task copies the metadata and text without doing
+flash I/O. Housekeeping appends in arrival order and retries when the shared buffer is busy.
+Overflow and failed writes increment `data.history_dropped` in the `dmr_ext` diagnostics.
+Messages still queued when power is cut can be lost.
+
+The low bits of the flags byte are group (bit 0), outgoing (bit 1), send failed (bit 2),
+and delivery acknowledged (bit 3). Outgoing without either result flag was sent without
+confirmation. Text is stored as plaintext. The timestamp is zero until a trusted wall
+clock is available. Record IDs preserve order across reboots.
 
 Each sector contains a 16-byte header followed by 21 slots of 192 bytes. All multibyte fields
 are little endian. The header contains the four bytes `RMG1`, a 32-bit generation, a CRC-32 of

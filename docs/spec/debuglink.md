@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # USB debug link
 
@@ -345,6 +346,8 @@ format, outgoing SMS sequence, outgoing SMS state. Format and state use the `dmr
 `dmr_req_state_t` numeric values. `data.tms_ack_hex` holds at most the first 12 payload octets in hex. Serial
 zero means none captured. The snapshot is made before the RX buffer is reused, includes malformed ACK-shaped
 packets, and does not itself confirm delivery. `data.tms_invalid` in `dmr_ext` counts malformed TMS packets.
+`data.history_dropped` in `dmr_ext` counts capture queue overflow and failed archive appends since boot
+when the [message journal](message-journal.md) is built.
 
 Value forms: numbers in decimal (`temp`, `input.*keys` in hex with `0x`), states as lower-case words, tones as
 `type:value` (`ctcss:1000` = 100.0 Hz, `dcs:19` = D023), strings as they are with control characters replaced by

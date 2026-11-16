@@ -8,10 +8,15 @@
 
 #define MESSAGE_JOURNAL_TEXT 144u
 #define MESSAGE_JOURNAL_SCRATCH 192u
+#define MESSAGE_HISTORY_QUEUE 2u
+#define MESSAGE_RECORD_GROUP 0x01u
+#define MESSAGE_RECORD_OUTGOING 0x02u
+#define MESSAGE_RECORD_FAILED 0x04u
+#define MESSAGE_RECORD_DELIVERED 0x08u
 
 typedef struct {
 	uint32_t src, dst, time;
-	uint8_t flags;	// reserved for the message service
+	uint8_t flags;	// MESSAGE_RECORD_*
 	char text[MESSAGE_JOURNAL_TEXT];
 } message_journal_record_t;
 
@@ -52,6 +57,20 @@ bool message_journal_activate(const message_journal_job_t *job);
 // Submit from the single storage-job producer. Keep the request and record unchanged and alive
 // until the callback runs on the housekeeping task.
 bool message_journal_submit(message_journal_job_t *job);
+
+typedef struct {
+	message_journal_record_t pending[MESSAGE_HISTORY_QUEUE];
+	uint32_t dropped;
+	uint8_t head, count;
+	bool active;
+} message_history_t;
+
+// The housekeeping task owns this queue for its lifetime and does all flash I/O.
+void message_history_start(message_history_t *history);
+void message_history_poll(void);
+// The radio task copies accepted SMS and terminal send results here without waiting on flash.
+void message_history_capture(uint32_t src, uint32_t dst, uint8_t flags, const char *text);
+uint32_t message_history_dropped(void);
 #endif
 
 #endif

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The application: the start-up task brings up the board and starts the core tasks, then stays on as housekeeping
 // (power switch watch).
 //
@@ -29,6 +30,9 @@
 #include "ui/ui.h"
 #include "ui/ui_svc.h"
 #include "config.h"
+#if CONFIG_MESSAGE_JOURNAL
+#include "storage/message_journal.h"
+#endif
 #if CONFIG_HOSTLINK
 #include "hostlink/hostlink.h"
 #endif
@@ -79,6 +83,31 @@ static void power_off(bool knob)
 	ui_notify(&ev);			// "Couldn't switch off"; the UI waits a whole period again
 }
 
+// Keep this frame separate so the history queue shares the stack with startup's initialization.
+#if CONFIG_MESSAGE_JOURNAL
+__attribute__((noinline))
+#endif
+static void housekeeping(void)
+{
+#if CONFIG_MESSAGE_JOURNAL
+	message_history_t history;
+	message_history_start(&history);
+#endif
+	for (;;) {
+		hal_delay_ms(HOUSEKEEPING_MS);
+		settings_poll(hal_millis());
+		storage_job_poll();
+#if CONFIG_MESSAGE_JOURNAL
+		message_history_poll();
+#endif
+		if (!board.power->switch_on() || radio_power_off_wanted()) {
+			power_off(true);
+		} else if (ui_app_power_off_due()) {
+			power_off(false);
+		}
+	}
+}
+
 static void startup_task(void *arg)
 {
 	(void)arg;
@@ -118,16 +147,7 @@ static void startup_task(void *arg)
 	hostlink_start();
 #endif	// after the settings: the host link personality depends on them
 
-	for (;;) {
-		hal_delay_ms(HOUSEKEEPING_MS);
-		settings_poll(hal_millis());	// saves here, so no other task waits for the flash
-		storage_job_poll();		// and the codeplug writes the UI asks for (save to channel, factory reset)
-		if (!board.power->switch_on() || radio_power_off_wanted()) {
-			power_off(true);	// the knob, or the radio core after a long critical battery (battery_off_s)
-		} else if (ui_app_power_off_due()) {
-			power_off(false);	// Settings > Power > Auto power off
-		}
-	}
+	housekeeping();
 }
 
 void app_start(void)

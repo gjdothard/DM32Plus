@@ -19,6 +19,7 @@ path while consolidating the radio UI and aligning it with the CPS.
 | Persistent journal activation | Implemented | Host tests verify blank-only activation, interrupted marker writes, reboot, and refusal after marker corruption |
 | Interrupted rollover recovery | Implemented | Host tests cut power during sector staging, target erase and program, and the final message commit |
 | On-radio history activation | Implemented | Settings confirmation defaults to Cancel and reports the deferred result |
+| Persistent SMS capture | Implemented | Host tests cover received and outgoing metadata, duplicate suppression, buffer contention, and reading committed records after reboot |
 | Conversation storage and Messages redesign | Pending | See the flash audit below |
 | CPS and codeplug changes | Pending | Inventory existing records and test compatibility before adding persisted data such as Favorites |
 
@@ -46,8 +47,9 @@ a session-local token. The [UI adapter](../../core/ui/ui_svc_data.c) resolves th
 banner and open message. Private replies target the sender, and group replies target the destination
 talkgroup.
 
-The target build reports 16 bytes of headroom in its primary RAM region. Reuse existing
-storage-path buffers and account for stack and RAM costs before enabling a journal on a board.
+The target build with capture reports 8 bytes of headroom in its primary RAM region. The
+capture queue is on the housekeeping stack. Reuse existing storage-path buffers and account
+for stack and RAM costs before adding conversation browsing.
 
 The CPS and firmware now enforce a smaller DMR ID database boundary, leaving a 512 KiB reserve.
 Treat that reserve as previously used until the journal migration, and account for older firmware
@@ -59,8 +61,9 @@ an activation marker written only after an explicit request and only into an era
 The firmware switch defaults off. Rollover uses the shared sector journal to recover after
 power loss and continues to refuse unknown contents. The activation control lives under
 Settings → Advanced → Message history on boards with a usable reserve and the feature enabled.
-Next, connect the message service to the job. Group entries by private peer or destination
-talkgroup and capture outgoing messages with their send status.
+The message service now captures accepted SMS and outgoing send results while activation is
+valid. Next, add a journal reader and group records by private peer or destination talkgroup
+for the conversation screen.
 
 ### Hardware gates
 

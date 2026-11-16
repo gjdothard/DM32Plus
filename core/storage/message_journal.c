@@ -252,6 +252,7 @@ static bool reserve_valid(const hal_flash_map_t *m)
 // This marker occupies its own sector, outside the record ring. A new marker is allowed
 // only on an erased reserve, or on a retry of a torn marker with the reserve still blank.
 static const uint8_t activation[] = { 'R', 'F', 'M', 'S', 'G', '1', 0x3C, 0xA5, 0x00 };
+static message_history_t *history;	// owned by the housekeeping task, synchronized by the quick lock
 
 static message_journal_result_t activate_reserve(const hal_flash_t *flash, const hal_flash_map_t *m, uint8_t *scratch)
 {
@@ -308,29 +309,44 @@ static message_journal_result_t run_job(const hal_flash_map_t *m, const message_
 		? MESSAGE_JOB_OK : MESSAGE_JOB_FAILED;
 }
 
-static void journal_job(void *ctx, bool activate)
+static message_journal_result_t execute_job(const message_journal_job_t *job, bool activate, uint32_t *id)
 {
-	const message_journal_job_t *job = ctx;
 	const hal_flash_map_t *m = storage_map();
 	if (!m || !reserve_valid(m)) {
-		job->complete(MESSAGE_JOB_UNAVAILABLE, 0);
-		return;
+		return MESSAGE_JOB_UNAVAILABLE;
 	}
 	uint8_t *scratch = storage_buffer_acquire();
 	if (!scratch) {
-		job->complete(MESSAGE_JOB_BUSY, 0);
-		return;
+		return MESSAGE_JOB_BUSY;
 	}
-	uint32_t id = 0;
 	storage_lock();
-	message_journal_result_t result = run_job(m, job, activate, scratch, &id);
+	message_journal_result_t result = run_job(m, job, activate, scratch, id);
 	storage_unlock();
 	storage_buffer_release();
+	return result;
+}
+
+static void activation_job(void *ctx)
+{
+	const message_journal_job_t *job = ctx;
+	uint32_t id = 0;
+	message_journal_result_t result = execute_job(job, true, &id);
+	if (result == MESSAGE_JOB_OK) {
+		storage_quick_lock();
+		if (history)
+			history->active = true;
+		storage_quick_unlock();
+	}
 	job->complete(result, id);
 }
 
-static void activation_job(void *ctx) { journal_job(ctx, true); }
-static void append_job(void *ctx) { journal_job(ctx, false); }
+static void append_job(void *ctx)
+{
+	const message_journal_job_t *job = ctx;
+	uint32_t id = 0;
+	message_journal_result_t result = execute_job(job, false, &id);
+	job->complete(result, id);
+}
 
 bool message_journal_available(void)
 {
@@ -349,5 +365,75 @@ bool message_journal_activate(const message_journal_job_t *job)
 bool message_journal_submit(message_journal_job_t *job)
 {
 	return job && job->complete && job->record && storage_job_post(append_job, job);
+}
+
+void message_history_start(message_history_t *state)
+{
+	uint8_t marker[sizeof(activation)];
+	*state = (message_history_t){0};
+	storage_lock();
+	state->active = message_journal_available() &&
+		board.flash->read(storage_map()->message_addr, marker, sizeof(marker)) &&
+		memcmp(marker, activation, sizeof(activation)) == 0;
+	storage_unlock();
+	storage_quick_lock();
+	history = state;
+	storage_quick_unlock();
+}
+
+void message_history_capture(uint32_t src, uint32_t dst, uint8_t flags, const char *text)
+{
+	storage_quick_lock();
+	if (history && history->active) {
+		if (history->count < MESSAGE_HISTORY_QUEUE) {
+			unsigned tail = (history->head + history->count) % MESSAGE_HISTORY_QUEUE;
+			message_journal_record_t *r = &history->pending[tail];
+			r->src = src;
+			r->dst = dst;
+			r->time = 0;	// no persistent wall clock source
+			r->flags = flags;
+			strncpy(r->text, text, sizeof(r->text) - 1u);
+			r->text[sizeof(r->text) - 1u] = '\0';
+			history->count++;
+		} else {
+			history->dropped++;
+		}
+	}
+	storage_quick_unlock();
+}
+
+uint32_t message_history_dropped(void)
+{
+	storage_quick_lock();
+	uint32_t dropped = history ? history->dropped : 0;
+	storage_quick_unlock();
+	return dropped;
+}
+
+void message_history_poll(void)
+{
+	storage_quick_lock();
+	const message_journal_record_t *record = history && history->count ? &history->pending[history->head] : NULL;
+	storage_quick_unlock();
+	if (!record)
+		return;
+	// A producer only fills tail slots. The head stays reserved until the append finishes.
+	message_journal_job_t job = { .record = record };
+	uint32_t id;
+	message_journal_result_t result = execute_job(&job, false, &id);
+	if (result == MESSAGE_JOB_BUSY)
+		return;
+	storage_quick_lock();
+	if (result == MESSAGE_JOB_INACTIVE || result == MESSAGE_JOB_UNAVAILABLE) {
+		history->dropped += history->count;
+		history->count = 0;
+		history->active = false;
+	} else {
+		history->head = (history->head + 1u) % MESSAGE_HISTORY_QUEUE;
+		history->count--;
+		if (result != MESSAGE_JOB_OK)
+			history->dropped++;
+	}
+	storage_quick_unlock();
 }
 #endif

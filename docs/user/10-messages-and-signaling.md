@@ -45,8 +45,9 @@ the screen reports that the message is gone. The inbox is cleared when the radio
 In builds with the experimental journal, **Settings → Advanced → Message history** prepares the
 radio's reserved storage. Select **Enable** to confirm. The radio reports whether it could
 activate the reserve. If it reports that blank storage is required, the existing bytes are
-preserved. This setting prepares storage for a future conversation archive. Messages currently
-continue to use the inbox described above.
+preserved. Once enabled, new received messages and outgoing send results are saved in the
+archive. The Messages screen still shows the four-entry live inbox. Archive browsing is
+pending. Archived text is stored in plaintext.
 
 ## Sending a message
 

@@ -11,6 +11,9 @@
 #include "config.h"
 #include "dmr/dmrDataService.h"
 #include "dmr/dmr_data_api.h"
+#if CONFIG_MESSAGE_JOURNAL
+#include "storage/message_journal.h"
+#endif
 #if CONFIG_DMR_EMERGENCY
 #include "dmr/dmr_emergency.h"
 #endif
@@ -167,6 +170,9 @@ static struct
 	uint8_t seq;
 	bool waiting;
 	uint32_t due;
+#if CONFIG_MESSAGE_JOURNAL
+	uint32_t src;
+#endif
 	char text[sizeof(((dmrDataTMS_t *)0)->text)];
 } sms;
 #if CONFIG_DMR_CONFIRMED
@@ -947,6 +953,14 @@ static void smsFinish(uint8_t state)
 {
 	sms.state = state;
 	sms.waiting = false;
+#if CONFIG_MESSAGE_JOURNAL
+	uint8_t flags = MESSAGE_RECORD_OUTGOING | (sms.group ? MESSAGE_RECORD_GROUP : 0);
+	if (state != DMR_REQ_OK)
+		flags |= MESSAGE_RECORD_FAILED;
+	else if (sms.ack)
+		flags |= MESSAGE_RECORD_DELIVERED;
+	message_history_capture(sms.src, sms.dst, flags, sms.text);
+#endif
 	if (state == DMR_REQ_OK)
 	{
 		post(DMR_DATA_EV_SMS_SENT, sms.dst);
@@ -970,6 +984,9 @@ static bool smsTransmit(void)
 		smsSeq = (smsSeq + 1) & 0x1F;
 		sms.seq = smsSeq;
 	}
+#if CONFIG_MESSAGE_JOURNAL
+	sms.src = channel.ownId;
+#endif
 	int count = 0;
 #if CONFIG_DMR_CONFIRMED
 	if ((sms.format == DMR_SMS_FORMAT_ETSI_IP) && sms.ack)
@@ -1062,6 +1079,9 @@ bool dmrDataServiceSendSMSFormat(bool group, uint32_t dst, const char *text, boo
 	}
 
 	sms.dst = dst;
+#if CONFIG_MESSAGE_JOURNAL
+	sms.src = channel.ownId;
+#endif
 	sms.group = group;
 	// ETSI IP text has no acknowledgment of its own: an individual one goes as confirmed data, so the ETSI response
 	// confirms delivery, unless confirmed IP data is off; a group one is done once on air
@@ -1981,6 +2001,10 @@ static void takeMailbox(void)
 	}
 	if (smsReq && !dmrDataServiceSendSMSFormat(smsGroup, smsDst, text, smsAck, smsFormat) && (sms.state != DMR_REQ_FAILED))
 	{
+#if CONFIG_MESSAGE_JOURNAL
+		message_history_capture(channel.ownId, smsDst, MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_FAILED |
+					(smsGroup ? MESSAGE_RECORD_GROUP : 0), text);
+#endif
 		post(DMR_DATA_EV_SMS_FAILED, smsDst);// another one still running
 	}
 	if (sigReq && !signalStart(sigKind, sigDst) && (sig.state != DMR_REQ_FAILED))
@@ -2508,6 +2532,9 @@ static void handlePacket(const dmrDataPacket_t *packet)
 		inboxUsed++;
 	}
 	unlock();
+#if CONFIG_MESSAGE_JOURNAL
+	message_history_capture(packet->src, packet->dst, packet->group ? MESSAGE_RECORD_GROUP : 0, tms.text);
+#endif
 	stats.smsReceived++;
 	stats.etsiSmsReceived += (format == DMR_SMS_FORMAT_ETSI) ? 1 : 0;
 	stats.ipTextReceived += (format == DMR_SMS_FORMAT_ETSI_IP) ? 1 : 0;

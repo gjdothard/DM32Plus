@@ -99,6 +99,10 @@ TESTS   += dmrDataServiceTestNoTms
 dmrDataServiceTestNoTms: $(SVC) $(CORE)/dmr/dmrDataService.c $(CORE)/dmr/dmrDataService.h $(CORE)/dmr/dmr_data_api.h
 	$(CC) $(CFLAGS) -DCONFIG_DMR_TMS=0 -o $@ $(SVC) -lm
 
+TESTS += dmrDataServiceTestHistory
+dmrDataServiceTestHistory: $(SVC) $(CORE)/dmr/dmrDataService.c $(CORE)/dmr/dmrDataService.h $(CORE)/dmr/dmr_data_api.h $(CORE)/storage/message_journal.h
+	$(CC) $(CFLAGS) $(FLASH_HAL) -DCONFIG_MESSAGE_JOURNAL=1 -o $@ $(SVC) -lm
+
 TESTS += dmrDataServiceTestNoUdpCompress
 dmrDataServiceTestNoUdpCompress: $(SVC) $(CORE)/dmr/dmrDataService.c $(CORE)/dmr/dmrDataService.h $(CORE)/dmr/dmr_data_api.h
 	$(CC) $(CFLAGS) -DCONFIG_DMR_UDP_COMPRESS=0 -o $@ $(SVC) -lm
@@ -146,6 +150,7 @@ run: $(TESTS)
 	./dmrDataTest > dmrDataTest.out; status=$$?; grep -E "^(FAIL|# (PASSED|FAILED))" dmrDataTest.out; exit $$status
 	./dmrDataServiceTest
 	./dmrDataServiceTestNoTms
+	./dmrDataServiceTestHistory
 	./dmrDataServiceTestNoUdpCompress
 	./hotspotDataTest
 	./hotspotUplinkTest
