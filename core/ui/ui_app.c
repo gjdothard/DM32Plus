@@ -1832,6 +1832,11 @@ static void list_draw(const ui_scr_def_t *d)
 			ui_draw_numbered_menu(view, &ui_st, &l);
 			return;
 		}
+		if (f->scr == SCR_APRS) {
+			l.name = l.prefix;
+			ui_draw_card_list(&ui_st, &l, UI_CARD_APRS);
+			return;
+		}
 		if (f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_ARS) {
 			if (l.hint == NULL)
 				l.hint = TR("Back");

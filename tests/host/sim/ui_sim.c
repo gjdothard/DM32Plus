@@ -399,6 +399,7 @@ static bool usb_up;	// the computer has brought the network adapter up (hal_neti
 static struct {
 	bool off;		// "aprs:off": not in this build
 	bool no_call;		// "aprs:nocall": no callsign anywhere
+	bool no_pos;		// "aprs:nopos": no position available
 	aprs_cfg_t cfg;
 	uint32_t sent;
 } aprs_sim;
@@ -420,11 +421,11 @@ bool ui_svc_aprs_view(aprs_view_t *v)
 		strcpy(v->call, "N0SIM-7");
 	v->block = aprs_sim.no_call ? APRS_NO_CALL : APRS_OK;
 	v->freq_hz = aprs_sim.cfg.region == APRS_REGION_CUSTOM ? aprs_sim.cfg.freq_hz : hz[aprs_sim.cfg.region % APRS_REGION_COUNT];
-	v->pos_valid = !aprs_sim.no_call;
+	v->pos_valid = !aprs_sim.no_call && !aprs_sim.no_pos;
 	v->pos_src = APRS_SRC_FIXED;
 	v->lat = 337000000;
 	v->lon = -841000000;
-	v->next_s = aprs_sim.cfg.tx_on ? 245 : 0xFFFFu;
+	v->next_s = aprs_sim.cfg.tx_on && v->pos_valid && aprs_sim.cfg.interval_s ? aprs_sim.cfg.interval_s : 0xFFFFu;
 	v->rf_sent = aprs_sim.sent;
 	v->stations = 2;
 	return true;
@@ -2759,6 +2760,7 @@ static bool run_token(char *t, char *err, size_t len)
 	if (strcmp(t, "aprs") == 0 && arg != NULL) {	// aprs:off (not built), aprs:nocall, aprs:custom (a custom frequency set)
 		aprs_sim.off = strcmp(arg, "off") == 0;
 		aprs_sim.no_call = strcmp(arg, "nocall") == 0;
+		aprs_sim.no_pos = strcmp(arg, "nopos") == 0;
 		if (strcmp(arg, "custom") == 0)
 			aprs_sim.cfg.freq_hz = 144930000;
 		return true;

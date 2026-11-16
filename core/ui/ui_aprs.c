@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Tools > APRS (docs/spec/aprs.md 10): what APRS is doing (callsign, frequency, position, next beacon, or why nothing
 // can be sent) and the everyday choices, one row each: send now, automatic beacons, the frequency (region), the RF
 // power (as the channel, or a level of its own), the digipeater path (the hops), the interval, SmartBeaconing, the
@@ -66,14 +67,31 @@ static const char *aprs_body(void)
 		sb_str(&b, TR("APRS: not in this build"));
 		return t;
 	}
+	bool cards = CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st);
+	uint8_t via = APRS_VIA_RF;
+	bool auto_beacon = false;
+	if (cards) {
+		aprs_cfg_t c;
+		ui_svc_aprs_cfg(&c);
+		via = c.via < APRS_VIA_COUNT ? c.via : APRS_VIA_RF;
+		auto_beacon = c.tx_on;
+	}
 	sb_str(&b, v.call[0] != '\0' ? v.call : TR("No callsign"));
-	sb_str(&b, TR(" on "));
-	sb_freq(&b, v.freq_hz);
+	if (cards) {
+		sb_str(&b, "  ");
+		sb_str(&b, tr(via_names[via]));
+		if (via != APRS_VIA_DMR)
+			sb_chr(&b, ' ');
+	} else {
+		sb_str(&b, TR(" on "));
+	}
+	if (!cards || via != APRS_VIA_DMR)
+		sb_freq(&b, v.freq_hz);
 	if (v.rf_active) {
 		sb_str(&b, TR(" (sending)"));
 	}
 	const char *why = why_text(v.block);
-	if (why != NULL) {
+	if (why != NULL && (!cards || via != APRS_VIA_DMR)) {
 		sb_chr(&b, '\n');
 		sb_str(&b, why);
 	}
@@ -87,12 +105,17 @@ static const char *aprs_body(void)
 	} else {
 		sb_str(&b, TR("No position"));
 	}
-	if (v.next_s != 0xFFFFu) {
+	if (cards && (!auto_beacon || v.next_s == 0xFFFFu)) {
+		sb_chr(&b, '\n');
+		sb_str(&b, auto_beacon ? TR("No timed beacon") : TR("Beacons off"));
+	} else if (v.next_s != 0xFFFFu) {
 		sb_chr(&b, '\n');
 		sb_str(&b, TR("Next in "));
 		sb_mmss(&b, v.next_s);
 	}
 	if (v.rf_sent + v.dmr_sent != 0) {
+		if (cards)
+			sb_chr(&b, '\n');
 		sb_str(&b, TR("  Sent "));
 		sb_u32(&b, v.rf_sent + v.dmr_sent, 1);
 	}

@@ -140,6 +140,8 @@ static const struct { const char *name, *script; } gallery[] = {
 #if CONFIG_UI_CARD_MENU
 	{ "gps_data", "branded-home datastatus ok 7" },
 	{ "ars", "branded-home datastatus ok 7 3" },
+	{ "aprs", "branded-home ok 7 2" },
+	{ "aprs_beacon", "branded-home ok 7 2 6 6 6 2 wait:3500" },
 #endif
 	{ "position", "ok 6 2" },
 	{ "gps_sky", "ok 6 2 2" },
@@ -522,7 +524,8 @@ static bool gallery_colors(void)
 static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_t nlen, char *script, size_t slen)
 {
 	unsigned flags = gallery_flags(i);
-	if ((!strcmp(gallery[i].name, "gps_data") || !strcmp(gallery[i].name, "ars")) &&
+	if ((!strcmp(gallery[i].name, "gps_data") || !strcmp(gallery[i].name, "ars") ||
+	     !strcmp(gallery[i].name, "aprs") || !strcmp(gallery[i].name, "aprs_beacon")) &&
 	    strcmp(g->name, "240x320i10x5"))
 		return false;
 	bool theme = c > gal_ncolors;

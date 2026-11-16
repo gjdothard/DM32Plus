@@ -3514,7 +3514,8 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 	bool directory = kind == UI_CARD_TALKGROUPS || kind == UI_CARD_CONTACTS;
 	bool channels = kind == UI_CARD_ZONE_CHANNELS;
 	bool scan = kind >= UI_CARD_SCAN && kind <= UI_CARD_SCAN_OPTIONS;
-	bool data = kind == UI_CARD_DATA_STATUS;
+	bool aprs = kind == UI_CARD_APRS;
+	bool data = aprs || kind == UI_CARD_DATA_STATUS;
 	char fit[40];
 	card_header(s, 24);
 	const char *title = composer || data ? l->name : messages ? l->prefix : scan ? TR("Scan") :
@@ -3548,7 +3549,24 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		gfx_text(meta, stage_x + 8, 59, stage, ui_col.focus);
 	}
 	int y = messages || data ? 55 : 79;
-	if (messages && l->body)
+	if (aprs && l->body) {
+		int height = 2 * 6;
+		const char *text = l->body;
+		while (*text && height < 6 * meta->h + 12) {
+			text = wrap_line(meta, text, width - 16, fit, sizeof fit);
+			height += meta->h;
+		}
+		card_list_row(y, width - 5, height, CARD_EDGE, CARD_SURFACE);
+		text = l->body;
+		for (int line = y + 6; *text && line + meta->h <= y + height - 6; line += meta->h) {
+			const char *next = wrap_line(meta, text, width - 16, fit, sizeof fit);
+			if (*next && line + 2 * meta->h > y + height - 6)
+				fit_end(meta, text, width - 16, fit, sizeof fit);
+			gfx_text(meta, 7, line, fit, ui_col.fg);
+			text = next;
+		}
+		y += height + 4;
+	} else if (messages && l->body)
 		y = wrap_text(meta, l->body, y, footer, true, ui_col.dim) + 4;
 	if (kind == UI_CARD_SCAN) {
 		card_list_row(y, width - 5, 49, CARD_EDGE, CARD_SURFACE);
@@ -3571,12 +3589,19 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		int yy = y + row * step;
 		bool focus = i == l->focus && (!(scan || data) || !(item.flags & UI_ITEM_INFO));
 		color_t highlight = item.flags & UI_ITEM_EDIT ? ui_col.warn : ui_col.focus;
-		color_t fg = focus ? CARD_INK : ui_col.fg;
+		color_t fg = focus ? CARD_INK : item.flags & UI_ITEM_DIM ? ui_col.dim : ui_col.fg;
 		color_t value = focus ? fg : item.flags & UI_ITEM_TEMP ? ui_col.warn : ui_col.dim;
 		int end = width - 5;
 		card_list_row(yy, end, step - 3, focus ? highlight : CARD_EDGE,
 			      focus ? highlight : CARD_SURFACE);
 		int x = 7;
+		if (aprs && item.num) {
+			char key[] = { item.num, 0 };
+			int ky = yy + (step - 3 - meta->h) / 2;
+			gfx_round_fill(x - 2, ky - 1, 13, meta->h + 2, focus ? CARD_INK : CARD_EDGE);
+			gfx_text(meta, x + 1, ky, key, focus ? ui_col.focus : fg);
+			x = 23;
+		}
 		if (item.flags & UI_ITEM_FOLDER) {
 			color_t icon = focus ? fg : ui_col.focus;
 			gfx_rect(7, yy + 9, 13, 9, icon);
@@ -3608,7 +3633,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 			fit_end(font, item.value, room, fit, sizeof fit);
 			gfx_text(font, name_x, yy + (step - 3 - font->h) / 2, fit, fg);
 		} else {
-			const font_t *font = kind == UI_CARD_SCAN_LISTS ? meta : sm;
+			const font_t *font = aprs || kind == UI_CARD_SCAN_LISTS ? meta : sm;
 			row_text(font, x, yy + (step - 3 - font->h) / 2, width - 11, item.label, item.value, fg, value,
 				 (item.flags & UI_ITEM_PREVIEW) != 0);
 		}

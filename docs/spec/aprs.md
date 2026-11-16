@@ -1,5 +1,6 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # APRS
 
@@ -279,6 +280,10 @@ in the radio's own APRS-IS client (`CONFIG_NET_APRSIS`, `tcp-services.md` 7), wh
   for 30 s.
 
 ## 10. UI
+
+On the tall dark card layout, the APRS summary is pinned above the scrolling controls. It shows the configured
+route (AFSK, DMR, or Both), the frequency when the route includes AFSK, the current position source, and the timed
+beacon state. The row order and selection handlers are shared with the compact APRS layout.
 
 Tools > APRS (`ui_aprs.c`): the body shows the callsign and frequency, why nothing can be sent (no callsign, no
 frequency, not amateur, no AFSK), the position and its source, the next beacon and the count sent. Rows: Send

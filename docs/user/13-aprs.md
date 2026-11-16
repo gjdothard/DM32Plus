@@ -32,8 +32,10 @@ Change **Answer GPS requests** in **Settings > Location**.
 
 ## The APRS page
 
-Press **OK**, **6** (Tools), **8** (APRS). The top of the page shows your callsign, the APRS
-frequency, your position and its source, and when the next beacon goes out. If the radio can't send, it says why.
+From **GPS, APRS, and Data**, choose **APRS**. On the dark card layout, the summary shows your callsign,
+the configured send route, the APRS frequency for AFSK, and the current position and source. It shows the
+next timed beacon, or says when automatic beacons are off or have no timed schedule. The existing numbered
+shortcuts still work, including **1** for **Send position now**. Other layouts also offer **Tools > APRS**.
 
 | Row | What it does |
 |---|---|

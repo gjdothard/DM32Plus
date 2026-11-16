@@ -637,6 +637,14 @@ msgid "No position"
 msgstr "Sin posición"
 
 #: core/ui/ui_aprs.c
+msgid "No timed beacon"
+msgstr "Sin baliza programada"
+
+#: core/ui/ui_aprs.c
+msgid "Beacons off"
+msgstr "Balizas off"
+
+#: core/ui/ui_aprs.c
 msgid "Next in "
 msgstr "Próx. en "
 
@@ -715,10 +723,6 @@ msgstr "No se puede enviar"
 #: core/ui/ui_aprs.c
 msgid "Beacons on"
 msgstr "Balizas on"
-
-#: core/ui/ui_aprs.c
-msgid "Beacons off"
-msgstr "Balizas off"
 
 #: core/ui/ui_aprs.c
 msgid "DMR position: not in this build"
