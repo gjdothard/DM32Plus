@@ -129,9 +129,12 @@ static void hub_item(uint16_t i, ui_item_t *it)
 	} else if ((e == HUB_SCAN || (e == HUB_TOOLS && !main)) && ui_st.scanning) {
 		sb_str(&b, TR("Scanning"));
 	}
-	if ((e == HUB_SCAN && !(ui_svc_features() & UI_FEAT_SCAN)) ||
-	    (e == HUB_GPS && !gps_data_available()))
+	if (e == HUB_SCAN && !(ui_svc_features() & UI_FEAT_SCAN))
 		it->flags |= UI_ITEM_DIM;
+#if CONFIG_UI_CARD_MENU
+	if (e == HUB_GPS && !gps_data_available())
+		it->flags |= UI_ITEM_DIM;
+#endif
 }
 
 static void hub_select(uint16_t i, bool hold)
