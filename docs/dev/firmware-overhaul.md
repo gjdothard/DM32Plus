@@ -20,6 +20,7 @@ path while consolidating the radio UI and aligning it with the CPS.
 | Interrupted rollover recovery | Implemented | Host tests cut power during sector staging, target erase and program, and the final message commit |
 | On-radio history activation | Implemented | Settings confirmation defaults to Cancel and reports the deferred result |
 | Persistent SMS capture | Implemented | Host tests cover received and outgoing metadata, duplicate suppression, buffer contention, and reading committed records after reboot |
+| Paged archive reader | Implemented | Host tests cover private and talkgroup filters, sparse pages, new arrivals, rollover, and flash read failures |
 | Conversation storage and Messages redesign | Pending | See the flash audit below |
 | CPS and codeplug changes | Pending | Inventory existing records and test compatibility before adding persisted data such as Favorites |
 
@@ -61,9 +62,9 @@ an activation marker written only after an explicit request and only into an era
 The firmware switch defaults off. Rollover uses the shared sector journal to recover after
 power loss and continues to refuse unknown contents. The activation control lives under
 Settings → Advanced → Message history on boards with a usable reserve and the feature enabled.
-The message service now captures accepted SMS and outgoing send results while activation is
-valid. Next, add a journal reader and group records by private peer or destination talkgroup
-for the conversation screen.
+The message service captures accepted SMS and outgoing send results while activation is valid.
+The archive reader returns short pages for all messages, a private peer, or a talkgroup.
+Next, wire the reader into a conversation directory and message view using existing UI memory.
 
 ### Hardware gates
 

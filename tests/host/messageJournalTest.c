@@ -15,6 +15,7 @@
 
 static uint8_t data[FLASH_BYTES], snapshot[FLASH_BYTES], scratch[STORAGE_SECTOR];
 static unsigned budget;
+static uint32_t failed_read = UINT32_MAX;
 void storage_lock(void) {}
 void storage_unlock(void) {}
 void storage_quick_lock(void) {}
@@ -23,6 +24,8 @@ void storage_quick_unlock(void) {}
 static bool read_flash(uint32_t addr, void *out, uint32_t len)
 {
 	CHECK(addr <= FLASH_BYTES && len <= FLASH_BYTES - addr);
+	if (addr == failed_read)
+		return false;
 	memcpy(out, data + addr, len);
 	return true;
 }
@@ -255,6 +258,97 @@ static void test_capture(void)
 	CHECK(!message_journal_read(&j, 3, scratch, &out));
 }
 
+static uint8_t page_count;
+static uint32_t next_before;
+
+static void page_complete(message_journal_result_t result, uint8_t count, uint32_t next)
+{
+	completion = result;
+	page_count = count;
+	next_before = next;
+	completions++;
+}
+
+static void read_page(message_history_page_t *page, message_journal_result_t expected)
+{
+	unsigned before = completions, writes = budget;
+	CHECK(message_history_read_page(page));
+	CHECK(!message_history_read_page(page) && completions == before);
+	storage_job_poll();
+	CHECK(completions == before + 1u && completion == expected && budget == writes);
+}
+
+static void save_history(uint32_t src, uint32_t dst, uint8_t flags, const char *text)
+{
+	budget = FLASH_BYTES;
+	message_history_capture(src, dst, flags, text);
+	message_history_poll();
+}
+
+static void test_archive_pages(void)
+{
+	static message_history_t state;
+	memset(data, 0xFF, sizeof(data));
+	budget = FLASH_BYTES;
+	job_map.message_size = 4u * STORAGE_SECTOR;
+	CHECK(storage_init());
+	message_history_start(&state);
+	message_history_item_t items[2];
+	message_history_page_t page = { .items = items, .complete = page_complete, .capacity = 2 };
+	read_page(&page, MESSAGE_JOB_INACTIVE);
+	CHECK(!page_count && !next_before);
+	message_journal_job_t activation = { .complete = complete };
+	run_job(&activation, true, MESSAGE_JOB_OK);
+	read_page(&page, MESSAGE_JOB_OK);
+	CHECK(!page_count && !next_before);
+
+	save_history(3, 1, 0, "Old private");
+	save_history(1, 9, MESSAGE_RECORD_OUTGOING, "Private out");
+	save_history(9, 1, 0, "Private in");
+	save_history(1, 9, MESSAGE_RECORD_GROUP | MESSAGE_RECORD_OUTGOING, "Group out");
+	for (unsigned n = 5; n <= 23; n++)
+		save_history(4, 9, MESSAGE_RECORD_GROUP, "Group in");
+
+	read_page(&page, MESSAGE_JOB_OK);
+	CHECK(page_count == 2 && items[0].id == 23 && items[1].id == 22 && next_before == 22);
+	page.before = next_before;
+	save_history(4, 9, MESSAGE_RECORD_GROUP, "New message");
+	read_page(&page, MESSAGE_JOB_OK);
+	CHECK(page_count == 2 && items[0].id == 21 && items[1].id == 20);
+
+	page.before = 0;
+	page.peer = (message_history_peer_t){ .id = 9 };
+	read_page(&page, MESSAGE_JOB_OK);
+	CHECK(page_count == 0 && next_before != 0);
+	page.before = next_before;
+	read_page(&page, MESSAGE_JOB_OK);
+	CHECK(page_count == 2 && items[0].id == 3 && items[1].id == 2);
+	CHECK(!strcmp(items[0].record.text, "Private in") && !strcmp(items[1].record.text, "Private out"));
+
+	page.before = 0;
+	page.peer.group = true;
+	read_page(&page, MESSAGE_JOB_OK);
+	CHECK(page_count == 2 && items[0].id == 24 && items[1].id == 23);
+	page.before = 5;
+	read_page(&page, MESSAGE_JOB_OK);
+	CHECK(page_count == 1 && items[0].id == 4 && !next_before);
+
+	page.peer = (message_history_peer_t){0};
+	failed_read = RESERVE_BASE + STORAGE_SECTOR + 16u + 3u * MESSAGE_JOURNAL_SCRATCH;
+	read_page(&page, MESSAGE_JOB_FAILED);
+	CHECK(!page_count && !next_before);
+	failed_read = UINT32_MAX;
+	CHECK(storage_buffer_acquire());
+	read_page(&page, MESSAGE_JOB_BUSY);
+	storage_buffer_release();
+	for (unsigned n = 25; n <= 43; n++)
+		save_history(4, 9, MESSAGE_RECORD_GROUP, "Rollover");
+	read_page(&page, MESSAGE_JOB_OK);
+	CHECK(!page_count && !next_before);	// the cursor predates the live window
+	page.capacity = 0;
+	CHECK(!message_history_read_page(&page));
+}
+
 int main(void)
 {
 	message_journal_t j;
@@ -303,6 +397,7 @@ int main(void)
 	CHECK(memcmp(out.text, longest.text, sizeof(out.text)) == 0);
 	test_deferred_append();
 	test_capture();
+	test_archive_pages();
 	puts("# messageJournalTest PASSED");
 	return 0;
 }

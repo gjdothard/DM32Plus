@@ -16,6 +16,7 @@
 #define SLOT		MESSAGE_JOURNAL_SCRATCH
 #define SLOTS		((SECTOR - HEADER_SIZE) / SLOT)
 #define MAX_GENERATION	(UINT32_MAX / SLOTS - 1u)
+#define PAGE_SCAN_SLOTS	32u
 
 static uint32_t get32(const uint8_t *p)
 {
@@ -207,27 +208,43 @@ bool message_journal_append(message_journal_t *j, const message_journal_record_t
 	return true;
 }
 
-bool message_journal_read(const message_journal_t *j, uint32_t id, uint8_t scratch[SLOT], message_journal_record_t *record)
+typedef enum { SLOT_MISSING, SLOT_VALID, SLOT_READ_ERROR } slot_result_t;
+
+static slot_result_t read_slot(const message_journal_t *j, uint32_t id, uint8_t *scratch)
 {
 	if (!j->flash || id == 0) {
-		return false;
+		return SLOT_MISSING;
 	}
 	uint32_t g = (id - 1u) / SLOTS + 1u;
 	// Leave one sector outside the live window so a rollover can fail without losing a live record.
 	if (g > j->generation || j->generation - g >= j->sectors - 1u) {
-		return false;
+		return SLOT_MISSING;
 	}
 	uint32_t addr = sector_addr(j, g), actual;
 	uint32_t at = addr + HEADER_SIZE + ((id - 1u) % SLOTS) * SLOT;
-	if (!sector_header(j, addr, &actual, false) || actual != g || !j->flash->read(at, scratch, SLOT) ||
-	    !record_valid(scratch, id)) {
-		return false;
-	}
+	if (!sector_header(j, addr, &actual, false))
+		return SLOT_READ_ERROR;
+	if (actual != g)
+		return SLOT_MISSING;
+	if (!j->flash->read(at, scratch, SLOT))
+		return SLOT_READ_ERROR;
+	return record_valid(scratch, id) ? SLOT_VALID : SLOT_MISSING;
+}
+
+static void record_decode(const uint8_t *scratch, message_journal_record_t *record)
+{
 	record->src = get32(scratch + 4);
 	record->dst = get32(scratch + 8);
 	record->time = get32(scratch + 12);
 	record->flags = scratch[16];
 	memcpy(record->text, scratch + TEXT_OFFSET, MESSAGE_JOURNAL_TEXT);
+}
+
+bool message_journal_read(const message_journal_t *j, uint32_t id, uint8_t scratch[SLOT], message_journal_record_t *record)
+{
+	if (read_slot(j, id, scratch) != SLOT_VALID)
+		return false;
+	record_decode(scratch, record);
 	return true;
 }
 
@@ -365,6 +382,71 @@ bool message_journal_activate(const message_journal_job_t *job)
 bool message_journal_submit(message_journal_job_t *job)
 {
 	return job && job->complete && job->record && storage_job_post(append_job, job);
+}
+
+static bool peer_matches(message_history_peer_t peer, const uint8_t *scratch)
+{
+	uint8_t flags = scratch[16];
+	bool group = (flags & MESSAGE_RECORD_GROUP) != 0;
+	uint32_t target = get32(scratch + (group || (flags & MESSAGE_RECORD_OUTGOING) ? 8u : 4u));
+	return peer.id == 0 || (peer.group == group && peer.id == target);
+}
+
+static bool page_read(const message_journal_t *j, const message_history_page_t *page,
+		      uint8_t *scratch, uint8_t *count, uint32_t *next)
+{
+	if (j->generation == 0)
+		return true;
+	uint32_t last = j->generation * SLOTS;
+	uint32_t first = j->generation >= j->sectors ? (j->generation - j->sectors + 1u) * SLOTS + 1u : 1u;
+	uint32_t id = page->before && page->before <= last ? page->before - 1u : last;
+	for (unsigned scanned = 0; id >= first && scanned < PAGE_SCAN_SLOTS && *count < page->capacity; scanned++, id--) {
+		slot_result_t result = read_slot(j, id, scratch);
+		if (result == SLOT_READ_ERROR)
+			return false;
+		if (result == SLOT_VALID && peer_matches(page->peer, scratch)) {
+			message_history_item_t *item = &page->items[(*count)++];
+			item->id = id;
+			record_decode(scratch, &item->record);
+		}
+	}
+	*next = id >= first ? id + 1u : 0;
+	return true;
+}
+
+static void read_page_job(void *ctx)
+{
+	const message_history_page_t *page = ctx;
+	uint8_t *scratch = storage_buffer_acquire();
+	if (!scratch) {
+		page->complete(MESSAGE_JOB_BUSY, 0, 0);
+		return;
+	}
+	uint8_t count = 0;
+	uint32_t next = 0;
+	message_journal_result_t result = MESSAGE_JOB_UNAVAILABLE;
+	storage_lock();
+	if (message_journal_available()) {
+		const hal_flash_map_t *m = storage_map();
+		message_journal_t j;
+		result = MESSAGE_JOB_FAILED;
+		if (board.flash->read(m->message_addr, scratch, sizeof(activation))) {
+			if (memcmp(scratch, activation, sizeof(activation)) != 0)
+				result = MESSAGE_JOB_INACTIVE;
+			else if (message_journal_mount(&j, board.flash, m->message_addr + SECTOR, m->message_size - SECTOR) &&
+				 page_read(&j, page, scratch, &count, &next))
+				result = MESSAGE_JOB_OK;
+		}
+	}
+	storage_unlock();
+	storage_buffer_release();
+	page->complete(result, result == MESSAGE_JOB_OK ? count : 0, result == MESSAGE_JOB_OK ? next : 0);
+}
+
+bool message_history_read_page(message_history_page_t *page)
+{
+	return page && page->items && page->complete && page->capacity && page->capacity <= MESSAGE_HISTORY_PAGE_MAX &&
+	       storage_job_post(read_page_job, page);
 }
 
 void message_history_start(message_history_t *state)

@@ -34,6 +34,18 @@ and delivery acknowledged (bit 3). Outgoing without either result flag was sent 
 confirmation. Text is stored as plaintext. The timestamp is zero until a trusted wall
 clock is available. Record IDs preserve order across reboots.
 
+The housekeeping task also provides read-only pages from newest to oldest. A request
+returns up to four records into a caller-supplied buffer and inspects at most 32 slots.
+A page can be empty and still have a continuation cursor. The cursor is an exclusive
+record ID, so new arrivals do not move the next page. When the live window rolls past
+a cursor, the read ends. Slots with invalid records are skipped. A flash read error
+fails the page without advancing the cursor.
+
+A private conversation matches the sender of a received message or the destination
+of an outgoing message. A group conversation matches the destination talkgroup in
+both directions. Private and group conversations can use the same number and still
+remain separate. Reads share the storage job and sector buffer with other flash work.
+
 Each sector contains a 16-byte header followed by 21 slots of 192 bytes. All multibyte fields
 are little endian. The header contains the four bytes `RMG1`, a 32-bit generation, a CRC-32 of
 those eight bytes, three unused bytes, and a commit byte. Generations start at 1. Generation

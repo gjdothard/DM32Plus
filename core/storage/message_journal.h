@@ -9,6 +9,7 @@
 #define MESSAGE_JOURNAL_TEXT 144u
 #define MESSAGE_JOURNAL_SCRATCH 192u
 #define MESSAGE_HISTORY_QUEUE 2u
+#define MESSAGE_HISTORY_PAGE_MAX 4u
 #define MESSAGE_RECORD_GROUP 0x01u
 #define MESSAGE_RECORD_OUTGOING 0x02u
 #define MESSAGE_RECORD_FAILED 0x04u
@@ -57,6 +58,28 @@ bool message_journal_activate(const message_journal_job_t *job);
 // Submit from the single storage-job producer. Keep the request and record unchanged and alive
 // until the callback runs on the housekeeping task.
 bool message_journal_submit(message_journal_job_t *job);
+
+typedef struct {
+	uint32_t id;
+	bool group;
+} message_history_peer_t;	// 0 matches every conversation
+
+typedef struct {
+	uint32_t id;		// stable journal ID
+	message_journal_record_t record;
+} message_history_item_t;
+
+typedef struct {
+	message_history_item_t *items;
+	void (*complete)(message_journal_result_t result, uint8_t count, uint32_t next_before);
+	message_history_peer_t peer;
+	uint32_t before;	// exclusive record ID, 0 starts at the newest record
+	uint8_t capacity;
+} message_history_page_t;
+
+// Submit from the UI's storage-job producer. Keep the request and output buffer alive until
+// completion. Continue with next_before, even on an empty page. Zero next_before means the end.
+bool message_history_read_page(message_history_page_t *page);
 
 typedef struct {
 	message_journal_record_t pending[MESSAGE_HISTORY_QUEUE];
