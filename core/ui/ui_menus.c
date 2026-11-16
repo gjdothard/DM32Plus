@@ -592,6 +592,23 @@ static void compose_item(uint16_t i, ui_item_t *it)
 	}
 }
 
+#if CONFIG_MESSAGE_JOURNAL
+static uint32_t inline_reply_id;
+#endif
+
+bool ui_thread_send_result(uint32_t id)
+{
+#if CONFIG_MESSAGE_JOURNAL
+	if (inline_reply_id && inline_reply_id == id) {
+		inline_reply_id = 0;
+		return true;
+	}
+#else
+	(void)id;
+#endif
+	return false;
+}
+
 static void send_text(const ui_target_t *target, const char *text, bool reply)
 {
 	static char msg[40];
@@ -605,6 +622,9 @@ static void send_text(const ui_target_t *target, const char *text, bool reply)
 	sb_init(&b, msg, sizeof msg);
 	sb_str(&b, TR("Sending to "));
 	sb_str(&b, name);
+#if CONFIG_MESSAGE_JOURNAL
+	inline_reply_id = reply && ui_svc_history_active() ? target->id : 0;
+#endif
 	if (reply)
 		ui_pop();
 	else
@@ -1405,6 +1425,7 @@ static bool thread_key(const input_event_t *ev)
 	message_history_view_t v;
 	ui_svc_history_view(&v, NULL, 0);
 	if (ev->action == ACT_CONTEXT) {
+		ui_frame()->top = 0;
 		if (v.key)
 			ui_svc_history_thread(v.key, 0, false);
 		return true;
@@ -1415,8 +1436,12 @@ static bool thread_key(const input_event_t *ev)
 		return false;
 	uint16_t row = ui_frame()->focus;
 	if ((up && row == 0) || (down && row == v.count - 1u)) {
-		if (v.flags & (up ? MESSAGE_THREAD_OLDER : MESSAGE_THREAD_NEWER))
-			ui_svc_history_thread(v.key, v.thread[thread_index(&v, row)].id, down);
+		if (v.flags & (up ? MESSAGE_THREAD_OLDER : MESSAGE_THREAD_NEWER)) {
+			uint32_t current = v.thread[thread_index(&v, row)].id;
+			// The next window includes the focused message. Step to its immediate neighbor.
+			ui_frame()->top = 1;
+			ui_svc_history_thread(v.key, down ? current - 1u : current + 1u, down);
+		}
 		return true;
 	}
 	return false;
@@ -1443,8 +1468,13 @@ void ui_history_tick(void)
 	if (f->arg != v.revision) {
 		f->arg = v.revision;
 
-		if (f->scr == SCR_THREAD && v.timeline && v.status == HISTORY_READY && v.count)
-			f->focus = v.forward ? 0 : v.count - 1u;
+		if (f->scr == SCR_THREAD && v.timeline && v.status != HISTORY_LOADING) {
+			if (v.status == HISTORY_READY && v.count) {
+				uint16_t step = f->top && (v.before || v.forward) && v.count > 1u ? 1u : 0u;
+				f->focus = v.forward ? step : v.count - 1u - step;
+			}
+			f->top = 0;
+		}
 		ui_dirty();
 	}
 }

@@ -1813,12 +1813,19 @@ void ui_svc_history_thread(uint32_t key, uint32_t anchor, bool forward)
 {
 	uint16_t revision = sim_history.revision + 1u;
 	sim_history = (message_history_view_t){ .key = key, .revision = revision, .status = HISTORY_READY,
-		.timeline = true, .forward = forward, .count = 1 };
+		.timeline = true, .forward = forward, .before = anchor, .count = 1 };
 	if (key & MESSAGE_HISTORY_GROUP_KEY) {
 		sim_history.thread[0] = (message_thread_entry_t){ .id = 10, .flags = MESSAGE_RECORD_OUTGOING };
 	} else if (anchor && !forward) {
-		sim_history.thread[0] = (message_thread_entry_t){ .id = 3 };
+		sim_history.count = 2;
+		sim_history.thread[0] = (message_thread_entry_t){ .id = 5 };
+		sim_history.thread[1] = (message_thread_entry_t){ .id = 3 };
 		sim_history.flags = MESSAGE_THREAD_NEWER;
+	} else if (anchor && forward) {
+		sim_history.count = 2;
+		sim_history.thread[0] = (message_thread_entry_t){ .id = 5 };
+		sim_history.thread[1] = (message_thread_entry_t){ .id = 8, .time = 756,
+			.flags = MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_DELIVERED };
 	} else {
 		sim_history.count = 2;
 		sim_history.thread[forward ? 1 : 0] = (message_thread_entry_t){ .id = 8, .time = 756,
@@ -2683,6 +2690,20 @@ static bool run_token(char *t, char *err, size_t len)
 		return true;
 	}
 #endif
+#endif
+#if CONFIG_MESSAGE_JOURNAL
+	if (strcmp(t, "smsresult") == 0 && arg != NULL && sim_history.timeline && sim_rec.messages_sent) {
+		bool ok = strcmp(arg, "ok") == 0;
+		if (!ok && strcmp(arg, "fail") != 0)
+			return false;
+		ui_svc_history_thread(sim_history.key, 0, false);
+		sim_history.thread[0].flags = MESSAGE_RECORD_OUTGOING |
+			(ok ? MESSAGE_RECORD_DELIVERED : MESSAGE_RECORD_FAILED);
+		ui_event_t result = { .kind = UI_EV_MESSAGE_SENT, .id = sim_rec.tx_id, .ok = ok };
+		ui_notify(&result);
+		advance(200);
+		return true;
+	}
 #endif
 	if (strcmp(t, "msg") == 0 && arg != NULL) {
 		char text[UI_MSG_TEXT_MAX + 1];

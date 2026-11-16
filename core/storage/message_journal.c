@@ -576,8 +576,10 @@ static void thread_scan(const message_journal_t *j, message_history_view_t *v, u
 	if (v->forward && id < first)
 		id = first;
 	uint8_t *messages = scratch + MESSAGE_JOURNAL_SCRATCH;
-	memset(messages, 0, MESSAGE_THREAD_TEXT);
 	unsigned used = 0;
+	for (unsigned i = 0; i < v->count; i++)
+		used += v->thread[i].bytes;
+	bool full = false;
 	for (unsigned scanned = 0; id >= first && id <= last && scanned < PAGE_SCAN_SLOTS;
 	     scanned++, id = v->forward ? id + 1u : id - 1u) {
 		slot_result_t result = read_slot(j, id, scratch);
@@ -589,20 +591,29 @@ static void thread_scan(const message_journal_t *j, message_history_view_t *v, u
 			continue;
 		uint32_t time = get32(scratch + 12);
 		unsigned bytes = (unsigned)strlen((const char *)scratch + TEXT_OFFSET) + 1u;
-		if (bytes > MESSAGE_THREAD_TEXT - used)
+		if (bytes > MESSAGE_THREAD_TEXT - used) {
+			full = true;
 			break;
+		}
 		unsigned i = v->count++;
 		v->thread[i] = (message_thread_entry_t){ .id = id, .time = time <= 1440u ? (uint16_t)time : 0,
 			.flags = scratch[16], .bytes = (uint8_t)bytes };
 		memcpy(messages + used, scratch + TEXT_OFFSET, bytes);
 		used += bytes;
-		if (v->count == MESSAGE_THREAD_ROWS)
+		if (v->count == MESSAGE_THREAD_ROWS) {
+			full = true;
 			break;
+		}
+	}
+	if (!full && id >= first && id <= last && v->count < ((v->before || v->forward) ? 2u : 1u)) {
+		*cursor = v->forward ? id - 1u : id + 1u;
+		return;
 	}
 	if (v->count) {
 		uint32_t a = v->thread[0].id, b = v->thread[v->count - 1u].id;
-		bool older = !(v->flags & THREAD_AT_START) && (a < b ? a : b) > first;
-		bool newer = v->before && !(v->flags & THREAD_AT_END) && (a > b ? a : b) < last;
+		bool older = (id >= first || v->forward) && !(v->flags & THREAD_AT_START) && (a < b ? a : b) > first;
+		bool newer = (v->before || v->forward) && (id <= last || !v->forward) && !(v->flags & THREAD_AT_END) &&
+			(a > b ? a : b) < last;
 		v->flags = (older ? MESSAGE_THREAD_OLDER : 0) | (newer ? MESSAGE_THREAD_NEWER : 0);
 		v->status = HISTORY_READY;
 	} else if (id < first || id > last) {
@@ -615,8 +626,6 @@ static void thread_scan(const message_journal_t *j, message_history_view_t *v, u
 		} else {
 			v->status = HISTORY_EMPTY;
 		}
-	} else {
-		*cursor = v->forward ? id - 1u : id + 1u;
 	}
 }
 
@@ -636,13 +645,14 @@ static void browser_poll(void)
 	uint8_t *scratch = storage_buffer_acquire();
 	if (!scratch)
 		return;
-	if (!view.key) {
+	if (!view.key || view.timeline) {
 		uint8_t *preview = scratch + MESSAGE_JOURNAL_SCRATCH;
+		size_t size = view.timeline ? MESSAGE_THREAD_TEXT : MESSAGE_JOURNAL_TEXT;
 		storage_quick_lock();
 		if (view.count && view.revision == history->view.revision)
-			memcpy(preview, history->view_text, MESSAGE_JOURNAL_TEXT);
+			memcpy(preview, history->view_text, size);
 		else
-			memset(preview, 0, MESSAGE_JOURNAL_TEXT);
+			memset(preview, 0, size);
 		storage_quick_unlock();
 	}
 	storage_lock();
@@ -661,7 +671,7 @@ static void browser_poll(void)
 	storage_unlock();
 	storage_quick_lock();
 	if (view.revision == history->view.revision) {
-		if (!view.key || view.status == HISTORY_READY)
+		if (!view.key || view.timeline || view.status == HISTORY_READY)
 			memcpy(history->view_text, scratch + (!view.key || view.timeline ? MESSAGE_JOURNAL_SCRATCH : TEXT_OFFSET),
 			       view.timeline ? MESSAGE_THREAD_TEXT : MESSAGE_JOURNAL_TEXT);
 		view.revision++;

@@ -20,6 +20,7 @@ const char *ui_compose_peer(void);
 #endif
 
 bool ui_thread_receive(uint16_t token);
+bool ui_thread_send_result(uint32_t id);
 bool ui_open_message_thread(uint16_t token);
 
 typedef enum {

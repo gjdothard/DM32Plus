@@ -625,6 +625,8 @@ static void handle_event(const ui_event_t *ev)
 		vibrate(UI_VIBE_MESSAGE);
 		break;
 	case UI_EV_MESSAGE_SENT:
+		if (ui_thread_send_result(ev->id))
+			break;
 		if (ev->ok) {
 			sb_str(&b, ev->index == 1 ? TR("Sent to ") : TR("Delivered to "));
 			station(&b, ev);
@@ -2518,6 +2520,17 @@ static void draw_screen(void);
 
 void ui_app_draw(void)
 {
+#if CONFIG_MESSAGE_JOURNAL && CONFIG_UI_CARD_MENU
+	if (ui_frame()->scr == SCR_THREAD && ui_frame()->top) {
+		message_history_view_t history;
+		ui_svc_history_view(&history, NULL, 0);
+		// Leave the previous frame on the panel until the overlapping window is ready.
+		if (history.status == HISTORY_LOADING) {
+			dirty = false;
+			return;
+		}
+	}
+#endif
 	uint32_t before = ui_strip_draws;
 	dirty = false;
 	draws++;

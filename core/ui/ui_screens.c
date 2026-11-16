@@ -3631,21 +3631,22 @@ void ui_draw_card_thread(const ui_state_t *s, const ui_list_t *l, const char *(*
 		uint16_t focus = l->focus < l->count ? l->focus : l->count - 1u;
 		uint16_t first = focus, end = focus + 1u;
 		int height = bubble_height(text(focus), text_width);
-		while (first) {
-			int extra = bubble_height(text(first - 1u), text_width);
-			if (height + extra > bottom - top)
-				break;
-			height += extra;
+		int room = bottom - top;
+		while (first && height < room) {
+			height += bubble_height(text(first - 1u), text_width);
 			first--;
 		}
-		while (end < l->count) {
-			int extra = bubble_height(text(end), text_width);
-			if (height + extra > bottom - top)
-				break;
-			height += extra;
-			end++;
-		}
 		int y = bottom - height;
+		// Keep the selected bubble at the bottom. Near the start, use the
+		// following messages to fill any space left by the short history.
+		if (height < room && end < l->count) {
+			while (end < l->count && height < room) {
+				height += bubble_height(text(end), text_width);
+				end++;
+			}
+			y = height > room ? top : bottom - height;
+		}
+		gfx_clip(0, top, width, room);
 		for (uint16_t i = first; i < end; i++) {
 			ui_item_t item = { 0 };
 			l->item(i, &item);
@@ -3662,8 +3663,7 @@ void ui_draw_card_thread(const ui_state_t *s, const ui_list_t *l, const char *(*
 			thread_lines(body, left + 7, y + 18, text_width, true, fg);
 			y += h;
 		}
-		if (l->top)
-			*l->top = first;
+		gfx_clip_off();
 	} else if (!l->body && l->empty) {
 		wrap_text(font, l->empty, top, bottom, true, ui_col.dim);
 	}

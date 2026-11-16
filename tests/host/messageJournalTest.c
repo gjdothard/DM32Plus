@@ -466,10 +466,12 @@ static void test_archive_pages(void)
 	CHECK(!strcmp(body, "Private out"));
 	message_history_thread_text(view.revision - 1u, 0, body, sizeof body);
 	CHECK(!body[0]);
-	message_history_thread(9, view.thread[1].id, true);
+	message_history_thread(9, view.thread[1].id - 1u, true);
+	message_history_poll();
 	message_history_poll();
 	message_history_view(&view, body, sizeof body);
-	CHECK(view.forward && view.status == HISTORY_READY && view.count == 1 && view.thread[0].id == 3);
+	CHECK(view.forward && view.status == HISTORY_READY && view.count == 2);
+	CHECK(view.thread[0].id == 2 && view.thread[1].id == 3);
 	message_history_thread(9, 3, true);
 	message_history_poll();
 	message_history_poll();
