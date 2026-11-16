@@ -87,7 +87,8 @@ fits the lower boundary.
 Local hardware test build `v26.11b7` at `0f6f4876` installed on November 15, 2026 with the
 journal enabled. The application-only updater verified all 150 written sectors by CRC.
 After reboot, the radio reported the expected build and existing codec, the database
-reported 315,996 records, and the journal diagnostic reported zero drops. Owner activation,
-SMS persistence, and rollback remain untested.
+reported 315,996 records, and the journal diagnostic reported zero drops. The owner reported
+that message history works on the radio. Individual test cases were not recorded. Interrupted
+writes and rollback remain open hardware checks.
 
 For test commands and screenshots, see [Testing](testing.md) and the [UI specification](../spec/ui.md).
