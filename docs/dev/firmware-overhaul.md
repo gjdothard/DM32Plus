@@ -88,7 +88,12 @@ Local hardware test build `v26.11b7` at `0f6f4876` installed on November 15, 202
 journal enabled. The application-only updater verified all 150 written sectors by CRC.
 After reboot, the radio reported the expected build and existing codec, the database
 reported 315,996 records, and the journal diagnostic reported zero drops. The owner reported
-that message history works on the radio. Individual test cases were not recorded. Interrupted
-writes and rollback remain open hardware checks.
+that message history works on the radio. A normal reboot retained all three sampled archive
+records byte for byte, and their CRCs passed before and after reboot.
+
+The owner reported a private-call freeze with the TX indication stuck while the cable was
+connected. The diagnostic link answered and reported no crash record or watchdog reset. The
+owner repeated the call successfully with the cable unplugged. The cause is undetermined.
+The radio stays on the test build. Interrupted-write and rollback checks are pending.
 
 For test commands and screenshots, see [Testing](testing.md) and the [UI specification](../spec/ui.md).
