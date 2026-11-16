@@ -815,7 +815,7 @@ static bool live_row(unsigned row, uint32_t peer, ui_msg_t *m)
 	unsigned n = live_rows(rows, peer, m);
 	if (row >= n)
 		return false;
-	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st))
+	if (peer && CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st))
 		row = n - 1u - row;
 	return ui_svc_msg_get(rows[row], m);
 }
@@ -840,12 +840,9 @@ static void newest_focus(uint16_t count)
 static void msgs_enter(void)
 {
 #if CONFIG_MESSAGE_JOURNAL
-	if (ui_svc_history_active()) {
+	if (ui_svc_history_active())
 		ui_svc_history_browse(0, 0);
-		return;
-	}
 #endif
-	newest_focus(msgs_count());
 }
 
 static void msg_preview(ui_item_t *it, const ui_msg_t *m)
@@ -1115,7 +1112,7 @@ static uint32_t history_peer(uint16_t i)
 	ui_svc_history_view(&v, NULL, 0);
 	if (v.key || i >= v.count)
 		return 0;
-	return v.peers[CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) ? v.count - 1u - i : i];
+	return v.peers[i];
 }
 
 static void history_item(uint16_t i, ui_item_t *it)
@@ -1124,8 +1121,6 @@ static void history_item(uint16_t i, ui_item_t *it)
 	ui_svc_history_view(&view, msg_text, sizeof msg_text);
 	if (view.key || i >= view.count)
 		return;
-	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st))
-		i = view.count - 1u - i;
 	history_label(view.peers[i], it->label, sizeof it->label);
 	if (view.status == HISTORY_READY && CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st)) {
 		const uint8_t *preview = (const uint8_t *)msg_text + i * MESSAGE_DIRECTORY_PREVIEW;
@@ -1358,8 +1353,7 @@ void ui_history_tick(void)
 		ui_svc_history_thread(v.key, 0, false);
 	if (f->arg != v.revision) {
 		f->arg = v.revision;
-		if (f->scr == SCR_MESSAGES && ui_svc_history_active() && !v.key && v.status == HISTORY_READY)
-			newest_focus(v.count);
+
 		if (f->scr == SCR_THREAD && v.timeline && v.status == HISTORY_READY && v.count)
 			f->focus = v.forward ? 0 : v.count - 1u;
 		ui_dirty();

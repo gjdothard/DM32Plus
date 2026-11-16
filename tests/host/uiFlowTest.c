@@ -1436,7 +1436,7 @@ int main(void)
 		{ "History activation reports success", "branded-home", "ok 9 0 up ok down ok wait:100",
 			"screen=group toast=Message_history_enabled", 7, false },
 		{ "Messages opens the conversation directory", "branded-home history", "ok 2",
-			"screen=messages shows=K1ABC_Joe shows=TG_3100 shows=Private_text shows=Group_reply hides=You", 2, false },
+			"screen=messages focus=K1ABC_Joe shows=TG_3100 shows=Private_text shows=Group_reply hides=You", 2, false },
 		{ "A private conversation opens focused on its newest bubble", "branded-home history", "ok 2 ok",
 			"screen=thread focus=You shows=Older_private_text shows=Private_text", 3, false },
 		{ "Read the full newest message", "branded-home history", "ok 2 ok ok",
@@ -1447,7 +1447,7 @@ int main(void)
 			"screen=thread shows=Earlier_page", 5, false },
 		{ "Down crosses into the newer page", "branded-home history", "ok 2 ok up up down",
 			"screen=thread shows=Private_text hides=Earlier_page", 6, false },
-		{ "Talkgroup conversation opens its saved group message", "branded-home history", "ok 2 up ok ok",
+		{ "Talkgroup conversation opens its saved group message", "branded-home history", "ok 2 down ok ok",
 			"screen=conversation shows=Group_reply shows=Sent", 5, false },
 #endif
 	};

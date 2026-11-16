@@ -3535,7 +3535,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		y += sm->h + 4;
 	}
 	int rows = (footer - y - 4) / step;
-	if ((thread || kind == UI_CARD_MESSAGES) && l->count && l->count < rows)
+	if (thread && l->count && l->count < rows)
 		y = footer - 4 - l->count * step;
 	uint16_t top = list_window(l, rows);
 	for (int row = 0; row < rows && top + row < l->count; row++) {

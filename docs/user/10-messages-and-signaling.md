@@ -21,7 +21,7 @@ Messages.
 
 ## Reading messages
 
-1. Press **OK**, **2** (Messages). Each row names the other radio or talkgroup. The dark card layout selects the newest conversation at the bottom.
+1. Press **OK**, **2** (Messages). Each row names the other radio or talkgroup. The newest conversation is first at the top.
 2. Press **OK** to open a conversation. On the dark card layout, press **OK** on a bubble to read the full text.
 3. A live received message opened from the banner or the volatile inbox is marked read and has these actions below the text:
 
