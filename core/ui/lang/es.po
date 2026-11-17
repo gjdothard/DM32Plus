@@ -312,7 +312,7 @@ msgstr "Código color: no disponible"
 msgid "FM only: this is a DMR channel"
 msgstr "Solo FM: es un canal DMR"
 
-#: core/ui/ui_app.c core/ui/ui_menus.c
+#: core/ui/ui_app.c core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Not in this build"
 msgstr "No incluido en esta versión"
 
@@ -1020,7 +1020,7 @@ msgstr "Sin acciones para esto"
 msgid "PTT talk  OK open  # more"
 msgstr "PTT hablar  OK abrir  # más"
 
-#: core/ui/ui_gps.c core/ui/ui_menus.c
+#: core/ui/ui_gps.c
 msgid "Status"
 msgstr "Estado"
 
@@ -1177,40 +1177,36 @@ msgid "1-7 open  Back"
 msgstr "1-7 abrir  Atrás"
 
 #: core/ui/ui_menus.c
-msgid "LRRP Subscriptions"
-msgstr "Suscripciones LRRP"
-
-#: core/ui/ui_menus.c
-msgid "Registering"
-msgstr "Registrando"
-
-#: core/ui/ui_menus.c
-msgid "Registered"
-msgstr "Registrado"
-
-#: core/ui/ui_menus.c
-msgid "Refused"
-msgstr "Rechazado"
-
-#: core/ui/ui_menus.c core/ui/ui_svc_data.c
-msgid "No answer"
-msgstr "Sin respuesta"
+msgid "ARS & LRRP"
+msgstr "ARS y LRRP"
 
 #: core/ui/ui_menus.c core/ui/ui_svc_data.c
 msgid "No GPS fix"
 msgstr "Sin señal GPS"
 
 #: core/ui/ui_menus.c
-msgid "Active reports"
-msgstr "Informes activos"
+msgid "Register Now"
+msgstr "Registrar ahora"
 
 #: core/ui/ui_menus.c
 msgid "Answer GPS requests"
 msgstr "Responder pet. GPS"
 
+#: core/ui/ui_menus.c
+msgid "Server ID"
+msgstr "ID del servidor"
+
 #: core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Quick Controls"
 msgstr "Controles rápidos"
+
+#: core/ui/ui_menus.c
+msgid "Registration queued"
+msgstr "Registro en cola"
+
+#: core/ui/ui_menus.c
+msgid "Cannot register now"
+msgstr "No se puede registrar"
 
 #: core/ui/ui_menus.c
 msgid "Talk to "
@@ -3077,10 +3073,6 @@ msgid "0-9 open  Back"
 msgstr "0-9 abrir  Atrás"
 
 #: core/ui/ui_menus.c
-msgid "Server ID"
-msgstr "ID del servidor"
-
-#: core/ui/ui_menus.c
 msgid "0 (Off)"
 msgstr "0 (Desactivado)"
 
@@ -3849,6 +3841,74 @@ msgid "Offset"
 msgstr "Desvío"
 
 #: core/ui/ui_screens.c
+msgid "Registering"
+msgstr "Registrando"
+
+#: core/ui/ui_screens.c
+msgid "Registered"
+msgstr "Registrado"
+
+#: core/ui/ui_screens.c
+msgid "Refused"
+msgstr "Rechazado"
+
+#: core/ui/ui_screens.c core/ui/ui_svc_data.c
+msgid "No answer"
+msgstr "Sin respuesta"
+
+#: core/ui/ui_screens.c
+msgid "Active subscriptions"
+msgstr "Suscripciones activas"
+
+#: core/ui/ui_screens.c
+msgid "No active subscriptions"
+msgstr "Sin suscripciones activas"
+
+#: core/ui/ui_screens.c
+msgid "Waiting for GPS"
+msgstr "Esperando al GPS"
+
+#: core/ui/ui_screens.c
+msgid "Check due"
+msgstr "Comprobación pendiente"
+
+#: core/ui/ui_screens.c
+msgid "Next check "
+msgstr "Próxima revisión "
+
+#: core/ui/ui_screens.c
+msgid "Next refresh"
+msgstr "Próxima renovación"
+
+#: core/ui/ui_screens.c
+msgid "Next retry"
+msgstr "Próximo intento"
+
+#: core/ui/ui_screens.c
+msgid "Due"
+msgstr "Pendiente"
+
+#: core/ui/ui_screens.c
+msgid "Registered for"
+msgstr "Registrado desde"
+
+#: core/ui/ui_screens.c
+msgid "Attempts"
+msgstr "Intentos"
+
+#: core/ui/ui_screens.c
+msgid " min"
+msgstr " min"
+
+#: core/ui/ui_screens.c
+msgid "Refresh interval"
+msgstr "Intervalo de renovación"
+
+#: core/ui/ui_screens.c
+msgid "OK Select"
+msgstr "OK elegir"
+
+#: core/ui/ui_screens.c
 msgid "Contacts & Talkgroups"
 msgstr "Contactos y grupos"
 
@@ -3899,10 +3959,6 @@ msgstr "OK ir  Atrás"
 #: core/ui/ui_screens.c
 msgid "OK/# open  Hold OK go  Back"
 msgstr "OK/# abrir  Mantén OK ir  Atrás"
-
-#: core/ui/ui_screens.c
-msgid "OK Select"
-msgstr "OK elegir"
 
 #: core/ui/ui_screens.c
 msgid "* more  Back"

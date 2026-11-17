@@ -6,6 +6,9 @@
 // owns one of these defines it without the weak attribute and the linker takes that one.
 #include <stddef.h>
 #include "ui_svc.h"
+#if CONFIG_UI_CARD_MENU
+#include "dmr/dmrDataService.h"
+#endif
 
 #define WEAK __attribute__((weak))
 
@@ -77,7 +80,8 @@ WEAK bool ui_svc_call_alert(uint32_t id) { (void)id; return false; }
 
 #if CONFIG_UI_CARD_MENU
 WEAK uint8_t ui_svc_ars_state(void) { return 0; }
-WEAK uint8_t ui_svc_lrrp_count(void) { return 0; }
+WEAK void ui_svc_data_dashboard(dmrDataDashboard_t *out) { *out = (dmrDataDashboard_t){0}; }
+WEAK bool ui_svc_ars_register_now(void) { return false; }
 #endif
 WEAK uint16_t ui_svc_utc_minute(void) { return 0; }
 WEAK bool ui_svc_position(ui_position_t *out) { (void)out; return false; }

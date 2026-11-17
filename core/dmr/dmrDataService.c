@@ -94,9 +94,9 @@ static void unlock(void)
 // --- The burst list being sent ---
 
 // What the list on air is for, so that its end reaches the right owner
-enum { TXK_OTHER, TXK_SMS, TXK_SIGNAL, TXK_ARS, TXK_REPLY, TXK_EMERGENCY, TXK_IP, TXK_UDP, TXK_POSITION, TXK_COUNT };
+enum { TXK_OTHER, TXK_SMS, TXK_SIGNAL, TXK_ARS, TXK_REPLY, TXK_EMERGENCY, TXK_IP, TXK_UDP, TXK_POSITION, TXK_LRRP, TXK_COUNT };
 static const char *const txKindNames[TXK_COUNT] = {
-	"other", "sms", "signal", "ars", "reply", "emergency", "ip", "udp", "position"
+	"other", "sms", "signal", "ars", "reply", "emergency", "ip", "udp", "position", "lrrp"
 };
 
 DMR_DATA_BUFFER static dmrBurst_t txBursts[DMR_DATA_MAX_BURSTS];
@@ -204,6 +204,7 @@ static struct
 	uint8_t sigKind;
 	uint32_t sigDst;
 	bool settingsPending;
+	bool lrrpClear;
 	dmrDataSettings_t settings;
 } mailbox;
 
@@ -220,6 +221,7 @@ static struct
 	uint32_t due;							// the next attempt
 	uint8_t attempts;
 	bool registered;						// the server acknowledged
+	bool manual;							// one manual attempt requested by the UI
 	bool refused;							// the server's last answer refused the registration
 	uint32_t registeredAt;
 	uint32_t refreshMs;						// re-register after this, 0: never
@@ -1386,6 +1388,25 @@ static uint32_t arsContext(uint32_t server)
 	return (h != 0) ? h : 1;
 }
 
+// A manual retry shares the normal send queue, and can't duplicate a request still awaiting its answer.
+static bool arsManualAvailable(void)
+{
+	return CONFIG_DMR_ARS && !passthrough && ars.powerOff == ARS_POWER_OFF_NONE &&
+		settings.arsServer != 0 && canTransmit() && !ars.manual &&
+		!(txKind == TXK_ARS && dmrDataServiceIsBusy()) &&
+		(ars.registered || !ars.attempts || now - stats.arsLastMs >= START_TIMEOUT_MS);
+}
+
+bool dmrDataServiceArsRegisterNow(void)
+{
+	lock();
+	bool ok = arsManualAvailable() && !mailbox.settingsPending;
+	if (ok)
+		ars.manual = true;
+	unlock();
+	return ok;
+}
+
 static bool arsSend(uint32_t server, bool registration)
 {
 	uint8_t pdu[DMR_ARS_MAX_PDU];
@@ -1478,6 +1499,22 @@ static void arsTick(void)
 			}
 		}
 	}
+
+	lock();
+	if (ars.manual && (context == 0 || (context == ars.context && context == ars.seen &&
+			now - ars.seenSince >= ars.settleMs)))
+	{
+		ars.manual = false;
+		if (context != 0)
+		{
+			if (ars.registered || ars.attempts > ARS_RETRIES)
+				ars.attempts = 0;
+			ars.registered = false;
+			ars.refused = false;
+			ars.due = now;
+		}
+	}
+	unlock();
 
 	uint8_t state = dmrDataServiceArsState();
 
@@ -1631,7 +1668,7 @@ static void positionReceived(uint32_t src, const uint8_t *doc, int len)
 // every n seconds or every n meters (checked every interval, 30 s when it gives none), and stops them. Without a
 // position source (settings.hasGps false: a radio without GPS) every answer says "no fix" and no trigger is started
 #define LRRP_QUEUE_SIZE				3		// one slot kept free
-#define LRRP_TRIGGERS_MAX			2
+#define LRRP_TRIGGERS_MAX			DMR_LRRP_ACTIVE_MAX
 #define LRRP_MIN_INTERVAL_S			5
 #define LRRP_DISTANCE_CHECK_S		30
 #define LRRP_FIRST_REPORT_MS		5000	// a new trigger's first report, after its start response
@@ -1698,7 +1735,7 @@ static bool lrrpSend(uint32_t dst, const uint8_t *doc, int length, int preambles
 	}
 
 	if (!queueTx(dmrDataBuildUDP(false, dst, channel.ownId, DMR_UDP_PORT_LRRP, DMR_UDP_PORT_LRRP, doc, length,
-								 DT_RATE_12_DATA, preambles, txBursts, DMR_DATA_MAX_BURSTS), TXK_OTHER))
+								 DT_RATE_12_DATA, preambles, txBursts, DMR_DATA_MAX_BURSTS), TXK_LRRP))
 	{
 		return false;
 	}
@@ -1833,9 +1870,17 @@ static bool lrrpHandleRequest(const lrrpPendingRequest_t *pending)
 	return true;
 }
 
+static void lrrpClear(void)
+{
+	lrrpReadIdx = lrrpWriteIdx;
+	memset(lrrpTriggers, 0, sizeof(lrrpTriggers));
+	if (txPending && txKind == TXK_LRRP)
+		txPending = false;
+}
+
 static void lrrpTick(void)
 {
-	if (!CONFIG_DMR_LRRP || passthrough)
+	if (!CONFIG_DMR_LRRP || !settings.lrrpReply || passthrough)
 	{
 		return;
 	}
@@ -1900,6 +1945,28 @@ int dmrDataServiceLrrpTriggerCount(void)
 		n += lrrpTriggers[i].active ? 1 : 0;
 	}
 	return n;
+}
+
+void dmrDataServiceDashboard(dmrDataDashboard_t *out)
+{
+	lock();
+	dmrArsState_t state = dmrDataServiceArsState();
+	*out = (dmrDataDashboard_t){
+		.nextMs = state == DMR_ARS_STATE_OFF ? 0 : stats.arsNextMs,
+		.registeredAt = ars.registeredAt, .refreshMs = ars.refreshMs,
+		.attempts = state == DMR_ARS_STATE_OFF ? 0 : ars.attempts, .maxAttempts = ARS_RETRIES + 1,
+		.arsState = state, .canRegister = arsManualAvailable() && !mailbox.settingsPending,
+	};
+	if (CONFIG_DMR_LRRP && !mailbox.lrrpClear && settings.lrrpReply && !passthrough)
+		for (unsigned i = 0; i < LRRP_TRIGGERS_MAX; i++)
+		{
+			const lrrpTrigger_t *t = &lrrpTriggers[i];
+			if (t->active)
+				out->subscription[out->count++] = (dmrLrrpSubscription_t){
+					t->requester, t->intervalMs, t->distanceMeters, t->due,
+				};
+		}
+	unlock();
 }
 
 uint32_t dmrDataServiceLocationNeededInMs(void)
@@ -1970,7 +2037,7 @@ void dmrDataServicePowerOffCanceled(void)
 
 static void takeMailbox(void)
 {
-	bool smsReq = false, sigReq = false, setReq = false;
+	bool smsReq = false, sigReq = false, setReq = false, clearLrrp;
 	uint32_t smsDst = 0, sigDst = 0;
 	bool smsGroup = false, smsAck = false;
 	uint8_t smsFormat = DMR_SMS_FORMAT_DEFAULT;
@@ -2002,8 +2069,12 @@ static void takeMailbox(void)
 		newSettings = mailbox.settings;
 		mailbox.settingsPending = false;
 	}
+	clearLrrp = mailbox.lrrpClear;
+	mailbox.lrrpClear = false;
 	unlock();
 
+	if (CONFIG_DMR_LRRP && clearLrrp)
+		lrrpClear();
 	if (setReq)
 	{
 		dmrDataServiceSetSettings(&newSettings);
@@ -2771,6 +2842,10 @@ void dmrDataServiceInit(const dmrDataEnv_t *e)
 
 void dmrDataServiceSetSettings(const dmrDataSettings_t *s)
 {
+	if (CONFIG_DMR_LRRP && !s->lrrpReply)
+		lrrpClear();
+	if (s->arsServer != settings.arsServer)
+		ars.manual = false;
 	settings = *s;
 	dmrDataSetUdpCompression(settings.udpCompress);
 }
@@ -2786,8 +2861,8 @@ void dmrDataServiceSetPassthrough(bool on)
 	if (on && !passthrough)
 	{
 		// Location requests and triggers belong to the PC from now on: nothing queued is answered later
-		lrrpReadIdx = lrrpWriteIdx;
-		memset(lrrpTriggers, 0, sizeof(lrrpTriggers));
+		lrrpClear();
+		ars.manual = false;
 	}
 	passthrough = on;
 }
@@ -3140,6 +3215,8 @@ void dmr_data_set_settings(const dmrDataSettings_t *in)
 	lock();
 	mailbox.settings = *in;
 	mailbox.settingsPending = true;
+	if (CONFIG_DMR_LRRP && !in->lrrpReply)
+		mailbox.lrrpClear = true;
 	unlock();
 }
 

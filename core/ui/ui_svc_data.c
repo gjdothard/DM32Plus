@@ -23,7 +23,8 @@ uint32_t ui_svc_feat_data(void)
 
 #if CONFIG_UI_CARD_MENU
 uint8_t ui_svc_ars_state(void) { return (uint8_t)dmr_data_ars_state(); }
-uint8_t ui_svc_lrrp_count(void) { return (uint8_t)dmrDataServiceLrrpTriggerCount(); }
+void ui_svc_data_dashboard(dmrDataDashboard_t *out) { dmrDataServiceDashboard(out); }
+bool ui_svc_ars_register_now(void) { return dmrDataServiceArsRegisterNow(); }
 #endif
 
 static void contact_name(uint32_t id, bool group, char *out, size_t len)

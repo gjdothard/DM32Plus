@@ -1840,7 +1840,7 @@ static void list_draw(const ui_scr_def_t *d)
 		if (f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_ARS) {
 			if (l.hint == NULL)
 				l.hint = TR("Back");
-			ui_draw_card_list(&ui_st, &l, UI_CARD_DATA_STATUS);
+			ui_draw_data_dashboard(view, &ui_st, &l);
 			return;
 		}
 		if (f->scr == SCR_TOOLS || (f->scr == SCR_SETTINGS && CONFIG_UI_SETTINGS)) {

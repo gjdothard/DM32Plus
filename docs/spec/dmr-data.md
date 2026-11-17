@@ -238,15 +238,19 @@ group messages by the talkgroup in either direction.
   The power-off path calls it through the radio core: `radio_req_power_off()` (`RREQ_POWER_OFF`), then
   `core/app/app.c` waits while `radio_power_off_busy()`, at most 3 s, before the settings flush and the latch.
 
-**GPS, APRS, and Data > ARS** reads the same registration state as the debug link. Server ID edits go through
+**GPS, APRS, and Data > ARS & LRRP** shows registration state, attempts, time registered, the next scheduled
+retry or refresh, refresh interval, and the current DMR transmit context. **Register Now** requests an immediate
+attempt through the normal scheduler after the context settles and the channel allows transmission. A second
+request is refused while a manual action is pending, an ARS transmission is queued or running, or a recent
+unacknowledged attempt is still within the transmit start timeout. Server ID edits go through
 the existing DMR data settings mailbox and persistence path. The keypad accepts 0 to disable registration and
 IDs 1 through 16777214, including gateway addresses. Back cancels the edit. ARP is part of the network gateway,
 which has no per-peer resolution status.
 
 ## 7. LRRP
 
-The LRRP Subscriptions page reads the number of active triggered reports from the service and displays the
-Answer GPS requests setting. Opening the page sends no packet.
+The ARS & LRRP dashboard reads the active triggered reports from the service and shows the requester, effective
+interval, optional distance threshold, and next check or GPS status. Opening the page sends no packet.
 
 - The Position action sends one unconfirmed private immediate request over UDP 4001. The response must match
   the source radio ID and request ID. The requester waits up to 8 s after transmission for the result.
@@ -260,7 +264,9 @@ Answer GPS requests setting. Opening the page sends no packet.
 - Without a position source (`hasGps` false) every immediate request is answered with
   result 0x10 (no fix) and a triggered request is refused with 0x10: no trigger is started, so nothing is sent
   later on its behalf.
-- `lrrpReply` off: requests are counted, not answered.
+- Turning `lrrpReply` off rejects new requests, clears queued requests and active subscriptions, and cancels
+  any LRRP response or report that has been queued but has not begun transmitting. Turning it back on starts
+  with no subscriptions.
 - With GPS and APRS built, the LRRP responder reads the same live board GPS fix as the Position screen.
   The provider rejects fixes that are invalid, stale, or disabled. Boards with GPS capability set `hasGps`.
 - Positions elsewhere: the ETSI GPS Info LC in voice calls is in `dmr-voice.md` 3.1, positions to an APRS gateway ID
@@ -277,7 +283,7 @@ Answer GPS requests setting. Opening the page sends no packet.
 | `radioCheckReply` | on | a radio check is how another user finds out whether this radio is on and in range; the answer is one short CSBK. A settings record saved before this default (no `SETTINGS_DS_CHECK_SET` in `ds_ip_cnf`, `settings-store.md` 3) answers too |
 | `callAlertAck` | on | the ack is what makes a call alert work for the caller |
 | `lrrpReply` | on | answers only a dispatcher's request; without GPS it says "no fix" |
-| `hasGps` | false | the radio core sets it false on every radio today, GPS models included (`data_init` in `core/radio/radio_sm.c`) |
+| `hasGps` | board capability | the radio core sets it when GPS and APRS are built and the board provides GPS |
 | `smsFormat` | ETSI IP text | the standard text application (5.4); ETSI short data and Motorola TMS (`CONFIG_DMR_TMS`) for radios that need them. A settings record from before this default (no format bit in `ds_flags`, `settings-store.md` 3) keeps TMS: only the default changed |
 | `radioCheckEtsi` | off | the Motorola form is what most radios answer |
 | `udpCompress` | auto | SAP 3 saves 19-23 octets per UDP packet; auto leaves the DMR application ports (MOTOTRBO servers) on the full header (11.2) |

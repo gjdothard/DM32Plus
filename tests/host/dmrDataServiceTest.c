@@ -394,6 +394,23 @@ static void testARS(void)
 	CHECK(countSent('A', DMR_ARS_DEVICE_REGISTRATION) == 0);
 	CHECK(dmrDataServiceArsState() == DMR_ARS_STATE_REGISTERED);
 
+	// A manual refresh waits for a clear channel and an in-flight request is not duplicated.
+	channelClear = false;
+	CHECK(dmrDataServiceArsRegisterNow());
+	CHECK(!dmrDataServiceArsRegisterNow());
+	runMainTask(100);
+	CHECK(countSent('A', DMR_ARS_DEVICE_REGISTRATION) == 0);
+	channelClear = true;
+	runMainTask(1000);
+	CHECK(countSent('A', DMR_ARS_DEVICE_REGISTRATION) == 1);
+	CHECK(!dmrDataServiceArsRegisterNow());
+	receiveARS(ACK_PLAIN, sizeof(ACK_PLAIN));
+	runMainTask(1000);
+	dmrDataDashboard_t dashboard;
+	dmrDataServiceDashboard(&dashboard);
+	CHECK(dashboard.arsState == DMR_ARS_STATE_REGISTERED && dashboard.attempts == 1);
+	CHECK(dashboard.refreshMs == ARS_REFRESH_DEFAULT_MS && dashboard.nextMs != 0);
+
 	// The server asks: registers again straight away
 	sentCount = 0;
 	receiveARS(QUERY, sizeof(QUERY));
@@ -623,6 +640,10 @@ static void testLrrp(void)
 	runMainTask(3000);
 	CHECK(countLrrp(0x0B) == 1);
 	CHECK(dmrDataServiceLrrpTriggerCount() == 1);// the distance one
+	dmrDataDashboard_t dashboard;
+	dmrDataServiceDashboard(&dashboard);
+	CHECK(dashboard.count == 1 && dashboard.subscription[0].requester == LRRP_SERVER);
+	CHECK(dashboard.subscription[0].intervalMs == 30000 && dashboard.subscription[0].distanceMeters == 500);
 
 	receiveLrrp("0f06220155");
 	runMainTask(3000);
@@ -651,6 +672,29 @@ static void testLrrp(void)
 	runMainTask(3000);
 	CHECK(sentCount == 0);
 	settings.lrrpReply = true;
+
+	// Turning replies off clears both subscriptions, even if an On update replaces it in the mailbox.
+	settings.hasGps = true;
+	haveLocation = true;
+	receiveLrrp("090922041122334434313c");
+	receiveLrrp("090922015534311e788374");
+	runMainTask(3000);
+	CHECK(dmrDataServiceLrrpTriggerCount() == 2);
+	channelClear = false;
+	runMainTask(5000);
+	CHECK(txPending && txKind == TXK_LRRP);
+	dmrDataSettings_t updated = settings;
+	updated.lrrpReply = false;
+	dmr_data_set_settings(&updated);
+	dmrDataServiceDashboard(&dashboard);
+	CHECK(dashboard.count == 0);
+	updated.lrrpReply = true;
+	dmr_data_set_settings(&updated);
+	channelClear = true;
+	sentCount = 0;
+	runMainTask(65000);
+	CHECK(dmrDataServiceLrrpTriggerCount() == 0 && countLrrp(0x0D) == 0);
+	haveLocation = false;
 }
 
 

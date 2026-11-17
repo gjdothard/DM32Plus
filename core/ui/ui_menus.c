@@ -199,7 +199,7 @@ static const ui_scr_def_t hub_screen = {
 
 #if CONFIG_UI_CARD_MENU
 static void open_gps_position(void);
-#if CONFIG_UI_SETTINGS && CONFIG_DMR_ARS
+#if CONFIG_UI_SETTINGS && (CONFIG_DMR_ARS || CONFIG_DMR_LRRP)
 static void group_item(uint16_t i, ui_item_t *it);
 static void group_select(uint16_t i, bool hold);
 static bool group_key(const input_event_t *ev);
@@ -214,7 +214,7 @@ static bool menu_section_key(const input_event_t *ev)
 static const char *menu_section_title(void)
 {
 	static const char *const titles[] = { TRN("Radio"), TRN("GPS, APRS, and Data"),
-		"ARS", TRN("LRRP Subscriptions") };
+		TRN("ARS & LRRP") };
 	return tr(titles[ui_frame()->arg]);
 }
 
@@ -224,8 +224,7 @@ static bool section_available(uint16_t arg, uint16_t i)
 		switch (i) {
 		case 0: return (ui_svc_features() & UI_FEAT_GPS) != 0;
 		case 1: return CONFIG_APRS;
-		case 2: return CONFIG_DMR_ARS;
-		case 3: return (ui_svc_features() & UI_FEAT_LRRP) != 0;
+		case 2: return CONFIG_DMR_ARS || (ui_svc_features() & UI_FEAT_LRRP);
 		}
 	}
 	return i == 0 || CONFIG_CHANNEL_LIST;
@@ -234,22 +233,9 @@ static bool section_available(uint16_t arg, uint16_t i)
 static uint16_t menu_section_count(void)
 {
 	switch (ui_frame()->arg) {
-	case MENU_SECTION_GPS: return 4;
-	case MENU_SECTION_ARS: return CONFIG_UI_SETTINGS && CONFIG_DMR_ARS ? 2 : 1;
+	case MENU_SECTION_GPS: return 3;
+	case MENU_SECTION_ARS: return DATA_ROWS;
 	default: return 2;
-	}
-}
-
-static const char *ars_status(void)
-{
-	if (!CONFIG_DMR_ARS)
-		return TR("Not in this build");
-	switch (ui_svc_ars_state()) {
-	case DMR_ARS_STATE_REGISTERING: return TR("Registering");
-	case DMR_ARS_STATE_REGISTERED: return TR("Registered");
-	case DMR_ARS_STATE_REFUSED: return TR("Refused");
-	case DMR_ARS_STATE_NO_ANSWER: return TR("No answer");
-	default: return TR("Off");
 	}
 }
 
@@ -275,44 +261,39 @@ static void menu_section_item(uint16_t i, ui_item_t *it)
 	sb_init(&b, it->value, sizeof it->value);
 	switch (arg) {
 	case MENU_SECTION_GPS: {
-		static const char *const links[] = { TRN("Position"), "APRS", "ARS", TRN("LRRP Subscriptions") };
+		static const char *const links[] = { TRN("Position"), "APRS", TRN("ARS & LRRP") };
 		label = tr(links[i]);
 		if (section_available(arg, i)) {
 			if (i == 0)
 				gps_summary(&b);
 			else if (i == 2 && CONFIG_DMR_ARS)
-				sb_str(&b, ars_status());
-			else if (i == 3)
-				sb_u32(&b, ui_svc_lrrp_count(), 1);
+				sb_str(&b, ui_ars_status(ui_svc_ars_state()));
 		}
 		break;
 	}
 	case MENU_SECTION_ARS:
-#if CONFIG_UI_SETTINGS && CONFIG_DMR_ARS
-		if (i == 1) {
+		if (i == DATA_REGISTER) {
+			str_copy(it->label, sizeof it->label, TR("Register Now"));
+			if (!CONFIG_DMR_ARS)
+				it->flags |= UI_ITEM_DIM;
+			return;
+		}
+#if CONFIG_UI_SETTINGS && (CONFIG_DMR_ARS || CONFIG_DMR_LRRP)
+		if ((i == DATA_ANSWER && CONFIG_DMR_LRRP) || (i == DATA_SERVER && CONFIG_DMR_ARS)) {
 			group_item(i, it);
 			return;
 		}
 #endif
-		label = TR("Status");
-		sb_str(&b, ars_status());
-		break;
-	case MENU_SECTION_LRRP:
-		label = i == 0 ? TR("Active reports") : TR("Answer GPS requests");
-		if (i == 0)
-			sb_u32(&b, ui_svc_lrrp_count(), 1);
-		else
-			sb_str(&b, ui_svc_setting_get(UI_SET_POS_REPLY) ? TR("On") : TR("Off"));
+		label = i == DATA_ANSWER ? TR("Answer GPS requests") : TR("Server ID");
+		it->flags |= UI_ITEM_INFO;
 		break;
 	default:
 		label = i == 0 ? TR("Quick Controls") : TR("Channels");
 		break;
 	}
 	str_copy(it->label, sizeof it->label, label);
-	if (arg == MENU_SECTION_ARS || arg == MENU_SECTION_LRRP) {
-		it->flags |= UI_ITEM_INFO;
+	if (arg == MENU_SECTION_ARS)
 		return;
-	}
 	item_num(it, i + 1);
 	if (!section_available(arg, i))
 		it->flags |= UI_ITEM_DIM;
@@ -323,14 +304,18 @@ static void menu_section_select(uint16_t i, bool hold)
 	(void)hold;
 	uint16_t arg = ui_frame()->arg;
 	if (arg == MENU_SECTION_ARS) {
-#if CONFIG_UI_SETTINGS && CONFIG_DMR_ARS
-		if (i == 1)
+		if (i == DATA_REGISTER) {
+			if (ui_svc_ars_register_now())
+				ui_toast(TR("Registration queued"));
+			else
+				ui_toast(TR("Cannot register now"));
+		}
+#if CONFIG_UI_SETTINGS && (CONFIG_DMR_ARS || CONFIG_DMR_LRRP)
+		else
 			group_select(i, hold);
 #endif
 		return;
 	}
-	if (arg == MENU_SECTION_LRRP)
-		return;
 	if (!section_available(arg, i)) {
 		ui_toast(TR("Not in this build"));
 	} else if (arg == MENU_SECTION_GPS) {
@@ -338,7 +323,6 @@ static void menu_section_select(uint16_t i, bool hold)
 		case 0: open_gps_position(); break;
 		case 1: ui_push(SCR_APRS, 0); break;
 		case 2: ui_push(SCR_MENU_SECTION, MENU_SECTION_ARS); break;
-		case 3: ui_push(SCR_MENU_SECTION, MENU_SECTION_LRRP); break;
 		}
 	} else {
 		ui_push(i == 0 ? SCR_QUICK : SCR_CHANNELS, 0);
@@ -348,7 +332,7 @@ static void menu_section_select(uint16_t i, bool hold)
 static const ui_scr_def_t menu_section_screen = {
 	.name = "menu-section", .flags = SF_LIST | SF_NUMBERED | SF_FIELD, .title = menu_section_title,
 	.count = menu_section_count, .item = menu_section_item, .select = menu_section_select,
-#if CONFIG_UI_SETTINGS && CONFIG_DMR_ARS
+#if CONFIG_UI_SETTINGS && (CONFIG_DMR_ARS || CONFIG_DMR_LRRP)
 	.key = menu_section_key, .enter = group_enter,
 #endif
 };
@@ -6155,12 +6139,18 @@ static int32_t set_value;
 
 static const set_item_t *set_item_at(uint16_t i)
 {
-#if CONFIG_UI_CARD_MENU && CONFIG_DMR_ARS
+#if CONFIG_UI_CARD_MENU && (CONFIG_DMR_ARS || CONFIG_DMR_LRRP)
+	static const set_item_t reply = {
+		.name = TRN("Answer GPS requests"), .id = UI_SET_POS_REPLY, .type = ST_TOGGLE,
+	};
 	static const set_item_t ars_server = {
 		.name = TRN("Server ID"), .id = UI_SET_ARS_SERVER, .type = ST_NUMBER, .step = 1,
 	};
-	if (ui_frame()->scr == SCR_MENU_SECTION && ui_frame()->arg == MENU_SECTION_ARS)
-		return i == 1 ? &ars_server : NULL;
+	if (ui_frame()->scr == SCR_MENU_SECTION && ui_frame()->arg == MENU_SECTION_ARS) {
+		if (i == DATA_ANSWER && CONFIG_DMR_LRRP)
+			return &reply;
+		return i == DATA_SERVER && CONFIG_DMR_ARS ? &ars_server : NULL;
+	}
 #endif
 	uint16_t g = ui_frame()->arg;
 	return g < GROUPS ? set_nth((uint8_t)g, i) : NULL;

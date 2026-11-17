@@ -24,11 +24,15 @@ room. The [Radio reference](23-radios.md) lists them and says where APRS is veri
 ## GPS, APRS, and Data
 
 On the dark card layout, press **OK**, **7** on Home. **1** opens Position and shows the fix and satellites used
-beside the card. **2** opens APRS. **3** opens ARS and shows the current registration status and the configured
-server ID. Select **Server ID**, press **OK**, enter the ID, and press **OK** to save or **Back** to cancel. Enter **0**
-to turn registration off. **4** opens LRRP Subscriptions and shows how many remote
-triggered location reports are active and whether the radio is set to answer GPS requests. This page is read-only.
-Change **Answer GPS requests** in **Settings > Location**.
+beside the card. **2** opens APRS. **3** opens the **ARS & LRRP** dashboard.
+
+- **Answer GPS requests** toggles LRRP replies. Switching it off clears active subscriptions and cancels reports still
+  waiting to transmit. Turning it back on allows new requests. The same setting is under **Settings > Location**.
+- **Register Now** schedules a registration on the current eligible DMR channel. It waits for a clear channel.
+  The dashboard shows the next retry or refresh, time registered, attempts, refresh interval, and transmit context.
+- Select **Server ID**, press **OK**, enter the ID, and press **OK** to save or **Back** to cancel. Enter **0** to turn ARS off.
+- Each active LRRP card shows the requester ID, interval, optional distance threshold, and the next check or GPS status.
+  A check time is an estimate. Opening the dashboard sends no packet.
 
 ## The APRS page
 

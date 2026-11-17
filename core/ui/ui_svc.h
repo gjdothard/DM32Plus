@@ -176,7 +176,9 @@ bool ui_svc_call_alert(uint32_t id);
 
 #if CONFIG_UI_CARD_MENU
 uint8_t ui_svc_ars_state(void);	// dmrArsState_t
-uint8_t ui_svc_lrrp_count(void);	// active triggered reports
+struct dmrDataDashboard;
+void ui_svc_data_dashboard(struct dmrDataDashboard *out);
+bool ui_svc_ars_register_now(void);
 #endif
 
 // --- Location ---

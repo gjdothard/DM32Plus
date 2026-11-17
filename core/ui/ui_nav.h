@@ -54,7 +54,8 @@ typedef enum {
 	SCR_COUNT
 } ui_scr_t;
 
-enum { MENU_SECTION_RADIO, MENU_SECTION_GPS, MENU_SECTION_ARS, MENU_SECTION_LRRP };
+enum { DATA_ANSWER, DATA_REGISTER, DATA_SERVER, DATA_ROWS };
+enum { MENU_SECTION_RADIO, MENU_SECTION_GPS, MENU_SECTION_ARS };
 
 // Screen flags
 #define SF_LIST		0x01u	// drawn and driven as a list (ui_draw_list)

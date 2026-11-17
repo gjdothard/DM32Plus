@@ -24,7 +24,7 @@ The Talk to tile fits the `TG` prefix and seven digits. The picker shortens a lo
 the end to keep the leading ID visible.
 
 With `CONFIG_UI_CARD_MENU`, the tall dark display replaces the seven-entry Hub with a nine-entry Main Menu.
-Radio opens Quick Controls and the all-channels list. GPS, APRS, and Data opens Position, APRS, ARS, and LRRP Subscriptions.
+Radio opens Quick Controls and the all-channels list. GPS, APRS, and Data opens Position, APRS, and the combined ARS & LRRP dashboard.
 Scan opens its own control before starting a scan. Activity / Logs opens the Recent activity list.
 Zones / Channels uses a two-step zone and channel list. The zone row shows its channel count and marks
 the active zone. OK and CONTEXT open its channels, and held OK tunes the zone directly on boards with CONTEXT.

@@ -9,6 +9,10 @@
 #include "fmt.h"
 #include "i18n.h"
 #include "ui_svc.h"
+#if CONFIG_UI_CARD_MENU
+#include "ui_nav.h"
+#include "dmr/dmrDataService.h"
+#endif
 #include "config.h"
 
 ui_layout_t ui_layout;
@@ -3504,6 +3508,147 @@ void ui_draw_position_footer(const ui_state_t *s)
 }
 #endif
 
+const char *ui_ars_status(uint8_t state)
+{
+	if (!CONFIG_DMR_ARS)
+		return TR("Not in this build");
+	switch (state) {
+	case DMR_ARS_STATE_REGISTERING: return TR("Registering");
+	case DMR_ARS_STATE_REGISTERED: return TR("Registered");
+	case DMR_ARS_STATE_REFUSED: return TR("Refused");
+	case DMR_ARS_STATE_NO_ANSWER: return TR("No answer");
+	default: return TR("Off");
+	}
+}
+
+static void dashboard_control(const ui_list_t *l, unsigned i, int x, int y, int w, bool enabled)
+{
+	ui_item_t item = {0};
+	l->item(i, &item);
+	bool focus = l->focus == i;
+	color_t bg = focus ? (item.flags & UI_ITEM_EDIT ? ui_col.warn : ui_col.focus) : CARD_SURFACE;
+	color_t fg = focus ? CARD_INK : enabled ? ui_col.fg : ui_col.dim;
+	gfx_round_fill(x, y, w, 19, bg);
+	row_text(&font_6x12, x + 5, y + 3, x + w - 5, item.label, item.value, fg,
+		 focus ? fg : ui_col.focus, false);
+}
+
+static void dashboard_timer(int x, int w, const char *label, uint32_t seconds, const char *empty)
+{
+	char value[24];
+	gfx_round_fill(x, 105, w, 34, CARD_SURFACE);
+	gfx_text_fit(&font_6x12, label, w - 10, value, sizeof value);
+	gfx_text(&font_6x12, x + 5, 108, value, ui_col.dim);
+	sbuf_t b;
+	sb_init(&b, value, sizeof value);
+	if (empty)
+		sb_str(&b, empty);
+	else
+		sb_mmss(&b, seconds);
+	gfx_text(ui_layout.small, x + 5, 121, value, ui_col.fg);
+}
+
+static void dashboard_subscriptions(const ui_state_t *s, const dmrDataDashboard_t *data, int width, int footer)
+{
+	const font_t *font = &font_6x12;
+	gfx_text(font, 5, 211, TR("Active subscriptions"), ui_col.focus);
+	if (!data->count) {
+		gfx_text(font, 5, 231, TR("No active subscriptions"), ui_col.dim);
+		return;
+	}
+	ui_position_t position;
+	bool fixed = ui_svc_position(&position) && position.fix;
+	for (unsigned i = 0; i < data->count; i++) {
+		const dmrLrrpSubscription_t *sub = &data->subscription[i];
+		int y = 225 + (int)i * 28;
+		if (y + 27 >= footer)
+			break;
+		char id[20], rule[24];
+		sbuf_t b;
+		sb_init(&b, id, sizeof id);
+		sb_str(&b, "DMR ");
+		sb_u32(&b, sub->requester, 1);
+		sb_init(&b, rule, sizeof rule);
+		sb_u32(&b, sub->intervalMs / 1000u, 1);
+		sb_str(&b, " s");
+		if (sub->distanceMeters) {
+			sb_str(&b, " / ");
+			sb_u32(&b, sub->distanceMeters, 1);
+			sb_str(&b, " m");
+		}
+		card_list_row(y, width, 26, CARD_EDGE, CARD_SURFACE);
+		row_text(font, 5, y + 1, width - 10, id, rule, ui_col.fg, ui_col.dim, false);
+		int32_t ms = (int32_t)(sub->due - s->now_ms);
+		sb_init(&b, rule, sizeof rule);
+		if (!fixed)
+			sb_str(&b, TR("Waiting for GPS"));
+		else if (ms <= 0)
+			sb_str(&b, TR("Check due"));
+		else {
+			sb_str(&b, TR("Next check "));
+			sb_mmss(&b, ((uint32_t)ms + 999u) / 1000u);
+		}
+		gfx_text(font, 5, y + 13, rule, fixed ? ui_col.fg : ui_col.warn);
+	}
+}
+
+void ui_draw_data_dashboard(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l)
+{
+	dmrDataDashboard_t data;
+	ui_svc_data_dashboard(&data);
+	bool registered = data.arsState == DMR_ARS_STATE_REGISTERED;
+	int width = gfx_width(), footer = gfx_height() - 19;
+	char fit[32];
+	const font_t *font = &font_6x12;
+	card_header(s, 24);
+	card_center_title(l->name, 5, fit, sizeof fit);
+	dashboard_control(l, DATA_ANSWER, 1, 55, width - 2, CONFIG_DMR_LRRP);
+	int actionWidth = width / 2;
+	gfx_text_fit(font, ui_ars_status(data.arsState), width - actionWidth - 10, fit, sizeof fit);
+	gfx_text(font, 5, 84, fit, registered ? ui_col.rx : ui_col.dim);
+	dashboard_control(l, DATA_REGISTER, width - actionWidth, 81, actionWidth - 1, data.canRegister);
+	int32_t ms = (int32_t)(data.nextMs - s->now_ms);
+	dashboard_timer(1, actionWidth - 3, registered ? TR("Next refresh") : TR("Next retry"),
+			ms > 0 ? ((uint32_t)ms + 999u) / 1000u : 0,
+			!data.nextMs ? "--" : ms <= 0 ? TR("Due") : NULL);
+	dashboard_timer(actionWidth + 1, width - actionWidth - 2, TR("Registered for"),
+			(s->now_ms - data.registeredAt) / 1000u, registered ? NULL : "--");
+
+	char value[24];
+	sbuf_t b;
+	sb_init(&b, value, sizeof value);
+	sb_u32(&b, data.attempts, 1);
+	sb_str(&b, " / ");
+	sb_u32(&b, data.maxAttempts, 1);
+	card_list_row(143, width, 64, CARD_EDGE, CARD_SURFACE);
+	row_text(font, 5, 146, width - 10, TR("Attempts"), value, ui_col.dim, ui_col.fg, false);
+	sb_init(&b, value, sizeof value);
+	if (registered && data.refreshMs) {
+		sb_u32(&b, data.refreshMs / 60000u, 1);
+		sb_str(&b, TR(" min"));
+	} else {
+		sb_str(&b, registered ? TR("Off") : "--");
+	}
+	row_text(font, 5, 159, width - 10, TR("Refresh interval"), value, ui_col.dim, ui_col.fg, false);
+	dashboard_control(l, DATA_SERVER, 1, 171, width - 2, CONFIG_DMR_ARS);
+	if (v->dmr.active) {
+		char id[16];
+		sb_init(&b, id, sizeof id);
+		sb_str(&b, "ID ");
+		sb_u32(&b, v->dmr.own_id, 1);
+		sb_init(&b, value, sizeof value);
+		sb_str(&b, "TX ");
+		sb_freq(&b, v->ch.tx_hz);
+		sb_str(&b, " TS");
+		sb_u32(&b, v->dmr.ts, 1);
+		sb_str(&b, " CC");
+		sb_u32(&b, v->dmr.cc, 1);
+		row_text(font, 5, 191, width - 10, value, id, ui_col.fg, ui_col.dim, false);
+	}
+	dashboard_subscriptions(s, &data, width, footer);
+	card_list_footer(s, footer, TR("OK Select"), TR("Back"), fit, sizeof fit);
+}
+
 void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kind_t kind)
 {
 	const font_t *sm = ui_layout.small, *meta = &font_6x12;
@@ -3515,7 +3660,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 	bool channels = kind == UI_CARD_ZONE_CHANNELS;
 	bool scan = kind >= UI_CARD_SCAN && kind <= UI_CARD_SCAN_OPTIONS;
 	bool aprs = kind == UI_CARD_APRS;
-	bool data = aprs || kind == UI_CARD_DATA_STATUS;
+	bool data = aprs;
 	char fit[40];
 	card_header(s, 24);
 	const char *title = composer || data ? l->name : messages ? l->prefix : scan ? TR("Scan") :

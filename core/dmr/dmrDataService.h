@@ -322,6 +322,18 @@ bool dmrDataServicePassthrough(void);
 
 dmrArsState_t dmrDataServiceArsState(void);
 int dmrDataServiceLrrpTriggerCount(void);
+#define DMR_LRRP_ACTIVE_MAX 2
+typedef struct {
+	uint32_t requester, intervalMs, distanceMeters, due;
+} dmrLrrpSubscription_t;
+typedef struct dmrDataDashboard {
+	dmrLrrpSubscription_t subscription[DMR_LRRP_ACTIVE_MAX];
+	uint32_t nextMs, registeredAt, refreshMs;
+	uint8_t count, attempts, maxAttempts, arsState;
+	bool canRegister;
+} dmrDataDashboard_t;
+void dmrDataServiceDashboard(dmrDataDashboard_t *out);
+bool dmrDataServiceArsRegisterNow(void);
 // When the service next needs a position, in ms (0: now or any time, UINT32_MAX: never): GPS power management
 uint32_t dmrDataServiceLocationNeededInMs(void);
 // The platform's position for LRRP (weak: none). Only asked when the settings say hasGps
