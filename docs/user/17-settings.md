@@ -88,7 +88,7 @@ Some settings are on the menu before the feature behind them exists, or don't ap
 
 ### Location (key 5)
 
-On builds with GPS or DMR messages, **UTC offset** sets the local time shown in the status clock and on messages. Set the difference from UTC
+On builds with GPS, a hardware clock, or DMR messages, **UTC offset** sets the local time shown in the status clock and on messages. Set the difference from UTC
 in 15-minute steps, from −720 to +840 minutes. The default is 0. Change it if your local offset changes.
 
 | Setting | Values | Default | What it does | Status |

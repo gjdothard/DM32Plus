@@ -201,11 +201,14 @@ DATA_CMD.
 | 0x03 / 0x04 | current day count, low / high byte (16 bits, days since an epoch the firmware chooses) |
 | 0x0C / 0x0D / 0x0E | load seconds / minutes / hours |
 | 0x0F / 0x10 | load day low / high |
-| 0x11 | RTC_CCR: bit 0 interrupt enable, bit 1 run, bit 2 load (self clearing); RadioFoundry writes 0x07 |
+| 0x11 | RTC_CCR: bit 0 interrupt enable, bit 1 run, bit 2 load (self clearing); the clock driver leaves alarms disabled |
 | 0x12 | RTC_LOAD_VSTAT bit 0: set to 0 before loading, 1 after (marks the time valid) |
 
 Datasheet first-power-up order: reset the RTC I2C interface, soft-reset the RTC (RTC_SOFT_RST_N = 0, wait 25 ms, = 1),
 optionally set the match (alarm) registers, load time, CCR.
+
+The clock driver preserves the RTC domain on boot and reads a retained value only when the validity bit and run
+bit are set and the day count is in its UTC epoch range. GPS initialization and power-off retention passed the bench check described in the [bring-up guide](../testing/dm32-bringup.md#rtc-retention).
 
 ### 3.4 Timers
 

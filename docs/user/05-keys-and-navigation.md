@@ -85,8 +85,10 @@ On the standard Hub, **OK**, **6** opens Tools. On the dark card layout, **OK** 
 | **8** | Tools & Utilities |
 | **9** | Settings |
 
-The 24-hour clock is to the right of the battery percentage on the tall branded display. It uses GPS time and the
-saved **Settings > Location > UTC offset**. It shows `--:--` until GPS time is available and when that time is stale.
+The 24-hour clock is to the right of the battery percentage on the tall branded display. It uses fresh GPS time or a valid hardware
+clock, with the saved **Settings > Location > UTC offset**. On a radio with RTC support, let GPS acquire a fix once
+so the hardware clock can keep time when GPS is unavailable. The display shows `--:--` when neither source has valid time.
+See the [feature matrix](../feature-matrix.md) for which radios have RTC support.
 
 <img src="../ux/screens/240x320i10x5/hub.png" width="200" alt="Main Menu on the card layout">
 

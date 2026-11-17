@@ -247,6 +247,9 @@
 #ifndef CONFIG_VIBRATE
 #define CONFIG_VIBRATE			1
 #endif
+#ifndef CONFIG_RTC
+#define CONFIG_RTC			0
+#endif
 #ifndef CONFIG_GPS
 #define CONFIG_GPS			1
 #endif

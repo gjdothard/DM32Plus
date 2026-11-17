@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 /*
  * Host tests for the APRS protocol layers (core/aprs, docs/spec/aprs.md 13): the AX.25 FCS and addresses, HDLC bit
@@ -469,6 +470,10 @@ static void test_nmea(void)
 	      "gga %d", f.alt_dm);
 	const char *bad = "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6B";
 	CHECK(!nmea_parse(bad, strlen(bad), &f), "bad checksum");
+	const char *missing = "$GPRMC,,A,4807.038,N,01131.000,E,0.0,,161126,,*32";
+	CHECK(nmea_parse(missing, strlen(missing), &f) && f.fix && f.utc_hms == UINT32_MAX, "missing UTC");
+	const char *midnight = "$GPRMC,000000.00,A,4807.038,N,01131.000,E,0.0,,161126,,*1C";
+	CHECK(nmea_parse(midnight, strlen(midnight), &f) && f.fix && f.utc_hms == 0, "valid UTC midnight");
 	const char *nofix = "$GNRMC,000000,V,,,,,,,010120,,,N*4F";
 	bool ok = nmea_parse(nofix, strlen(nofix), &f);
 	CHECK(ok && !f.fix, "no fix (ok=%d)", ok);

@@ -216,7 +216,8 @@ The default for messages the radio sends is ETSI IP text. Why this one of the tw
 Defined short data stays available (Settings > Connections > Message format: "ETSI short") for radios that only show
 that form, and it confirms delivery. Motorola TMS ("Motorola") is the format for MOTOTRBO fleets.
 
-The inbox stamps accepted SMS with the board GPS UTC minute at receipt. The archive stores that same value
+The inbox stamps accepted SMS with the current UTC minute at receipt, using the shared
+[clock service](radio-features.md#56-time-of-day). The archive stores that same value
 for incoming messages and samples it when an outgoing result is recorded. The existing record time field
 holds the UTC minute of day plus one, with zero for unavailable time and older records. It is independent of
 the monotonic receive timestamp used for duplicate detection. The tall card conversation view reads pages of up

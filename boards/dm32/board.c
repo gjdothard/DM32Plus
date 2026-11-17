@@ -62,7 +62,14 @@ static const keymap_entry_t keymap[] = {
 static const uint8_t side_keys[] = { KEY_SK1, KEY_SK2 };
 static const char *const side_key_names[] = { "SK1", "SK2" };
 
+#if CONFIG_RTC
+extern const hal_rtc_t hrc_rtc;
+#endif
+
 const board_t board = {
+#if CONFIG_RTC
+	.rtc = &hrc_rtc,
+#endif
 	.name = "DM-32UV",
 	.home_brand = "DM32",
 	.caps = CAP_KEYPAD | CAP_ENCODER | (CONFIG_GPS ? CAP_GPS : 0) | (CONFIG_DMR ? CAP_DMR : 0) |

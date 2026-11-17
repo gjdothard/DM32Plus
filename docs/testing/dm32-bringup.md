@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # DM-32UV bring-up checklist
 
@@ -196,6 +197,14 @@ No fix needed: the module talks from about 1 s after power-up, indoors too.
 | The diagnostics line `gps ...` (Settings > Diagnostics, or the debug link's diag lines) 10 s after start-up | `gps yes`, the good count rising by a few a second, bad near 0, `b` rising by about 300-600 a second | `gps no` with `b0`: no bytes on UART1: PTA9's mux (IO_DIPLEX0 bit 9 = 0), the power pin (0x2C low), the module. `gps no` with bytes but no good sentences: the baud rate (try 115200; stock may have reconfigured the module) |
 | Outdoors, a few minutes | Info > Position shows a fix and the satellite count | the NMEA talker or sentence set (`aprs_nmea`) |
 | Bad count rising steadily | near 0 | UART errors: the divisor (547 at 84 MHz APB) or noise on the line |
+
+### RTC retention
+
+On 2026-11-17, the clock reported no valid RTC time on initial boot. An onboard GPS fix set the clock. After GPS
+was disabled, the RTC advanced three seconds in three seconds. The radio then stayed off for about 64 seconds.
+Its first reply after boot had valid RTC time with GPS still off. The RTC advanced 83 seconds over about 84
+seconds of wall time between the pre-shutdown and post-boot samples. The reported minimum free RTOS heap was
+13,904 bytes during this check (minimum required: 2,048 bytes). This was a radio-only check without RF traffic.
 
 ## 13. APRS
 

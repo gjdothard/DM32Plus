@@ -473,17 +473,18 @@ doesn't. The boards ignore it for the first 1.5 s after power-up while the readi
 
 ### 5.6 Time of day
 
-RadioFoundry keeps no wall clock. `hal_time.h` gives only time since start-up, and that is what every record uses: the crash
-log's `uptime_ms`, messages (`ui_msg_t.age_ms`), call history and the APRS station list ("14m ago"). Nothing on the screen shows a time of day, so a
-radio never shows a made-up one after power-on.
+The status clock and message timestamps use fresh on-radio GPS time when available. With `CONFIG_RTC` and a board
+clock, they fall back to retained UTC. When neither source is valid, the status clock shows `--:--` and messages use
+the unknown timestamp. The UTC offset applies at display time. Uptime still measures intervals and ages.
 
-The only time of day is the UTC time a GPS or host NMEA fix carries. It travels with that position into DMR GPS and
-LRRP reports. A fixed position carries none, and the reports leave the time out (`utc_hms` 0xFFFFFFFF, date 0).
+The startup task reads the RTC without resetting it. Housekeeping samples it once a second and uses a fresh,
+valid on-radio RMC date and time to initialize or correct it. The stored UTC epoch is 2020-01-01 and uses the upper
+half of the hardware day counter on platforms with a free-running day count. A valid flag, running counter, and
+day in the supported range are required. The [feature matrix](../feature-matrix.md) lists board support. Backed
+clocks can carry UTC across power cycles after the first synchronization.
 
-Some radios have a real-time clock, and some keep it running through power-off. `board.toml` `[hardware] clock`
-records which, with its source (`backed`, `unbacked`, `none`, or `unknown`), and the feature matrix and the site show
-it. A clock driver arrives behind a hardware switch (`CONFIG_RTC`, `hardware` in `tests/hil/features.toml`). Until GPS,
-the network or the user sets it, the radio shows "no time", and records keep using uptime or mark the time unknown.
+GPS or host NMEA time still travels with its position into DMR GPS and LRRP reports. A fixed position carries no
+time (`utc_hms` 0xFFFFFFFF, date 0).
 
 ## 6. TX power, calibration, band limits
 

@@ -268,6 +268,9 @@ typedef struct {
 } aprs_gps_t;
 bool aprs_gps(aprs_gps_t *out, uint32_t now_ms);
 #if CONFIG_GPS
+#if CONFIG_RTC
+bool aprs_gps_rtc_utc(uint32_t now_ms, uint32_t *utc);
+#endif
 uint16_t aprs_utc_minute(uint32_t now_ms);	// UTC minute of day plus one, or zero if stale
 #endif
 #if CONFIG_GPS_SKY

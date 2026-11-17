@@ -6,6 +6,9 @@
 #include "config.h"
 #include "board.h"
 #include "hal_time.h"
+#if CONFIG_RTC
+#include "app/wall_clock.h"
+#endif
 #include "debuglink/debuglink.h"
 #include "hostlink/hostlink.h"
 #include "input/input.h"
@@ -295,6 +298,9 @@ static void link_section(dl_text_t *t)
 
 	debuglink_link_counters(c);
 	dl_text(t, "uptime_ms=%u\n", (unsigned)hal_millis());
+#if CONFIG_RTC
+	dl_text(t, "rtc.utc_seconds_plus_one=%u\n", (unsigned)wall_clock_rtc_seconds());
+#endif
 	dl_text(t, "ui.screen=%s\n", ui_screen_name());
 	ui_app_status_t u;
 	ui_get_status(&u);

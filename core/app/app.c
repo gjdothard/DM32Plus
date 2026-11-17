@@ -30,6 +30,9 @@
 #include "ui/ui.h"
 #include "ui/ui_svc.h"
 #include "config.h"
+#if CONFIG_RTC
+#include "app/wall_clock.h"
+#endif
 #if CONFIG_MESSAGE_JOURNAL
 #include "storage/message_journal.h"
 #endif
@@ -95,6 +98,9 @@ static void housekeeping(void)
 #endif
 	for (;;) {
 		hal_delay_ms(HOUSEKEEPING_MS);
+#if CONFIG_RTC
+		wall_clock_poll();
+#endif
 		settings_poll(hal_millis());
 		storage_job_poll();
 #if CONFIG_MESSAGE_JOURNAL
@@ -112,6 +118,9 @@ static void startup_task(void *arg)
 {
 	(void)arg;
 	board_init();
+#if CONFIG_RTC
+	wall_clock_poll();
+#endif
 	board.display->init();
 	board.display->set_backlight(100);
 	board.input->init();

@@ -6142,7 +6142,7 @@ static const set_item_t s_location[] = {
 	LIST(TRN("Position format"), NULL, UI_SET_POS_FORMAT, v_posfmt, n_posfmt),
 	LIST(TRN("Send position"), "APRS", UI_SET_POS_SEND_S, v_possend, n_possend),
 	TOGGLE(TRN("Answer GPS requests"), "LRRP position location", UI_SET_POS_REPLY),
-#if CONFIG_GPS || CONFIG_DMR_SMS
+#if CONFIG_GPS || CONFIG_DMR_SMS || CONFIG_RTC
 	NUMBER(TRN("UTC offset"), "time zone local message time", UI_SET_UTC_OFFSET_MIN, -720, 840, 15, " min"),
 #endif
 };

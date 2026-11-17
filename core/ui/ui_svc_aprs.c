@@ -40,7 +40,7 @@ void ui_svc_aprs_set_cfg(const aprs_cfg_t *c)
 }
 
 // The Position screen reads the board GPS through APRS, the one place its NMEA goes
-#if CONFIG_GPS
+#if CONFIG_GPS && !CONFIG_RTC
 uint16_t ui_svc_utc_minute(void)
 {
 	return board_has_gps() ? aprs_utc_minute(hal_millis()) : 0;

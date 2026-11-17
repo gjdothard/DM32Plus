@@ -301,6 +301,9 @@ off too. On a busy channel the RX trace fills the ring in minutes: read it soon 
 
 ### 3.7 GET_VIEW
 
+In the `link` section, `rtc.utc_seconds_plus_one` is the last hardware clock sample in UTC seconds since
+2020-01-01, plus one. Zero means unavailable. The key is present on builds with `CONFIG_RTC`.
+
 The radio's state as key=value lines, one section per request, so each fits a reply. `next` is the following
 section, `0xFF` after the last. Every section starts with `section=<name>`; a section cut short ends with
 `truncated=1`. Hosts ignore keys they don't know; keys may be added at any time, and `view=` in the core section

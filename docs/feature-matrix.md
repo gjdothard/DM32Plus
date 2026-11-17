@@ -69,6 +69,7 @@ is `tools/bringup.py list --radio <id>`.
 | `beep` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `vibrate` | off | ✕ | not recorded | ✕ | ✕ | ✕ |
 | `gps` | pass (seed) | not recorded | ✕ | not recorded | not recorded | not recorded |
+| `rtc` | not recorded | not written | not written | not written | not written | not written |
 | `dmr_data_rx` | not recorded | pass (seed) | pass (seed) | not recorded | not recorded | not recorded |
 | `dmr_sms` | not recorded | pass (seed) | pass (seed) | not recorded | pass (seed) | not recorded |
 | `dmr_tms` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
@@ -158,7 +159,7 @@ has the part it needs (`board.toml` `[hardware] unconfirmed`). The rule:
 that needs hardware some radios lack (`hardware` in `tests/hil/features.toml`) is never ○. The last two rows are not
 switches. Voltage reading: what the radio measures, its battery, its DC input (Supply) or none (`board_volts()` in
 `hal/board.h`). Clock: whether the radio's real-time clock keeps time through power-off (`board.toml` `[hardware]
-clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](spec/radio-features.md) 5.6).
+clock`; ? = not known yet). The `RTC` row lists firmware support ([radio-features.md](spec/radio-features.md#56-time-of-day)).
 
 <!-- generated: tools/boards.py docs feature-defaults; edit config/features.mk and boards/*/config.mk -->
 | Feature switch | DM-32UV | DM-1701 | DM-1801 Pro | DB25-D PRO | MD-380 | MD-UV380 |
@@ -233,6 +234,7 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `BATTERY_SAVE` | ● | ● | ● | ● | ● | ● |
 | `VIBRATE` | ? | ✕ | ● | ✕ | ✕ | ✕ |
 | `GPS` | ● | ● | ✕ | ● | ● | ● |
+| `RTC` | ● | … | … | … | … | … |
 | `AUDIO_PROBE` | … | ○ | … | … | … | ○ |
 | `STUB_ENTRY` | ● | ● | ● | ● | ● | ● |
 | `NAND_STORAGE` | ✕ | ✕ | ✕ | ● | ✕ | ✕ |

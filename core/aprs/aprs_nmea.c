@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // NMEA 0183 RMC / GGA and the field splitting nmea_sky.c shares (aprs_nmea.h)
 #include <string.h>
@@ -125,6 +126,7 @@ bool nmea_number(const char *s, size_t n, uint8_t scale, uint32_t *out)
 bool nmea_parse(const char *s, size_t n, nmea_fix_t *out)
 {
 	memset(out, 0, sizeof(*out));
+	out->utc_hms = UINT32_MAX;
 	out->speed_kn10 = 0xFFFFu;
 	out->course10 = 0xFFFFu;
 	out->alt_dm = INT32_MIN;
@@ -141,7 +143,8 @@ bool nmea_parse(const char *s, size_t n, nmea_fix_t *out)
 			return false;
 		}
 		out->kind = NMEA_RMC;
-		if (fixed(f[1], fl[1], 0, &v)) {
+		if ((fl[1] == 6 || (fl[1] > 7 && f[1][6] == '.')) &&
+		    memchr(f[1], '.', 6) == NULL && fixed(f[1], fl[1], 0, &v)) {
 			out->utc_hms = v;
 		}
 		out->fix = fl[2] == 1 && f[2][0] == 'A';
@@ -155,7 +158,7 @@ bool nmea_parse(const char *s, size_t n, nmea_fix_t *out)
 		if (fixed(f[8], fl[8], 1, &v) && v < 3600u) {
 			out->course10 = (uint16_t)v;
 		}
-		if (fixed(f[9], fl[9], 0, &v)) {
+		if (fl[9] == 6 && memchr(f[9], '.', 6) == NULL && fixed(f[9], fl[9], 0, &v)) {
 			out->date = v;
 		}
 		return true;
@@ -165,7 +168,8 @@ bool nmea_parse(const char *s, size_t n, nmea_fix_t *out)
 			return false;
 		}
 		out->kind = NMEA_GGA;
-		if (fixed(f[1], fl[1], 0, &v)) {
+		if ((fl[1] == 6 || (fl[1] > 7 && f[1][6] == '.')) &&
+		    memchr(f[1], '.', 6) == NULL && fixed(f[1], fl[1], 0, &v)) {
 			out->utc_hms = v;
 		}
 		out->fix = fl[6] == 1 && f[6][0] >= '1' && f[6][0] <= '8';

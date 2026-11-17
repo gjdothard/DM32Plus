@@ -32,6 +32,11 @@ TESTS   := dmrFecTest sfrTest dmrDataTest dmrDataServiceTest hotspotDataTest hot
 
 all: run
 
+TESTS += wallClockTest
+wallClockTest: wallClockTest.c $(CORE)/app/wall_clock.c
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -DCONFIG_RTC=1 -o $@ $^
+
+
 TESTS += dmrAesTest
 dmrAesTest: dmrAesTest.c $(CORE)/dmr/dmrAes.c $(CORE)/dmr/dmrPrivacy.c $(CORE)/dmr/ambe/ambeFec.c $(CORE)/dmr/call/dmr_lc.c $(CORE)/dmr/fec/dmrFec.c
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ $^
@@ -166,6 +171,7 @@ run: $(TESTS)
 	./ipGatewayTestAir440
 	./sfrTest
 	./aprsTest
+	./wallClockTest
 ifneq ($(TSHARK),)
 	@# Independent check of the frames the gateway sent: no malformed packets or bad checksums
 	@for f in ipGatewayTest.pcap ipGatewayTest16.pcap ipGatewayTest31.pcap ipGatewayTestShared.pcap ipGatewayTestAir440.pcap; do "$(TSHARK)" -r $$f -o ip.check_checksum:TRUE -o udp.check_checksum:TRUE -z expert,note -q; done > ipGatewayTest.expert
