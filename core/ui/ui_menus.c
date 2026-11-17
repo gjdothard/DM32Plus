@@ -6889,6 +6889,24 @@ static void picker_item(uint16_t i, ui_item_t *it)
 		str_copy(it->label, sizeof it->label, TR("Type a number..."));
 		return;
 	}
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		if (picks[i].t.name[0])
+			str_copy(it->label, sizeof it->label, picks[i].t.name);
+		else
+			ui_sb_target(it->label, sizeof it->label, &picks[i].t);
+		sbuf_t value;
+		sb_init(&value, it->value, sizeof it->value);
+		if (picks[i].t.name[0]) {
+			if (picks[i].t.group)
+				sb_str(&value, "TG ");
+			sb_u32(&value, picks[i].t.id, 1);
+		}
+		sb_chr(&value, '\n');
+		sb_str(&value, tr(picks[i].tag));
+		return;
+	}
+#endif
 	ui_sb_target(it->label, sizeof it->label, &picks[i].t);
 	if (picks[i].t.group)
 		it->flags |= UI_ITEM_PREVIEW;

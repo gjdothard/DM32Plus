@@ -445,6 +445,10 @@ msgstr "Sin coincidencia: Atrás borra"
 msgid "OK change  Back"
 msgstr "OK cambiar  Atrás"
 
+#: core/ui/ui_app.c
+msgid "Find"
+msgstr "Buscar"
+
 #: core/ui/ui_app.c core/ui/ui_menus.c
 msgid "Activity / Logs"
 msgstr "Actividad / Registros"

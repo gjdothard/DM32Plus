@@ -35,6 +35,8 @@ Activity / Logs uses the same frame with caller cards. Each row separates the ca
 Its PTT, context actions, and empty state keep their existing behavior.
 The Radio submenu uses numbered navigation cards. All Channels uses two-line cards with mode and channel
 details, plus a dedicated Find region. Its numbering, filtering, edit action, and tune shortcut are unchanged.
+Find and Talk to use the same card frame, with contact IDs separated from names and type or source shown
+on a second line. Channel TX-contact and RX-group pickers use field cards with a Find region.
 Contacts & Talkgroups uses separate group and private-call tabs on the same filtered contacts list.
 The horizontal actions change tabs and keep the filter text. The first two assignable side keys supply
 those actions while the directory is open. The ID has a dedicated column, and a long name can shorten.

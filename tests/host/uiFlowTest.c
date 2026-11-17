@@ -1461,6 +1461,18 @@ int main(void)
 		run_flow(&card_quick[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
 #if CONFIG_UI_CARD_MENU
 	static const flow_t card_menu[] = {
+		{ "Find cards retain IDs and result kinds", "branded-home", "5 6 3",
+			"screen=find shows=Find shows=K1ABC_Joe shows=3101234 shows=Contact", 3, false },
+		{ "Find card PTT keeps private targeting", "branded-home 5 6 3", "ptt",
+			"txid=3101234 txpriv=1", 1, false },
+		{ "Talk to cards show the default group and ID", "branded-home", "quick 4",
+			"screen=picker shows=20:12 shows=Default shows=TG_3100", 2, false },
+		{ "Talk to card PTT uses the focused group once", "branded-home quick 4", "down ptt",
+			"txid=91 txpriv=0", 2, false },
+		{ "TX contact picker uses field cards", "branded-home ok 1 2 ok down down down down down down down down down", "ok",
+			"screen=chpick shows=TX_Contact shows=20:12 shows=TG_3100", 1, false },
+		{ "RX group picker uses field cards", "branded-home ok 1 2 ok down down down down down down down down down down", "ok",
+			"screen=chpick shows=RX_Group_List shows=20:12", 1, false },
 		{ "Radio submenu uses numbered navigation cards", "branded-home", "ok 1",
 			"screen=menu-section shows=Radio shows=Quick_Controls shows=Channels shows=20:12", 2, false },
 		{ "All Channels cards show mode and channel details", "branded-home", "ok 1 2",

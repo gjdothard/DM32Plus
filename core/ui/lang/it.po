@@ -445,6 +445,10 @@ msgstr "Nessun risultato: Indietro cancella"
 msgid "OK change  Back"
 msgstr "OK cambia  Indietro"
 
+#: core/ui/ui_app.c
+msgid "Find"
+msgstr "Cerca"
+
 #: core/ui/ui_app.c core/ui/ui_menus.c
 msgid "Activity / Logs"
 msgstr "Attività / Registri"

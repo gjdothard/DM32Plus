@@ -240,6 +240,9 @@ static const struct { const char *name, *script; } audit_extra[] = {
 	{ "recent_cards_empty", "branded-home ok 6" },
 	{ "channel_cards", "branded-home ok 1 2" },
 	{ "channel_cards_filtered", "branded-home ok 1 2 2 6" },
+	{ "find_cards", "branded-home 5 6 3" },
+	{ "target_cards", "branded-home quick 4" },
+	{ "contact_picker_cards", "branded-home ok 1 2 ok down down down down down down down down down ok" },
 	{ "caller_cards_temporary", "branded-home quick 1 up ok back call:3101234,91,g wait:11000 ctx up" },
 	{ "caller_cards_rx", "branded-home rx:3101234,91,g ctx" },
 #endif
@@ -572,6 +575,10 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 			snprintf(script, slen, "branded-home ok 3");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "channels"))
 			snprintf(script, slen, "branded-home ok 1 2");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "channel_contact"))
+			snprintf(script, slen, "branded-home ok 1 2 ok down down down down down down down down down ok");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "talk_target_picker_vfo"))
+			snprintf(script, slen, "branded-home vfokey quick 4 tt");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "recent"))
 			snprintf(script, slen, "branded-home call:3101234,91,g call:3105678,3100,g call:3102222,0,p wait:11000 ok 6");
 #if CONFIG_CONTACT_EDIT
@@ -599,6 +606,7 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 			snprintf(script, slen, "branded-home quick 3%s", gallery[i].script + strlen("quick 7"));
 		else if (!strcmp(g->name, "240x320i10x5") &&
 			 (!strcmp(name, "quick_dmr") || !strcmp(name, "quick_fm") || !strcmp(name, "hub") ||
+			  !strncmp(name, "find_", 5) || !strcmp(name, "talk_target_picker") ||
 			  !strcmp(name, "caller_actions") ||
 			  !strcmp(name, "zones") || !strcmp(name, "zone_channels") ||
 			  !strcmp(name, "messages") || !strcmp(name, "messages_empty") ||

@@ -1817,7 +1817,8 @@ static void list_draw(const ui_scr_def_t *d)
 	l.hint = tr(d->hint);
 	l.body = d->body != NULL ? d->body() : NULL;
 	if ((d->flags & SF_FILTER) && (filter_keys[0] ||
-	    (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) && f->scr == SCR_CHANNELS))) {
+	    (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) &&
+	     (f->scr == SCR_CHANNELS || f->scr == SCR_CHPICK)))) {
 		sbuf_t b;
 		sb_init(&b, header, sizeof header);
 		sb_str(&b, TR("Find: "));
@@ -1839,6 +1840,12 @@ static void list_draw(const ui_scr_def_t *d)
 	if (CONFIG_UI_SETTINGS && CONFIG_DMR_ARS && f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_ARS)
 		l.hint = TR("OK change  Back");
 	if (ui_card_layout(&ui_st)) {
+		if (f->scr == SCR_FIND || f->scr == SCR_PICKER || f->scr == SCR_CHPICK) {
+			if (f->scr == SCR_FIND)
+				l.prefix = TR("Find");
+			ui_draw_card_page(&ui_st, &l, f->scr == SCR_CHPICK ? UI_CARD_PAGE_FIELDS : UI_CARD_PAGE_DETAILS);
+			return;
+		}
 		if (f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_RADIO) {
 			l.prefix = l.name;
 			l.name = NULL;
