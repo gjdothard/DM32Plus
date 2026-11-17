@@ -141,6 +141,12 @@ details.notice > summary { font-weight: 600; }
 
 /* hero */
 .hero { background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%); border-bottom: 1px solid var(--border); }
+.page-home .home-plus { color: var(--accent); }
+.page-home .footer-help { display: none; }
+.page-home .eyebrow { color: var(--muted); font-weight: 600; }
+.page-home .hero-device figcaption { text-align: center; margin-top: var(--space-3); }
+.page-home .feature-rows > div { grid-template-columns: 8rem 1fr; }
+@media (max-width: 560px) { .page-home .feature-rows > div { grid-template-columns: 1fr; } }
 .hero-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: var(--space-6); align-items: center; padding-top: var(--space-5); padding-bottom: var(--space-5); }
 /* the home page's screenshot carousel: a row that scrolls and snaps by itself (touch, trackpad, arrow keys on the
    focused row); site.js adds the buttons and the position. Every screen is one height, whatever its display.

@@ -3,6 +3,11 @@
 
 # The Web Site
 
+The DM32+ home page introduces the firmware for its target radio, links to installation and the CPS,
+and explains Stable, Testing, and Development releases. Its header uses the DM32+ name. Shared reference
+pages retain upstream branding, and the home page credits RadioFoundry and links to the original MIT license.
+Product claims describe implemented behavior; hardware verification remains in the bring-up records.
+
 The site is generated from the repository, like the PDF manual. It lists the radios, their screens
 and features, holds the documentation, and carries two tools that run in the browser with nothing sent to a server:
 the web flasher (back up, install, restore; [web-flasher.md](web-flasher.md)) and the Codeplug Editor

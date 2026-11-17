@@ -254,7 +254,7 @@ class Site:
 		if many:
 			alternates += '<link rel="alternate" hreflang="x-default" href="%s">\n' % html.escape(page_url(self.i18n.default))
 		is_cps = page_class == "codeplug"
-		brand, brand_accent = ("DM32", "+") if is_cps else ("Radio", "Foundry")
+		brand, brand_accent = ("DM32", "+") if is_cps or page_class == "home" else ("Radio", "Foundry")
 		document_title = title if is_cps else title + " · " + brand + brand_accent
 		ctx = {"lang": lang, "dir": meta.get("dir", "ltr"), "document_title": document_title, "root": root,
 		       "brand": brand, "brand_accent": brand_accent,
@@ -268,8 +268,11 @@ class Site:
 		       "repo": self.repo_url, "community": COMMUNITY_URL, "nav_current": nav,
 		       "url": SITE_URL + (full[:-len("index.html")] if full.endswith("index.html") else full),
 		       "og_image": SITE_URL + "static/img/social.png?v=" + self.asset_version,
-		       "og_width": social.W * social.ZOOM, "og_height": social.H * social.ZOOM}
+		       "og_width": social.W * social.ZOOM, "og_height": social.H * social.ZOOM,
+		       "image_alt": self.t(lang, "home.product" if page_class == "home" else "site.preview_alt")}
 		ctx["nav"] = self.nav(lang, ctx["home"], nav)
+		if page_class == "home":
+			ctx["og_image"] = SITE_URL + "static/img/dm32plus-social.png?v=" + self.asset_version
 		self.write(full, self.tpl.render("base", ctx, lang).replace("{{root}}", root).replace("{{home}}", root + prefix))
 
 	def nav(self, lang, home, current):
@@ -278,6 +281,9 @@ class Site:
 			 ("screenshots", "screenshots/index.html"), ("tools", "tools/index.html")]
 		if current == "codeplug":
 			items = [("docs", "docs/index.html"), ("tools", "tools/index.html")]
+		elif current == "home":
+			items = [("flash", "flash/index.html#radio=dm32"), ("codeplug", "codeplug/index.html"),
+				 ("docs", "docs/index.html"), ("screenshots", "screenshots/index.html")]
 		return "".join('<a href="%s%s"%s>%s</a>' % (home, href, ' aria-current="page"' if key == current else "",
 							    html.escape(self.i18n.t(lang, "nav." + key)))
 			       for key, href in items)
@@ -373,8 +379,15 @@ class Site:
 			b["frame_geometry"] = img["geometry"]
 			b["render"] = img
 			b["look_renders"] = {lk["id"]: device.render(b, lk["name"], lk["id"]) for lk in b["looks"]}
+		product_board = next(b for b in self.boards if b["id"] == "dm32")
+		with open(repo.path("docs", "ux", "screens", product_board["gallery"], "home_dual.png"), "rb") as f:
+			product_screen = f.read()
+		self.write("static/img/radios/dm32plus-home.svg", social.with_screen(
+			product_board["render"]["frame"], product_board["render"]["geometry"], product_screen))
 		with open(os.path.join(self.out, "static", "img", "social.png"), "wb") as f:
 			f.write(social.png(social.card(self.boards)))
+		with open(os.path.join(self.out, "static", "img", "dm32plus-social.png"), "wb") as f:
+			f.write(social.png(social.card([next(b for b in self.boards if b["id"] == "dm32")])))
 		self.tool = toolzip.write(os.path.join(self.out, "downloads"))
 		data = self.json_data()
 		for name, obj in data.items():
@@ -524,24 +537,20 @@ class Site:
 		return out
 
 	def home(self, lang):
-		flagship = self.boards[0]
+		flagship = next(b for b in self.boards if b["id"] == "dm32")
 		ctx = {"flagship_id": flagship["id"], "flagship_name": flagship["name"],
-		       "cards": "".join(self.radio_card(lang, b) for b in self.boards),
-		       "dev_rows": self.dev_rows(lang), "request_card": self.request_card(lang), "variants": self.variant_cards(lang),
-		       "radio_count": str(len(self.boards)), "feature_count": str(len(self.features))}
+		       "repo": self.repo_url}
 		content = self.tpl.render("home", ctx, lang)
 		# the carousel's screens, all one height (site.css --shot-h)
 		shot_h = shots.css_px(".carousel", "--shot-h")
 		for g in set(re.findall(r'<figure class="carousel-slide"><img src="[^"]*static/img/screens/([^/"]+)/', content)):
 			w, h = shots.size(g)
 			self.shots.use(g, w * shot_h / h)
-		# the drawings with the boot screen: the flagship's own in the hero, every one (looks too) on a card
-		hero_h, card_h = shots.css_px(".hero-device img", "max-height"), shots.css_px(".radio-card img", "height")
+		# The product radio's drawing includes its own boot screen.
+		hero_h = shots.css_px(".hero-device img", "max-height")
 		self.drawn(flagship, flagship["frame_geometry"], hero_h * flagship["frame_geometry"]["aspect"])
-		for b in self.boards:
-			for img in [b["render"]] + list(b["look_renders"].values()):
-				self.drawn(b, img["geometry"], card_h * img["geometry"]["aspect"])
-		self.page(lang, "index.html", self.t(lang, "home.title"), content, "home")
+		self.page(lang, "index.html", self.t(lang, "home.title"), content, "home",
+			  description=self.t(lang, "home.lead"), nav="home")
 
 	def drawn(self, b, geometry, frame_w):
 		"""A page shows b's drawing frame_w CSS pixels wide (at most), a screenshot in its display."""
