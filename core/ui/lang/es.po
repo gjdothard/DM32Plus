@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 #
 # The radio's strings in Español (es; docs/dev/translating.md). Kept in step with the source by
 # tools/i18n.py --sync: translate the empty msgstr lines; an empty one shows the English.
@@ -1781,6 +1782,10 @@ msgid "Save as new channel"
 msgstr "Guardar como nuevo"
 
 #: core/ui/ui_menus.c
+msgid "Operating talkgroups"
+msgstr "Grupos de operación"
+
+#: core/ui/ui_menus.c
 msgid "Yes"
 msgstr "Sí"
 
@@ -3295,6 +3300,18 @@ msgstr "Escaneo detenido aquí"
 #: core/ui/ui_menus.c
 msgid "In use"
 msgstr "En uso"
+
+#: core/ui/ui_menus.c
+msgid "Add talkgroup"
+msgstr "Añadir grupo"
+
+#: core/ui/ui_menus.c
+msgid "Channel talkgroup list is full"
+msgstr "Lista de grupos llena"
+
+#: core/ui/ui_menus.c
+msgid "Remove talkgroup"
+msgstr "Quitar grupo"
 
 #: core/ui/ui_screens.c
 msgid "IDLE"

@@ -40,6 +40,13 @@ WEAK bool ui_svc_monitor(bool on) { (void)on; return false; }
 WEAK bool ui_svc_vox(bool on) { (void)on; return false; }
 WEAK bool ui_svc_save_channel(void) { return false; }
 WEAK bool ui_svc_write_channel(uint16_t number, const channel_t *ch) { (void)number; (void)ch; return false; }
+#if CONFIG_TALKGROUP_EDIT
+WEAK bool ui_svc_edit_talkgroups(uint16_t channel, uint16_t contact, ui_tg_edit_t op)
+{
+	(void)channel; (void)contact; (void)op;
+	return false;
+}
+#endif
 #if CONFIG_CONTACT_EDIT
 WEAK bool ui_svc_write_contact(uint16_t index, const contact_t *c) { (void)index; (void)c; return false; }
 #endif

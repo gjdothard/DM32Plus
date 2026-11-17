@@ -96,6 +96,11 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "zones", "ok 4" },
 	{ "channels", "ok 5" },
 	{ "channel", "ok 5 ok" },
+#if CONFIG_TALKGROUP_EDIT
+	{ "operating_talkgroups", "talkgroup-pool ok 5 ok up ok ok ok ok down ok" },
+	{ "add_talkgroup", "talkgroup-pool ok 5 ok up ok ok" },
+	{ "talkgroup_actions", "talkgroup-pool ok 5 ok up ok ok ok down ok" },
+#endif
 	{ "channel_power", "ok 5 ok down down down down down ok enc+ enc+" },
 	{ "channel_changed", "ok 5 ok down down down down down ok enc+ enc+ ok down down down ok" },
 	{ "channel_rx_entry", "ok 5 ok down down down ok 4 4 6 0" },

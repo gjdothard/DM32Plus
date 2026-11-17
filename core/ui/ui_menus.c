@@ -2571,7 +2571,11 @@ static const ui_scr_def_t chlist_screen = {
 
 enum { CE_NAME, CE_NUMBER, CE_MODE, CE_RX, CE_TX, CE_POWER, CE_RX_ONLY, CE_BW, CE_RX_TONE, CE_TX_TONE, CE_VOX,
        CE_CC, CE_TS, CE_CONTACT, CE_LIST, CE_ID, CE_DMO, CE_BEEP, CE_ALIAS1, CE_ALIAS2, CE_TOT, CE_SCAN, CE_ECO,
-       CE_ZONES, CE_GO, CE_SHARE, CE_SAVE, CE_SAVE_NEW, CE_COUNT, CE_NONE = 0xFF };
+       CE_ZONES, CE_GO, CE_SHARE, CE_SAVE, CE_SAVE_NEW,
+#if CONFIG_TALKGROUP_EDIT
+       CE_TALKGROUPS,
+#endif
+       CE_COUNT, CE_NONE = 0xFF };
 
 static channel_t ced_ch;		// what the screen shows (the working copy when editing)
 static uint16_t ced_num;		// its number, 0 = no such channel
@@ -2689,6 +2693,12 @@ static void ced_build(void)
 			continue;
 		if ((r == CE_SAVE && !(changed || fresh)) || ((r == CE_SAVE || r == CE_SAVE_NEW) && !edit))
 			continue;
+#if CONFIG_TALKGROUP_EDIT
+		uint8_t count;
+		if (r == CE_TALKGROUPS && (!dmr || fresh || ced_orig.mode != RADIO_MODE_DMR ||
+		    !codeplug_talkgroup_refs(ced_num, NULL, &count)))
+			continue;
+#endif
 		ced_rows[ced_n++] = r;
 	}
 }
@@ -2824,7 +2834,11 @@ static void chinfo_item(uint16_t i, ui_item_t *it)
 		TRN("Timeslot"), TRN("TX contact"), TRN("RX group list"), TRN("Own ID"), TRN("Direct mode"),
 		TRN("Talk permit beeps"), TRN("Talker alias TS1"), TRN("Talker alias TS2"), TRN("TX time-out"), TRN("Scan"),
 		TRN("Battery saver"), TRN("Zones"), TRN("Tune to this ch"), TRN(GLYPH_SHARE " Share channel to..."),
-		TRN("Save"), TRN("Save as new channel") };
+		TRN("Save"), TRN("Save as new channel"),
+#if CONFIG_TALKGROUP_EDIT
+		TRN("Operating talkgroups"),
+#endif
+	};
 	const channel_t *ch = &ced_ch;
 	if (i >= ced_n)
 		return;
@@ -3326,6 +3340,9 @@ static void chinfo_select(uint16_t i, bool hold)
 		break;
 	case CE_SAVE: ced_save(false); break;
 	case CE_SAVE_NEW: ced_save(true); break;
+#if CONFIG_TALKGROUP_EDIT
+	case CE_TALKGROUPS: ui_push(SCR_TALKGROUPS, ced_num); break;
+#endif
 	default: break;
 	}
 	ui_dirty();
@@ -6958,6 +6975,127 @@ const char *ui_thread_text(uint16_t row)
 const char *ui_compose_peer(void) { return compose_title(); }
 #endif
 
+#if CONFIG_TALKGROUP_EDIT
+bool ui_talkgroup_edit_focused(void)
+{
+	const ui_frame_t *f = ui_frame();
+	return f->scr == SCR_CHANNEL && f->focus < ced_n && ced_rows[f->focus] == CE_TALKGROUPS;
+}
+
+static uint16_t operating_tg_count(void)
+{
+	uint8_t count;
+	return codeplug_talkgroup_refs(ui_frame()->arg, NULL, &count) ? (uint16_t)(count + 1u) : 0;
+}
+
+static void operating_tg_label(uint16_t ref, char *label, uint8_t len, char *value, uint8_t value_len)
+{
+	contact_t contact;
+	if (!codeplug_contact(ref, &contact) || contact.type != CONTACT_GROUP) {
+		str_copy(label, len, TR("Not set"));
+		return;
+	}
+	ui_target_t target = { .id = contact.id, .group = true };
+	str_copy(target.name, sizeof target.name, contact.name);
+	ui_sb_target(label, len, &target);
+	if (value)
+		str_copy(value, value_len, contact.timeslot == 2 ? "TS2" : contact.timeslot == 1 ? "TS1" : TR("Channel's"));
+}
+
+static void operating_tg_item(uint16_t i, ui_item_t *it)
+{
+	if (!i) {
+		str_copy(it->label, sizeof it->label, TR("Add talkgroup"));
+		return;
+	}
+	codeplug_talkgroup_t tg;
+	codeplug_talkgroup_at(ui_frame()->arg, (uint8_t)(i - 1u), &tg);
+	operating_tg_label(tg.contact_number, it->label, sizeof it->label, it->value, sizeof it->value);
+	it->flags |= UI_ITEM_PREVIEW;
+}
+
+static void operating_tg_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	uint16_t channel = ui_frame()->arg;
+	if (!i) {
+		if (operating_tg_count() > CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL)
+			ui_toast(TR("Channel talkgroup list is full"));
+		else
+			ui_push(SCR_TALKGROUP_ADD, channel);
+		return;
+	}
+	codeplug_talkgroup_t tg;
+	codeplug_talkgroup_at(channel, (uint8_t)(i - 1u), &tg);
+	if (tg.contact_number)
+		ui_push(SCR_TALKGROUP_MOVE, tg.contact_number);
+}
+
+static bool operating_tg_add_label(uint16_t raw, char *buf, uint8_t len)
+{
+	contact_t contact;
+	if (!codeplug_contact((uint16_t)(raw + 1u), &contact) || contact.type != CONTACT_GROUP)
+		return false;
+	operating_tg_label((uint16_t)(raw + 1u), buf, len, NULL, 0);
+	return true;
+}
+
+static void operating_tg_add_item(uint16_t i, ui_item_t *it)
+{
+	operating_tg_label((uint16_t)(ui_filter_raw(i) + 1u), it->label, sizeof it->label, it->value, sizeof it->value);
+	it->flags |= UI_ITEM_PREVIEW;
+}
+
+static void operating_tg_add_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	if (ui_svc_edit_talkgroups(ui_frame()->arg, (uint16_t)(ui_filter_raw(i) + 1u), UI_TG_ADD))
+		ui_pop();
+	else
+		ui_toast(TR("Couldn't save: try again"));
+}
+
+static uint16_t operating_tg_move_count(void) { return 3; }
+
+static void operating_tg_move_item(uint16_t i, ui_item_t *it)
+{
+	static const char *const labels[] = { TRN("Move up"), TRN("Move down"), TRN("Remove talkgroup") };
+	str_copy(it->label, sizeof it->label, tr(labels[i]));
+}
+
+static void operating_tg_move_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	static const ui_tg_edit_t ops[] = { UI_TG_UP, UI_TG_DOWN, UI_TG_REMOVE };
+	if (ui_svc_edit_talkgroups(ced_num, ui_frame()->arg, ops[i])) {
+		ui_pop();
+		ui_frame_t *f = ui_frame();
+		if (i == 0 && f->focus > 1)
+			f->focus--;
+		else if (i == 1 && f->focus + 1u < operating_tg_count())
+			f->focus++;
+	} else {
+		ui_toast(TR("Couldn't save: try again"));
+	}
+}
+
+static const ui_scr_def_t operating_tg_screen = {
+	.name = "operatingtalkgroups", .flags = SF_LIST, .prefix = TRN("Operating talkgroups"),
+	.count = operating_tg_count, .item = operating_tg_item, .select = operating_tg_select,
+};
+
+static const ui_scr_def_t operating_tg_add_screen = {
+	.name = "addtalkgroup", .flags = SF_LIST | SF_FILTER, .prefix = TRN("Add talkgroup"),
+	.count = ui_filter_count, .item = operating_tg_add_item, .select = operating_tg_add_select,
+	.raw_count = contacts_raw_count, .raw_label = operating_tg_add_label,
+};
+
+static const ui_scr_def_t operating_tg_move_screen = {
+	.name = "talkgroupactions", .flags = SF_LIST, .prefix = TRN("Talkgroup"),
+	.count = operating_tg_move_count, .item = operating_tg_move_item, .select = operating_tg_move_select,
+};
+#endif
+
 const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
 	[SCR_HOME] = &home_screen, [SCR_QUICK] = &quick_screen, [SCR_HUB] = &hub_screen,
 #if CONFIG_UI_CARD_MENU
@@ -6978,6 +7116,10 @@ const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
 	[SCR_RECENT] = &recent_screen, [SCR_ZONES] = &channels_screen, [SCR_ZONE] = &zone_screen,
 	[SCR_TOOLS] = &tools_screen, [SCR_SETTINGS] = &settings_screen, [SCR_GROUP] = &group_screen,
 	[SCR_PICKER] = &picker_screen, [SCR_INFO] = &info_screen, [SCR_CONFIRM] = &confirm_screen,
+#if CONFIG_TALKGROUP_EDIT
+	[SCR_TALKGROUPS] = &operating_tg_screen, [SCR_TALKGROUP_ADD] = &operating_tg_add_screen,
+	[SCR_TALKGROUP_MOVE] = &operating_tg_move_screen,
+#endif
 #if CONFIG_CONTACT_POSITION
 	[SCR_CONTACT_POSITION] = &contact_position_screen,
 #endif

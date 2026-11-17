@@ -49,13 +49,15 @@ Home shows the result after "PTT→".
 
 ## Choosing a talk target
 
-On a DMR memory channel with **Operating talkgroups** assigned in the Codeplug Editor, turn the channel knob
+On a DMR memory channel with **Operating talkgroups** assigned, turn the channel knob
 to cycle through those entries and press Up or Down to change channels. Each entry supplies the timeslot and
 talkgroup together. The first entry is the default. The repeater frequencies, color code, power, and privacy
 settings come from the channel. The RX Group List still controls which additional talkgroups you hear.
-In the Codeplug Editor, open **Operating talkgroups** and check up to 16 saved group contacts.
-Each contact uses its own timeslot override, or the channel's timeslot if it has none.
-Lists with more than four entries require firmware with extended operating talkgroup support.
+With a converted codeplug, open a saved DMR channel in the channel editor and select **Operating talkgroups**.
+Select **Add talkgroup** to choose a saved group contact. Select an existing assignment to move it up, move it down,
+or remove it from this channel. Edits save individually. You can also edit the list in the Codeplug Editor.
+Each channel holds up to 63 assignments, subject to shared space. Each contact uses its own timeslot override
+when set. Otherwise, it follows the channel's timeslot.
 
 Hold **#** on a DMR channel to open the talk target picker: the channel's default, the reply target, the RX group
 list's talkgroups, recent talkgroups, and "Type a number..." to dial an ID or talkgroup by hand. The **Talk target**

@@ -103,6 +103,7 @@ below are for an STM32F4 radio.
 | `CONFIG_DMR` | y | DMR voice: modem driver, call stack, AMBE FEC, vocoder hosting, PCM audio |
 | `CONFIG_DMR_PRIVACY` | = DMR | basic privacy (Motorola / Anytone BP) on the voice path, `core/dmr/dmrPrivacy.c` (`docs/spec/dmr-voice.md` 5) |
 | `CONFIG_DMR_TALKGROUP_ENTRIES` | = DMR | Per-channel DMR operating entries with timeslot and talkgroup ID. Memory Home's encoder cycles through them |
+| `CONFIG_TALKGROUP_EDIT` | Channel editing and DMR operating entries | Add, reorder, and remove saved group contacts from the shared operating talkgroup pool on the radio |
 | `CONFIG_DMR_AES256` | = DMR_PRIVACY | AES-256/OFB voice, PI and late-entry MI signaling; needs DMR_PRIVACY; RAM session provisioning (`docs/spec/dmr-voice.md` 5.1) |
 | `CONFIG_DMR_TALKER_ALIAS` | = DMR | talker alias decode and our own alias TX (`docs/spec/dmr-voice.md` 3) |
 | `CONFIG_DMR_GPS` | = DMR | ETSI GPS Info in the embedded LC (FLCO 8): the caller's position on the receive screen (with distance and bearing when ours is known), in Recent and on the debug link; ours sent in the alias superframes when the position-in-DMR-calls setting under Tools > APRS is on and a position source has a fix (the APRS position: GPS, host, fixed; `docs/spec/dmr-voice.md`) |

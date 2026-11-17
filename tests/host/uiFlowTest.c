@@ -314,6 +314,18 @@ static const flow_t flows[] = {
 	  "writes=1 toast=Saved_as_channel_41", 7, true },
 	// The channel editor's rules (ui.md 2.1). Channel 1 is an FM repeater (146.940, TX 600 kHz below), channel 3 DMR
 	// simplex; on channel 3 the own ID is row 12 and the TX time-out row 17
+#if CONFIG_TALKGROUP_EDIT
+	{ "Operating talkgroups opens on a converted channel", "talkgroup-pool", "ok 5 ok up ok",
+	  "screen=operatingtalkgroups focus=Add_talkgroup", 5, false },
+	{ "Operating talkgroups opens a saved group picker", "talkgroup-pool ok 5 ok up ok", "ok",
+	  "screen=addtalkgroup shows=TG", 1, false },
+	{ "Operating talkgroups offers move and remove", "talkgroup-pool ok 5 ok up ok ok ok", "down ok",
+	  "screen=talkgroupactions shows=Move_up shows=Move_down shows=Remove_talkgroup", 2, true },
+	{ "Operating talkgroups removes an assignment", "talkgroup-pool ok 5 ok up ok ok ok down ok", "down down ok",
+	  "screen=operatingtalkgroups count=1 writes=2", 3, true },
+	{ "Operating talkgroups reorders saved references", "talkgroup-pool ok 5 ok up ok ok ok ok down ok down down ok", "ok",
+	  "screen=operatingtalkgroups count=3 focus=TG_91 writes=3", 1, true },
+#endif
 	{ "E new RX keeps the repeater offset", "ok 5 up up ok down down down", "ok 1 4 7 0 0 ok",
 	  "shows=147.000 shows=146.4 shows=600_kHz", 7, false },
 	{ "E new RX in another band: simplex", "ok 5 up up ok down down down", "ok 4 4 6 0 0 0 ok",

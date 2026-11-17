@@ -51,6 +51,9 @@ typedef enum {
 	SCR_CONVERSATION, SCR_THREAD,
 #endif
 	SCR_LIVE_THREAD,
+#if CONFIG_TALKGROUP_EDIT
+	SCR_TALKGROUPS, SCR_TALKGROUP_ADD, SCR_TALKGROUP_MOVE,
+#endif
 	SCR_COUNT
 } ui_scr_t;
 
@@ -177,6 +180,9 @@ const char *ui_filter_text(void);
 void ui_filter_reset(void);
 void ui_filter_rebuild(void);
 void ui_menus_save_failed(void);	// a codeplug write failed: what waited for it is dropped (ui_menus.c)
+#if CONFIG_TALKGROUP_EDIT
+bool ui_talkgroup_edit_focused(void);
+#endif
 #if CONFIG_ZONE_EDIT
 // A list shows again, or the codeplug changed under it (ui_menus.c): the zone editor's focus follows its change
 void ui_menus_resume(void);

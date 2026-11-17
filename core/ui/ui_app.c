@@ -699,6 +699,11 @@ static void handle_event(const ui_event_t *ev)
 			ui_menus_save_failed();
 		break;
 	}
+#if CONFIG_TALKGROUP_EDIT
+	case UI_EV_TALKGROUPS_SAVED:
+		ui_dirty();
+		break;
+#endif
 	case UI_EV_CALL_ALERT_RESULT:
 		if (ev->ok) {
 			station(&b, ev);
@@ -2611,6 +2616,9 @@ void ui_app_status(ui_app_status_t *s)
 	s->query = stack[sp].scr == SCR_FIND ? ui_find_query() : (d->flags & SF_FILTER) ? filter_keys : "";
 	s->draws = draws;
 	s->strip_drawn = strip_ok;
+#if CONFIG_TALKGROUP_EDIT
+	s->talkgroup_edit_focused = ui_talkgroup_edit_focused();
+#endif
 #if CONFIG_CONTACT_POSITION
 	s->contact_position_valid = stack[sp].scr == SCR_CONTACT_POSITION && ui_contact_position_shown();
 #endif

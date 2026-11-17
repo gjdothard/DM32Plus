@@ -143,17 +143,17 @@ channel it stopped on is the one copied).
 
 ### DMR Memory talkgroup entries
 
-A zone contains channels. A DMR channel can contain an ordered list of operating entries. Each entry
-contains a timeslot (1 or 2) and a group ID. The channel supplies the RX and TX frequencies, color
-code, power, encryption, and other shared settings. A matching group contact supplies the display
-name. The codeplug editor uses the contact's timeslot override when assigning an entry, or the
-channel's timeslot when the contact has no override. The radio uses the stored entry's timeslot.
+A zone contains channels. A DMR channel can contain an ordered list of saved group contact references. The channel
+supplies the RX and TX frequencies, color code, power, encryption, and other shared settings. The contact supplies
+the name and group ID. The radio uses the contact's timeslot override when present and the channel's timeslot otherwise.
+The channel editor can add, reorder, and remove up to 63 references on a converted codeplug, subject to shared pool
+capacity. Each edit runs in the storage task and commits a new pool generation.
 The first entry is the default when entering the channel. Cycling the entries does not write to the codeplug.
 
 Selecting an entry changes the base receive timeslot and the normal PTT destination and timeslot
 together. The RX group list remains an independent receive filter on the active timeslot. An entry
-selection does not write to that list or turn its members into operating entries. The group ID and
-timeslot together identify the entry, so the same group can be assigned to both slots.
+selection does not write to that list or turn its members into operating entries. Two distinct saved contacts with
+the same group ID and different timeslot overrides can both be assigned.
 
 On DMR Memory Home with an entry list, the encoder cycles through that list. Up and Down change
 channels. Quick Controls opens the same list for direct selection. A selection applies to the chosen

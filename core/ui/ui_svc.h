@@ -79,6 +79,10 @@ bool ui_svc_save_channel(void);
 // Store a whole channel (the channel editor, ui.md 2.1) at number 1..CODEPLUG_CHANNELS_MAX, as a storage job like
 // ui_svc_save_channel. false: a write is still going on, or no codeplug storage in this build
 bool ui_svc_write_channel(uint16_t number, const channel_t *ch);
+#if CONFIG_TALKGROUP_EDIT
+typedef enum { UI_TG_ADD, UI_TG_UP, UI_TG_DOWN, UI_TG_REMOVE } ui_tg_edit_t;
+bool ui_svc_edit_talkgroups(uint16_t channel, uint16_t contact, ui_tg_edit_t op);
+#endif
 #if CONFIG_CONTACT_EDIT
 // Store a contact (the contact editor, ui.md 2.4) at index 1..CODEPLUG_CONTACTS_MAX, as a storage job. false: a write
 // is still going on, or no codeplug storage in this build
@@ -387,6 +391,9 @@ typedef enum {
 	UI_EV_SCAN_STOPPED,	// the scan stopped on a channel
 	UI_EV_CALL_ALERT_RESULT,	// our call alert: ok = the radio answered, else no answer after the retries
 	UI_EV_SAVE_FAILED,	// a save to the codeplug the UI asked for failed later (text: what failed)
+#if CONFIG_TALKGROUP_EDIT
+	UI_EV_TALKGROUPS_SAVED,
+#endif
 #if CONFIG_MESSAGE_JOURNAL
 	UI_EV_HISTORY_RESULT,	// translated on the UI task (text: activation result)
 #endif

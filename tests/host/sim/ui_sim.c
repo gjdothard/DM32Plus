@@ -777,6 +777,77 @@ uint32_t codeplug_dmr_id(void) { return 3101276; }
 static struct { uint16_t index; contact_t c; } sim_ct_edits[SIM_CONTACT_EDITS];
 static uint8_t n_ct_edits;
 
+#if CONFIG_TALKGROUP_EDIT
+static bool sim_tg_pool;
+static uint16_t sim_tg_refs[CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL];
+static uint8_t sim_tg_count;
+
+bool codeplug_talkgroup_refs(uint16_t channel, uint16_t *refs, uint8_t *count)
+{
+	*count = 0;
+	if (!sim_tg_pool || channel != 3)
+		return false;
+	*count = sim_tg_count;
+	if (refs)
+		memcpy(refs, sim_tg_refs, *count * sizeof *refs);
+	return true;
+}
+
+bool ui_svc_edit_talkgroups(uint16_t channel, uint16_t ref, ui_tg_edit_t op)
+{
+	if (!sim_tg_pool || channel != 3)
+		return false;
+	uint8_t i = 0;
+	while (i < sim_tg_count && sim_tg_refs[i] != ref)
+		i++;
+	if (op == UI_TG_ADD && i == sim_tg_count && i < CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL)
+		sim_tg_refs[sim_tg_count++] = ref;
+	else if (op == UI_TG_REMOVE && i < sim_tg_count) {
+		sim_tg_count--;
+		memmove(sim_tg_refs + i, sim_tg_refs + i + 1, (sim_tg_count - i) * sizeof sim_tg_refs[0]);
+	} else if ((op == UI_TG_UP && i > 0 && i < sim_tg_count) || (op == UI_TG_DOWN && i + 1 < sim_tg_count)) {
+		uint8_t next = (uint8_t)(i + (op == UI_TG_UP ? -1 : 1));
+		sim_tg_refs[i] = sim_tg_refs[next];
+		sim_tg_refs[next] = ref;
+	} else {
+		return false;
+	}
+	sim_rec.codeplug_writes++;
+	return true;
+}
+#endif
+
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+void radio_req_dmr_talkgroup_step(int16_t step) { (void)step; }
+void radio_req_dmr_talkgroup_select(uint8_t index) { (void)index; }
+
+bool codeplug_contact_find(uint32_t id, bool group, contact_t *out)
+{
+	for (uint16_t ref = 1; ref <= CODEPLUG_CONTACTS_MAX; ref++) {
+		if (codeplug_contact(ref, out) && out->id == id && (out->type != CONTACT_PRIVATE) == group)
+			return true;
+	}
+	return false;
+}
+
+uint8_t codeplug_talkgroup_at(uint16_t channel, uint8_t index, codeplug_talkgroup_t *out)
+{
+	*out = (codeplug_talkgroup_t){0};
+#if CONFIG_TALKGROUP_EDIT
+	if (sim_tg_pool && channel == 3) {
+		contact_t contact;
+		if (index < sim_tg_count && codeplug_contact(sim_tg_refs[index], &contact))
+			*out = (codeplug_talkgroup_t){ .id = contact.id, .timeslot = contact.timeslot,
+						      .contact_number = sim_tg_refs[index] };
+		return sim_tg_count;
+	}
+#endif
+	(void)channel;
+	(void)index;
+	return 0;
+}
+#endif
+
 #if CONFIG_CONTACT_EDIT
 bool ui_svc_write_contact(uint16_t index, const contact_t *c)
 {
@@ -2030,6 +2101,10 @@ static void advance(uint32_t ms)
 
 void sim_reset(const sim_geom_t *g, sim_map_t map)
 {
+#if CONFIG_TALKGROUP_EDIT
+	sim_tg_pool = false;
+	sim_tg_count = 0;
+#endif
 #if CONFIG_MESSAGE_JOURNAL
 	sim_history_enabled = false;
 	sim_history = (message_history_view_t){0};
@@ -2506,6 +2581,12 @@ static bool run_token(char *t, char *err, size_t len)
 		advance(arg != NULL ? (uint32_t)atoi(arg) : 1000u);
 		return true;
 	}
+#if CONFIG_TALKGROUP_EDIT
+	if (strcmp(t, "talkgroup-pool") == 0) {
+		sim_tg_pool = true;
+		return true;
+	}
+#endif
 	if (strcmp(t, "branded-home") == 0) {
 		static const char *const levels[] = { "L-", "L", "L+", "L++", "M", "M+", "M++", "H-", "H" };
 		board.home_brand = "DM32";

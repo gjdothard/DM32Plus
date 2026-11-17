@@ -665,6 +665,60 @@ static struct {
 } job;
 static channel_t job_ch;	// the job's working copy of the stored channel
 
+#if CONFIG_TALKGROUP_EDIT
+static void edit_talkgroups_job(void *ctx)
+{
+	(void)ctx;
+	uint16_t refs[CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL];
+	uint8_t count;
+	uint16_t ref = (uint16_t)job.id;
+	storage_lock();
+	if (!codeplug_channel(job.channel, &job_ch) || job_ch.mode != RADIO_MODE_DMR ||
+	    !codeplug_talkgroup_refs(job.channel, refs, &count))
+		goto failed;
+	uint8_t i = 0;
+	while (i < count && refs[i] != ref)
+		i++;
+	if (job.temp == UI_TG_ADD) {
+		if (i < count)
+			goto saved;
+		if (count == CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL)
+			goto failed;
+		refs[count++] = ref;
+	} else if (i == count) {
+		goto failed;
+	} else if (job.temp == UI_TG_REMOVE) {
+		count--;
+		memmove(refs + i, refs + i + 1, (count - i) * sizeof refs[0]);
+	} else {
+		int next = i + (job.temp == UI_TG_UP ? -1 : 1);
+		if (next < 0 || next >= count)
+			goto saved;
+		refs[i] = refs[next];
+		refs[next] = ref;
+	}
+	if (!codeplug_set_talkgroup_refs(job.channel, refs, count))
+		goto failed;
+saved:
+	storage_unlock();
+	ui_notify(&(ui_event_t){ .kind = UI_EV_TALKGROUPS_SAVED });
+	return;
+failed:
+	storage_unlock();
+	save_failed(TRN("Couldn't write the codeplug: not saved"));
+}
+
+bool ui_svc_edit_talkgroups(uint16_t channel, uint16_t contact, ui_tg_edit_t op)
+{
+	if (!channel || !contact || op > UI_TG_REMOVE || storage_job_busy())
+		return false;
+	job.channel = channel;
+	job.id = contact;
+	job.temp = (uint8_t)op;
+	return storage_job_post(edit_talkgroups_job, NULL);
+}
+#endif
+
 // Power, bandwidth, tones, mode, color code and timeslot go into the channel; the squelch is radio-wide (the default
 // squelch preference). The radio core re-reads the channel (codeplug_serial), and the clear makes the remaining
 // flags follow the new values
