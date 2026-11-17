@@ -297,8 +297,8 @@ contacts. It opens from:
 - Actions: Save as contact (item 7 for a person, item 4 for a talkgroup), for a target that isn't a contact. Its ID,
   type and name come with it.
 - Contacts: select Add talkgroup or Add contact. On a tabbed directory the tab sets the entry's type.
-- Contacts: open More for a saved entry and select Edit. Talkgroup actions are Edit, Message, and Make channel
-  default. Private contact actions are Edit, Message, Radio check, Call alert, and Position.
+- Contacts: open More for a saved entry and select Edit. Talkgroup actions are Edit, Message, and Make CH Default.
+  Private contact actions are Edit, Message, Radio check, Call alert, and Position.
 
 The name starts as the target's name, else "TG 3100" for a talkgroup or the ID for a person.
 
@@ -307,7 +307,7 @@ The name starts as the target's name, else "TG 3100" for a talkgroup or the ID f
 | Name | opens Text entry (2.1) |
 | ID | opens an editor that takes digits, as the channel editor's Own ID: the first digit starts a new ID, a digit past 16777214 is refused, BACK takes back a digit and with none typed closes it, OK keeps (nothing typed: unchanged) |
 | Type | Talkgroup / Private, flips when creating an entry without a preset type |
-| Timeslot override | Channel default / TS 1 / TS 2 for a saved talkgroup or a new talkgroup from the directory |
+| TS | Channel default / TS 1 / TS 2 for a saved talkgroup or a new talkgroup from the directory |
 | Save | saves |
 
 - Long SELECT anywhere saves. BACK opens Unsaved Changes ("Discard this new contact?"), "No, keep editing" first.

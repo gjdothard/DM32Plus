@@ -1403,9 +1403,9 @@ int main(void)
 		{ "Main Menu direct Contacts", "branded-home", "ok 3", "screen=contacts", 2, false },
 #if CONFIG_CONTACT_EDIT
 		{ "Saved talkgroup More lists Edit, Message, and Make Channel Default", "branded-home ok 3", "ctx",
-		  "screen=actions count=3 focus=Edit shows=Message shows=Make_channel_default", 1, false },
+		  "screen=actions count=3 focus=Edit shows=Message shows=Make_CH_Default", 1, false },
 		{ "Edit a saved talkgroup with a fixed type", "branded-home ok 3 ctx", "ok",
-		  "screen=contactedit count=4 shows=Timeslot_override hides=Type", 1, false },
+		  "screen=contactedit count=4 shows=TS hides=Type", 1, false },
 		{ "Add a talkgroup directly from its tab", "branded-home ok 3", "up ok",
 		  "screen=contactedit count=4 shows=New_Talkgroup", 2, false },
 		{ "Saving a talkgroup edit returns to its actions", "branded-home ok 3 ctx ok", "down down ok long:ok",
@@ -1547,7 +1547,7 @@ int main(void)
 		{ "Saved private More lists the contact actions", "branded-home ok 3 right", "ctx",
 		  "screen=actions count=5 focus=Edit shows=Message shows=Radio_check shows=Call_alert shows=Position", 1, false },
 		{ "Edit a private contact with a fixed type", "branded-home ok 3 right ctx", "ok",
-		  "screen=contactedit count=3 hides=Timeslot_override hides=Type", 1, false },
+		  "screen=contactedit count=3 hides=TS hides=Type", 1, false },
 		{ "Add a private contact directly from its tab", "branded-home ok 3 right", "up ok",
 		  "screen=contactedit count=3 shows=New_Contact", 2, false },
 #endif

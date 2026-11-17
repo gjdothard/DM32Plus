@@ -1266,6 +1266,10 @@ msgid "Save to channel"
 msgstr "Salva nel canale"
 
 #: core/ui/ui_menus.c
+msgid "Make CH Default"
+msgstr "Canale predef."
+
+#: core/ui/ui_menus.c
 msgid "Make channel default"
 msgstr "Rendi canale predef."
 
@@ -1972,10 +1976,6 @@ msgstr "Nuovo contatto"
 #: core/ui/ui_menus.c
 msgid "Type"
 msgstr "Tipo"
-
-#: core/ui/ui_menus.c
-msgid "Timeslot override"
-msgstr "Slot assegnato"
 
 #: core/ui/ui_menus.c
 msgid "Talkgroup"

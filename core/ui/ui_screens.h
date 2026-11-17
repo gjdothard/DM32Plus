@@ -252,11 +252,11 @@ void ui_draw_position_footer(const ui_state_t *s);
 #endif
 const char *ui_ars_status(uint8_t state);
 void ui_draw_data_dashboard(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l);
-void ui_draw_numbered_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l);
+void ui_draw_numbered_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l, bool uniform);
 typedef enum {
 	UI_CARD_ZONES, UI_CARD_ZONE_CHANNELS, UI_CARD_TALKGROUPS, UI_CARD_CONTACTS,
 	UI_CARD_SCAN, UI_CARD_SCAN_LISTS, UI_CARD_SCAN_OPTIONS,
-	UI_CARD_MESSAGES, UI_CARD_COMPOSER, UI_CARD_APRS, UI_CARD_FIELDS,
+	UI_CARD_MESSAGES, UI_CARD_COMPOSER, UI_CARD_APRS, UI_CARD_FIELDS, UI_CARD_CONTACT_EDITOR,
 } ui_card_list_kind_t;
 void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kind_t kind);
 void ui_draw_card_thread(const ui_state_t *s, const ui_list_t *l, const char *(*text)(uint16_t));

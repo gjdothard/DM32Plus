@@ -185,7 +185,7 @@ static void hub_draw(void)
 		.count = hub_count(), .focus = f->focus, .top = &f->top,
 		.item = hub_item, .hint = TR("1-7 open  Back"),
 	};
-	ui_draw_numbered_menu(ui_view(), &ui_st, &list);
+	ui_draw_numbered_menu(ui_view(), &ui_st, &list, false);
 }
 #endif
 
@@ -489,7 +489,7 @@ static void act_item(uint16_t i, ui_item_t *it)
 			it->flags |= UI_ITEM_DIM;
 		break;
 	case A_MAKE_DEFAULT:
-		sb_str(&b, TR("Make channel default"));
+		sb_str(&b, ui_frame()->arg ? TR("Make CH Default") : TR("Make channel default"));
 		if (!(feats() & UI_FEAT_TALK_TARGET) || (ui_frame()->arg && (ui_view()->vfo || ui_view()->ch.mode != RADIO_MODE_DMR)))
 			it->flags |= UI_ITEM_DIM;
 		break;
@@ -3840,7 +3840,7 @@ static void ct_item(uint16_t i, ui_item_t *it)
 	i = ct_row(i);
 	str_copy(it->label, sizeof it->label, tr(labels[i]));
 	if (i == CT_TS && ct_fixed_type())
-		str_copy(it->label, sizeof it->label, TR("Timeslot override"));
+		str_copy(it->label, sizeof it->label, "TS");
 	sbuf_t b;
 	sb_init(&b, it->value, sizeof it->value);
 	switch (i) {

@@ -3661,7 +3661,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 	bool scan = kind >= UI_CARD_SCAN && kind <= UI_CARD_SCAN_OPTIONS;
 	bool aprs = kind == UI_CARD_APRS;
 	bool data = aprs;
-	bool fields = kind == UI_CARD_FIELDS;
+	bool fields = kind == UI_CARD_FIELDS || kind == UI_CARD_CONTACT_EDITOR;
 	char fit[40];
 	card_header(s, 24);
 	const char *title = fields ? (l->prefix ? l->prefix : l->name) : composer || data ? l->name : messages ? l->prefix : scan ? TR("Scan") :
@@ -3780,7 +3780,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 			gfx_text(font, name_x, yy + (step - 3 - font->h) / 2, fit, fg);
 		} else {
 			const font_t *font = aprs || kind == UI_CARD_SCAN_LISTS ? meta : sm;
-			if (fields && gfx_text_width(sm, item.label) + gfx_text_width(sm, item.value) + 5 > width - 18)
+			if (kind == UI_CARD_FIELDS && gfx_text_width(sm, item.label) + gfx_text_width(sm, item.value) + 5 > width - 18)
 				font = meta;
 			row_text(font, x, yy + (step - 3 - font->h) / 2, width - 11, item.label, item.value, fg, value,
 				 (item.flags & UI_ITEM_PREVIEW) != 0);
@@ -3871,7 +3871,7 @@ void ui_draw_card_thread(const ui_state_t *s, const ui_list_t *l, const char *(*
 	card_list_footer(s, bottom + 4, l->hint, NULL, fit, sizeof fit);
 }
 
-void ui_draw_numbered_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l)
+void ui_draw_numbered_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l, bool uniform)
 {
 #if CONFIG_DUAL_WATCH
 	if (ui_card_layout(s) && l->count) {
@@ -3902,13 +3902,15 @@ void ui_draw_numbered_menu(const radio_view_t *v, const ui_state_t *s, const ui_
 				right -= vw + 6;
 				gfx_text(meta, right, ky, item.value, ui_col.warn);
 			}
-			const font_t *label = gfx_text_width(sm, item.label) <= right - 28 ? sm : meta;
+			const font_t *label = uniform || gfx_text_width(sm, item.label) <= right - 28 ? sm : meta;
 			gfx_text_fit(label, item.label, right - 28, fit, sizeof fit);
 			gfx_text(label, 25, text_y + (sm->h - label->h) / 2, fit, fg);
 		}
 		card_list_footer(s, footer, TR("OK Select"), TR("Back"), fit, sizeof fit);
 		return;
 	}
+#else
+	(void)uniform;
 #endif
 	ui_draw_list(v, s, l);
 }

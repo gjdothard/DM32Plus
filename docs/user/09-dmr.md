@@ -60,8 +60,8 @@ Each channel holds up to 63 assignments, subject to shared space. Each contact u
 when set. Otherwise, it follows the channel's timeslot.
 
 Use **Add talkgroup** or **Add contact** from the corresponding directory tab. For a saved entry, press **# More**
-and choose **Edit** to change its name or number. Talkgroups also have a **Timeslot override**. Saved assignments
-follow edits to their group contact. **Make channel default** sets the saved channel's TX contact.
+and choose **Edit** to change its name or number. **TS** sets a talkgroup's timeslot override. Saved assignments
+follow edits to their group contact. **Make CH Default** sets the saved channel's TX contact.
 
 Hold **#** on a DMR channel to open the talk target picker: the channel's default, the reply target, the RX group
 list's talkgroups, recent talkgroups, and "Type a number..." to dial an ID or talkgroup by hand. The **Talk target**

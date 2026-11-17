@@ -1840,7 +1840,7 @@ static void list_draw(const ui_scr_def_t *d)
 	if (ui_card_layout(&ui_st)) {
 		if (f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_GPS) {
 			l.prefix = l.name;
-			ui_draw_numbered_menu(view, &ui_st, &l);
+			ui_draw_numbered_menu(view, &ui_st, &l, false);
 			return;
 		}
 		if (f->scr == SCR_APRS) {
@@ -1857,13 +1857,13 @@ static void list_draw(const ui_scr_def_t *d)
 		if (f->scr == SCR_TOOLS || (f->scr == SCR_SETTINGS && CONFIG_UI_SETTINGS)) {
 			if (f->scr == SCR_TOOLS)
 				l.prefix = TR("Tools & Utilities");
-			ui_draw_numbered_menu(view, &ui_st, &l);
+			ui_draw_numbered_menu(view, &ui_st, &l, false);
 			return;
 		}
 #if CONFIG_CONTACT_EDIT
 		if (f->scr == SCR_ACTIONS && f->arg) {
 			l.prefix = l.name;
-			ui_draw_numbered_menu(view, &ui_st, &l);
+			ui_draw_numbered_menu(view, &ui_st, &l, true);
 			return;
 		}
 		if (f->scr == SCR_CONTACT_EDIT || f->scr == SCR_CHANNEL || f->scr == SCR_TEXT || f->scr == SCR_DISCARD) {
@@ -1874,7 +1874,7 @@ static void list_draw(const ui_scr_def_t *d)
 			} else if (f->scr == SCR_DISCARD) {
 				l.hint = TR("OK pick  Back");
 			}
-			ui_draw_card_list(&ui_st, &l, UI_CARD_FIELDS);
+			ui_draw_card_list(&ui_st, &l, f->scr == SCR_CONTACT_EDIT ? UI_CARD_CONTACT_EDITOR : UI_CARD_FIELDS);
 			return;
 		}
 #endif
