@@ -12,7 +12,8 @@
 // sectors: a sector the codeplug shares with the radio's own settings (0x6000) keeps them.
 
 import { CodeplugImage, REGIONS, IDDB_HEADER, CODEPLUG_SPAN } from "./image.js";
-import { decodeTalkGroups } from "./talkgroups.js";
+import { decodeTalkGroups, TALK_GROUP_START, TALK_GROUP_END } from "./talkgroups.js";
+import { BANK_SIZE, POOL_START, POOL_END, readPool, writePool } from "./talkgroup-pool.js";
 import { readHeader, extent, AREA1, AREA1_SIZE, AREA2 } from "./iddb.js";
 import { GENERAL, BOOT_TEXT } from "./records.js";
 import { channelKeySlot } from "./channelkeys.js";
@@ -52,9 +53,17 @@ export function keepIdentity(want, have) {
 }
 
 // Regions of the codeplug a write may change
-export function writeRanges() {
+export function writeRanges(want = null) {
 	const out = [];
 	for (const [a, b] of REGIONS) {
+		if (a === POOL_START) {
+			if (want?.talkgroupBank !== undefined) {
+				const start = POOL_START + want.talkgroupBank * BANK_SIZE;
+				out.push([start, start + BANK_SIZE]);
+			}
+			continue;
+		}
+		if (want?.sharedTalkgroups && a === TALK_GROUP_START && b === TALK_GROUP_END) continue;
 		let s = a;
 		for (const [ka, kb] of KEEP_OUT) {
 			if (ka >= s && ka < b) {
@@ -249,8 +258,37 @@ export class CpsSerial {
 	// What a write sends. Fast: the blocks whose CRC on the radio differs from want's (have: the radio's bytes as last
 	// read, trusted for a block only where its CRC matches). CPS: the codeplug's bytes that differ from have (null:
 	// everything), and with iddb the whole ID database (never read back first: it can be megabytes)
+	// Rebase the desired assignment list against the radio's actual generations.
+	// A write only targets the inactive bank, even when it came from a different codeplug file.
+	async prepareTalkgroupWrite(want, have) {
+		const requested = readPool(want.bytes);
+		const capable = String(this.probe?.features ?? "").split(",").includes("DMR_TALKGROUP_POOL");
+		if (!requested && have && readPool(have.bytes)) throw new TransportError("talkgroups_convert_first");
+		if (!capable) {
+			if (requested) throw new TransportError("talkgroups_firmware");
+			return want;
+		}
+
+		const range = [[POOL_START, POOL_END]];
+		const actual = CodeplugImage.blank();
+		await this.fastOr(() => this.fastBlocks(actual, range, {}),
+			() => this.cpsGet(actual, range, {}));
+		const target = readPool(actual.bytes);
+		if (!requested) {
+			if (target) throw new TransportError("talkgroups_convert_first");
+			return want;
+		}
+		const prepared = want.clone();
+		prepared.bytes.set(actual.bytes.subarray(POOL_START, POOL_END), POOL_START);
+		const written = writePool(prepared.bytes, requested.lists);
+		prepared.sharedTalkgroups = true;
+		if (target?.index !== written.index) prepared.talkgroupBank = written.index;
+		return prepared;
+	}
+
 	async plan(want, have, { iddb = false } = {}) {
-		return this.fastOr(() => this.fastPlan(want, have, { iddb }), () => this.cpsPlan(want, have, { iddb }));
+		const image = await this.prepareTalkgroupWrite(want, have);
+		return this.fastOr(() => this.fastPlan(image, have, { iddb }), () => this.cpsPlan(image, have, { iddb }));
 	}
 
 	// fast() with the fast protocol, else cps(); cps() too when the radio refuses a block as out of range. SUMS, READ and
@@ -268,9 +306,12 @@ export class CpsSerial {
 	}
 
 	cpsPlan(want, have, { iddb = false } = {}) {
-		const plan = changes(want.bytes, have?.bytes ?? null, writeRanges());
+		const plan = changes(want.bytes, have?.bytes ?? null, writeRanges(want));
 		if (iddb) plan.push(...changes(want.bytes, null, iddbRanges(want)));
-		plan.sort((x, y) => x[0] - y[0]);
+		plan.sort((x, y) => {
+			const pool = ([addr]) => addr >= POOL_START && addr < POOL_END;
+			return Number(pool(x)) - Number(pool(y)) || x[0] - y[0];
+		});
 		const bytes = plan.reduce((n, [, runs]) => n + runs.reduce((m, [, d]) => m + d.length, 0), 0);
 		return { plan, bytes };
 	}
@@ -311,7 +352,9 @@ export class CpsSerial {
 	// Write the plan; throws when the radio refuses a sector
 	async write(want, have, { iddb = false, progress = () => {}, signal } = {}) {
 		const features = String(this.probe?.features || "").split(",");
-		const largest = Math.max(...Array.from({ length: 1024 }, (_, i) => decodeTalkGroups(want.bytes, i + 1).length));
+		const image = await this.prepareTalkgroupWrite(want, have);
+		const largest = image.sharedTalkgroups ? 0 :
+			Math.max(...Array.from({ length: 1024 }, (_, i) => decodeTalkGroups(want.bytes, i + 1).length));
 		if ((largest && !features.includes("DMR_TALKGROUP_ENTRIES")) ||
 			(largest > 4 && !features.includes("DMR_TALKGROUP_OVERFLOW")))
 			throw new TransportError("talkgroups_firmware");
@@ -319,7 +362,9 @@ export class CpsSerial {
 			Array.from({ length: 1024 }, (_, i) => channelKeySlot(want.bytes, i + 1)).some((s) => s !== 0))
 			throw new TransportError("channel_keys_firmware");
 		if (iddb && idDbEnd(want.bytes) > this.end) throw new TransportError("iddb_too_big");
-		return this.fastOr(() => this.fastWrite(want, have, { iddb, progress, signal }), () => this.cpsWrite(want, have, { iddb, progress, signal }));
+		const result = await this.fastOr(() => this.fastWrite(image, have, { iddb, progress, signal }),
+			() => this.cpsWrite(image, have, { iddb, progress, signal }));
+		return { ...result, image };
 	}
 
 	async cpsWrite(want, have, { iddb, progress, signal }) {
@@ -428,10 +473,14 @@ export class CpsSerial {
 	}
 
 	async fastPlan(want, have, { iddb = false } = {}) {
-		const cp = writeRanges(), db = iddb ? iddbRanges(want) : [];
+		const cp = writeRanges(want), db = iddb ? iddbRanges(want) : [];
 		want.ensure(Math.max(...[...cp, ...db].map(([, b]) => b)));
 		const sums = await this.fastSums(blocksOf([...cp, ...db]).map(([a]) => a));
 		const codeplug = await this.fastChanged(want, have, cp, sums);
+		codeplug.sort((x, y) => {
+			const pool = ([addr]) => addr >= POOL_START && addr < POOL_END;
+			return Number(pool(x)) - Number(pool(y)) || x[0] - y[0];
+		});
 		const ids = iddb ? await this.fastChanged(want, have, db, sums) : [];
 		// the database's header block: rewritten first erased and again last whenever any of it changes (iddb-compact.md
 		// 4.3), so a write cut short leaves no database rather than a mix
@@ -463,7 +512,7 @@ export class CpsSerial {
 		}
 		// a block the fast protocol refuses (outside what it serves on this radio) goes through the CPS
 		for (const a of refused) {
-			const runs = changes(want.bytes, null, writeRanges().filter(([x, y]) => x < a + BLOCK && y > a)
+			const runs = changes(want.bytes, null, writeRanges(want).filter(([x, y]) => x < a + BLOCK && y > a)
 				.map(([x, y]) => [Math.max(x, a), Math.min(y, a + BLOCK)]));
 			for (const [sector, r] of runs) await this.writeSector(sector, r);
 		}

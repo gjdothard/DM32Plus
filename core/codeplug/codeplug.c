@@ -646,6 +646,7 @@ uint8_t codeplug_talkgroups(uint16_t number, codeplug_talkgroup_t out[CODEPLUG_T
 #define TG_ENTRY_BASE (TG_BANK_HEADER + (CH_MAX + 1u) * 2u)
 #define TG_BANK_CAPACITY ((TG_BANK_SIZE - TG_ENTRY_BASE) / 2u)
 static const uint8_t talkgroup_bank_magic[] = { 'R', 'F', 'T', 'P', 1, 0, 0, 0 };
+static const uint8_t talkgroup_pending_magic[] = { 'R', 'F', 'T', 'P', 0, 'P', 'N', 'D' };
 static uint32_t talkgroup_pool_base, talkgroup_pool_serial;
 
 static bool talkgroup_bank(uint32_t addr, uint32_t *generation)
@@ -715,8 +716,177 @@ uint8_t codeplug_talkgroup_at(uint16_t number, uint8_t index, codeplug_talkgroup
 	return count;
 }
 
+static bool pool_list_bounds(uint32_t pool, uint16_t number, uint16_t *start, uint16_t *end)
+{
+	uint8_t bounds[4];
+	if (!flash_read(pool + TG_BANK_HEADER + 2u * (number - 1u), bounds, sizeof bounds))
+		return false;
+	*start = le16(bounds);
+	*end = le16(bounds + 2);
+	return *end >= *start && *end <= TG_BANK_CAPACITY &&
+	       *end - *start <= CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL;
+}
+
+bool codeplug_talkgroup_refs(uint16_t number, uint16_t *refs, uint8_t *count)
+{
+	if (!count)
+		return false;
+	*count = 0;
+	if (!number || number > CH_MAX)
+		return false;
+	storage_lock();
+	uint32_t pool = talkgroup_pool();
+	uint16_t first, end;
+	bool ok = source == CODEPLUG_OPENFW && pool &&
+		pool_list_bounds(pool, number, &first, &end);
+	if (ok) {
+		uint8_t n = (uint8_t)(end - first);
+		ok = n == 0 || !refs || flash_read(pool + TG_ENTRY_BASE + first * 2u, refs, n * 2u);
+		if (ok) {
+			for (unsigned i = 0; refs && i < n; i++)
+				refs[i] = le16((const uint8_t *)&refs[i]);
+			*count = n;
+		}
+	}
+	storage_unlock();
+	return ok;
+}
+
+typedef struct {
+	uint32_t source, target, generation;
+	uint16_t first, end, total, channel;
+	const uint16_t *refs;
+	uint8_t count;
+} tg_pool_update_t;
+
+static bool pool_target_owned(uint32_t target)
+{
+	uint8_t bytes[64];
+	if (!flash_read(target, bytes, sizeof bytes))
+		return false;
+	if (!memcmp(bytes, talkgroup_bank_magic, sizeof talkgroup_bank_magic) ||
+	    !memcmp(bytes, talkgroup_pending_magic, sizeof talkgroup_pending_magic))
+		return true;
+	for (uint32_t off = 0; off < TG_BANK_SIZE; off += sizeof bytes) {
+		if (off && !flash_read(target + off, bytes, sizeof bytes))
+			return false;
+		for (unsigned i = 0; i < sizeof bytes; i++)
+			if (bytes[i] != 0xFF)
+				return false;
+	}
+	return true;
+}
+
+static bool pool_make_sector(const tg_pool_update_t *u, uint32_t off, uint8_t *out)
+{
+	memset(out, 0xFF, STORAGE_SECTOR);
+	int delta = u->count - (u->end - u->first);
+	if (!off) {
+		memcpy(out, talkgroup_bank_magic, sizeof talkgroup_bank_magic);
+		for (unsigned i = 0; i < 4; i++)
+			out[8 + i] = (uint8_t)(u->generation >> (8u * i));
+		if (!flash_read(u->source + TG_BANK_HEADER, out + TG_BANK_HEADER, TG_ENTRY_BASE - TG_BANK_HEADER))
+			return false;
+		for (unsigned channel = u->channel; channel <= CH_MAX; channel++) {
+			uint8_t *offset = out + TG_BANK_HEADER + 2u * channel;
+			put16(offset, (uint16_t)(le16(offset) + delta));
+		}
+	}
+
+	uint32_t pos = off < TG_ENTRY_BASE ? TG_ENTRY_BASE : off;
+	uint32_t stop = TG_ENTRY_BASE + 2u * (u->total + delta);
+	if (stop > off + STORAGE_SECTOR)
+		stop = off + STORAGE_SECTOR;
+	while (pos < stop) {
+		uint32_t entry = (pos - TG_ENTRY_BASE) / 2u;
+		uint32_t k;
+		if (entry >= u->first && entry < (uint32_t)u->first + u->count) {
+			put16(out + pos - off, u->refs[entry - u->first]);
+			pos += 2;
+			continue;
+		}
+		if (entry < u->first) {
+			uint32_t before = TG_ENTRY_BASE + 2u * u->first;
+			k = (before < stop ? before : stop) - pos;
+		} else {
+			k = stop - pos;
+			entry = (uint32_t)((int)entry - delta);
+		}
+		if (!flash_read(u->source + TG_ENTRY_BASE + entry * 2u, out + pos - off, k))
+			return false;
+		pos += k;
+	}
+	return true;
+}
+
+bool codeplug_set_talkgroup_refs(uint16_t number, const uint16_t *refs, uint8_t count)
+{
+	if (!number || number > CH_MAX || count > CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL || (count && !refs))
+		return false;
+	uint8_t *scratch = storage_buffer_acquire();
+	if (!scratch)
+		return false;
+
+	storage_lock();
+	uint32_t pool = talkgroup_pool();
+	tg_pool_update_t update = {
+		.source = pool, .target = pool == TG_BANK_START ? TG_BANK_START + TG_BANK_SIZE : TG_BANK_START,
+		.channel = number, .refs = refs, .count = count,
+	};
+	uint8_t word[4];
+	bool ok = source == CODEPLUG_OPENFW && pool && (!count || is_used(number)) &&
+		pool_list_bounds(pool, number, &update.first, &update.end) &&
+		flash_read(pool + TG_BANK_HEADER + CH_MAX * 2u, word, 2);
+	if (ok) {
+		update.total = le16(word);
+		ok = update.total >= update.end && update.total <= TG_BANK_CAPACITY &&
+			update.total - (update.end - update.first) + count <= (int)TG_BANK_CAPACITY &&
+			flash_read(pool + 8, word, sizeof word) && pool_target_owned(update.target);
+		if (ok)
+			update.generation = le32(word) + 1;
+	}
+	for (unsigned i = 0; ok && i < count; i++) {
+		contact_t contact;
+		ok = codeplug_contact(refs[i], &contact) && contact.type == CONTACT_GROUP;
+		for (unsigned j = 0; ok && j < i; j++)
+			ok = refs[i] != refs[j];
+	}
+	uint32_t crc = 0;
+	for (uint32_t off = 0; ok && off < TG_BANK_SIZE; off += STORAGE_SECTOR) {
+		ok = pool_make_sector(&update, off, scratch);
+		if (!ok)
+			break;
+		if (!off) {
+			crc = storage_crc32(0, scratch + 8, 4);
+			crc = storage_crc32(crc, scratch + TG_BANK_HEADER, STORAGE_SECTOR - TG_BANK_HEADER);
+			// Mark the inactive bank as ours, but invalid, so a restart can reclaim it.
+			memcpy(scratch, talkgroup_pending_magic, sizeof talkgroup_pending_magic);
+			ok = storage_sector_write(update.target, scratch);
+		} else {
+			crc = storage_crc32(crc, scratch, STORAGE_SECTOR);
+			ok = storage_sector_write(update.target + off, scratch);
+		}
+	}
+	// Write the signature and checksum only after every continuation sector is durable.
+	if (ok && (ok = pool_make_sector(&update, 0, scratch))) {
+		for (unsigned i = 0; i < 4; i++)
+			scratch[12 + i] = (uint8_t)(crc >> (8u * i));
+		ok = storage_sector_write(update.target, scratch);
+	}
+	if (ok)
+		serial++;
+	storage_unlock();
+	storage_buffer_release();
+	return ok;
+}
+
 static bool clear_talkgroups(uint16_t number)
 {
+	if (talkgroup_pool()) {
+		uint8_t count;
+		return codeplug_talkgroup_refs(number, NULL, &count) &&
+		       (!count || codeplug_set_talkgroup_refs(number, NULL, 0));
+	}
 	codeplug_talkgroup_t entries[CODEPLUG_TALKGROUP_MAX];
 	if (!read_talkgroups(number, entries))
 		return true;
@@ -959,6 +1129,10 @@ bool codeplug_delete_channel(uint16_t number)
 	}
 	storage_lock();
 	bool ok = materialize();
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+	if (ok && is_used(number) && talkgroup_pool())
+		ok = clear_talkgroups(number);
+#endif
 	if (ok && is_used(number)) {
 		set_used(number, false);
 		ok = write_bitmap(number);

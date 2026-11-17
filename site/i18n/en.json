@@ -1885,5 +1885,14 @@
  "editor.qdmr.note.channel_keys": "{n} channel encryption assignments cannot be represented in this YAML export. Use a binary codeplug or CSV to retain them.",
  "editor.qdmr.note.talkgroups": "{n} channels have operating talkgroups that YAML cannot store. Use a binary codeplug or CSV to retain them.",
  "editor.radio_err.talkgroups_firmware": "Update the radio firmware before programming operating talkgroups.",
- "flash.c7.err.wrapped_image": "This file has a vendor-updater header. For the web updater, choose the raw application .bin file, with or without its merged codec. Do not use the _BFUV32.bin file."
+ "flash.c7.err.wrapped_image": "This file has a vendor-updater header. For the web updater, choose the raw application .bin file, with or without its merged codec. Do not use the _BFUV32.bin file.",
+ "editor.tg.search": "Search saved talkgroups",
+ "editor.tg.channel_slot": "Channel default",
+ "editor.tg.space": "{n} shared slots free",
+ "editor.tg.up": "Move up",
+ "editor.tg.down": "Move down",
+ "editor.tg.remove": "Remove",
+ "editor.tg.assigned": "Assigned (knob order)",
+ "editor.tg.in_use": "Remove or replace assignments on these channels first: {channels}",
+ "editor.radio_err.talkgroups_convert_first": "Convert this codeplug before replacing the radio's shared talkgroup pool."
 }

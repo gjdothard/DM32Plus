@@ -10,6 +10,7 @@ import { parseFreq, parseTone, mhz } from "../codeplug/fields.js";
 import { LIMITS, POWER_NAMES } from "../codeplug/records.js";
 import { refNumber, listenBand } from "../codeplug/model.js";
 import { TALK_GROUP_MAX, validTalkGroups } from "../codeplug/talkgroups.js";
+import { MAX_ASSIGNMENTS, POOL_CAPACITY } from "../codeplug/talkgroup-pool.js";
 
 // --- Parsers shared by the columns and the forms ---
 
@@ -258,7 +259,7 @@ export function channelForm(m, t) {
 		dmr({ group: t("editor.form.digital") }),
 		dmr(sel("colorCode", "editor.col.cc", () => [...Array(16).keys()].map((n) => [n, String(n)]))),
 		dmr(sel("timeslot", "editor.col.ts", () => [[1, "1"], [2, "2"]])),
-		dmr(operatingTalkgroups(m.contacts, t)),
+		dmr(m.sharedTalkgroups ? sharedOperatingTalkgroups(m, t) : operatingTalkgroups(m.contacts, t)),
 		dmr(sel("privacySlot", "editor.col.encryption", (r) => encryptionOptions(t, r?.privacySlot))),
 		dmr(sel("contact", "editor.col.contact", () => refOptions(m.contacts, t))),
 		dmr(sel("rxList", "editor.col.rx_list", () => refOptions(m.rxLists, t))),
@@ -295,6 +296,71 @@ const coord = (t, max) => (r, k, v) => {
 	if (!Number.isFinite(n) || Math.abs(n) > max) return t("editor.err.range", { min: -max, max });
 	r[k] = n;
 };
+
+function sharedOperatingTalkgroups(model, t) {
+	const choices = model.contacts.filter(contact => contact.type === "group");
+	const key = "talkgroupRefs";
+	return {
+		key,
+		label: t("editor.col.talkgroups"),
+		render(id, entries = []) {
+			const selected = [...entries];
+			const details = h("details", { id, class: "operating-talkgroups", "aria-labelledby": id + "-label" });
+			const summary = h("summary");
+			const filter = h("input", { type: "search", "aria-label": t("editor.tg.search"),
+				placeholder: t("editor.tg.search") });
+			const assigned = h("ol", { class: "operating-talkgroup-list" });
+			const list = h("div", { class: "operating-talkgroup-list" });
+			const label = contact => typeof contact === "number" ? `#${contact}` :
+				`${contact.name} · TG ${contact.id} · ${contact.timeslot ? `TS${contact.timeslot}` : t("editor.tg.channel_slot")}`;
+			const other = model.channels.reduce((total, channel) =>
+				total + (channel.mode === "dmr" ? (channel.talkgroupRefs?.length ?? 0) : 0), 0) - entries.length;
+			const control = (text, action, disabled = false) =>
+				h("button", { type: "button", onclick: action, disabled }, text);
+			const update = () => {
+				const left = Math.max(0, POOL_CAPACITY - other - selected.length);
+				summary.textContent = `${t("editor.col.talkgroups")} · ${selected.length}/${MAX_ASSIGNMENTS} · ${t("editor.tg.space", { n: left })}`;
+				assigned.replaceChildren(...selected.map((contact, i) => {
+					const move = offset => () => {
+						const next = i + offset;
+						[selected[i], selected[next]] = [selected[next], selected[i]];
+						update();
+					};
+					return h("li", {}, label(contact), " ",
+						control(t("editor.tg.up"), move(-1), i === 0), " ",
+						control(t("editor.tg.down"), move(1), i === selected.length - 1), " ",
+						control(t("editor.tg.remove"), () => { selected.splice(i, 1); update(); }));
+				}));
+				const query = filter.value.trim().toLowerCase();
+				list.replaceChildren(...choices.filter(contact => label(contact).toLowerCase().includes(query))
+					.map(contact => {
+						const index = selected.indexOf(contact);
+						return h("label", {}, h("input", {
+							type: "checkbox", checked: index >= 0,
+							disabled: index < 0 && (!left || selected.length >= MAX_ASSIGNMENTS),
+							onchange(event) {
+								if (event.target.checked) selected.push(contact);
+								else selected.splice(index, 1);
+								update();
+							},
+						}), label(contact));
+					}));
+			};
+			filter.addEventListener("input", update);
+			details.readTalkGroups = () => [...selected];
+			update();
+			details.append(summary, h("strong", {}, t("editor.tg.assigned")), assigned, filter, list);
+			return details;
+		},
+		read(input) { return input.readTalkGroups(); },
+		parse(record, field, refs) {
+			if (refs.length > MAX_ASSIGNMENTS || new Set(refs).size !== refs.length ||
+			    refs.some(contact => !choices.includes(contact)))
+				return t("editor.err.talkgroups", { max: MAX_ASSIGNMENTS });
+			record[field] = refs;
+		},
+	};
+}
 
 function operatingTalkgroups(contacts, t) {
 	const options = new Map();

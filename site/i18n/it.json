@@ -1885,5 +1885,14 @@
  "editor.qdmr.note.channel_keys": "{n} assegnazioni di cifratura per canale non sono rappresentabili in questo file YAML. Usare un codeplug binario o CSV per conservarle.",
  "editor.qdmr.note.talkgroups": "{n} canali hanno gruppi operativi che YAML non può salvare. Usare un codeplug binario o CSV per conservarli.",
  "editor.radio_err.talkgroups_firmware": "Aggiornare il firmware prima di programmare i gruppi operativi.",
- "flash.c7.err.wrapped_image": "Questo file contiene un’intestazione per l’aggiornamento del produttore. Per l’aggiornamento web, scegliere il file .bin dell’applicazione senza intestazione, con o senza codec integrato. Non usare il file _BFUV32.bin."
+ "flash.c7.err.wrapped_image": "Questo file contiene un’intestazione per l’aggiornamento del produttore. Per l’aggiornamento web, scegliere il file .bin dell’applicazione senza intestazione, con o senza codec integrato. Non usare il file _BFUV32.bin.",
+ "editor.tg.search": "Cerca talkgroup salvati",
+ "editor.tg.channel_slot": "Predefinito del canale",
+ "editor.tg.space": "{n} posti condivisi liberi",
+ "editor.tg.up": "Sposta su",
+ "editor.tg.down": "Sposta giù",
+ "editor.tg.remove": "Rimuovi",
+ "editor.tg.assigned": "Assegnati (ordine del selettore)",
+ "editor.tg.in_use": "Rimuovi o sostituisci prima le assegnazioni su questi canali: {channels}",
+ "editor.radio_err.talkgroups_convert_first": "Convertire il codeplug prima di sostituire i talkgroup condivisi della radio."
 }

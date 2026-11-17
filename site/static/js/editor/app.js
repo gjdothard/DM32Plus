@@ -8,7 +8,7 @@ import { h, t, ROOT, HOME, button, notice, download, progressBar, num as fmtNum,
 import { equal } from "../flasher/bytes.js";
 import { SerialStream, serialSupported, RFOUNDRY_USB, browserErrorKey, knownRadioPort } from "../flasher/link.js";
 import { CodeplugImage, IDDB_HEADER, REGIONS } from "../codeplug/image.js";
-import { decode, encode, empty, remove, validate, newChannel, newContact, numberAll, assignNumbers } from "../codeplug/model.js";
+import { channelsUsingTalkgroups, decode, encode, empty, remove, validate, newChannel, newContact, numberAll, assignNumbers } from "../codeplug/model.js";
 import { LIMITS, decodeGeneral } from "../codeplug/records.js";
 import { CpsSerial, TransportError, estimate, keepIdentity, IDENTITY, iddbRanges } from "../codeplug/transport.js";
 import { FastError } from "../codeplug/fastlink.js";
@@ -268,6 +268,13 @@ function duplicate(tab, g) {
 function del(tab, g) {
 	const items = g.targets();
 	if (!items.length) return;
+	if (tab === "contacts") {
+		const channels = channelsUsingTalkgroups(S.model, items);
+		if (channels.length) {
+			say(t("editor.tg.in_use", { channels: channels.map(channel => channel.name).join(", ") }), "bad");
+			return;
+		}
+	}
 	const go = () => change(t("editor.undo.delete"), () => remove(S.model, tab, items));
 	if (items.length === 1) return go();
 	confirmDialog(t("editor.delete_confirm", { n: items.length }), t("editor.delete"), go);
@@ -909,10 +916,10 @@ function writeChosen(c, { want }, iddb, prepared) {
 				return r;
 			});
 			diag.note("write done", { bytes: res.bytes, sectors: res.sectors });
-			c.image = want.clone();
+			c.image = (res.image ?? want).clone();
 			if (iddb) c.dbKnown = true;
 			S.iddbChanged = false;
-			S.model.base = want;
+			S.model.base = res.image ?? want;
 			S.model.iddb = dbHeader(want.bytes);	// format N when it went to a radio that reads only that
 			S.dirty = false;
 			refresh();

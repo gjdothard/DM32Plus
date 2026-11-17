@@ -7,6 +7,7 @@
 // every byte the editor doesn't decode, and grows past CODEPLUG_SPAN when a DMR ID database needs more room.
 
 import { TALK_GROUP_START, TALK_GROUP_END } from "./talkgroups.js";
+import { POOL_START, POOL_END } from "./talkgroup-pool.js";
 
 export const CODEPLUG_SPAN = 0x120000;
 export const EE = 0x00000;	// EEPROM image
@@ -19,6 +20,7 @@ export const REGIONS = [
 	[EE + 0x07500, EE + 0x0B000],
 	[EE + TALK_GROUP_START, EE + TALK_GROUP_END],
 	[FL + 0x00000, FL + 0x011A0],
+	[POOL_START, POOL_END],
 	[FL + 0x7B000, FL + 0x8EE60],
 ];
 // The DMR ID database header (7.5; format C's is 32 bytes, iddb-compact.md 3.1): enough to tell whether one is there,

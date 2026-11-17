@@ -13,6 +13,7 @@ const HEADER = 16;
 const ENTRY_BASE = HEADER + (CHANNELS + 1) * 2;
 export const POOL_CAPACITY = (BANK_SIZE - ENTRY_BASE) / 2;
 const MAGIC = Uint8Array.of(0x52, 0x46, 0x54, 0x50, 1, 0, 0, 0);
+const PENDING = Uint8Array.of(0x52, 0x46, 0x54, 0x50, 0, 0x50, 0x4E, 0x44);
 
 function wordView(bytes) {
 	return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -64,11 +65,23 @@ export function readPool(bytes) {
 	return first ? { ...first, index: 0 } : null;
 }
 
+export function sameAssignments(a, b) {
+	if (!a || a.size !== b.size) return false;
+	for (const [channel, refs] of b) {
+		const old = a.get(channel);
+		if (!old || old.length !== refs.length || refs.some((ref, i) => ref !== old[i])) return false;
+	}
+	return true;
+}
+
 export function writePool(bytes, lists) {
 	const current = readPool(bytes);
+	if (current && sameAssignments(current.lists, lists))
+		return { index: current.index, used: [...lists.values()].reduce((n, refs) => n + refs.length, 0) };
+
 	const index = current ? 1 - current.index : 0;
 	const target = bank(bytes, index);
-	if (target.length !== BANK_SIZE || (!owned(target) && !target.every(byte => byte === 0xFF)))
+	if (target.length !== BANK_SIZE || (!owned(target) && !PENDING.every((byte, i) => byte === target[i]) && !target.every(byte => byte === 0xFF)))
 		throw new Error("Operating talkgroup pool overlaps unknown codeplug data");
 
 	for (const [channel, refs] of lists) {

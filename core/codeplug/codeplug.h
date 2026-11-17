@@ -160,6 +160,11 @@ uint8_t codeplug_talkgroups(uint16_t number, codeplug_talkgroup_t out[CODEPLUG_T
 // Resolve one ordered assignment. Returns the list length, with *out cleared for a missing reference.
 #define CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL 63
 uint8_t codeplug_talkgroup_at(uint16_t number, uint8_t index, codeplug_talkgroup_t *out);
+// Read the channel's contact slots. A converted pool must be installed first.
+bool codeplug_talkgroup_refs(uint16_t number, uint16_t *refs, uint8_t *count);
+// Replace only this channel's ordered list; the prior bank remains valid until the replacement commits.
+bool codeplug_set_talkgroup_refs(uint16_t number, const uint16_t *refs, uint8_t count);
+
 
 #endif
 #define CODEPLUG_CONTACTS_MAX	1024
