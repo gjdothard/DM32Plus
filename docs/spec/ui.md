@@ -37,6 +37,8 @@ The Radio submenu uses numbered navigation cards. All Channels uses two-line car
 details, plus a dedicated Find region. Its numbering, filtering, edit action, and tune shortcut are unchanged.
 Find and Talk to use the same card frame, with contact IDs separated from names and type or source shown
 on a second line. Channel TX-contact and RX-group pickers use field cards with a Find region.
+Dual Watch uses numbered action cards and channel/zone picker cards. Picker titles include the pane letter;
+the other pane's channel stays dimmed and marked in use. Existing A/B selection and stop behavior are unchanged.
 Contacts & Talkgroups uses separate group and private-call tabs on the same filtered contacts list.
 The horizontal actions change tabs and keep the filter text. The first two assignable side keys supply
 those actions while the directory is open. The ID has a dedicated column, and a long name can shorten.
@@ -583,6 +585,8 @@ and key map pairs (K at 160x120i5, M at 128x64, V at 160x128, K at 240x320) plus
 Shared behavior flows select Quick controls by name because the grids differ by mode and display layout.
 Independent order checks pin all nine numbered positions in the standard and wide FM and DMR memory grids
 and both VFO grids, with and without a Home brand. Card flows also press specific number keys.
+Screen expectations compare literal debug screen identifiers, including underscores. Text expectations
+continue to use an underscore for a space.
 Copy to VFO flows use its assignable key. VOX flows cover the standard FM memory grid and the FM VFO;
 the wide FM memory grid has Offset on key 6.
 A crawler then visits every reachable screen and checks the rules that hold everywhere: BACK leaves every screen, long

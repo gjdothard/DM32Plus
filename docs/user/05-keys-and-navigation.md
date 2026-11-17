@@ -94,6 +94,8 @@ On the card layout, **Activity / Logs** shows callers as cards, with their call 
 **OK** opens the channel editor and **#** tunes to the focused channel.
 Find and Talk to keep their existing key actions in the card layout. Names and IDs have separate places,
 and a second line identifies the result type or why a talk target appears in the list.
+Dual Watch actions use numbered cards. Its channel and zone pickers name the pane being changed;
+the channel already used by the other pane is dimmed and marked in use.
 
 The 24-hour clock is to the right of the battery percentage on the tall branded display. It uses fresh GPS time or a valid hardware
 clock, with the saved **Settings > Location > UTC offset**. On a radio with RTC support, let GPS acquire a fix once

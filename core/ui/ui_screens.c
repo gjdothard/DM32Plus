@@ -3537,13 +3537,15 @@ void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kin
 		y += meta->h + 14;
 	}
 	// Values can move below labels; a translation never makes one row use a smaller label font.
-	if (kind == UI_CARD_PAGE_FIELDS) {
+	if (kind == UI_CARD_PAGE_FIELDS || actions) {
 		for (uint16_t i = 0; i < l->count; i++) {
 			ui_item_t item = { 0 };
 			l->item(i, &item);
-			if (gfx_text_width(font, item.label) + gfx_text_width(font, item.value) + 8 > width - 16)
+			if (actions && item.value[0])
 				step = 44;
-			if (gfx_text_width(font, item.label) > width - 16)
+			if (!actions && step < 44 && gfx_text_width(font, item.label) + gfx_text_width(font, item.value) + 8 > width - 16)
+				step = 44;
+			if (!actions && gfx_text_width(font, item.label) > width - 16)
 				step = 2 * font->h + meta->h + 12;
 		}
 	}
@@ -3576,10 +3578,14 @@ void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kin
 		int right = width - (actions ? 17 : 9);
 		if (actions)
 			gfx_text(meta, width - 12, yy + 9, ">", focus ? highlight : CARD_EDGE);
-		if (kind == UI_CARD_PAGE_DETAILS) {
+		if (kind == UI_CARD_PAGE_DETAILS || (actions && step == 44)) {
 			char value[44];
 			bool more;
-			gfx_text_alt(item.value, 0, value, sizeof value, &more);
+			if (actions) {
+				detail = detail ? detail : item.value;
+				value[0] = 0;
+			} else
+				gfx_text_alt(item.value, 0, value, sizeof value, &more);
 			int vw = gfx_text_width(meta, value);
 			fit_end(font, item.label, right - x - (vw ? vw + 6 : 0), fit, sizeof fit);
 			gfx_text(font, x, yy + 4, fit, fg);

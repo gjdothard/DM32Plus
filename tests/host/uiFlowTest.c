@@ -1461,6 +1461,14 @@ int main(void)
 		run_flow(&card_quick[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
 #if CONFIG_UI_CARD_MENU
 	static const flow_t card_menu[] = {
+		{ "Dual Watch action cards retain pane choices", "branded-home quick 3", "ctx",
+			"screen=dual shows=20:12 shows=Talk_on_B shows=Change_A shows=Stop,_stay_on_A", 1, false },
+		{ "Dual Watch cards keep B in the picker title", "branded-home quick 3 ctx", "3",
+			"screen=dual_pick shows=Watch_on_B shows=In_use shows=FM", 1, false },
+		{ "Dual Watch cards keep B in the zone title", "branded-home quick 3 ctx 3", "up up up up ok",
+			"screen=dual_zone shows=Zone_for_B shows=Local_repeaters", 5, false },
+		{ "Dual Watch picker cards change only B", "branded-home quick 3 ctx 3", "5 ok",
+			"screen=home apos=3 bpos=5 dual=1", 2, false },
 		{ "Find cards retain IDs and result kinds", "branded-home", "5 6 3",
 			"screen=find shows=Find shows=K1ABC_Joe shows=3101234 shows=Contact", 3, false },
 		{ "Find card PTT keeps private targeting", "branded-home 5 6 3", "ptt",

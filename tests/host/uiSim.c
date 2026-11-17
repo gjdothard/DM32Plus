@@ -242,6 +242,9 @@ static const struct { const char *name, *script; } audit_extra[] = {
 	{ "channel_cards_filtered", "branded-home ok 1 2 2 6" },
 	{ "find_cards", "branded-home 5 6 3" },
 	{ "target_cards", "branded-home quick 4" },
+	{ "dual_action_cards", "branded-home quick 3 ctx" },
+	{ "dual_picker_cards", "branded-home quick 3 ctx 3" },
+	{ "dual_zone_cards", "branded-home quick 3 ctx 3 up up up up ok" },
 	{ "contact_picker_cards", "branded-home ok 1 2 ok down down down down down down down down down ok" },
 	{ "caller_cards_temporary", "branded-home quick 1 up ok back call:3101234,91,g wait:11000 ctx up" },
 	{ "caller_cards_rx", "branded-home rx:3101234,91,g ctx" },
@@ -579,6 +582,9 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 			snprintf(script, slen, "branded-home ok 1 2 ok down down down down down down down down down ok");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "talk_target_picker_vfo"))
 			snprintf(script, slen, "branded-home vfokey quick 4 tt");
+		else if (!strcmp(g->name, "240x320i10x5") &&
+			 (!strcmp(name, "dual_actions") || !strcmp(name, "dual_pick") || !strcmp(name, "dual_zones")))
+			snprintf(script, slen, "branded-home quick 3%s", gallery[i].script + strlen("quick 7"));
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "recent"))
 			snprintf(script, slen, "branded-home call:3101234,91,g call:3105678,3100,g call:3102222,0,p wait:11000 ok 6");
 #if CONFIG_CONTACT_EDIT

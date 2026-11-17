@@ -1840,6 +1840,21 @@ static void list_draw(const ui_scr_def_t *d)
 	if (CONFIG_UI_SETTINGS && CONFIG_DMR_ARS && f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_ARS)
 		l.hint = TR("OK change  Back");
 	if (ui_card_layout(&ui_st)) {
+		if (f->scr == SCR_DUAL || f->scr == SCR_DUAL_PICK || f->scr == SCR_DUAL_ZONE) {
+			if (f->scr != SCR_DUAL) {
+				static char pane_title[48];
+				sbuf_t title;
+				sb_init(&title, pane_title, sizeof pane_title);
+				sb_str(&title, l.prefix);
+				sb_chr(&title, ' ');
+				sb_str(&title, l.name);
+				l.prefix = pane_title;
+				l.name = NULL;
+			}
+			ui_draw_card_page(&ui_st, &l, f->scr == SCR_DUAL ? UI_CARD_PAGE_ACTIONS :
+				f->scr == SCR_DUAL_PICK ? UI_CARD_PAGE_DETAILS : UI_CARD_PAGE_FIELDS);
+			return;
+		}
 		if (f->scr == SCR_FIND || f->scr == SCR_PICKER || f->scr == SCR_CHPICK) {
 			if (f->scr == SCR_FIND)
 				l.prefix = TR("Find");

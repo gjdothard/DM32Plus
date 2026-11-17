@@ -57,7 +57,7 @@ msgstr "Ora predef.: "
 msgid "Talking to "
 msgstr "Parli con "
 
-#: core/ui/ui_app.c core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/ui_app.c core/ui/ui_dual.c core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "No calls heard yet"
 msgstr "Nessuna chiamata ancora"
 
@@ -948,6 +948,10 @@ msgstr "1-5 scegli  Indietro"
 #: core/ui/ui_dual.c core/ui/ui_menus.c
 msgid "Zone"
 msgstr "Zona"
+
+#: core/ui/ui_dual.c core/ui/ui_menus.c
+msgid "In use"
+msgstr "In uso"
 
 #: core/ui/ui_dual.c
 msgid "Watch on"
@@ -3352,10 +3356,6 @@ msgstr "Ancora niente da saltare"
 #: core/ui/ui_menus.c
 msgid "Scan stopped here"
 msgstr "Scansione ferma qui"
-
-#: core/ui/ui_menus.c
-msgid "In use"
-msgstr "In uso"
 
 #: core/ui/ui_menus.c
 msgid "Channel talkgroup list is full"

@@ -2389,9 +2389,10 @@ static bool check(const char *kv, char *err, size_t len)
 	memcpy(key, kv, (size_t)(eq - kv));
 	key[eq - kv] = 0;
 	snprintf(want, sizeof want, "%s", eq + 1);
-	for (char *p = want; *p; p++)
-		if (*p == '_')
-			*p = ' ';
+	if (strcmp(key, "screen") != 0)
+		for (char *p = want; *p; p++)
+			if (*p == '_')
+				*p = ' ';
 	ui_app_status_t s;
 	ui_app_status(&s);
 	bool prefix = false;
