@@ -6650,7 +6650,8 @@ static void picker_item(uint16_t i, ui_item_t *it)
 		}
 		ui_target_t target = { .id = entry.id, .group = true };
 		contact_t contact;
-		if (codeplug_contact_find(entry.id, true, &contact))
+		if (entry.contact_number ? codeplug_contact(entry.contact_number, &contact) :
+		    codeplug_contact_find(entry.id, true, &contact))
 			str_copy(target.name, sizeof target.name, contact.name);
 		ui_sb_target(it->label, sizeof it->label, &target);
 		it->flags |= UI_ITEM_PREVIEW;	// keep the leading TG ID when a long contact name needs ellipsis

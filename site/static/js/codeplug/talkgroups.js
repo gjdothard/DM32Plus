@@ -68,20 +68,6 @@ export function decodeTalkGroups(bytes, number) {
 	return extra.length === count && validTalkGroups(combined) ? combined : entries;
 }
 
-// Absolute image offsets for a validated legacy list. Migration references these bytes for
-// entries that cannot be represented by a saved contact with the same effective slot.
-export function legacyTalkGroupAddresses(bytes, number) {
-	const length = decodeTalkGroups(bytes, number).length;
-	const base = TALK_GROUP_START + (number - 1) * INLINE_MAX * 4;
-	const addresses = Array.from({ length: Math.min(length, INLINE_MAX) }, (_, i) => base + i * 4);
-	if (length > INLINE_MAX) {
-		const at = OVERFLOW + MAGIC.length + (number - 1) * 2;
-		const first = POOL + ((bytes[at] | bytes[at + 1] << 8) & 0x1FF) * 4;
-		for (let i = 0; i < length - INLINE_MAX; i++) addresses.push(first + i * 4);
-	}
-	return addresses;
-}
-
 function putEntry(data, offset, { id, timeslot }) {
 	data.set([id & 0xFF, (id >> 8) & 0xFF, id >> 16, TAG + timeslot - 1], offset);
 }

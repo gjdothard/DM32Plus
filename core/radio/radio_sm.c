@@ -1015,7 +1015,8 @@ static void dmr_load_channel(radio_sm_t *sm)
 		sm->talk_id = entry.id;
 		sm->talk_ts = entry.timeslot;
 		sm->talk_private = false;
-		find_name(sm, entry.id, true, c.name);
+		if (!entry.contact_number || !codeplug_contact(entry.contact_number, &c))
+			find_name(sm, entry.id, true, c.name);
 		if (c.name[0]) {
 			c.id = entry.id;
 			c.type = CONTACT_GROUP;

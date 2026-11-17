@@ -153,6 +153,7 @@ void codeplug_openfw_encode(const channel_t *ch, uint8_t *rec);
 #define CODEPLUG_TALKGROUP_MAX	16
 typedef struct {
 	uint32_t id;
+	uint16_t contact_number;	// saved slot when stored in the shared pool
 	uint8_t timeslot;
 } codeplug_talkgroup_t;
 uint8_t codeplug_talkgroups(uint16_t number, codeplug_talkgroup_t out[CODEPLUG_TALKGROUP_MAX]);

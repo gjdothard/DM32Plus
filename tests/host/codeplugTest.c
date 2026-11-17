@@ -740,14 +740,16 @@ static void test_talkgroup_records(void)
 		put16(older + 16 + i * 2, i < 2 ? 0 : 63);
 	for (unsigned i = 0; i < 62; i++)
 		put16(older + entries_start + i * 2, (uint16_t)(i + 1));
-	put16(older + entries_start + 62 * 2, 0x8004);	// exact legacy bytes of channel 2 entry 1
+	put_contact(100, "TG 3100 TS1", 3100, CONTACT_GROUP, 0x00);
+	put_contact(101, "TG 3100000 TS2", 3100000, CONTACT_GROUP, 0x02);
+	put16(older + entries_start + 62 * 2, 100);
 	put_pool_u32(older + 12, storage_crc32(storage_crc32(0, older + 8, 4), older + 16, 0x4000 - 16));
 	memcpy(newer, older, 0x4000);
 	put_pool_u32(newer + 8, 2);	// until the new checksum is present this bank must be ignored
 	CHECK(codeplug_reload() == CODEPLUG_OPENFW);
 	CHECK(codeplug_talkgroup_at(2, 62, &item) == 63 && item.id == 3100 && item.timeslot == 1);
 
-	put16(newer + entries_start + 62 * 2, 0x8005);
+	put16(newer + entries_start + 62 * 2, 101);
 	put_pool_u32(newer + 12, storage_crc32(storage_crc32(0, newer + 8, 4), newer + 16, 0x4000 - 16));
 	CHECK(codeplug_reload() == CODEPLUG_OPENFW);
 	CHECK(codeplug_talkgroup_at(2, 62, &item) == 63 && item.id == 3100000 && item.timeslot == 2);

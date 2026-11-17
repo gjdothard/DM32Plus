@@ -638,14 +638,13 @@ uint8_t codeplug_talkgroups(uint16_t number, codeplug_talkgroup_t out[CODEPLUG_T
 	return count;
 }
 
-// Two generations in the open-firmware flash image. The legacy EEPROM records
-// stay in place so unresolved assignments can point to their original ID/slot bytes.
+// Two generations in the open-firmware flash image. A committed bank stores
+// saved contact slots; the offline converter resolves legacy ID/slot pairs.
 #define TG_BANK_START FL(0x14000u)
 #define TG_BANK_SIZE 0x4000u
 #define TG_BANK_HEADER 16u
 #define TG_ENTRY_BASE (TG_BANK_HEADER + (CH_MAX + 1u) * 2u)
 #define TG_BANK_CAPACITY ((TG_BANK_SIZE - TG_ENTRY_BASE) / 2u)
-#define TG_LEGACY_TAG 0x8000u
 static const uint8_t talkgroup_bank_magic[] = { 'R', 'F', 'T', 'P', 1, 0, 0, 0 };
 static uint32_t talkgroup_pool_base, talkgroup_pool_serial;
 
@@ -704,17 +703,9 @@ uint8_t codeplug_talkgroup_at(uint16_t number, uint8_t index, codeplug_talkgroup
 					count = (uint8_t)(end - first);
 					if (index < count && flash_read(pool + TG_ENTRY_BASE + 2u * (first + index), bounds, 2)) {
 						uint16_t ref = le16(bounds);
-						if (ref & TG_LEGACY_TAG) {
-							uint32_t addr = EE(0xB000u) + 4u * (ref - TG_LEGACY_TAG);
-							if ((addr < TALKGROUP_OVERFLOW ||
-							     (addr >= TALKGROUP_POOL && addr < EE(0x10000u) && talkgroup_has_overflow())) &&
-							    flash_read(addr, bounds, sizeof bounds))
-								append_talkgroup(bounds, out, 0);
-						} else {
-							contact_t contact;
-							if (codeplug_contact(ref, &contact) && contact.type == CONTACT_GROUP)
-								*out = (codeplug_talkgroup_t){ .id = contact.id, .timeslot = contact.timeslot };
-						}
+						contact_t contact;
+						if (codeplug_contact(ref, &contact) && contact.type == CONTACT_GROUP)
+							*out = (codeplug_talkgroup_t){ .id = contact.id, .contact_number = ref, .timeslot = contact.timeslot };
 					}
 				}
 			}

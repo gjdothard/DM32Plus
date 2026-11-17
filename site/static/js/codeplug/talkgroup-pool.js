@@ -2,7 +2,6 @@
 // Copyright (c) 2026 Garrett Dothard
 
 import { crc32 } from "../flasher/bytes.js";
-import { decodeTalkGroups, legacyTalkGroupAddresses } from "./talkgroups.js";
 
 export const POOL_START = 0x34000;
 export const BANK_SIZE = 0x4000;
@@ -14,32 +13,13 @@ const HEADER = 16;
 const ENTRY_BASE = HEADER + (CHANNELS + 1) * 2;
 export const POOL_CAPACITY = (BANK_SIZE - ENTRY_BASE) / 2;
 const MAGIC = Uint8Array.of(0x52, 0x46, 0x54, 0x50, 1, 0, 0, 0);
-const LEGACY_START = 0xB000;
-const LEGACY_INLINE_END = 0xF000;
-const LEGACY_POOL_START = 0xF808;
-const LEGACY_END = 0x10000;
-const LEGACY_TAG = 0x8000;
 
 function wordView(bytes) {
 	return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
-export function legacyReference(offset) {
-	if (offset % 4 || offset < LEGACY_START || offset >= LEGACY_END ||
-	    (offset >= LEGACY_INLINE_END && offset < LEGACY_POOL_START)) {
-		throw new RangeError("Invalid legacy operating talkgroup offset");
-	}
-	return LEGACY_TAG + (offset - LEGACY_START) / 4;
-}
-
-export function legacyOffset(ref) {
-	const offset = LEGACY_START + (ref - LEGACY_TAG) * 4;
-	return ref >= LEGACY_TAG && offset < LEGACY_END &&
-		(offset < LEGACY_INLINE_END || offset >= LEGACY_POOL_START) ? offset : null;
-}
-
 function validReference(ref) {
-	return Number.isInteger(ref) && ((ref >= 1 && ref <= CONTACTS) || legacyOffset(ref) !== null);
+	return Number.isInteger(ref) && ref >= 1 && ref <= CONTACTS;
 }
 
 function bank(bytes, index) {
@@ -116,32 +96,4 @@ export function writePool(bytes, lists) {
 	view.setUint32(12, crc32(next.subarray(HEADER), crc32(next.subarray(8, 12))), true);
 	target.set(next);
 	return { index, used };
-}
-
-
-// Resolve an existing codeplug once. An ambiguous or missing record remains an exact legacy reference.
-export function migrateLegacyPool(bytes, channels, contacts) {
-	const groups = new Map();
-	for (const contact of contacts) {
-		if (contact.type !== "group" || !Number.isInteger(contact.number) ||
-		    contact.number < 1 || contact.number > CONTACTS) continue;
-		const matches = groups.get(contact.id) ?? [];
-		matches.push(contact);
-		groups.set(contact.id, matches);
-	}
-
-	const lists = new Map();
-	for (const channel of channels) {
-		if (channel.mode !== "dmr") continue;
-		const entries = decodeTalkGroups(bytes, channel.number);
-		if (!entries.length) continue;
-		const addresses = legacyTalkGroupAddresses(bytes, channel.number);
-		const refs = entries.map(({ id, timeslot }, i) => {
-			const matches = (groups.get(id) ?? []).filter(contact =>
-				(contact.timeslot || channel.timeslot || 1) === timeslot);
-			return matches.length === 1 ? matches[0].number : legacyReference(addresses[i]);
-		});
-		lists.set(channel.number, refs);
-	}
-	return lists;
 }

@@ -54,11 +54,11 @@ its encoder still refuses the unknown sector.
 Use two separately committed 16 KiB banks at codeplug image offsets `0x34000` and `0x38000`. Both banks were
 read from the connected radio and were fully erased. The draft format holds 7,159 two-byte references per bank,
 with a maximum of 63 per channel. Checksums cover the generation and payload. A torn inactive bank leaves
-the previous generation readable. A migrated entry with an ambiguous or missing saved record retains a tagged
-reference into its original legacy bytes. Those legacy bytes must remain available while any such entry exists.
+the previous generation readable. The offline converter creates saved talkgroup records for missing ID/slot pairs. The new bank stores
+only saved slots and has no references into the legacy bytes.
 Never claim an unrecognized bank containing data.
 
-The bank codec, legacy conversion helper, and firmware indexed reader have host coverage. The knob and picker
+The bank codec, one-time converter, and firmware indexed reader have host coverage. The knob and picker
 use indexed reads. The normal CPS write does not yet use the new bank. Next
 implement the radio's recoverable bank writer and CPS transfer and migration, then add assignment controls and
 the directory Add, Edit, and More screens. Verify both transfer directions and interrupted writes before building
