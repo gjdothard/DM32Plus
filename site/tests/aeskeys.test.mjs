@@ -1,8 +1,21 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AesKeys, keyBytes } from "../static/js/codeplug/aeskeys.js";
+import { AesKeys, keyBytes, randomKey } from "../static/js/codeplug/aeskeys.js";
+
+test("random key generation uses all 32 bytes and wipes its temporary buffer", () => {
+	let buffer;
+	const text = randomKey(bytes => {
+		buffer = bytes;
+		bytes.forEach((_, index) => { bytes[index] = index; });
+	});
+	assert.equal(text, Array.from({ length: 32 }, (_, i) => i.toString(16).padStart(2, "0")).join("").toUpperCase());
+	assert.ok(buffer.every(byte => byte === 0));
+	assert.throws(() => randomKey(bytes => { buffer = bytes; bytes.fill(17); throw new Error("unavailable"); }));
+	assert.ok(buffer.every(byte => byte === 0));
+});
 
 const noPause = async () => {};
 test("key validation preserves every byte and rejects partial or malformed values", () => {

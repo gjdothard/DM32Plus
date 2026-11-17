@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """Portable launcher HTTP behavior, independent of the site build and installed runtimes."""
 import importlib.util
 from pathlib import Path
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
+from io import BytesIO
 import urllib.error
 import urllib.request
 
@@ -56,6 +59,16 @@ class OfflineServerTest(unittest.TestCase):
 			with self.assertRaises(urllib.error.HTTPError) as error:
 				self.opener.open(urllib.request.Request(self.base + "/codeplug/", headers={"Host": host}))
 			self.assertEqual(error.exception.code, 403)
+
+	def test_release_assets_resolve_to_the_selected_tag(self):
+		filename = "dm32plus-dm32-v26.11b1.json"
+		for endpoint, tag in (("", "dm32plus-v26.11b1"), ("RC/", "RC-dm32plus-v26.11b1")):
+			with self.subTest(tag=tag):
+				with patch.object(server_module.urllib.request, "urlopen", return_value=BytesIO(b"{}")) as upstream:
+					with self.opener.open(self.base + "/_dm32plus_release/" + endpoint + filename) as response:
+						self.assertEqual(response.read(), b"{}")
+				self.assertEqual(upstream.call_args.args[0].full_url,
+					f"https://github.com/gjdothard/DM32Plus/releases/download/{tag}/{filename}")
 
 	def test_second_listener_cannot_take_existing_port(self):
 		with self.assertRaises(OSError):

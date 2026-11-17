@@ -53,6 +53,14 @@ On a DMR memory channel with **Operating talkgroups** assigned, turn the channel
 to cycle through those entries and press Up or Down to change channels. Each entry supplies the timeslot and
 talkgroup together. The first entry is the default. The repeater frequencies, color code, power, and privacy
 settings come from the channel. The RX Group List still controls which additional talkgroups you hear.
+In the web CPS, open a DMR channel and select **Talkgroups**. Use **Add talkgroups** to find and assign
+saved groups, or **Create talkgroup** to add a new contact and assign it together. Use **Move up** and
+**Move down** to set the knob order. **Save channel** applies the edit to your codeplug.
+
+In the web CPS, choose **Channels > Convert Operating Talkgroups** to prepare a legacy codeplug for
+firmware with shared talkgroup support. Review the assignment and contact counts before confirming.
+You can undo the conversion in the editor before writing the codeplug to the radio.
+
 With a converted codeplug, open a saved DMR channel in the channel editor and select **Operating talkgroups**.
 Select **Add talkgroup** to choose a saved group contact. Select an existing assignment to move it up, move it down,
 or remove it from this channel. Edits save individually. You can also edit the list in the Codeplug Editor.
@@ -313,12 +321,16 @@ The tool checks that the radio is idle and waits for confirmation that the key w
 `radio privacy off` or by selecting basic privacy. The Settings privacy editor stores basic privacy keys only.
 
 For keys that survive a restart, use the web CPS **Encryption** tab. Connect with the radio idle, choose a slot,
-enter key ID 1-255 and exactly 64 hexadecimal characters, and save the key. Key values stay out of codeplug exports
+enter key ID 1-255 and exactly 64 hexadecimal characters, or choose **Generate random key**.
+The generator uses the browser's cryptographic random source to create 32 bytes locally. Copy the key
+for your other radios before saving it. Programmed slots show **Key programmed**; **Change key** asks
+for confirmation before opening the replacement editor. Key values entered in the editor can be shown
+or copied. Selecting a different slot, refreshing status, or leaving the tab clears the entry. Key values stay out of codeplug exports
 and browser drafts; they are stored in ordinary radio flash. Deletion does not securely erase old flash records.
 
 To assign a key, open **Channels**, edit a DMR channel, and set **Encryption** to its key slot. Save the channel,
 then **Write to Radio**. Assign **Off on this channel** for clear voice, or **Radio default** to inherit the
-Encryption tab's **Use as radio default** selection. Keys, the default and channel assignments survive restart.
+Encryption tab's **Radio default** selection. Keys, the default and channel assignments survive restart.
 An empty, unreadable or exhausted assigned slot blocks voice TX and shows an encryption-key warning.
 
 Existing channels inherit the radio default. **Turn default AES off** affects those channels; explicit channel

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Undo and redo for the codeplug editor. Before each change the page takes a snapshot: the order of every table and
 // a shallow copy of every record. Records hold plain values and references to other records (never shared arrays),
 // so restoring the copies into the same objects brings back the codeplug exactly, references included. The image
@@ -17,7 +18,8 @@ function snapshot(m) {
 		for (const r of m[t]) objects.set(r, copy(r));
 	}
 	for (const v of m.vfo) if (v) objects.set(v, copy(v));
-	return { tables, objects, general: { ...m.general }, base: m.base, iddb: m.iddb };
+	return { tables, objects, general: { ...m.general }, base: m.base, iddb: m.iddb,
+		vfo: m.vfo.slice(), sharedTalkgroups: m.sharedTalkgroups };
 }
 
 function copy(r) {
@@ -35,6 +37,8 @@ function restore(m, s) {
 	m.general = { ...s.general };
 	m.base = s.base;
 	m.iddb = s.iddb;
+	m.vfo = s.vfo.slice();
+	m.sharedTalkgroups = s.sharedTalkgroups;
 }
 
 export class History {

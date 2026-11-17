@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Programming the Radio
 
@@ -21,7 +22,16 @@ back in the others. How each radio is wired for this is in the [Radio reference]
 Open **Codeplug Editor** in the site's menu. It reads and writes the radio from the browser. Nothing is sent to a
 server: files, the codeplug and your RadioID API key stay on your computer.
 
+On a fresh visit, choose **Read from Radio**, **Open File**, or **Create codeplug**. A saved working draft opens
+directly in the editor. The header's theme control applies to the workspace and its dialogs. Firmware installation
+and upgrade links are in the **Firmware** menu beside the page title.
+
 ### Reading and writing the radio
+
+The connection bar shows the connected radio and its firmware. **Connect** identifies the radio and asks you
+to choose its port when needed. **Disconnect** releases that port for another application. A lost
+connection is shown in the same bar; choose **Connect** to reconnect. Read, Write and Encryption share this
+connection. Encryption retains the slot metadata when switching tabs and clears any draft key entry.
 
 1. Turn the radio on with RadioFoundry running and connect it: the USB cable on a radio with USB, otherwise the
    programming cable. The radio must be in USB serial mode, not USB network mode.
@@ -80,13 +90,30 @@ TFTP ([USB network](15-usb-network.md#programming-over-the-network)).
 | DMR ID Database | Names for DMR IDs that aren't contacts, built from RadioID.net ([below](#dmr-id-database-and-contacts-from-radioidnet)) |
 | Problems | Errors and warnings, each with a link to the record |
 
+Choose **Add** to create a record in its editor. **Save** adds it to the codeplug; canceling leaves the codeplug
+unchanged. The pencil beside a record opens its editor again. A new channel and any talkgroups created with it
+can be undone together.
+
+The channel table starts with the common fields. Open **Columns** to show additional fields; the browser remembers
+your choice. The channel name and edit controls stay visible while scrolling horizontally. Filtering includes
+hidden columns.
+
 In a table, double-click a cell or type on it to edit it in place. Click a column heading to sort, and type in the
 filter to narrow the rows. Check rows and choose **Bulk Edit** to set one field on all of them (not on Zones or RX Lists, whose members are
 edited in their own dialog). **Undo** and **Redo**
 cover every change, including an import.
 
-The page keeps the working codeplug in the browser, so closing or reloading the page doesn't lose edits. **New** starts
-over.
+In **Problems**, choose **Show** to open the affected record and focus its field. The error appears beside the
+field. Use Left and Right arrows to switch tabs, or Home and End to select the first or last tab. Tab moves into
+the active section's controls.
+
+The page keeps a draft of the working codeplug in this browser. The status shows **Saving draft**, **Draft saved in
+this browser**, or **Draft unavailable**. Wait for the saved status before leaving. If drafts are unavailable,
+keep the page open and download a codeplug file. A browser draft, a downloaded file, and a write to the radio are
+separate operations. **New** starts over.
+
+Opening a file over unsaved changes asks for confirmation. Channel and membership editors ask before discarding
+modified fields or lists, whether you choose **Cancel** or press Escape. Declining keeps the editor open.
 
 ### Files
 

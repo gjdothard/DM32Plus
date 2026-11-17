@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Codeplug files for the editor: what a file holds and the image in it (a codeplug image, a radio backup bundle, the
 // USB network codeplug.bin), and the draft the page keeps in the browser between visits. A file in another layout (a
 // stock TYT-family codeplug, docs/spec/codeplug-stock-tyt.md) is converted, or reported as foreign.
@@ -112,27 +113,37 @@ const DB = "rfoundry-codeplug-editor", STORE = "draft";
 function db() {
 	return new Promise((resolve, reject) => {
 		const req = indexedDB.open(DB, 1);
+		let blocked = false;
 		req.onupgradeneeded = () => req.result.createObjectStore(STORE);
-		req.onsuccess = () => resolve(req.result);
+		req.onsuccess = () => {
+			if (blocked) req.result.close();
+			else resolve(req.result);
+		};
 		req.onerror = () => reject(req.error);
+		req.onblocked = () => { blocked = true; reject(new Error("Draft storage is blocked")); };
 	});
 }
 
 async function tx(mode, fn) {
 	const d = await db();
-	return new Promise((resolve, reject) => {
-		const t = d.transaction(STORE, mode);
-		const req = fn(t.objectStore(STORE));
-		t.oncomplete = () => resolve(req?.result);
-		t.onerror = () => reject(t.error);
-	});
+	try {
+		return await new Promise((resolve, reject) => {
+			const t = d.transaction(STORE, mode);
+			const req = fn(t.objectStore(STORE));
+			t.oncomplete = () => resolve(req?.result);
+			t.onerror = t.onabort = () => reject(t.error);
+		});
+	} finally {
+		d.close();
+	}
 }
 
 export async function saveDraft(draft) {
 	try {
 		await tx("readwrite", (s) => s.put(draft, "current"));
+		return true;
 	} catch {
-		// private window or storage blocked: the page works without a draft
+		return false;
 	}
 }
 

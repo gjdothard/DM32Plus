@@ -8,6 +8,7 @@ import { BANK_SIZE, POOL_START, readPool } from "../static/js/codeplug/talkgroup
 import { convertOperatingTalkgroups } from "../static/js/codeplug/convert-talkgroups.js";
 import { CpsSerial } from "../static/js/codeplug/transport.js";
 import { FakeCpsRadio } from "../static/js/codeplug/fakecps.js";
+import { History } from "../static/js/editor/undo.js";
 
 function legacy() {
 	const model = empty();
@@ -64,4 +65,22 @@ test("a CPS transfer commits to the inactive bank and preserves the old codeplug
 	assert.deepEqual(decode(await client.read({ iddb: false })).channels[0].talkgroupRefs.map(contact => contact.number), [21, 20]);
 	await assert.rejects(client.write(before, result.image), { code: "talkgroups_convert_first" });
 	await client.close();
+});
+
+test("undo and redo restore the codeplug format and saved talkgroup references", () => {
+	const image = legacy();
+	const model = decode(image);
+	const history = new History();
+	const converted = decode(convertOperatingTalkgroups(encode(model).bytes).image);
+	history.record(model);
+	Object.assign(model, converted);
+
+	history.undo(model);
+	assert.equal(model.sharedTalkgroups, false);
+	assert.deepEqual(encode(model).bytes, image.bytes);
+
+	history.redo(model);
+	assert.equal(model.sharedTalkgroups, true);
+	assert.deepEqual(model.channels[0].talkgroupRefs, model.contacts);
+	assert.deepEqual(encode(model).bytes, encode(converted).bytes);
 });
