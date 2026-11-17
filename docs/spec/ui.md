@@ -33,6 +33,8 @@ Actions for the current or last caller use the numbered cards, shared status row
 and footer. Number shortcuts, PTT, and Back keep the standard actions behavior.
 Activity / Logs uses the same frame with caller cards. Each row separates the caller, age, and RX/TX target.
 Its PTT, context actions, and empty state keep their existing behavior.
+The Radio submenu uses numbered navigation cards. All Channels uses two-line cards with mode and channel
+details, plus a dedicated Find region. Its numbering, filtering, edit action, and tune shortcut are unchanged.
 Contacts & Talkgroups uses separate group and private-call tabs on the same filtered contacts list.
 The horizontal actions change tabs and keep the filter text. The first two assignable side keys supply
 those actions while the directory is open. The ID has a dedicated column, and a long name can shorten.

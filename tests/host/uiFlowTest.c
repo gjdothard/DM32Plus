@@ -1461,6 +1461,14 @@ int main(void)
 		run_flow(&card_quick[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
 #if CONFIG_UI_CARD_MENU
 	static const flow_t card_menu[] = {
+		{ "Radio submenu uses numbered navigation cards", "branded-home", "ok 1",
+			"screen=menu-section shows=Radio shows=Quick_Controls shows=Channels shows=20:12", 2, false },
+		{ "All Channels cards show mode and channel details", "branded-home", "ok 1 2",
+			"screen=channels shows=Channels shows=DMR shows=FM shows=TG3100", 3, false },
+		{ "All Channels cards preserve T9 filtering", "branded-home ok 1 2", "2 6",
+			"screen=channels shows=Find:_26 shows=COUNTY", 2, false },
+		{ "All Channels cards preserve the tune shortcut", "branded-home ok 1 2", "ctx",
+			"screen=home pos=3", 1, false },
 		{ "Activity cards keep the Main Menu title and empty state", "branded-home", "ok 6",
 			"screen=recent shows=Activity_/_Logs shows=No_calls_heard_yet shows=20:12", 2, false },
 		{ "Activity cards separate caller, target, direction, and age", "branded-home " CALLER, "ok 6",

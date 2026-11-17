@@ -90,6 +90,8 @@ On the standard Hub, **OK**, **6** opens Tools. On the dark card layout, **OK** 
 
 On the card layout, **Activity / Logs** shows callers as cards, with their call direction, target, and age.
 **PTT** talks to the focused call's target. **#** opens its actions.
+**Radio > Channels** uses cards with the channel number, name, mode, and details. Digits filter the list;
+**OK** opens the channel editor and **#** tunes to the focused channel.
 
 The 24-hour clock is to the right of the battery percentage on the tall branded display. It uses fresh GPS time or a valid hardware
 clock, with the saved **Settings > Location > UTC offset**. On a radio with RTC support, let GPS acquire a fix once

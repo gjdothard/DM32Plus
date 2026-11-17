@@ -5,8 +5,8 @@
 
 Reviewed November 17, 2026, at revision `7bb7191`.
 
-The six implementation families were approved after review of the proposed layouts. Activity / Logs now
-uses the caller-card presentation; the remaining entries below record the audit findings for the next families.
+The six implementation families were approved after review of the proposed layouts. The table below records
+the findings before implementation; each family is tracked by its separate implementation commit.
 
 The next redesigns should cover Activity / Logs, the Radio submenu and all-channels list, Talk to and Find,
 Dual Watch menus, and Settings subpages. These are common paths that switch from the card design to the

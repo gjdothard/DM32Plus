@@ -87,6 +87,9 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "compose", "call:3101234,91,g wait:11000 ctx 3" },
 	{ "sms-write", "call:3101234,91,g wait:11000 ctx 3 down down down down ok 4 4 wait:1100 4 4 4" },
 	{ "hub", "ok" },
+#if CONFIG_UI_CARD_MENU
+	{ "radio_menu", "branded-home ok 1" },
+#endif
 	{ "contacts", "ok 1" },
 	{ "contacts_find", "ok 1 5 6" },
 	{ "contact_actions", "ok 1 5 6 ctx" },
@@ -235,6 +238,8 @@ static const struct { const char *name, *script; } audit_extra[] = {
 	{ "caller_cards", "branded-home call:3101234,91,g wait:11000 ctx" },
 	{ "recent_cards", "branded-home call:3101234,91,g call:3105678,0,p wait:11000 ok 6" },
 	{ "recent_cards_empty", "branded-home ok 6" },
+	{ "channel_cards", "branded-home ok 1 2" },
+	{ "channel_cards_filtered", "branded-home ok 1 2 2 6" },
 	{ "caller_cards_temporary", "branded-home quick 1 up ok back call:3101234,91,g wait:11000 ctx up" },
 	{ "caller_cards_rx", "branded-home rx:3101234,91,g ctx" },
 #endif
@@ -544,7 +549,7 @@ static bool gallery_colors(void)
 static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_t nlen, char *script, size_t slen)
 {
 	unsigned flags = gallery_flags(i);
-	if ((!strcmp(gallery[i].name, "gps_data") || !strcmp(gallery[i].name, "ars") ||
+	if ((!strcmp(gallery[i].name, "radio_menu") || !strcmp(gallery[i].name, "gps_data") || !strcmp(gallery[i].name, "ars") ||
 	     !strcmp(gallery[i].name, "aprs") || !strcmp(gallery[i].name, "aprs_beacon")) &&
 	    strcmp(g->name, "240x320i10x5"))
 		return false;
@@ -565,6 +570,8 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 			snprintf(script, slen, "branded-home ok 9");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "contacts"))
 			snprintf(script, slen, "branded-home ok 3");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "channels"))
+			snprintf(script, slen, "branded-home ok 1 2");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "recent"))
 			snprintf(script, slen, "branded-home call:3101234,91,g call:3105678,3100,g call:3102222,0,p wait:11000 ok 6");
 #if CONFIG_CONTACT_EDIT

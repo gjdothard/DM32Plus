@@ -2627,6 +2627,12 @@ static void chlist_item(uint16_t i, ui_item_t *it)
 	sb_chr(&b, ' ');
 	sb_str(&b, ch.name);
 	sb_init(&b, it->value, sizeof it->value);
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		sb_str(&b, ch.mode == RADIO_MODE_DMR ? "DMR" : radio_am_channel(&ch) ? "AM" : "FM");
+		sb_chr(&b, '\n');
+	}
+#endif
 	sb_channel_row(&b, &ch);
 	if (num == chlist_current())
 		it->flags |= UI_ITEM_TEMP;	// the channel we are on

@@ -3577,13 +3577,17 @@ void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kin
 		if (actions)
 			gfx_text(meta, width - 12, yy + 9, ">", focus ? highlight : CARD_EDGE);
 		if (kind == UI_CARD_PAGE_DETAILS) {
-			int vw = gfx_text_width(meta, item.value);
+			char value[44];
+			bool more;
+			gfx_text_alt(item.value, 0, value, sizeof value, &more);
+			int vw = gfx_text_width(meta, value);
 			fit_end(font, item.label, right - x - (vw ? vw + 6 : 0), fit, sizeof fit);
 			gfx_text(font, x, yy + 4, fit, fg);
 			if (vw)
-				gfx_text(meta, right - vw, yy + 6, item.value, secondary);
+				gfx_text(meta, right - vw, yy + 6, value, secondary);
 			if (detail) {
-				fit_end(meta, detail, right - x, fit, sizeof fit);
+				gfx_text_alt(detail, 0, value, sizeof value, &more);
+				fit_end(meta, value, right - x, fit, sizeof fit);
 				gfx_text(meta, x, yy + 25, fit, secondary);
 			}
 		} else if (kind == UI_CARD_PAGE_FIELDS && step > 28) {
