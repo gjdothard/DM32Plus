@@ -61,6 +61,7 @@ class Site:
 	def __init__(self, out, repo_url, ref, firmware=None, strict=False, log=print, beta="", i18n_dir=None):
 		self.out = out
 		self.repo_url = repo_url.rstrip("/")
+		self.firmware_product = "DM32Plus" if self.repo_url.lower() == "https://github.com/gjdothard/dm32plus" else None
 		self.ref = ref
 		self.firmware = firmware
 		self.beta = beta	# a pre-release newer than the release in firmware (site/cloudflare-build.sh), or ""
@@ -143,7 +144,6 @@ class Site:
 			if f["group"] not in self.groups:
 				self.groups.append(f["group"])
 		self.releases = repo.releases(self.firmware)
-		self.firmware_product = "DM32Plus" if self.repo_url.rstrip("/").lower() == "https://github.com/gjdothard/dm32plus" else None
 		if self.firmware_product:
 			self.releases = [(m, image) for m, image in self.releases
 					 if m.get("product") == self.firmware_product and m["board"] == "dm32"]
