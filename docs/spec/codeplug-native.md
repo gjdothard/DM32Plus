@@ -23,6 +23,8 @@ plan for a native format. Nothing in section 4 is built yet.
 - Opening a file over unsaved edits requires confirmation. Channel and membership dialogs ask before discarding
   modified fields or lists, including dismissal with Escape. Browser drafts are written in edit order and report
   saving, saved, or unavailable; a restored draft preserves whether it had unexported or unwritten edits.
+- Record creation is staged until the editor is saved. A new channel and any talkgroup contacts created in its
+  editor are one undoable change. The Problems view opens the affected record section and labels its field.
 - Radio-wide state, keys included, lives in the settings store, not in the codeplug. A codeplug file can be shared
   without leaking keys or the owner's last channel.
 

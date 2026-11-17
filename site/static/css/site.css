@@ -680,7 +680,7 @@ dialog.ed-channel-dialog { width: min(44rem, calc(100% - 2rem)); box-sizing: bor
 .ed-channel-body .pair-tools { grid-column: 1 / -1; flex-wrap: wrap; }
 .ed-channel-tabs, .ed-tg-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 .ed-channel-tabs .btn { border-color: transparent; }
-.ed-channel-tabs .btn[aria-pressed="true"] { border-color: var(--border); background: var(--surface); color: var(--accent); }
+.ed-channel-tabs .btn[aria-selected="true"] { border-color: var(--border); background: var(--surface); color: var(--accent); }
 .ed-channel-dialog [hidden] { display: none; }
 .ed-channel-body .form-row:has(.ed-tg-editor) { grid-column: 1 / -1; }
 .ed-tg-editor .ed-tg-actions p { margin: 0; }
@@ -733,4 +733,20 @@ abbr.gl:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bo
 .ed-draft-unavailable { color: var(--bad); }
 @media (max-width: 640px) {
 	.ed-save-status { text-align: start; }
+}
+
+/* Keep editing controls and channel names visible while optional columns scroll. */
+table.grid.has-pinned :is(.grid-check, .grid-open, .c-pinned) { position: sticky; z-index: 2; background: var(--surface); box-sizing: border-box; }
+table.grid.has-pinned .grid-check { left: 0; width: 2.25rem; min-width: 2.25rem; max-width: 2.25rem; }
+table.grid.has-pinned .grid-open { left: 2.25rem; width: 2.75rem; min-width: 2.75rem; max-width: 2.75rem; }
+table.grid.has-pinned .c-pinned { left: 5rem; min-width: 8rem; border-right: 1px solid var(--border); }
+table.grid.has-pinned thead :is(.grid-check, .grid-open, .c-pinned) { z-index: 3; }
+.ed-table-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ed-columns { position: relative; }
+.ed-column-choices { position: absolute; left: 0; top: 100%; z-index: 5; display: grid; gap: var(--space-2); width: 14rem; max-width: calc(100vw - 4rem); max-height: 22rem; overflow: auto; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); box-shadow: var(--shadow); }
+.ed-column-choices label { display: flex; align-items: center; gap: var(--space-2); }
+.ed-field-error { color: var(--bad); grid-column: 1 / -1; }
+.form-row [aria-invalid="true"], .ed-radio-form [aria-invalid="true"] { border-color: var(--bad); }
+@media (max-width: 640px) {
+	.ed-column-choices { right: auto; left: 0; }
 }

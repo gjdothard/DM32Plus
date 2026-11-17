@@ -7,6 +7,7 @@
 
 import { h, button } from "../flasher/dom.js";
 import { guardDialog } from "./unsaved.js";
+import { keyboardTabs } from "./navigation.js";
 import { parseFreq, parseTone, mhz } from "../codeplug/fields.js";
 import { LIMITS, POWER_NAMES } from "../codeplug/records.js";
 import { refNumber, listenBand, newContact } from "../codeplug/model.js";
@@ -111,6 +112,28 @@ const refLabel = (v, t) => (v == null ? "" : typeof v === "number" ? t("editor.m
 // table whose members are edited in its own dialog (zones, RX lists): Bulk Edit isn't offered there
 export const bulkColumns = (table, m, t) => columns(table, m, t).filter((c) => c.readOnly !== true && c.key !== "name" && c.key !== "number");
 
+export const DEFAULT_CHANNEL_COLUMNS = ["name", "number", "mode", "rxHz", "txHz", "colorCode", "timeslot", "contact"];
+
+export function visibleChannelColumns(all, selected = DEFAULT_CHANNEL_COLUMNS) {
+	const keys = new Set(Array.isArray(selected) ? selected : DEFAULT_CHANNEL_COLUMNS);
+	const name = all.find(column => column.key === "name");
+	return [{ ...name, pinned: true }, ...all.filter(column => column.key !== "name" && keys.has(column.key))];
+}
+
+// Reuse the table parsers for compact contact, DTMF, and APRS record editors.
+export function recordForm(table, model, t) {
+	return columns(table, model, t).filter(column => column.set).map(column => ({
+		key: column.key, label: column.label, type: column.type === "bool" ? "bool" : column.type === "select" ? "select" : "text",
+		options: column.options,
+		disabled: table === "contacts" && column.key === "id" ? record => record.type === "all" : undefined,
+		parse: (record, key, value) => {
+			if (table === "contacts" && key === "id" && record.type === "all") return;
+			return column.set(record, value);
+		},
+		format: column.editValue || column.format,
+	}));
+}
+
 export function columns(table, m, t) {
 	const col = (key, label, type, parse, extra = {}) => ({
 		key, label: t(label), type,
@@ -200,7 +223,7 @@ export function columns(table, m, t) {
 					return;
 				}
 				return freq(t)(r, k, v);
-			}, { format: (v) => (v ? mhz(v) : t("editor.aprs.channel_freq")), numeric: true }),
+			}, { format: (v) => (v ? mhz(v) : t("editor.aprs.channel_freq")), editValue: v => v ? mhz(v) : "", numeric: true }),
 		];
 	}
 	return [];
@@ -457,18 +480,19 @@ function channelTalkgroups(model, t, draftContacts) {
 }
 
 // A form in a dialog over a working copy of the record; Save hands the copy back
-export function formDialog(title, fields, record, t, onSave) {
+export function formDialog(title, fields, record, t, onSave, options = {}) {
 	const work = { ...record };
 	const errs = h("p", { class: "notice bad", hidden: true });
 	const rows = [];
-	const body = h("div", { class: "ed-channel-body" });
-	const nav = h("div", { class: "ed-channel-tabs", role: "group", "aria-label": t("editor.form.sections") });
+	const body = h("div", { class: "ed-channel-body" + (fields.some(field => field.tab) ? "" : " form-grid") });
+	const nav = h("div", { class: "ed-channel-tabs", role: "tablist", "aria-label": t("editor.form.sections"), hidden: !fields.some(field => field.tab) });
 	const sections = [];
 	let section;
 	const select = (active) => {
 		for (const tab of sections) {
 			tab.content.hidden = tab !== active;
-			tab.control.setAttribute("aria-pressed", String(tab === active));
+			tab.control.setAttribute("aria-selected", String(tab === active));
+			tab.control.tabIndex = tab === active ? 0 : -1;
 		}
 	};
 	// One field: its label and input, kept in rows for sync() and save()
@@ -492,19 +516,27 @@ export function formDialog(title, fields, record, t, onSave) {
 		}
 		const label = h(f.render ? "span" : "label", f.render ? { id: id + "-label" } : { for: id },
 			typeof f.label === "function" ? f.label(work) : f.label);
-		const row = h("div", { class: "form-row" + (f.type === "bool" ? " form-check" : "") }, label, input);
-		rows.push({ f, input, row, label, section });
+		const error = h("span", { id: id + "-error", class: "ed-field-error small", hidden: true });
+		input.setAttribute("aria-describedby", error.id);
+		input.addEventListener("input", () => { error.hidden = true; input.removeAttribute("aria-invalid"); });
+		input.addEventListener("change", () => { error.hidden = true; input.removeAttribute("aria-invalid"); });
+		const row = h("div", { class: "form-row" + (f.type === "bool" ? " form-check" : "") }, label, input, error);
+		rows.push({ f, input, row, label, error, section });
 		return row;
 	};
 	for (const f of fields) {
 		if (f.tab) {
 			const tab = {
-				content: h("div", { class: "form-grid", id: "channel-" + f.tab, hidden: sections.length !== 0 }),
+				content: h("div", { class: "form-grid", id: "channel-" + f.tab, role: "tabpanel",
+					"aria-labelledby": "channel-tab-" + f.tab, hidden: sections.length !== 0 }),
 				show: f.show,
 			};
 			tab.control = button(f.label, () => select(tab));
+			tab.control.id = "channel-tab-" + f.tab;
+			tab.control.setAttribute("role", "tab");
 			tab.control.setAttribute("aria-controls", tab.content.id);
-			tab.control.setAttribute("aria-pressed", String(sections.length === 0));
+			tab.control.setAttribute("aria-selected", String(sections.length === 0));
+			tab.control.tabIndex = sections.length === 0 ? 0 : -1;
 			sections.push(tab);
 			nav.append(tab.control);
 			body.append(tab.content);
@@ -565,7 +597,7 @@ export function formDialog(title, fields, record, t, onSave) {
 				input.disabled = on;
 			}
 			if (f.type === "bool") (f.set ? f.set(work, input.checked) : (work[f.key] = input.checked));
-			if (f.show) row.hidden = !f.show(work);
+			if (f.show) row.hidden = !f.show(work) && f.key !== options.field;
 			if (typeof f.label === "function") label.textContent = f.label(work);
 			if (f.disabled) {
 				input.disabled = f.disabled(work, value);
@@ -573,12 +605,14 @@ export function formDialog(title, fields, record, t, onSave) {
 			}
 		}
 		for (const tab of sections) {
-			tab.control.hidden = tab.show ? !tab.show(work) : false;
+			const hasProblem = rows.some(row => row.section === tab && row.f.key === options.field);
+			tab.control.hidden = tab.show ? !tab.show(work) && !hasProblem : false;
 			if (tab.control.hidden && !tab.content.hidden) select(sections[0]);
 		}
 	};
 	body.addEventListener("change", sync);
 	body.addEventListener("input", sync);
+	keyboardTabs(nav, control => select(sections.find(tab => tab.control === control)));
 	sync();
 	const dlg = h("dialog", { class: "confirm editor-dialog ed-channel-dialog", "aria-labelledby": "channel-edit-title" });
 	const signature = () => JSON.stringify(rows.filter(row => row.input).map(({ f, input }) =>
@@ -590,7 +624,8 @@ export function formDialog(title, fields, record, t, onSave) {
 		let first;
 		for (const row of rows) {
 			const { f, input } = row;
-			if (f.show && !f.show(work)) continue;
+			if (row.error) { row.error.hidden = true; input.removeAttribute("aria-invalid"); }
+			if (f.show && !f.show(work) && f.key !== options.field) continue;
 			if (f.type === "bool" || f.type === "pair" || f.type === "group" || f.type === "note") continue;
 			if (f.type === "select") {
 				const v = input._opts[input.selectedIndex]?.[0];
@@ -599,6 +634,9 @@ export function formDialog(title, fields, record, t, onSave) {
 			}
 			const err = f.parse ? f.parse(work, f.key, f.read ? f.read(input, work) : input.value) : ((work[f.key] = input.value), null);
 			if (err) {
+				row.error.textContent = err;
+				row.error.hidden = false;
+				input.setAttribute("aria-invalid", "true");
 				bad.push(`${typeof f.label === "function" ? f.label(work) : f.label}: ${err}`);
 				first ??= row;
 			}
@@ -607,24 +645,32 @@ export function formDialog(title, fields, record, t, onSave) {
 			errs.hidden = false;
 			errs.textContent = bad.join(" · ");
 			if (first.section && !first.section.control.hidden) select(first.section);
-			first.input.focus();
+			(first.input.matches("input, select") ? first.input : first.input.querySelector("input, button"))?.focus();
 			return;
 		}
-		onSave(work);
+		if (onSave(work) === false) return;
 		dlg.close();
 	};
 	errs.setAttribute("role", "alert");
 	dlg.append(h("header", { class: "ed-channel-header" }, h("h2", { id: "channel-edit-title" }, title), nav),
 		body, h("footer", { class: "ed-channel-footer" }, errs, h("div", { class: "confirm-actions" },
-			button(t("editor.cancel"), cancel), button(t("editor.form.save_channel"), save, { primary: true }))));
-	dlg.addEventListener("close", () => dlg.remove());
+			button(t("editor.cancel"), cancel), button(options.saveLabel || t("editor.form.save_channel"), save, { primary: true }))));
+	dlg.addEventListener("close", () => { dlg.remove(); options.onClose?.(); });
 	document.body.append(dlg);
 	dlg.showModal();
+	const problem = byKey(options.field);
+	if (problem?.input) {
+		if (problem.section) select(problem.section);
+		problem.error.textContent = options.error || "";
+		problem.error.hidden = !options.error;
+		if (options.error) problem.input.setAttribute("aria-invalid", "true");
+		(problem.input.matches("input, select") ? problem.input : problem.input.querySelector("input, button"))?.focus();
+	}
 }
 
 // --- Members of a zone or an RX group list ---
 
-export function membersDialog(title, members, pool, max, t, label, onSave) {
+export function membersDialog(title, members, pool, max, t, label, onSave, options = {}) {
 	let list = members.slice();
 	const filter = h("input", { type: "search", placeholder: t("editor.filter"), "aria-label": t("editor.filter") });
 	const avail = h("select", { multiple: true, size: 14, class: "members-list", "aria-label": t("editor.members.available") });
@@ -661,10 +707,16 @@ export function membersDialog(title, members, pool, max, t, label, onSave) {
 	chosen.addEventListener("dblclick", del);
 	fill();
 	const dlg = h("dialog", { class: "confirm editor-dialog" });
+	const nameInput = h("input", { type: "text", value: options.name ?? "", maxlength: LIMITS.name });
+	const error = h("p", { id: "members-error", class: "ed-field-error small", role: "alert", hidden: true });
+	nameInput.setAttribute("aria-describedby", error.id);
+	chosen.setAttribute("aria-describedby", error.id);
 	const cancel = guardDialog(dlg,
-		() => list.length !== members.length || list.some((item, index) => item !== members[index]),
+		() => nameInput.value !== (options.name ?? "") || list.length !== members.length || list.some((item, index) => item !== members[index]),
 		t("editor.dialog.discard"));
 	dlg.append(h("h2", {}, title),
+		options.name !== undefined ? h("label", { class: "form-row" }, t("editor.col.name"), nameInput) : null,
+		error,
 		h("div", { class: "members" },
 			h("div", {}, h("h3", {}, t("editor.members.available")), filter, avail),
 			h("div", { class: "members-actions" }, button(t("editor.members.add"), add), button(t("editor.members.remove"), del),
@@ -672,12 +724,27 @@ export function membersDialog(title, members, pool, max, t, label, onSave) {
 			h("div", {}, h("h3", {}, t("editor.members.chosen")), chosen, count)),
 		h("div", { class: "confirm-actions" }, button(t("editor.cancel"), cancel),
 			button(t("editor.save_record"), () => {
-				onSave(list);
+				const record = {};
+				const invalid = options.name !== undefined ? name(LIMITS.name)(t)(record, "name", nameInput.value) : null;
+				if (invalid || list.length > max) {
+					error.textContent = invalid || t("editor.members.count", { n: list.length, max });
+					error.hidden = false;
+					(invalid ? nameInput : chosen).focus();
+					return;
+				}
+				if (onSave(list, record.name) === false) return;
 				dlg.close();
 			}, { primary: true })));
-	dlg.addEventListener("close", () => dlg.remove());
+	dlg.addEventListener("close", () => { dlg.remove(); options.onClose?.(); });
 	document.body.append(dlg);
 	dlg.showModal();
+	if (options.error) {
+		error.textContent = options.error;
+		error.hidden = false;
+		const input = options.field === "name" ? nameInput : chosen;
+		input.setAttribute("aria-invalid", "true");
+		input.focus();
+	}
 }
 
 export { refNumber, refLabel };

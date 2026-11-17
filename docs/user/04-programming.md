@@ -86,10 +86,22 @@ TFTP ([USB network](15-usb-network.md#programming-over-the-network)).
 | DMR ID Database | Names for DMR IDs that aren't contacts, built from RadioID.net ([below](#dmr-id-database-and-contacts-from-radioidnet)) |
 | Problems | Errors and warnings, each with a link to the record |
 
+Choose **Add** to create a record in its editor. **Save** adds it to the codeplug; canceling leaves the codeplug
+unchanged. The pencil beside a record opens its editor again. A new channel and any talkgroups created with it
+can be undone together.
+
+The channel table starts with the common fields. Open **Columns** to show additional fields; the browser remembers
+your choice. The channel name and edit controls stay visible while scrolling horizontally. Filtering includes
+hidden columns.
+
 In a table, double-click a cell or type on it to edit it in place. Click a column heading to sort, and type in the
 filter to narrow the rows. Check rows and choose **Bulk Edit** to set one field on all of them (not on Zones or RX Lists, whose members are
 edited in their own dialog). **Undo** and **Redo**
 cover every change, including an import.
+
+In **Problems**, choose **Show** to open the affected record and focus its field. The error appears beside the
+field. Use Left and Right arrows to switch tabs, or Home and End to select the first or last tab. Tab moves into
+the active section's controls.
 
 The page keeps a draft of the working codeplug in this browser. The status shows **Saving draft**, **Draft saved in
 this browser**, or **Draft unavailable**. Wait for the saved status before leaving. If drafts are unavailable,

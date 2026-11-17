@@ -20,7 +20,8 @@ import { FakeCpsRadio } from "../codeplug/fakecps.js";
 import { Grid } from "./grid.js";
 import { History } from "./undo.js";
 import { DraftSaver } from "./draft.js";
-import { bulkColumns, columns, channelForm, formDialog, membersDialog, refLabel } from "./views.js";
+import { keyboardTabs } from "./navigation.js";
+import { bulkColumns, columns, channelForm, recordForm, visibleChannelColumns, DEFAULT_CHANNEL_COLUMNS, formDialog, membersDialog, refLabel } from "./views.js";
 import { openFile, saveBytes, tftpBytes, FileError, imageFrom, saveDraft, loadDraft } from "./files.js";
 import { extensions } from "./extensions.js";
 import "./parts.js";
@@ -52,11 +53,17 @@ const root = document.getElementById("editor");
 const toolbar = h("div", { class: "ed-toolbar" });
 const status = h("div", { class: "ed-status small muted", "aria-live": "polite" });
 const tabs = h("nav", { class: "ed-tabs", role: "tablist", "aria-label": t("editor.tabs") });
-const view = h("div", { class: "ed-view" });
+const view = h("div", { class: "ed-view", id: "editor-panel", role: "tabpanel" });
 const connectionBar = h("div", { class: "ed-connection", "aria-live": "polite" });
 const draftStatus = h("span", { class: "ed-draft small", "aria-live": "polite" });
 let draftState = "saving", connecting = false, connectionLost = false;
-let encryptionView, encryptionConnection;
+let encryptionView, encryptionConnection, radioView, radioModel;
+let channelColumns = DEFAULT_CHANNEL_COLUMNS;
+try {
+	const saved = JSON.parse(localStorage.getItem("dm32plus.channelColumns"));
+	if (Array.isArray(saved)) channelColumns = saved;
+} catch { /* Column preferences are optional. */ }
+keyboardTabs(tabs, control => show(control.dataset.tab));
 const messages = h("div", { class: "ed-messages", "aria-live": "polite" });
 
 // --- Model changes ---
@@ -144,11 +151,21 @@ function refresh() {
 		rxLists: S.model.rxLists.length, dtmfContacts: S.model.dtmfContacts.length, aprs: S.model.aprs.length,
 		iddb: S.model.iddb?.count || 0, problems: p.length,
 	};
-	tabs.replaceChildren(...TABS.map((k) => {
-		const b = h("button", { type: "button", role: "tab", "aria-selected": String(S.tab === k), class: k === "problems" && errors ? "has-errors" : "",
-			onclick: () => show(k) }, t(`editor.tab.${k}`), k in counts && k !== "radio" ? h("span", { class: "ed-count" }, String(counts[k])) : null);
-		return b;
-	}));
+	for (const key of TABS) {
+		let tab = tabs.querySelector('[data-tab="' + key + '"]');
+		if (!tab) {
+			tab = h("button", { type: "button", role: "tab", id: "editor-tab-" + key, "data-tab": key,
+				"aria-controls": view.id, onclick: () => show(key) });
+			tabs.append(tab);
+		}
+		tab.setAttribute("aria-selected", String(S.tab === key));
+		tab.tabIndex = S.tab === key ? 0 : -1;
+		tab.classList.toggle("has-errors", key === "problems" && errors > 0);
+		const children = [t("editor.tab." + key)];
+		if (key in counts) children.push(h("span", { class: "ed-count" }, String(counts[key])));
+		tab.replaceChildren(...children);
+	}
+	view.setAttribute("aria-labelledby", "editor-tab-" + S.tab);
 	status.textContent = [S.fileName, S.dirty ? t("editor.status.unsaved") : t("editor.status.saved")].join(" · ");
 	renderConnection();
 	renderView(p);
@@ -208,8 +225,16 @@ function renderToolbar(errors) {
 
 function renderView(p) {
 	const tab = S.tab;
-	if (tab === "radio") return view.replaceChildren(radioTab());
 	if (tab !== "encryption" && view.firstChild === encryptionView) encryptionView.deactivate();
+	if (tab === "radio") {
+		if (!radioView || radioModel !== S.model) {
+			radioModel = S.model;
+			radioView = radioTab();
+		}
+		radioView.update();
+		if (view.firstChild !== radioView) view.replaceChildren(radioView);
+		return;
+	}
 	if (tab === "encryption") {
 		if (!encryptionView || encryptionConnection !== S.conn) {
 			encryptionView?.deactivate();
@@ -230,8 +255,10 @@ function renderView(p) {
 		S.grid.update();
 		return;
 	}
+	const allColumns = columns(tab, S.model, t);
 	const g = new Grid({
-		columns: columns(tab, S.model, t), rows: S.model[tab], t, empty: t(`editor.empty.${tab}`),
+		columns: tab === "channels" ? visibleChannelColumns(allColumns, channelColumns) : allColumns,
+		searchColumns: allColumns, rows: S.model[tab], t, empty: t(`editor.empty.${tab}`),
 		onChange: (row, col, value) => {
 			let err = null;
 			change(t("editor.undo.edit"), () => {
@@ -241,7 +268,7 @@ function renderView(p) {
 			return err;
 		},
 		onSelect: () => S.grid?.update(),
-		onOpen: tab === "channels" || tab === "zones" || tab === "rxLists" ? (r) => openRecord(tab, r) : null,
+		onOpen: record => openRecord(tab, record),
 	});
 	g.filter = S.filter[tab] || "";
 	g.render();
@@ -252,9 +279,30 @@ function renderView(p) {
 		} });
 	const actions = h("div", { class: "ed-actions" });
 	const update = () => actions.replaceChildren(...tableActions(tab, g));
-	S.grid = { table: tab, g, update, sharedTalkgroups: S.model.sharedTalkgroups };
+	S.grid = { table: tab, g, filter, update, sharedTalkgroups: S.model.sharedTalkgroups };
 	update();
-	view.replaceChildren(h("div", { class: "ed-bar" }, actions, filter), g.el);
+	const picker = tab === "channels" ? columnPicker(g, allColumns) : null;
+	view.replaceChildren(h("div", { class: "ed-bar" }, actions, h("div", { class: "ed-table-tools" }, picker, filter)), g.el);
+}
+
+function columnPicker(grid, all) {
+	const picker = h("details", { class: "ed-columns" }, h("summary", { class: "btn" }, t("editor.columns")));
+	const choices = h("div", { class: "ed-column-choices" });
+	for (const column of all) {
+		const input = h("input", { type: "checkbox", checked: column.key === "name" || channelColumns.includes(column.key),
+			disabled: column.key === "name", onchange: () => {
+				const selected = new Set(channelColumns);
+				if (input.checked) selected.add(column.key);
+				else selected.delete(column.key);
+				channelColumns = [...selected];
+				try { localStorage.setItem("dm32plus.channelColumns", JSON.stringify(channelColumns)); }
+				catch { /* This view remains usable when preferences cannot be stored. */ }
+				grid.setColumns(visibleChannelColumns(all, channelColumns));
+			} });
+		choices.append(h("label", {}, input, column.label));
+	}
+	picker.append(choices);
+	return picker;
 }
 
 function convertTalkgroups() {
@@ -283,10 +331,12 @@ function tableActions(tab, g) {
 	const sel = g.selection();
 	const full = S.model[tab].length >= TABLE_MAX[tab];
 	const numbered = tab !== "zones";
+	const add = button(t("editor.add"), () => addRecord(tab), { disabled: full });
+	add.dataset.action = "add";
 	const out = [
 		// first, so it sits above the row checkboxes it acts on; not on a table with nothing it can set (zones, RX lists)
 		bulkColumns(tab, S.model, t).length ? button(sel.length ? t("editor.bulk_edit_n", { n: sel.length }) : t("editor.bulk_edit"), () => bulkSet(tab, g), { disabled: sel.length < 2 }) : null,
-		button(t("editor.add"), () => addRecord(tab, g), { disabled: full }),
+		add,
 		button(t("editor.duplicate"), () => duplicate(tab, g), { disabled: full || !g.targets().length }),
 		button(t("editor.delete"), () => del(tab, g), { disabled: !g.targets().length, danger: true }),
 		button(t("editor.move_up"), () => move(tab, g, -1), { disabled: !g.targets().length, quiet: true }),
@@ -305,8 +355,10 @@ function blank(tab) {
 	const n = (base) => {
 		const names = new Set(S.model[tab].map((x) => x.name));
 		let i = S.model[tab].length + 1;
-		while (names.has(`${base} ${i}`)) i++;
-		return `${base} ${i}`;
+		const max = tab === "aprs" ? LIMITS.aprsName : LIMITS.name;
+		const value = () => base.slice(0, Math.max(0, max - String(i).length - 1)) + " " + i;
+		while (names.has(value())) i++;
+		return value();
 	};
 	switch (tab) {
 	case "channels": return newChannel({ name: n(t("editor.new.channel")) });
@@ -314,18 +366,12 @@ function blank(tab) {
 	case "zones": return { name: n(t("editor.new.zone")), channels: [] };
 	case "rxLists": return { number: null, name: n(t("editor.new.rx_list")), contacts: [] };
 	case "dtmfContacts": return { number: null, name: n(t("editor.new.dtmf")), code: "0" };
-	case "aprs": return { number: null, name: "APRS", ssid: 7, lat: 0, lon: 0, path1: "WIDE1-1", path2: "", symTable: "/", symCode: ">", comment: "", txHz: 0, baud300: false, useFixed: false, qsy: false, silent: false, ambiguity: 0 };
+	case "aprs": return { number: null, name: n("APRS"), ssid: 7, lat: 0, lon: 0, path1: "WIDE1-1", path2: "", symTable: "/", symCode: ">", comment: "", txHz: 0, baud300: false, useFixed: false, qsy: false, silent: false, ambiguity: 0 };
 	}
 }
 
-function addRecord(tab, g) {
-	const r = blank(tab);
-	change(t("editor.undo.add"), () => {
-		S.model[tab].push(r);
-		if (tab !== "zones") assignNumbers(S.model[tab], TABLE_MAX[tab]);
-	});
-	g.focusRow(r);
-	if (tab === "zones" || tab === "rxLists") openRecord(tab, r);
+function addRecord(tab) {
+	openRecord(tab, blank(tab), { creating: true });
 }
 
 function duplicate(tab, g) {
@@ -432,48 +478,73 @@ function bulkSet(tab, g) {
 	});
 }
 
-function openRecord(tab, r) {
-	if (tab === "channels") {
-		const model = S.model;
-		const draftContacts = [];
-		formDialog(t("editor.channel_title", { name: r.name }), channelForm(model, t, draftContacts), r, t, (work) => {
-			change(t("editor.undo.edit"), () => {
-				if (work.mode === "dmr") {
-					const assigned = model.sharedTalkgroups ?
-						contact => work.talkgroupRefs.includes(contact) :
-						contact => work.talkGroups.some(entry => entry.id === contact.id);
-					const created = draftContacts.filter(assigned);
-					if (created.length) {
-						model.contacts.push(...created);
-						assignNumbers(model.contacts, LIMITS.contacts);
-					}
-				}
-				Object.assign(r, work);
-			});
+function problemText(problem) {
+	return t("editor.problem." + problem.code, {
+		...problem.params, field: problem.field ? t("editor.field." + problem.field) : "",
+	});
+}
+
+function openRecord(tab, record, { creating = false, problem = null } = {}) {
+	const model = S.model;
+	const title = creating ? t("editor.record.create", { name: record.name }) : t("editor.record.edit", { name: record.name });
+	const options = {
+		field: problem?.field, error: problem ? problemText(problem) : null,
+		saveLabel: t(tab === "channels" ? "editor.form.save_channel" : "editor.save_record"),
+		onClose() {
+			if (model[tab].includes(record)) S.grid?.g.focusRow(record);
+			else view.querySelector('[data-action="add"]')?.focus();
+		},
+	};
+	const commit = (work, contacts = []) => {
+		change(t(creating ? "editor.undo.add" : "editor.undo.edit"), () => {
+			Object.assign(record, work);
+			if (creating) model[tab].push(record);
+			model.contacts.push(...contacts);
+			if (tab !== "zones") assignNumbers(model[tab], TABLE_MAX[tab]);
+			if (contacts.length) assignNumbers(model.contacts, LIMITS.contacts);
+			if (creating && S.grid?.table === tab) {
+				S.filter[tab] = "";
+				S.grid.filter.value = "";
+				S.grid.g.filter = "";
+			}
 		});
-	} else if (tab === "zones") {
-		membersDialog(t("editor.zone_title", { name: r.name }), r.channels, [...S.model.channels].sort((a, b) => a.number - b.number), LIMITS.zoneChannels, t,
-			(c) => `${c.number} · ${c.name}`, (list) => change(t("editor.undo.edit"), () => (r.channels = list)));
-	} else if (tab === "rxLists") {
-		membersDialog(t("editor.rx_list_title", { name: r.name }), r.contacts, S.model.contacts.filter((c) => c.type === "group"), LIMITS.rxListContacts, t,
-			(c) => `${c.name} (${c.id})`, (list) => change(t("editor.undo.edit"), () => (r.contacts = list)));
+	};
+	if (tab === "channels") {
+		const draftContacts = [];
+		formDialog(title, channelForm(model, t, draftContacts), record, t, work => {
+			const created = work.mode !== "dmr" ? [] : draftContacts.filter(contact => model.sharedTalkgroups ?
+				work.talkgroupRefs.includes(contact) : work.talkGroups.some(entry => entry.id === contact.id));
+			commit(work, created);
+		}, options);
+	} else if (tab === "zones" || tab === "rxLists") {
+		const zone = tab === "zones", key = zone ? "channels" : "contacts";
+		const pool = zone ? [...model.channels].sort((a, b) => a.number - b.number) : model.contacts.filter(contact => contact.type === "group");
+		membersDialog(title, record[key], pool, zone ? LIMITS.zoneChannels : LIMITS.rxListContacts, t,
+			item => zone ? `${item.number} · ${item.name}` : `${item.name} (${item.id})`,
+			(list, name) => commit({ ...record, name, [key]: list }), { ...options, name: record.name });
+	} else {
+		formDialog(title, recordForm(tab, model, t), record, t, work => commit(work), options);
 	}
 }
 
 // --- Radio tab: the radio-wide settings ---
 
 function radioTab() {
-	const g = S.model.general;
+	const g = S.model.general, fields = new Map();
 	const field = (key, label, max, help, parse) => {
 		const input = h("input", { type: "text", value: g[key] ?? "", maxlength: max, id: "g-" + key, spellcheck: "false" });
-		const err = h("span", { class: "small ed-err" });
+		const err = h("span", { id: "g-" + key + "-error", class: "small ed-err" });
+		input.setAttribute("aria-describedby", err.id);
+		fields.set(key, { input, err });
 		input.addEventListener("change", () => {
 			const res = parse(input.value);
 			if (res.error) {
 				err.textContent = res.error;
+				input.setAttribute("aria-invalid", "true");
 				return;
 			}
 			err.textContent = "";
+			input.removeAttribute("aria-invalid");
 			change(t("editor.undo.edit"), () => (S.model.general = { ...S.model.general, [key]: res.value }));
 		});
 		return h("div", { class: "form-row" }, h("label", { for: "g-" + key }, label), input, help ? h("span", { class: "small muted" }, help) : null, err);
@@ -492,13 +563,25 @@ function radioTab() {
 			field("groupHang", t("editor.general.group_hang"), 3, t("editor.general.hang_help"), num(0, 255)),
 			field("privateHang", t("editor.general.private_hang"), 3, t("editor.general.hang_help"), num(0, 255))),
 	];
-	if (S.conn) {
-		const p = S.conn.probe;
-		parts.push(h("h3", {}, t("editor.connected_radio")), h("dl", { class: "specs" },
+	const connected = h("div");
+	const panel = h("div", {}, ...parts, connected);
+	panel.update = () => {
+		for (const [key, field] of fields) {
+			if (field.input !== document.activeElement && !field.err.textContent) field.input.value = S.model.general[key] ?? "";
+		}
+		connected.replaceChildren();
+		if (S.conn) connected.append(h("h3", {}, t("editor.connected_radio")), h("dl", { class: "specs" },
 			h("dt", {}, t("editor.radio_model")), h("dd", {}, S.conn.radio.name),
-			h("dt", {}, t("editor.firmware")), h("dd", {}, p?.git || "?")));
-	}
-	return h("div", {}, ...parts);
+			h("dt", {}, t("editor.firmware")), h("dd", {}, S.conn.probe?.version?.release || S.conn.probe?.git || "?")));
+	};
+	panel.showProblem = (key, message) => {
+		const field = fields.get(key);
+		if (!field) return;
+		field.err.textContent = message;
+		field.input.setAttribute("aria-invalid", "true");
+		field.input.focus();
+	};
+	return panel;
 }
 
 // --- Problems tab ---
@@ -507,12 +590,15 @@ function problemsTab(p) {
 	if (!p.length) return notice(t("editor.problems.none"), "ok");
 	const rows = p.map((x) => {
 		const what = x.item ? (x.item.number ? `${t(`editor.tab.${x.table}`)} ${x.item.number} · ${x.item.name}` : `${t(`editor.tab.${x.table}`)} · ${x.item.name}`) : t(`editor.tab.${x.table === "general" ? "radio" : x.table}`);
-		const go = x.item ? button(t("editor.problems.show"), () => {
-			show(x.table);
-			S.grid?.g.focusRow(x.item);
-		}, { quiet: true }) : button(t("editor.problems.show"), () => show(x.table === "general" ? "radio" : x.table), { quiet: true });
+		const go = button(t("editor.problems.show"), () => {
+			const tab = x.table === "general" ? "radio" : x.table;
+			show(tab);
+			if (x.item) openRecord(tab, x.item, { problem: x });
+			else if (tab === "radio") radioView.showProblem(x.field, problemText(x));
+			else say(problemText(x), x.level === "error" ? "bad" : "warn");
+		}, { quiet: true });
 		return h("tr", {}, h("td", {}, h("span", { class: `badge ${x.level === "error" ? "badge-bad" : "badge-testing"}` }, t(`editor.level.${x.level}`))),
-			h("td", {}, what), h("td", {}, t(`editor.problem.${x.code}`, { ...x.params, field: x.field ? t(`editor.field.${x.field}`) : "" })), h("td", {}, go));
+			h("td", {}, what), h("td", {}, problemText(x)), h("td", {}, go));
 	});
 	return h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("tbody", {}, ...rows)));
 }
