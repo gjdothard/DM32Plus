@@ -4847,6 +4847,10 @@ static void dmr_id_item(uint16_t i, ui_item_t *it)
 				sb_u32(&b, v, 1);
 			sb_chr(&b, '_');		// what is typed so far, as the channel editor: "3101_"
 			it->flags |= UI_ITEM_EDIT;
+#if CONFIG_UI_CARD_MENU
+			if (ui_card_layout(&ui_st))
+				sb_str(&b, "\n1-16776415");
+#endif
 		} else if (v != 0) {
 			sb_u32(&b, v, 1);
 		} else {
@@ -6505,6 +6509,10 @@ static void group_item(uint16_t i, ui_item_t *it)
 	if (s == NULL)
 		return;
 	str_copy(it->label, sizeof it->label, tr(s->name));
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st) && s->type != ST_ACTION && s->id == UI_SET_BACKLIGHT_S)
+		str_copy(it->label, sizeof it->label, TR("Backlight"));
+#endif
 	bool edit = set_editing && i == ui_frame()->focus;
 	if (s->type != ST_ACTION)
 		set_value_text(s, edit ? set_value : ui_svc_setting_get(s->id), it->value, sizeof it->value);
@@ -6514,8 +6522,22 @@ static void group_item(uint16_t i, ui_item_t *it)
 		strcpy(it->value, "-");
 	if (s->id == UI_SET_MIC_GAIN && !edit && mic_agc_on())
 		strcpy(it->value, "AGC");
-	if (edit)
+	if (edit) {
 		it->flags |= UI_ITEM_EDIT;
+#if CONFIG_UI_CARD_MENU
+		if (ui_card_layout(&ui_st) && ui_frame()->scr == SCR_GROUP && s->type == ST_NUMBER) {
+			int32_t lo, hi;
+			set_range(s, &lo, &hi);
+			sbuf_t value = { it->value + strlen(it->value), it->value + sizeof it->value - 1 };
+			sb_chr(&value, '\n');
+			sb_i32(&value, lo);
+			sb_chr(&value, '-');
+			sb_i32(&value, hi);
+			if (s->unit)
+				sb_str(&value, s->unit);
+		}
+#endif
+	}
 	if (set_why_not(s) != NULL)
 		it->flags |= UI_ITEM_DIM;
 }
@@ -7137,8 +7159,13 @@ static void lang_list_item(uint16_t i, ui_item_t *it)
 	str_copy(it->label, sizeof it->label, lang_name((uint8_t)i));
 	if (i == lang_current())
 		str_copy(it->value, sizeof it->value, TR("In use"));
-	if (!lang_built((uint8_t)i))
+	if (!lang_built((uint8_t)i)) {
 		it->flags |= UI_ITEM_DIM;
+#if CONFIG_UI_CARD_MENU
+		if (ui_card_layout(&ui_st))
+			str_copy(it->value, sizeof it->value, TR("Not in this build"));
+#endif
+	}
 }
 
 static void lang_list_select(uint16_t i, bool hold)

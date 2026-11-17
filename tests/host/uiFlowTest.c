@@ -1461,6 +1461,20 @@ int main(void)
 		run_flow(&card_quick[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
 #if CONFIG_UI_CARD_MENU
 	static const flow_t card_menu[] = {
+		{ "Display settings use a consistent card frame", "branded-home", "ok 9 2",
+			"screen=group shows=Display shows=Backlight shows=Language shows=20:12", 3, false },
+		{ "Numeric setting cards show the actual allowed range", "branded-home ok 9 2", "ok down",
+			"screen=group shows=90% shows=10-100% set5=100", 2, false },
+		{ "Numeric setting Back cancels without applying", "branded-home ok 9 2 ok down", "back",
+			"screen=group set5=100", 1, false },
+		{ "Numeric setting OK applies the selected value", "branded-home ok 9 2 ok down", "ok",
+			"screen=group set5=90", 1, false },
+		{ "My Radio uses identity field cards", "branded-home", "ok 9 9 ok",
+			"screen=dmr-id shows=20:12 shows=Saved_in_the_codeplug shows=DMR_ID", 4, false },
+		{ "My Radio ID entry shows its allowed range", "branded-home ok 9 9 ok", "3 1 0 1",
+			"screen=dmr-id shows=1-16776415 writes=0", 4, false },
+		{ "Language cards identify the active catalog", "branded-home", "ok 9 2 up ok",
+			"screen=language shows=In_use shows=20:12", 5, false },
 		{ "Dual Watch action cards retain pane choices", "branded-home quick 3", "ctx",
 			"screen=dual shows=20:12 shows=Talk_on_B shows=Change_A shows=Stop,_stay_on_A", 1, false },
 		{ "Dual Watch cards keep B in the picker title", "branded-home quick 3 ctx", "3",

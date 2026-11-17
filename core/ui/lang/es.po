@@ -446,6 +446,10 @@ msgid "OK change  Back"
 msgstr "OK cambiar  Atrás"
 
 #: core/ui/ui_app.c
+msgid "{Up/Dn change  OK keep  Back cancel|Up/Dn  OK keep  Back cancel}"
+msgstr "{Arr/Ab cambiar  OK guardar  Atrás cancelar|Arr/Ab  OK guardar  Atrás cancelar}"
+
+#: core/ui/ui_app.c
 msgid "Find"
 msgstr "Buscar"
 
@@ -3188,6 +3192,10 @@ msgstr "Elige un tipo de clave antes"
 #: core/ui/ui_menus.c
 msgid "No GPS on this radio"
 msgstr "Sin GPS en esta radio"
+
+#: core/ui/ui_menus.c
+msgid "Backlight"
+msgstr "Luz de fondo"
 
 #: core/ui/ui_menus.c
 msgid "Diagnostics: not in this build"

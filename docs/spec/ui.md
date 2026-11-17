@@ -39,6 +39,9 @@ Find and Talk to use the same card frame, with contact IDs separated from names 
 on a second line. Channel TX-contact and RX-group pickers use field cards with a Find region.
 Dual Watch uses numbered action cards and channel/zone picker cards. Picker titles include the pane letter;
 the other pane's channel stays dimmed and marked in use. Existing A/B selection and stop behavior are unchanged.
+Settings groups, My Radio, and Language share the field-card frame. Numeric edits use amber borders and text
+and show the setting's actual range. Long field values move below their labels instead of shrinking the label.
+Language identifies the active catalog and explains catalogs not included in the image.
 Contacts & Talkgroups uses separate group and private-call tabs on the same filtered contacts list.
 The horizontal actions change tabs and keep the filter text. The first two assignable side keys supply
 those actions while the directory is open. The ID has a dedicated column, and a long name can shorten.

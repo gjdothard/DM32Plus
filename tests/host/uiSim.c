@@ -245,6 +245,11 @@ static const struct { const char *name, *script; } audit_extra[] = {
 	{ "dual_action_cards", "branded-home quick 3 ctx" },
 	{ "dual_picker_cards", "branded-home quick 3 ctx 3" },
 	{ "dual_zone_cards", "branded-home quick 3 ctx 3 up up up up ok" },
+	{ "setting_cards", "branded-home ok 9 2" },
+	{ "setting_edit_cards", "branded-home ok 9 2 ok down" },
+	{ "identity_cards", "branded-home ok 9 9 ok" },
+	{ "identity_edit_cards", "branded-home ok 9 9 ok 3 1 0 1" },
+	{ "language_cards", "branded-home ok 9 2 up ok" },
 	{ "contact_picker_cards", "branded-home ok 1 2 ok down down down down down down down down down ok" },
 	{ "caller_cards_temporary", "branded-home quick 1 up ok back call:3101234,91,g wait:11000 ctx up" },
 	{ "caller_cards_rx", "branded-home rx:3101234,91,g ctx" },
@@ -574,6 +579,18 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 				 !strcmp(name, "position") ? 1 : !strcmp(name, "gps_sky") ? 2 : 3);
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "settings"))
 			snprintf(script, slen, "branded-home ok 9");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "settings_display"))
+			snprintf(script, slen, "branded-home ok 9 2");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "settings_editor"))
+			snprintf(script, slen, "branded-home ok 9 2 ok up");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "settings_advanced"))
+			snprintf(script, slen, "branded-home ok 9 0");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "settings_freq_trim"))
+			snprintf(script, slen, "branded-home trim ok 9 0 up");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "dmr_id"))
+			snprintf(script, slen, "branded-home ok 9 9 ok");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "dmr_id_entry"))
+			snprintf(script, slen, "branded-home ok 9 9 ok 3 1 0 9");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "contacts"))
 			snprintf(script, slen, "branded-home ok 3");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "channels"))

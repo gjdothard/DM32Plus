@@ -1840,6 +1840,16 @@ static void list_draw(const ui_scr_def_t *d)
 	if (CONFIG_UI_SETTINGS && CONFIG_DMR_ARS && f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_ARS)
 		l.hint = TR("OK change  Back");
 	if (ui_card_layout(&ui_st)) {
+		if (f->scr == SCR_GROUP || f->scr == SCR_DMR_ID || f->scr == SCR_LANGUAGE) {
+			ui_item_t focused = { 0 };
+			if (l.count)
+				l.item(l.focus, &focused);
+			if (f->scr == SCR_GROUP && (focused.flags & UI_ITEM_EDIT))
+				l.hint = TR(TEXT_ALT_OPEN "Up/Dn change  OK keep  Back cancel" TEXT_ALT_NEXT
+					"Up/Dn  OK keep  Back cancel" TEXT_ALT_CLOSE);
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_FIELDS);
+			return;
+		}
 		if (f->scr == SCR_DUAL || f->scr == SCR_DUAL_PICK || f->scr == SCR_DUAL_ZONE) {
 			if (f->scr != SCR_DUAL) {
 				static char pane_title[48];

@@ -3508,6 +3508,33 @@ static void card_page_footer(const ui_state_t *s, int y, const char *hint)
 	card_list_footer(s, y, left, back, fit, sizeof fit);
 }
 
+static int card_page_text(const font_t *font, const char *text, int y, int end, bool draw, color_t color)
+{
+	char line[64];
+	while (*text && y + font->h <= end) {
+		const char *next = wrap_line(font, text, gfx_width() - 14, line, sizeof line);
+		if (*next && y + 2 * font->h > end)
+			fit_end(font, text, gfx_width() - 14, line, sizeof line);
+		if (draw)
+			gfx_text(font, 6, y, line, color);
+		text = next;
+		y += font->h;
+	}
+	return y;
+}
+
+static void card_page_field(int x, int y, int right, const ui_item_t *item, color_t fg, color_t value_color)
+{
+	const font_t *font = ui_layout.small, *meta = &font_6x12;
+	char value[44], label[40];
+	gfx_text_fit(meta, item->value, right - x, value, sizeof value);
+	int vw = gfx_text_width(meta, value);
+	fit_end(font, item->label, right - x - (vw ? vw + 8 : 0), label, sizeof label);
+	gfx_text(font, x, y, label, fg);
+	if (vw)
+		gfx_text(meta, right - vw, y + (font->h - meta->h) / 2, value, value_color);
+}
+
 void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kind_t kind)
 {
 	const font_t *font = ui_layout.small, *meta = &font_6x12;
@@ -3525,9 +3552,9 @@ void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kin
 	}
 	if (l->body && l->body[0]) {
 		int limit = footer - (l->count ? step + 10 : 4);
-		int height = wrap_text(meta, l->body, 0, limit - y - 12, false, 0) + 12;
+		int height = card_page_text(meta, l->body, 0, limit - y - 12, false, 0) + 12;
 		card_list_row(y, width - 2, height, CARD_EDGE, CARD_SURFACE);
-		wrap_text(meta, l->body, y + 6, y + height - 6, true, ui_col.fg);
+		card_page_text(meta, l->body, y + 6, y + height - 6, true, ui_col.fg);
 		y += height + 5;
 	}
 	if (l->header && l->header[0]) {
@@ -3543,7 +3570,8 @@ void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kin
 			l->item(i, &item);
 			if (actions && item.value[0])
 				step = 44;
-			if (!actions && step < 44 && gfx_text_width(font, item.label) + gfx_text_width(font, item.value) + 8 > width - 16)
+			if (!actions && step < 44 && (strchr(item.value, '\n') ||
+			    gfx_text_width(font, item.label) + gfx_text_width(meta, item.value) + 8 > width - 16))
 				step = 44;
 			if (!actions && gfx_text_width(font, item.label) > width - 16)
 				step = 2 * font->h + meta->h + 12;
@@ -3562,13 +3590,16 @@ void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kin
 			*detail++ = 0;
 		int yy = y + row * step, x = 7;
 		bool focus = i == l->focus && !(item.flags & UI_ITEM_INFO);
+		bool editing = focus && (item.flags & UI_ITEM_EDIT);
 		color_t highlight = item.flags & UI_ITEM_EDIT ? ui_col.warn : ui_col.focus;
 		color_t fg = focus && !actions ? CARD_INK : item.flags & UI_ITEM_DIM ? ui_col.dim : ui_col.fg;
 		color_t secondary = focus && !actions ? fg : ui_col.dim;
+		if (editing)
+			fg = secondary = ui_col.warn;
 		if (!focus && (item.flags & UI_ITEM_WARN))
 			fg = ui_col.warn;
 		card_list_row(yy, width - 2, step - 4, focus ? highlight : CARD_EDGE,
-			focus ? actions ? CARD_SELECTED : highlight : CARD_SURFACE);
+			editing ? CARD_SURFACE : focus ? actions ? CARD_SELECTED : highlight : CARD_SURFACE);
 		if (actions && item.num) {
 			char key[] = { item.num, 0 };
 			gfx_round_fill(5, yy + 8, 15, meta->h + 2, focus ? highlight : CARD_EDGE);
@@ -3597,6 +3628,12 @@ void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kin
 				gfx_text(meta, x, yy + 25, fit, secondary);
 			}
 		} else if (kind == UI_CARD_PAGE_FIELDS && step > 28) {
+			if (detail) {
+				card_page_field(x, yy + 3, right, &item, fg, secondary);
+				fit_end(meta, detail, right - x, fit, sizeof fit);
+				gfx_text(meta, x, yy + step - meta->h - 7, fit, secondary);
+				continue;
+			}
 			const char *tail = wrap_line(font, item.label, right - x, fit, sizeof fit);
 			gfx_text(font, x, yy + 3, fit, fg);
 			if (*tail) {
@@ -3604,6 +3641,8 @@ void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kin
 				gfx_text(font, x, yy + 3 + font->h, fit, fg);
 			}
 			row_text(meta, x, yy + step - meta->h - 7, right, "", item.value, fg, secondary, false);
+		} else if (kind == UI_CARD_PAGE_FIELDS) {
+			card_page_field(x, yy + (step - 4 - font->h) / 2, right, &item, fg, secondary);
 		} else {
 			row_text(font, x, yy + (step - 4 - font->h) / 2, right,
 				item.label, item.value, fg, secondary, (item.flags & UI_ITEM_PREVIEW) != 0);
