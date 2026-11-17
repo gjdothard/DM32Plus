@@ -28,7 +28,7 @@ typedef struct {
 } flow_t;
 
 #define CALLER	"call:3101234,91,g wait:11000 "
-#define TALK_BACK	"ok 7 3 down down down down down down down down down ok long:back quick 7 ctx 3 5 ok "	// on, and A 3 / B 5
+#define TALK_BACK	"ok 7 3 down down down down down down down down down ok long:back quick:dual ctx 3 5 ok "	// on, and A 3 / B 5
 
 static const flow_t flows[] = {
 	{ "1 next channel", "", "up", "pos=4", 1, false },
@@ -105,40 +105,40 @@ static const flow_t flows[] = {
 #endif
 #endif
 	{ "9 power one step", "", "quick 1 back", "power=8 screen=home", 3, false },
-	{ "9 squelch 2 steps (FM)", "down", "quick 2 up up back", "sq=7 screen=home", 5, false },
-	{ "10 privacy", "", "quick 6 back", "privacy=1 screen=home", 3, false },
+	{ "9 squelch 2 steps (FM)", "down", "quick:squelch up up back", "sq=7 screen=home", 5, false },
+	{ "10 privacy", "", "quick:privacy back", "privacy=1 screen=home", 3, false },
 	{ "11 scan start (Tools > Scan)", "", "ok 6 1", "scanning=1", 3, false },
 	{ "11 nuisance skip", "ok 6 1", "ctx 1", "pos=4 scanning=1", 2, false },
 	{ "11 scan stop", "ok 6 1", "back", "scanning=0", 1, false },
 	// Dual watch (docs/ux/dual-watch.md): on in a few presses, PTT on the selected channel, the other one press away
-	{ "11 dual watch: start, B the next channel", "", "quick 7", "dual=1 sel=A pos=3 bpos=4 screen=home", 2, false },
-	{ "11 dual watch: start, then B by number", "", "quick 7 ctx 3 5 ok", "dual=1 sel=A pos=3 bpos=5 screen=home", 6, false },
-	{ "11 dual watch: again with the last B", "quick 7 ctx 3 5 ok back back", "quick 7", "dual=1 sel=A", 2, false },
-	{ "11 dual watch: B in another zone", "", "quick 7 ctx 1 zone+", "dual=1 sel=B bzone=1 screen=home", 5, false },
-	{ "11 dual watch: B on the VFO", "", "quick 7 ctx 1 vfokey", "dual=1 bvfo=1 sel=B", 5, false },
-	{ "11 dual watch: talk on B from #", "quick 7 ctx 3 5 ok", "ctx 1", "dual=1 sel=B uipos=5", 2, false },
-	{ "11 dual watch: the A/B key", "quick 7 ctx 3 5 ok", "abkey", "dual=1 sel=B", 1, false },
-	{ "11 dual watch: PTT keeps it on", "quick 7 ctx 3 5 ok ctx 1", "pttdown wait:1000 pttup wait:1000", "dual=1 sel=B pos=5", 2, false },
-	{ "11 dual watch: Up moves the selected", "quick 7 ctx 3 5 ok", "up", "dual=1 sel=A pos=4", 1, false },
-	{ "11 dual watch: stop stays on B", "quick 7 ctx 3 5 ok ctx 1", "back back", "dual=0 pos=5", 2, false },
+	{ "11 dual watch: start, B the next channel", "", "quick:dual", "dual=1 sel=A pos=3 bpos=4 screen=home", 2, false },
+	{ "11 dual watch: start, then B by number", "", "quick:dual ctx 3 5 ok", "dual=1 sel=A pos=3 bpos=5 screen=home", 6, false },
+	{ "11 dual watch: again with the last B", "quick:dual ctx 3 5 ok back back", "quick:dual", "dual=1 sel=A", 2, false },
+	{ "11 dual watch: B in another zone", "", "quick:dual ctx 1 zone+", "dual=1 sel=B bzone=1 screen=home", 5, false },
+	{ "11 dual watch: B on the VFO", "", "quick:dual ctx 1 vfokey", "dual=1 bvfo=1 sel=B", 5, false },
+	{ "11 dual watch: talk on B from #", "quick:dual ctx 3 5 ok", "ctx 1", "dual=1 sel=B uipos=5", 2, false },
+	{ "11 dual watch: the A/B key", "quick:dual ctx 3 5 ok", "abkey", "dual=1 sel=B", 1, false },
+	{ "11 dual watch: PTT keeps it on", "quick:dual ctx 3 5 ok ctx 1", "pttdown wait:1000 pttup wait:1000", "dual=1 sel=B pos=5", 2, false },
+	{ "11 dual watch: Up moves the selected", "quick:dual ctx 3 5 ok", "up", "dual=1 sel=A pos=4", 1, false },
+	{ "11 dual watch: stop stays on B", "quick:dual ctx 3 5 ok ctx 1", "back back", "dual=0 pos=5", 2, false },
 	// One Back press says how to stop it; it goes on. A second one later is a first press again
-	{ "11 dual watch: one Back keeps it", "quick 7 ctx 3 5 ok", "back", "dual=1 toast=Press_Back_again", 1, false },
-	{ "11 dual watch: Back, later Back", "quick 7 ctx 3 5 ok", "back wait:2500 back", "dual=1 toast=Press_Back_again", 2,
+	{ "11 dual watch: one Back keeps it", "quick:dual ctx 3 5 ok", "back", "dual=1 toast=Press_Back_again", 1, false },
+	{ "11 dual watch: Back, later Back", "quick:dual ctx 3 5 ok", "back wait:2500 back", "dual=1 toast=Press_Back_again", 2,
 	  false },
 	// Back clears the selected channel's changes first, then asks
-	{ "11 dual watch: Back undoes changes first", "quick 7 ctx 3 5 ok quick 2 back", "back", "dual=1 temporary=0 toast=Changes_undone",
+	{ "11 dual watch: Back undoes changes first", "quick:dual ctx 3 5 ok quick:timeslot back", "back", "dual=1 temporary=0 toast=Changes_undone",
 	  1, false },
-	{ "11 dual watch: quick 7 stops it", "quick 7 ctx 3 5 ok", "quick 7", "dual=0 pos=3", 2, false },
-	{ "11 dual watch: a quick setting keeps it on", "down quick 7 ctx 3 5 ok", "quick 8 back", "dual=1 sel=A", 3, false },
-	{ "11 dual watch, two receivers: a call on each", "receivers:2 quick 7 ctx 3 5 ok",
+	{ "11 dual watch: Quick control stops it", "quick:dual ctx 3 5 ok", "quick:dual", "dual=0 pos=3", 2, false },
+	{ "11 dual watch: a quick setting keeps it on", "down quick:dual ctx 3 5 ok", "quick 8 back", "dual=1 sel=A", 3, false },
+	{ "11 dual watch, two receivers: a call on each", "receivers:2 quick:dual ctx 3 5 ok",
 	  "rxa:3101234,91,g wait:300 rxb:3107777,3100,g wait:300", "dual=1 sel=A rx=A calls=0", 0, false },
-	{ "11 dual watch, two receivers: A's call ends", "receivers:2 quick 7 ctx 3 5 ok",
+	{ "11 dual watch, two receivers: A's call ends", "receivers:2 quick:dual ctx 3 5 ok",
 	  "rxa:3101234,91,g wait:300 rxb:3107777,3100,g wait:300 rxaend wait:300", "dual=1 rx=B calls=1 last=A", 0, false },
-	{ "11 dual watch, two receivers: talk on B", "receivers:2 quick 7 ctx 3 5 ok rxb:3107777,3100,g wait:300 rxbend",
+	{ "11 dual watch, two receivers: talk on B", "receivers:2 quick:dual ctx 3 5 ok rxb:3107777,3100,g wait:300 rxbend",
 	  "ctx 1", "dual=1 sel=B last=B uipos=5", 2, false },
-	{ "11 dual watch: long SK2", "quick 7 ctx 3 5 ok back back", "long:user2", "dual=1 sel=A bpos=5", 1, false },
-	{ "11 dual watch: Tools > Scan, a zone scan instead", "quick 7 ctx 3 5 ok", "ok 6 1", "dual=0 scanning=1", 3, false },
-	{ "11 dual watch: the last B after power off", "quick 7 ctx 3 5 ok back back reboot", "quick 7", "dual=1 sel=A bpos=5",
+	{ "11 dual watch: long SK2", "quick:dual ctx 3 5 ok back back", "long:user2", "dual=1 sel=A bpos=5", 1, false },
+	{ "11 dual watch: Tools > Scan, a zone scan instead", "quick:dual ctx 3 5 ok", "ok 6 1", "dual=0 scanning=1", 3, false },
+	{ "11 dual watch: the last B after power off", "quick:dual ctx 3 5 ok back back reboot", "quick:dual", "dual=1 sel=A bpos=5",
 	  2, false },
 	{ "S freq trim opens its page", "trim", "ok 7 0 up ok", "screen=freq-trim shows=440_MHz shows=144_MHz", 9, false },
 	{ "S freq trim: Down steps 0.1 ppm at once", "trim ok 7 0 up ok", "down down",
@@ -174,38 +174,40 @@ static const flow_t flows[] = {
 	{ "11 dual watch talk back: # 1 goes back at once", TALK_BACK "tune:b call:3101234,91,g wait:4000", "ctx 1",
 	  "dual=1 sel=A", 2, false },
 	// A reply target lapses with its window: B's pane shows B's own talk group once the receiver has gone back to A
-	{ "11 dual watch: no stale reply target on B", "quick 7 ctx 3 5 ok wait:3000",
+	{ "11 dual watch: no stale reply target on B", "quick:dual ctx 3 5 ok wait:3000",
 	  "tune:b call:3101234,91,g tune:a call:3107777,3100,g wait:4000", "dual=1 sel=A hides=World", 0, false },
 	// B on the VFO, selected before the receiver has been there (a new selection doesn't retune): digits are a frequency
-	{ "11 dual watch: digits on B the VFO, receiver on A", "quick 7 ctx 1 vfokey ctx 1 wait:3000 tune:a ctx 1", "4 4",
+	{ "11 dual watch: digits on B the VFO, receiver on A", "quick:dual ctx 1 vfokey ctx 1 wait:3000 tune:a ctx 1", "4 4",
 	  "dual=1 sel=B entry=44", 2, false },
 	// Stopped with B selected, the radio stays on B: the next start keeps the pair (A the channel it is on)
-	{ "11 dual watch: again after a stop on B", "quick 7 ctx 1 back back", "quick 7", "dual=1 sel=A apos=4 bpos=3", 2,
+	{ "11 dual watch: again after a stop on B", "quick:dual ctx 1 back back", "quick:dual", "dual=1 sel=A apos=4 bpos=3", 2,
 	  false },
-	{ "11 dual watch: again after a stop on B and power off", "quick 7 ctx 1 back back reboot", "quick 7",
+	{ "11 dual watch: again after a stop on B and power off", "quick:dual ctx 1 back back reboot", "quick:dual",
 	  "dual=1 sel=A apos=4 bpos=3", 2, false },
-	{ "11 dual watch: again on the last B's channel", "quick 7 back back up", "quick 7", "dual=1 sel=A apos=4 bpos=3", 2,
+	{ "11 dual watch: again on the last B's channel", "quick:dual back back up", "quick:dual", "dual=1 sel=A apos=4 bpos=3", 2,
 	  false },
-	{ "11 dual watch key on and off", "quick 7 ctx 3 5 ok back back", "dualkey", "dual=1", 1, false },
+	{ "11 dual watch key on and off", "quick:dual ctx 3 5 ok back back", "dualkey", "dual=1", 1, false },
 	// Changes and requests act on the selected channel wherever the receiver is, and stay with it over hops
-	{ "11 dual watch: power goes to the selected", "quick 7 ctx 3 5 ok tune:b", "quick 2 back", "dual=1 sel=A pos=3 temporary=1",
+	{ "11 dual watch: power goes to the selected", "quick:dual ctx 3 5 ok tune:b", "quick:timeslot back", "dual=1 sel=A pos=3 temporary=1",
 	  3, false },
-	{ "11 dual watch: the screens show the selected", "quick 7 ctx 3 5 ok quick 2 back tune:b", "",
+	{ "11 dual watch: the screens show the selected", "quick:dual ctx 3 5 ok quick:timeslot back tune:b", "",
 	  "dual=1 pos=5 temporary=0 uipos=3 uitemp=1", 0, false },
-	{ "11 dual watch: changes kept over hops", "quick 7 ctx 3 5 ok quick 2 back", "tune:b tune:a", "pos=3 temporary=1", 0,
+	{ "11 dual watch: changes kept over hops", "quick:dual ctx 3 5 ok quick:timeslot back", "tune:b tune:a", "pos=3 temporary=1", 0,
 	  false },
-	{ "11 dual watch: talk target for the selected", "quick 7 tune:b", "tt", "dual=1 screen=picker", 1, false },
-	{ "11 dual watch: VFO entry over a hop", "quick 7 ctx 1 vfokey ctx 1 ctx 1", "1 4 6 tune:a 5", "dual=1 sel=B entry=1465",
+	{ "11 named Quick control follows the selected mode while receiving the other", "quick:dual tune:b",
+	  "quick:timeslot back", "dual=1 sel=A uipos=3 uitemp=1", 3, false },
+	{ "11 dual watch: talk target for the selected", "quick:dual tune:b", "tt", "dual=1 screen=picker", 1, false },
+	{ "11 dual watch: VFO entry over a hop", "quick:dual ctx 1 vfokey ctx 1 ctx 1", "1 4 6 tune:a 5", "dual=1 sel=B entry=1465",
 	  4, false },
 	// Up / Down with nothing to step to says why
-	{ "11 dual watch: one channel in the zone", "zonesize:1,1 quick 7 ctx 1 zone+", "up",
+	{ "11 dual watch: one channel in the zone", "zonesize:1,1 quick:dual ctx 1 zone+", "up",
 	  "dual=1 sel=B toast=Only_one_channel", 1, false },
-	{ "11 dual watch: the zone's other channel is A", "zonesize:0,2 quick 7 ctx 1", "up",
+	{ "11 dual watch: the zone's other channel is A", "zonesize:0,2 quick:dual ctx 1", "up",
 	  "dual=1 sel=B apos=1 bpos=2 toast=No_other_channel_here", 1, false },
 	// Nothing ends it but the user: a channel change from elsewhere becomes the selected channel or selects the other
-	{ "11 dual watch: a channel from elsewhere", "quick 7 ctx 3 5 ok", "dlpos:7 wait:1000", "dual=1 sel=A apos=7 bpos=5",
+	{ "11 dual watch: a channel from elsewhere", "quick:dual ctx 3 5 ok", "dlpos:7 wait:1000", "dual=1 sel=A apos=7 bpos=5",
 	  0, false },
-	{ "11 dual watch: the other channel from elsewhere", "quick 7 ctx 3 5 ok", "dlpos:5 wait:1000",
+	{ "11 dual watch: the other channel from elsewhere", "quick:dual ctx 3 5 ok", "dlpos:5 wait:1000",
 	  "dual=1 sel=B apos=3 bpos=5 toast=Talking_on_B", 0, false },
 	// The debug link: its stop is the user's (the watch stays off); A or B selected there is followed, and a channel it
 	// sets after that goes to that one
@@ -218,52 +220,52 @@ static const flow_t flows[] = {
 	// Started again right after its stop (before START_GRACE_MS): the UI takes it on, so the B change goes on watching
 	{ "11 dual watch: the debug link's stop, then its start", "dldual:5 wait:1000 dlstop wait:100",
 	  "dldual:5 dlsel:b wait:100 dlpos:7 wait:1000", "dual=1 sel=B bpos=7", 0, false },
-	{ "11 dual watch: stopped by the debug link", "quick 7 ctx 3 5 ok", "dlstop wait:1500",
+	{ "11 dual watch: stopped by the debug link", "quick:dual ctx 3 5 ok", "dlstop wait:1500",
 	  "dual=0 pos=3 toast=Dual_watch_off:_on_A", 0, false },
-	{ "11 dual watch: stopped by the debug link on B", "quick 7 ctx 3 5 ok ctx 1", "dlstop wait:1500",
+	{ "11 dual watch: stopped by the debug link on B", "quick:dual ctx 3 5 ok ctx 1", "dlstop wait:1500",
 	  "dual=0 pos=5 toast=Dual_watch_off:_on_B", 0, false },
-	{ "11 dual watch: B selected by the debug link", "quick 7 ctx 3 5 ok", "dlsel:b wait:500",
+	{ "11 dual watch: B selected by the debug link", "quick:dual ctx 3 5 ok", "dlsel:b wait:500",
 	  "dual=1 sel=B toast=Talking_on_B", 0, false },
-	{ "11 dual watch: B selected and a channel at once", "quick 7 ctx 3 5 ok", "dlsel:b dlpos:7 wait:1000",
+	{ "11 dual watch: B selected and a channel at once", "quick:dual ctx 3 5 ok", "dlsel:b dlpos:7 wait:1000",
 	  "dual=1 sel=B apos=3 bpos=7", 0, false },
-	{ "11 dual watch: a channel for B from the debug link", "quick 7 ctx 3 5 ok", "dlsel:b wait:200 dlpos:7 wait:1000",
+	{ "11 dual watch: a channel for B from the debug link", "quick:dual ctx 3 5 ok", "dlsel:b wait:200 dlpos:7 wait:1000",
 	  "dual=1 sel=B apos=3 bpos=7", 0, false },
-	{ "11 dual watch: Zones menu sets the selected", "quick 7 ctx 3 5 ok", "ok 4 down ok wait:1000",
+	{ "11 dual watch: Zones menu sets the selected", "quick:dual ctx 3 5 ok", "ok 4 down ok wait:1000",
 	  "dual=1 sel=A azone=1 apos=1 bzone=0 bpos=5", 4, false },
-	{ "11 dual watch: after hotspot mode", "quick 7 ctx 3 5 ok", "hotspot:on wait:1000 hotspot:off wait:1000",
+	{ "11 dual watch: after hotspot mode", "quick:dual ctx 3 5 ok", "hotspot:on wait:1000 hotspot:off wait:1000",
 	  "dual=1 sel=A apos=3 bpos=5", 0, false },
-	{ "11 dual watch: a codeplug write", "quick 7 ctx 3 5 ok", "cpwrite wait:1000", "dual=1 sel=A apos=4 bpos=6 pos=4", 0,
+	{ "11 dual watch: a codeplug write", "quick:dual ctx 3 5 ok", "cpwrite wait:1000", "dual=1 sel=A apos=4 bpos=6 pos=4", 0,
 	  false },
-	{ "11 dual watch: B deleted", "quick 7 ctx 3 5 ok", "cpdel:5 wait:1000", "dual=0 pos=3 toast=Dual_watch_off:_on_COUNTY",
+	{ "11 dual watch: B deleted", "quick:dual ctx 3 5 ok", "cpdel:5 wait:1000", "dual=0 pos=3 toast=Dual_watch_off:_on_COUNTY",
 	  0, false },
 	// It comes back at power on, as it was
-	{ "11 dual watch: back after power off", "quick 7 ctx 3 5 ok reboot wait:1000", "", "dual=1 sel=A apos=3 bpos=5", 0,
+	{ "11 dual watch: back after power off", "quick:dual ctx 3 5 ok reboot wait:1000", "", "dual=1 sel=A apos=3 bpos=5", 0,
 	  false },
-	{ "11 dual watch: back with B selected", "quick 7 ctx 3 5 ok ctx 1 reboot wait:1000", "", "dual=1 sel=B apos=3 bpos=5",
+	{ "11 dual watch: back with B selected", "quick:dual ctx 3 5 ok ctx 1 reboot wait:1000", "", "dual=1 sel=B apos=3 bpos=5",
 	  0, false },
-	{ "11 dual watch: off stays off", "quick 7 ctx 3 5 ok back back reboot wait:1000", "", "dual=0", 0, false },
+	{ "11 dual watch: off stays off", "quick:dual ctx 3 5 ok back back reboot wait:1000", "", "dual=0", 0, false },
 	// The VFO key and Copy to VFO act on the selected channel
-	{ "11 dual watch: VFO key", "quick 7 ctx 3 5 ok", "vfokey", "dual=1 sel=A avfo=1 bpos=5", 1, false },
-	{ "11 dual watch: VFO key back", "quick 7 ctx 3 5 ok vfokey", "vfokey", "dual=1 sel=A avfo=0 apos=3 bpos=5", 1, false },
+	{ "11 dual watch: VFO key", "quick:dual ctx 3 5 ok", "vfokey", "dual=1 sel=A avfo=1 bpos=5", 1, false },
+	{ "11 dual watch: VFO key back", "quick:dual ctx 3 5 ok vfokey", "vfokey", "dual=1 sel=A avfo=0 apos=3 bpos=5", 1, false },
 	// Each channel has its own VFO: with B on one, the VFO key takes A to the other (apos / bpos: which VFO, 1 or 2)
-	{ "11 dual watch: VFO key, B the VFO", "quick 7 ctx 1 vfokey ctx 1", "vfokey",
+	{ "11 dual watch: VFO key, B the VFO", "quick:dual ctx 1 vfokey ctx 1", "vfokey",
 	  "dual=1 sel=A avfo=1 apos=2 bvfo=1 bpos=1", 1, false },
-	{ "11 dual watch: VFO key, B the VFO, and back", "quick 7 ctx 1 vfokey ctx 1 vfokey", "vfokey",
+	{ "11 dual watch: VFO key, B the VFO, and back", "quick:dual ctx 1 vfokey ctx 1 vfokey", "vfokey",
 	  "dual=1 sel=A avfo=0 apos=3 bvfo=1 bpos=1", 1, false },
-	{ "11 dual watch: Copy to VFO", "quick 7 ctx 3 5 ok", "quick 4 wait:1000", "dual=1 sel=A avfo=1 bpos=5", 2, false },
-	{ "11 dual watch: Copy to VFO, B the VFO", "quick 7 ctx 1 vfokey ctx 1", "quick 4 wait:1000",
+	{ "11 dual watch: Copy to VFO", "quick:dual ctx 3 5 ok", "copykey wait:1000", "dual=1 sel=A avfo=1 bpos=5", 2, false },
+	{ "11 dual watch: Copy to VFO, B the VFO", "quick:dual ctx 1 vfokey ctx 1", "copykey wait:1000",
 	  "dual=1 sel=A avfo=1 apos=2 bvfo=1 bpos=1", 2, false },
 	// The A/B key only switches; off, it says how to start
 	{ "11 dual watch: A/B with the watch off", "", "abkey", "dual=0 pos=3 toast=Turn_on_dual_watch_first", 1, false },
 	// The zone keys move the selected channel to another zone; the watch goes on
-	{ "11 dual watch: next zone moves A", "quick 7 ctx 3 5 ok", "zone+", "dual=1 sel=A azone=1 apos=1 bzone=0 bpos=5 toast=A_zone:_Simplex", 1, false },
-	{ "11 dual watch: previous zone moves B", "quick 7 ctx 3 5 ok ctx 1", "zone-", "dual=1 sel=B bzone=2 bpos=1 azone=0 apos=3", 1, false },
-	{ "11 dual watch: home zone", "quick 7 ctx 3 5 ok zone+ zone+", "homekey", "dual=1 azone=0 apos=1 bzone=0 bpos=5", 1, false },
+	{ "11 dual watch: next zone moves A", "quick:dual ctx 3 5 ok", "zone+", "dual=1 sel=A azone=1 apos=1 bzone=0 bpos=5 toast=A_zone:_Simplex", 1, false },
+	{ "11 dual watch: previous zone moves B", "quick:dual ctx 3 5 ok ctx 1", "zone-", "dual=1 sel=B bzone=2 bpos=1 azone=0 apos=3", 1, false },
+	{ "11 dual watch: home zone", "quick:dual ctx 3 5 ok zone+ zone+", "homekey", "dual=1 azone=0 apos=1 bzone=0 bpos=5", 1, false },
 	// The first channel of the zone is the other pane's: the next one
-	{ "11 dual watch: the zone's first channel is A", "down down quick 7 ctx 3 5 ok ctx 1 zone+", "homekey",
+	{ "11 dual watch: the zone's first channel is A", "down down quick:dual ctx 3 5 ok ctx 1 zone+", "homekey",
 	  "dual=1 sel=B azone=0 apos=1 bzone=0 bpos=2", 1, false },
-	{ "11 dual watch: the zone key on the VFO", "quick 7 ctx 1 vfokey ctx 1 ctx 1", "zone+", "dual=1 sel=B bvfo=0 bzone=0 bpos=1", 1, false },
-	{ "11 dual watch: Up/Down on zone moves the selected", "ok 7 8 down down ok long:back quick 7 ctx 3 5 ok", "up",
+	{ "11 dual watch: the zone key on the VFO", "quick:dual ctx 1 vfokey ctx 1 ctx 1", "zone+", "dual=1 sel=B bvfo=0 bzone=0 bpos=1", 1, false },
+	{ "11 dual watch: Up/Down on zone moves the selected", "ok 7 8 down down ok long:back quick:dual ctx 3 5 ok", "up",
 	  "dual=1 azone=1 bzone=0", 1, false },
 #if CONFIG_CHANNEL_LIST
 	// task-flows.md 12 says 3: the VFO row is first but Channels opens on the current zone (flow 2), so one Up
@@ -433,29 +435,28 @@ static const flow_t flows[] = {
 	{ "18 VFO split on DMR: tile 6", "ok 4 up ok quick 4", "6 up ok", "mode=dmr txfreq=147120000", 3, false },
 	{ "18 VFO split: transmitting shows the TX frequency", "ok 4 up ok quick 5 up ok back", "pttdown",
 	  "shows=147.120", 1, false },
-	{ "18 a channel keeps Monitor", "down", "quick 5", "hides=TX_freq hides=TXFreq txfreq=147660000", 2, false },
-	{ "18 Copy to VFO from a DMR channel", "", "quick 4", "vfo=1 mode=dmr screen=home toast=Copied_to_VFO temporary=0",
+	{ "18 FM memory Monitor keeps the stored TX frequency", "down", "quick:monitor",
+	  "monitor=1 vfo=0 txfreq=147660000", 2, false },
+	{ "18 Copy to VFO from a DMR channel", "", "copykey", "vfo=1 mode=dmr screen=home toast=Copied_to_VFO temporary=0",
 	  2, false },
-	{ "18 Copy to VFO from an FM channel", "down", "quick 4", "vfo=1 mode=fm freq=147060000 toast=Copied_to_VFO", 2,
+	{ "18 Copy to VFO from an FM channel", "down", "copykey", "vfo=1 mode=fm freq=147060000 toast=Copied_to_VFO", 2,
 	  false },
-	{ "18 Copy to VFO: a temporary color code goes along", "quick 3 7 ok back", "quick 4", "vfo=1 cc=7 temporary=0",
+	{ "18 Copy to VFO: a temporary color code goes along", "quick:color 7 ok back", "copykey", "vfo=1 cc=7 temporary=0",
 	  2, false },
-	{ "18 Copy to VFO: the talk target goes along", "tt down ok", "quick 4", "vfo=1 talk=91 temporary=0", 2,
+	{ "18 Copy to VFO: the talk target goes along", "tt down ok", "copykey", "vfo=1 talk=91 temporary=0", 2,
 	  false },
-	{ "18 Copy to VFO: the channel is unchanged", "quick 3 7 ok back quick 4", "ok 4 ok", "vfo=0 cc=1 temporary=0",
+	{ "18 Copy to VFO: the channel is unchanged", "quick:color 7 ok back copykey", "ok 4 ok", "vfo=0 cc=1 temporary=0",
 	  3, false },
-	{ "18 Copy to VFO writes no codeplug", "quick 3 7 ok back", "quick 4", "writes=0", 2, false },
-	{ "19 hear all latched", "", "quick 5", "hearall=1", 2, false },
-	{ "19 hear all off on BACK", "quick 5 back", "back", "hearall=0", 1, false },
-	{ "19 hear all ends with the channel", "quick 5 back", "up", "hearall=0", 1, false },
-	{ "21 VOX on (FM)", "down", "quick 6", "vox=1", 2, false },
-	{ "21 VOX off again", "down quick 6", "6", "vox=0", 1, false },
-	{ "21 monitor latch (FM)", "down", "quick 5", "monitor=1", 2, false },
+	{ "18 Copy to VFO writes no codeplug", "quick:color 7 ok back", "copykey", "writes=0", 2, false },
+	{ "19 hear all latched", "", "quick:digital-monitor", "hearall=1", 2, false },
+	{ "19 hear all off on BACK", "quick:digital-monitor back", "back", "hearall=0", 1, false },
+	{ "19 hear all ends with the channel", "quick:digital-monitor back", "up", "hearall=0", 1, false },
+	{ "21 monitor latch (FM)", "down", "quick:monitor", "monitor=1", 2, false },
 	{ "3 focus follows the row", "", "tt down", "focusid=91", 2, false },
 	{ "3 focus cleared on Home", "tt down", "long:back", "focusid=0", 1, false },
-	{ "20 timeslot", "", "quick 2 back", "ts=2 screen=home", 3, false },
-	{ "20 color code 7", "", "quick 3 7 ok", "cc=7", 4, false },
-	{ "20 save to channel", "quick 2", "long:ok", "writes=1", 1, true },
+	{ "20 timeslot", "", "quick:timeslot back", "ts=2 screen=home", 3, false },
+	{ "20 color code 7", "", "quick:color 7 ok", "cc=7", 4, false },
+	{ "20 save to channel", "quick:timeslot", "long:ok", "writes=1", 1, true },
 	{ "20 VFO Quick save explains itself", "ok 4 up ok", "quick 1 long:ok",
 	  "vfo=1 toast=VFO_settings_save_automatically writes=0", 3, false },
 	// Settings the radio core acts on reach it (ui_svc_apply), key presses ask for a key beep
@@ -476,7 +477,7 @@ static const flow_t flows[] = {
 	{ "R site survey per site", "", "ok 6 6 4", "set33=2", 4, false },
 	{ "R beacon interval", "", "ok 6 6 5", "set34=120 toast=Must_match", 4, false },
 	{ "R wake probe on", "", "ok 6 6 7", "set36=1 toast=Wake_probe_on", 4, false },
-	{ "T22 Home and undo", "quick 2 back ok 6", "long:back back", "screen=home temporary=0", 2, false },
+	{ "T22 Home and undo", "quick:timeslot back ok 6", "long:back back", "screen=home temporary=0", 2, false },
 	// Settings that act now (uifix). set<N> = ui_setting_t N: 7 theme, 31 privacy key type, 32 privacy key
 	{ "S PTT on when locked (default)", "long:quick", "ptt", "tx=1 pttblock=0", 1, false },
 	{ "S PTT off when locked", "ok 7 4 down down down ok long:back long:quick", "ptt",
@@ -554,8 +555,8 @@ static const flow_t flows[] = {
 	// Quick settings in the FM VFO: tile 8 is Width, as on a channel
 	{ "Q FM VFO: Width on 8", "vfokey", "quick 8", "toast=Bandwidth", 2, false },
 	{ "S VFO mode back to FM", "ok 4 up ok quick 4 back", "quick 4", "toast=VFO:_FM mode=fm temporary=0", 2, false },
-	{ "S VFO DMR: color code 7", "ok 4 up ok quick 4 back", "quick 3 7 ok", "cc=7 temporary=0", 4, false },
-	{ "S VFO DMR: timeslot 2", "ok 4 up ok quick 4 back", "quick 2 back", "ts=2 temporary=0", 3, false },
+	{ "S VFO DMR: color code 7", "ok 4 up ok quick 4 back", "quick:color 7 ok", "cc=7 temporary=0", 4, false },
+	{ "S VFO DMR: timeslot 2", "ok 4 up ok quick 4 back", "quick:timeslot back", "ts=2 temporary=0", 3, false },
 	{ "S VFO DMR: talk to a typed TG", "ok 4 up ok quick 4 back", "quick 8 down ok 3 1 0 0 ok", "talk=3100 temporary=0",
 	  9, false },
 	{ "S VFO DMR: the mode stays across a channel", "ok 4 up ok quick 4 back ok 4 ok", "ok 4 up ok", "mode=dmr vfo=1", 4,
@@ -718,9 +719,9 @@ static const flow_t flows[] = {
 	  "screen=zones toast=That_zone_was_deleted", 0, true },
 	{ "26 another task deletes a zone ahead: the open one stays", "ok 4 down down ctx", "zonejob:0",
 	  "screen=zone toast=none shows=Hotspots", 0, true },
-	{ "26 delete a zone ahead of dual watch's B: B follows its zone", "quick 7 ctx 1 zone+ zone+",
+	{ "26 delete a zone ahead of dual watch's B: B follows its zone", "quick:dual ctx 1 zone+ zone+",
 	  "ok 4 up ctx up ok " ZO_DELETE_KEY " down ok back wait:500", "dual=1 azone=0 bzone=1 writes=1", 11, true },
-	{ "26 delete dual watch's B zone: B's channel is in no other zone, the watch ends", "quick 7 ctx 1 zone+",
+	{ "26 delete dual watch's B zone: B's channel is in no other zone, the watch ends", "quick:dual ctx 1 zone+",
 	  "ok 4 ctx up up ok " ZO_DELETE_KEY " down ok back wait:500", "dual=0 zone=1 writes=1 toast=Dual_watch_off", 11, true },
 #endif
 #if CONFIG_VFO_FM || CONFIG_VFO_DMR
@@ -977,6 +978,75 @@ static void run_flow(const flow_t *f, const sim_geom_t *g, sim_map_t map, const 
 		printf("FAIL %s [%s]: wrote the codeplug while only operating (P7)\n", f->name, mapname);
 		fails++;
 	}
+}
+
+// Pin the key order independently of named-control behavior flows.
+static void quick_order_checks(void)
+{
+	static const uint8_t memory_fm[UI_QUICK_TILES] = {
+		QT_POWER, QT_SQUELCH, QT_TONE, QT_TO_VFO, QT_MONITOR, QT_VOX, QT_SCAN, QT_BANDWIDTH, QT_BRIGHTNESS,
+	};
+	static const uint8_t memory_dmr[UI_QUICK_TILES] = {
+		QT_POWER, QT_TIMESLOT, QT_CC, QT_TO_VFO, QT_HEAR_ALL, QT_PRIVACY, QT_SCAN, QT_TALK_TO, QT_BRIGHTNESS,
+	};
+	static const uint8_t wide_fm[UI_QUICK_TILES] = {
+		QT_POWER, QT_ZONE_SCAN, QT_SCAN, QT_SQUELCH, QT_TONE, QT_SPLIT, QT_MONITOR, QT_BANDWIDTH, QT_GPS,
+	};
+	static const uint8_t wide_dmr[UI_QUICK_TILES] = {
+		QT_POWER, QT_ZONE_SCAN, QT_SCAN, QT_TALK_TO, QT_TIMESLOT, QT_CC, QT_HEAR_ALL, QT_PRIVACY, QT_GPS,
+	};
+	static const uint8_t vfo_fm[UI_QUICK_TILES] = {
+		QT_POWER, QT_SQUELCH, QT_TONE, QT_MODE, QT_SPLIT, QT_VOX, QT_SCAN, QT_BANDWIDTH, QT_BRIGHTNESS,
+	};
+	static const uint8_t vfo_dmr[UI_QUICK_TILES] = {
+		QT_POWER, QT_TIMESLOT, QT_CC, QT_MODE, QT_HEAR_ALL, QT_SPLIT, QT_SCAN, QT_TALK_TO, QT_BRIGHTNESS,
+	};
+	static const char *const setups[] = { "down", "", "vfokey", "vfokey quick 4 back" };
+	int checked = 0;
+	char err[300];
+	for (int g = 0; g < sim_geom_count; g++)
+	for (int branded = 0; branded < 2; branded++)
+	for (int mode = 0; mode < 4; mode++) {
+		sim_reset(&sim_geoms[g], SIM_MAP_K);
+		if ((branded && !sim_run("branded-home", err, sizeof err)) ||
+		    !sim_run(setups[mode], err, sizeof err)) {
+			printf("FAIL Quick order setup [%s]: %s\n", sim_geoms[g].name, err);
+			fails++;
+			continue;
+		}
+		bool wide = (branded || CONFIG_DMR_TALKGROUP_ENTRIES) &&
+			(sim_geoms[g].w - 2 * sim_geoms[g].inset >= 220);
+		const uint8_t *expected = mode == 2 ? vfo_fm : mode == 3 ? vfo_dmr :
+			mode == 0 ? (wide ? wide_fm : memory_fm) : (wide ? wide_dmr : memory_dmr);
+		for (int tile = 0; tile < UI_QUICK_TILES; tile++) {
+			uint8_t actual = ui_quick_kind(tile, sim_view());
+			if (actual != expected[tile]) {
+				printf("FAIL Quick order [%s, brand %d, mode %d] key %d: expected %u, got %u\n",
+					sim_geoms[g].name, branded, mode, tile + 1, expected[tile], actual);
+				fails++;
+			}
+			checked++;
+		}
+	}
+	printf("# Quick order: %d numbered controls checked\n", checked);
+}
+
+static void vox_flows(const sim_geom_t *g, sim_map_t map, const char *mapname)
+{
+	static const flow_t vfo[] = {
+		{ "21 VOX on in FM VFO", "vfokey", "quick 6", "vox=1", 2, false },
+		{ "21 VOX off again in FM VFO", "vfokey quick 6", "6", "vox=0", 1, false },
+	};
+	static const flow_t memory[] = {
+		{ "21 VOX on in the standard FM memory grid", "down", "quick 6", "vox=1", 2, false },
+		{ "21 VOX off again in the standard FM memory grid", "down quick 6", "6", "vox=0", 1, false },
+	};
+	for (size_t i = 0; i < sizeof vfo / sizeof vfo[0]; i++)
+		run_flow(&vfo[i], g, map, mapname);
+	// Wide memory grids use tile 6 for Offset. VOX remains in the VFO grid and channel editor.
+	if (!CONFIG_DMR_TALKGROUP_ENTRIES || g->w - 2 * g->inset < 220)
+		for (size_t i = 0; i < sizeof memory / sizeof memory[0]; i++)
+			run_flow(&memory[i], g, map, mapname);
 }
 
 // ---- crawler ----
@@ -1344,6 +1414,7 @@ int main(void)
 		const sim_geom_t *g = sim_geom_find(runs[r].geom);
 		for (size_t i = 0; i < sizeof flows / sizeof flows[0]; i++)
 			run_flow(&flows[i], g, runs[r].map, runs[r].name);
+		vox_flows(g, runs[r].map, runs[r].name);
 	}
 	for (size_t i = 0; i < sizeof flows_mono / sizeof flows_mono[0]; i++)
 		run_flow(&flows_mono[i], sim_geom_find("128x64"), SIM_MAP_M, "M GD-77");
@@ -1353,6 +1424,7 @@ int main(void)
 	for (size_t i = 0; i < sizeof flows_f / sizeof flows_f[0]; i++)
 		run_flow(&flows_f[i], gf, SIM_MAP_F, "F few keys");
 	printf("# %d flows run\n", flows_run);
+	quick_order_checks();
 	about_checks();
 	call_screen_checks();
 	vfo_split_dmr_checks();
@@ -1371,6 +1443,15 @@ int main(void)
 	static const flow_t card_quick[] = {
 		{ "Tall color DMR Quick Controls", "", "branded-home quick", "screen=quick shows=Quick_Controls shows=GPS", 1, false },
 		{ "Tall color FM Quick Controls", "", "branded-home down quick 4 up", "screen=quick sq=6 shows=Quick_Controls", 4, false },
+		{ "DMR memory key 2 starts zone scan", "branded-home", "quick 2", "scanning=1 dual=0", 2, false },
+		{ "DMR memory key 3 starts dual watch", "branded-home", "quick 3", "dual=1", 2, false },
+		{ "DMR memory key 5 changes timeslot", "branded-home", "quick 5", "ts=2", 2, false },
+		{ "DMR memory key 6 edits color code", "branded-home", "quick 6 7 ok", "cc=7", 4, false },
+		{ "DMR memory key 7 toggles digital monitor", "branded-home", "quick 7", "hearall=1", 2, false },
+		{ "DMR memory key 8 toggles privacy", "branded-home", "quick 8", "privacy=1", 2, false },
+		{ "FM memory key 6 shows the stored offset without toggling VOX", "branded-home down", "quick 6",
+			"screen=quick vox=0 txfreq=147660000 shows=Offset shows=+600k", 2, false },
+		{ "FM memory key 7 toggles Monitor", "branded-home down", "quick 7", "monitor=1", 2, false },
 		{ "Talk to keeps all seven digits beside a long name", "",
 			"branded-home worst call:3109999,9100091,g quick 4", "screen=picker shows=TG_9100091", 2, false },
 		{ "Talk to tile fits a seven-digit group", "",

@@ -558,6 +558,7 @@ draw the anti-aliased fonts (`CONFIG_FONT_AA`), and `240x320i10x5` the larger te
 | Token | Meaning |
 |---|---|
 | `up down left right ok back quick ctx 0..9 tt mon user1..user4 emerg enc+ enc-` | a short press (counted) |
+| `quick:<control>` | select a named control in the current Quick grid: `power`, `squelch`, `timeslot`, `color`, `privacy`, `digital-monitor`, `monitor`, `vox`, or `dual`. Sends QUICK when needed, then the number key; both presses count. Fails if the control is absent. |
 | `long:<key>` | a long press (counted) |
 | `ptt`, `ptt:<ms>`, `pttdown`, `pttup` | PTT (counted) |
 | `mondown`, `monup` | the monitor key held, then released (FM: the squelch held open) |
@@ -572,7 +573,12 @@ draw the anti-aliased fonts (`CONFIG_FONT_AA`), and `240x320i10x5` the larger te
 | `expect:<key>=<value>` | check: `screen focus depth count zone pos vfo freq mode tx txid txpriv talk locked query banner toast power sq ts cc temporary writes checks sent text scanning privacy hearall monitor hotspot beeps radio_tot radio_backlight beep pttblock poweroff wake usbnet set<id>` (`wake` 1 when a banner or the emergency screen asked for the backlight since the last check, `beep` the last beep kind, `set<id>` a setting's stored value; `_` = space, `*` = anything) |
 
 `uiFlowTest` runs every task flow of `task-flows.md` with the press budgets of `usability-tests.md` on four display
-and key map pairs (K at 160x120i5, M at 128x64, V at 160x128, K at 240x320) plus the few-key fallbacks: 160 flow runs.
+and key map pairs (K at 160x120i5, M at 128x64, V at 160x128, K at 240x320) plus the few-key fallbacks.
+Shared behavior flows select Quick controls by name because the grids differ by mode and display layout.
+Independent order checks pin all nine numbered positions in the standard and wide FM and DMR memory grids
+and both VFO grids, with and without a Home brand. Card flows also press specific number keys.
+Copy to VFO flows use its assignable key. VOX flows cover the standard FM memory grid and the FM VFO;
+the wide FM memory grid has Offset on key 6.
 A crawler then visits every reachable screen and checks the rules that hold everywhere: BACK leaves every screen, long
 BACK reaches Home, long QUICK locks on Home and nowhere else, long CONTEXT opens the talk target picker on a DMR channel, the status strip is drawn (except About while idle),
 PTT shows TX, and every field-use screen is at most 3 presses deep. The About check scrolls the page to its end at
