@@ -231,6 +231,11 @@ static const struct { const char *name, *script; } audit_extra[] = {
 	{ "battery", "ok 6 9" },
 	{ "my_radio", "ok 7 9 ok" },
 	{ "caller_actions", "call:3101234,91,g wait:11000 ctx" DOWN12 },
+#if CONFIG_UI_CARD_MENU
+	{ "caller_cards", "branded-home call:3101234,91,g wait:11000 ctx" },
+	{ "caller_cards_temporary", "branded-home quick 1 up ok back call:3101234,91,g wait:11000 ctx up" },
+	{ "caller_cards_rx", "branded-home rx:3101234,91,g ctx" },
+#endif
 	{ "contact_actions", "ok 1 5 6 ctx" DOWN12 },
 	{ "recent", "call:3101234,91,g call:3105678,3100,g call:3102222,0,p ok 3" DOWN12 },
 	{ "quick_dmr_all", "quick" DOWN12 },
@@ -242,6 +247,9 @@ static const struct { const char *name, *script; } audit_extra[] = {
 #define LONG_MSG "Meet_at_the_north_lot_of_the_county_fairgrounds_at_1500._Bring_the_spare_battery,_the_mag_mount_" \
 	"antenna_and_the_printed_ICS-205_for_the_net_control."
 static const struct { const char *name, *script; } worst_screens[] = {
+#if CONFIG_UI_CARD_MENU
+	{ "w_caller_cards", "branded-home call:3101999,16776414,g wait:11000 ctx" },
+#endif
 	{ "w_rx_alias", "rx:3109999,16776415,g,KD9ABC_Christopher_W,_Boston_MA" },
 	{ "w_rx_unknown", "rx:3101999,16776414,g,KD9ABC_Christopher_W,_Boston_MA" },
 	{ "w_rx_private", "rx:3108765,0,p" },
@@ -580,6 +588,7 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 			snprintf(script, slen, "branded-home quick 3%s", gallery[i].script + strlen("quick 7"));
 		else if (!strcmp(g->name, "240x320i10x5") &&
 			 (!strcmp(name, "quick_dmr") || !strcmp(name, "quick_fm") || !strcmp(name, "hub") ||
+			  !strcmp(name, "caller_actions") ||
 			  !strcmp(name, "zones") || !strcmp(name, "zone_channels") ||
 			  !strcmp(name, "messages") || !strcmp(name, "messages_empty") ||
 			  !strcmp(name, "compose") || !strcmp(name, "sms-write")))

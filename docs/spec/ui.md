@@ -29,6 +29,8 @@ Scan opens its own control before starting a scan. Activity / Logs opens the Rec
 Zones / Channels uses a two-step zone and channel list. The zone row shows its channel count and marks
 the active zone. OK and CONTEXT open its channels, and held OK tunes the zone directly on boards with CONTEXT.
 Filtering and channel and zone edits use the same list and editor handlers as the standard layout.
+Actions for the current or last caller use the numbered cards, shared status row, centered target title,
+and footer. Number shortcuts, PTT, and Back keep the standard actions behavior.
 Contacts & Talkgroups uses separate group and private-call tabs on the same filtered contacts list.
 The horizontal actions change tabs and keep the filter text. The first two assignable side keys supply
 those actions while the directory is open. The ID has a dedicated column, and a long name can shorten.

@@ -1380,6 +1380,20 @@ int main(void)
 		run_flow(&card_quick[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
 #if CONFIG_UI_CARD_MENU
 	static const flow_t card_menu[] = {
+		{ "Home caller actions use the numbered cards", "branded-home " CALLER, "ctx",
+			"screen=actions shows=20:12 shows=OK_Select shows=Talk_to_TG_91 shows=Private_call centered=K1ABC_Joe", 1, false },
+		{ "Caller cards keep talkgroup PTT", "branded-home " CALLER, "ctx ptt",
+			"txid=91 txpriv=0", 2, false },
+		{ "Caller cards keep the private shortcut", "branded-home " CALLER, "ctx 2",
+			"screen=home talk=3101234", 2, false },
+		{ "Caller cards keep the message shortcut", "branded-home " CALLER, "ctx 3",
+			"screen=compose", 2, false },
+		{ "Caller cards return Home with Back", "branded-home " CALLER, "ctx back",
+			"screen=home", 2, false },
+#if CONFIG_CONTACT_POSITION
+		{ "Caller cards show the last position row", "branded-home " CALLER, "ctx up",
+			"screen=actions focus=Last_position shows=Last_position shows=OK_Select", 2, false },
+#endif
 		{ "Main Menu opens from Home", "branded-home", "ok", "screen=hub shows=Main_Menu shows=20:12 shows=Activity_/_Logs", 1, false },
 		{ "Radio opens Quick Controls", "branded-home", "ok 1 1", "screen=quick", 3, false },
 		{ "Radio keeps the all-channels list", "branded-home", "ok 1 2", "screen=channels", 3, false },

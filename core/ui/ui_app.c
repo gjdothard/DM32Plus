@@ -1860,12 +1860,12 @@ static void list_draw(const ui_scr_def_t *d)
 			ui_draw_numbered_menu(view, &ui_st, &l, false);
 			return;
 		}
-#if CONFIG_CONTACT_EDIT
-		if (f->scr == SCR_ACTIONS && f->arg) {
+		if (f->scr == SCR_ACTIONS) {
 			l.prefix = l.name;
-			ui_draw_numbered_menu(view, &ui_st, &l, true);
+			ui_draw_numbered_menu(view, &ui_st, &l, f->arg != 0);
 			return;
 		}
+#if CONFIG_CONTACT_EDIT
 		if (f->scr == SCR_CONTACT_EDIT || f->scr == SCR_CHANNEL || f->scr == SCR_TEXT || f->scr == SCR_DISCARD) {
 			l.hint = TR("OK change  Back");
 			if (f->scr == SCR_TEXT) {

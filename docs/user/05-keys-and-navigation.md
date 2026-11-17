@@ -71,6 +71,9 @@ Home
 ```
 
 In numbered lists (the menu, Tools, Settings, actions, quick settings), a number key opens the corresponding row.
+On the dark card layout, **#** on Home opens numbered action cards for the current or last caller.
+The caller stays in the title. Use a number key, or move the focus and press **OK**. **PTT** talks to the focused
+target, and **Back** returns Home.
 On the standard Hub, **OK**, **6** opens Tools. On the dark card layout, **OK** opens the Main Menu:
 
 | Key | Opens |
