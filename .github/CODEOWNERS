@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 #
 # Code owners: a pull request that touches these paths needs the owner's review before it merges (the main ruleset
 # requires code owner review). The workflows run with the repository's trust (pr-tests.yml runs main's copy against
@@ -7,33 +8,33 @@
 # gate, and the pins that decide which compiler and which submodules a build trusts. They and this file are the owner's.
 
 # the workflows, their actions, Dependabot and this file
-/.github/ @sfowlr
+/.github/ @gjdothard
 
 # the self-hosted runner, its job gate and the CI images
-/tools/ci-runner/ @sfowlr
-/tools/docker/ @sfowlr
+/tools/ci-runner/ @gjdothard
+/tools/docker/ @gjdothard
 
 # what the workflows run
-/tools/ci.sh @sfowlr
-/tools/coverage.sh @sfowlr
-/tools/checkout-submodules.sh @sfowlr
-/tools/install-arm-toolchain.sh @sfowlr
-/tools/platform_toolchain.sh @sfowlr
-/tools/rfoundry_python.sh @sfowlr
-/tools/release.py @sfowlr
-/tools/release_build.sh @sfowlr
-/tools/build_manual.sh @sfowlr
-/tools/ui_gallery_compare.py @sfowlr
+/tools/ci.sh @gjdothard
+/tools/coverage.sh @gjdothard
+/tools/checkout-submodules.sh @gjdothard
+/tools/install-arm-toolchain.sh @gjdothard
+/tools/platform_toolchain.sh @gjdothard
+/tools/rfoundry_python.sh @gjdothard
+/tools/release.py @gjdothard
+/tools/release_build.sh @gjdothard
+/tools/build_manual.sh @gjdothard
+/tools/ui_gallery_compare.py @gjdothard
 
 # the toolchain pins (version and SHA-256) and the submodules' sources
-/platform/*/platform.toml @sfowlr
-/.gitmodules @sfowlr
+/platform/*/platform.toml @gjdothard
+/.gitmodules @gjdothard
 
 # what keeps the codec, stock images and keys out of the tree
-/.gitignore @sfowlr
-/codecs/ @sfowlr
+/.gitignore @gjdothard
+/codecs/ @gjdothard
 
 # the CI and release documentation
-/docs/dev/ci.md @sfowlr
-/docs/dev/ci-runners.md @sfowlr
-/docs/dev/release.md @sfowlr
+/docs/dev/ci.md @gjdothard
+/docs/dev/ci-runners.md @gjdothard
+/docs/dev/release.md @gjdothard
