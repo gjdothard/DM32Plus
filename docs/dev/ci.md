@@ -1,6 +1,16 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Continuous Integration
+
+This fork builds firmware only for the product board selected by the workflow's `board_file`.
+Other board definitions remain available for shared host tests and compatibility fixtures; their firmware
+builds do not gate this fork's releases. PR, main, nightly, and release firmware jobs use the same selection.
+Host tests, sanitizers, translation checks, and site tests retain their shared coverage.
+The full local gate for this fork is `JOBS=8 tools/ci.sh --board <product-board-id>`.
+Release packaging accepts `tools/release_build.sh --toolchain <id> --board <product-board-id> ...`.
+Product naming and the portable CPS release proxy read the selected board's `product.json`; packaged CPS
+archives carry a copy as `release-products.json`.
 
 What runs automatically, when, and how to run each piece by hand. The runners and the container image are in
 [ci-runners.md](ci-runners.md). Every CI job calls the same
@@ -10,9 +20,9 @@ so one set serves the self-hosted Gitea runner and GitHub.
 
 | Workflow | Runs on | When | What |
 |---|---|---|---|
-| `ci.yml` | `ubuntu-24.04` | every push to `main` that changes source (below); by hand on any branch | the unit tests (once, with coverage and sanitizers), Python and license checks, every board's default build |
+| `ci.yml` | `ubuntu-24.04` | every push to `main` that changes source (below); by hand on any branch | the unit tests (once, with coverage and sanitizers), Python and license checks, the product board's default and maximal builds |
 | `pr-tests.yml` | `ubuntu-24.04` | every pull request; a fork's after a maintainer approves the run | `ci.yml`'s jobs and the manual check, for the files the pull request changes; `PR checks` gates the merge. A branch's only CI |
-| `nightly.yml` | `ubuntu-24.04` | 07:17 UTC daily when a file the firmware builds read changed since the last pass; by hand | the feature matrix of every board, `reuse lint` |
+| `nightly.yml` | `ubuntu-24.04` | 07:17 UTC daily when a file the firmware builds read changed since the last pass; by hand | the product board's feature matrix, `reuse lint` |
 | `site.yml` | `ubuntu-24.04` | a published release; by hand | asks Cloudflare Pages to build `main` again, for the new release's images. Pages itself builds every push ([website.md](website.md)); pull requests also build the site in the unit tests job |
 | `hil.yml` | `rfoundry-hil` (the bench Mac) | by hand; nightly only when `RFOUNDRY_HIL_SCHEDULE=true` | `tests/hil` against the radio and the SDR bench |
 | `ui-gallery.yml` | `ubuntu-24.04` | a pull request that changes the UI (`core/ui/`, the simulator, `uiSim`) | renders the screen gallery at the base and at the pull request, and makes the side-by-side artifact |
@@ -41,17 +51,11 @@ push runs only the manual workflow. A newer push cancels the run in progress (`c
 |---|---|
 | `unit tests` | `SANITIZE=1 tools/coverage.sh` (the host tests with the tshark pcap checks, built once with `--coverage` and ASan / UBSan, and gcovr's report), then the UI screen gallery (`uiSim --gallery`) |
 | `checks` | `tools/ci.sh --steps registry,python,licenses` (doc links and the strict web site build among the Python checks; the job installs `site/requirements.txt` for the site) |
-| `firmware (Arm)` | `tools/ci.sh --quick --steps firmware --toolchain arm`: every board built with the Arm toolchain, default and maximal (with the stack check), in one job |
-| `firmware (C-SKY)` | `tools/ci.sh --quick --steps firmware --toolchain csky`, in the csky-elf image (`tools/docker/csky-toolchain/run.sh`) unless the runner has csky-elf GCC; skipped where the image isn't available |
+| `firmware (C-SKY)` | `tools/ci.sh --quick --steps firmware --board <product-board-id>`, in the csky-elf image (`tools/docker/csky-toolchain/run.sh`) unless the runner has csky-elf GCC; skipped where the image isn't available |
 
-There is one firmware job per toolchain, not one per radio or per platform: a job's checkout and start take longer
-than a radio's build, and a runner has 4 cores, so the two firmware jobs side by side keep an 8-core host busy while
-leaving runners free for other pull requests. The two are one job with a `toolchain` matrix: the `[toolchain] id` of
-`platform/*/platform.toml` (`arm`, `csky`) and its `name` for the job's name. `--toolchain` takes the boards from the
-registry (`tools/boards.py list --toolchain`), so a new radio, or a new platform on a toolchain already listed (a
-second Arm SoC, for example), joins CI, the nightly and the release with no workflow edit. Only a new toolchain
-goes in the matrices of `ci.yml`, `pr-tests.yml`, `nightly.yml` and `release.yml` and gets its set-up in the
-toolchain action ([below](#toolchains)). The jobs run in parallel.
+The firmware job selects its board from the matrix's `board_file` and passes its directory name to
+`tools/ci.sh --board`. The board's platform still pins the compiler. Adding another board to the registry does
+not add it to this fork's firmware gate. The shared host tests and registry checks continue to cover retained boards.
 
 Each firmware job builds with zero warnings, writes the size report (image bytes and free space in the linker's
 application region, also put in the job summary on GitHub) and fails when the application region overflows. The
@@ -75,8 +79,7 @@ the network. A new submodule also goes in the Dockerfile's `SUBMODULE_URLS`.
 
 ## Pull request checks: `pr-tests.yml`
 
-Every pull request runs `ci.yml`'s jobs (`unit tests`, `firmware (Arm)` and `firmware (C-SKY)` for every board
-built with each toolchain) and `checks` on its merge commit. The first job,
+Every pull request runs `ci.yml`'s jobs (`unit tests` and the product `firmware (C-SKY)` job) and `checks` on its merge commit. The first job,
 `changes`, looks at the files the pull request changes and skips what they don't touch: source changes (`ci.yml`'s
 paths) run the build and test jobs. When a board's `board.toml` or `board.mk`, a `platform.toml` or the release
 tooling changes, the firmware jobs also run `tools/release_build.sh`: every stable board packaged as a release tag
@@ -159,8 +162,7 @@ support it, so check the first run on the Gitea runner before relying on the com
 
 | Job | Command |
 |---|---|
-| `matrix (Arm)` | `tools/ci.sh --matrix --steps firmware --toolchain arm`: for each board, each switch off alone, fm-minimal, maximal |
-| `matrix (C-SKY)` | the same for every board built with csky-elf GCC, in the csky-elf image unless the runner has csky-elf GCC |
+| `matrix (C-SKY)` | `tools/ci.sh --matrix --steps firmware --board <product-board-id>`: each switch off alone, fm-minimal, and maximal |
 | `reuse` | `reuse lint`, a warning until it passes |
 
 The maximal build turns on every switch except the board's `BOARD_UNSUPPORTED` (the hardware can't),
@@ -169,9 +171,8 @@ The maximal build turns on every switch except the board's `BOARD_UNSUPPORTED` (
 they add code that doesn't run on the radio but still takes its flash and RAM, so a shared addition could push one
 radio over and fail CI on unrelated pull requests.
 
-One job per toolchain runs its boards one after another (artifacts `matrix-arm`, `matrix-csky`). A job per board would finish each board sooner, but it
-repeats the checkout, the submodules and the toolchain set-up for every board, and a 4-core runner is kept busy by
-one board's builds anyway. Nobody waits on the nightly, so the fewer jobs win.
+One job builds the selected product board and uploads `matrix-csky`. Other boards remain available to the
+shared tools but do not enter this fork's nightly matrix.
 
 `--matrix` leaves out the default builds the per-push run already made. Each build tree is removed once its size is
 recorded and it built clean (the logs and images stay; a configuration that failed keeps its tree), so a run holds one

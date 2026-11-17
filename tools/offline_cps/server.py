@@ -16,7 +16,17 @@ import webbrowser
 
 APP = "radiofoundry-offline-cps"
 HEALTH = "/__offline_cps_health"
-RELEASE_ASSET = re.compile(r"/_dm32plus_release/(?:(RC)/)?(dm32plus-dm32-(v\d{2}\.\d{1,2}(?:\.\d+)?(?:b\d+)?))\.(bin|json)")
+
+
+def release_products():
+	packaged = Path(__file__).with_name("release-products.json")
+	if packaged.is_file():
+		return json.loads(packaged.read_text(encoding="utf-8"))
+	products = []
+	for path in sorted((Path(__file__).resolve().parents[2] / "boards").glob("*/product.json")):
+		product = json.loads(path.read_text(encoding="utf-8"))
+		products.append({**product, "board": path.parent.name})
+	return products
 
 
 class LocalHTTPServer(http.server.ThreadingHTTPServer):
@@ -26,6 +36,11 @@ class LocalHTTPServer(http.server.ThreadingHTTPServer):
 
 
 def make_handler(site, package_id):
+	products = []
+	for product in release_products():
+		prefix, board = re.escape(product["prefix"]), re.escape(product["board"])
+		pattern = re.compile(rf"/_{prefix}_release/(?:(RC)/)?({prefix}-{board}-(v\d{{2}}\.\d{{1,2}}(?:\.\d+)?(?:b\d+)?))\.(bin|json)")
+		products.append((pattern, product))
 	class Handler(http.server.SimpleHTTPRequestHandler):
 		extensions_map = {
 			**http.server.SimpleHTTPRequestHandler.extensions_map,
@@ -42,9 +57,10 @@ def make_handler(site, package_id):
 				self.send_error(403, "Local access only")
 				return
 			path = urllib.parse.urlsplit(self.path).path
-			asset = RELEASE_ASSET.fullmatch(path)
+			asset, product = next(((match, product) for pattern, product in products
+				if (match := pattern.fullmatch(path))), (None, None))
 			if asset:
-				self._release_asset(asset, head)
+				self._release_asset(asset, product, head)
 			elif path == HEALTH:
 				body = json.dumps({"app": APP, "package": package_id}).encode()
 				self.send_response(200)
@@ -58,11 +74,11 @@ def make_handler(site, package_id):
 			else:
 				super().do_GET()
 
-		def _release_asset(self, match, head):
+		def _release_asset(self, match, product, head):
 			candidate, base, version, extension = match.groups()
-			tag = f"RC-dm32plus-{version}" if candidate else f"dm32plus-{version}"
-			url = f"https://github.com/gjdothard/DM32Plus/releases/download/{tag}/{base}.{extension}"
-			request = urllib.request.Request(url, headers={"User-Agent": "DM32Plus-CPS"})
+			tag = ("RC-" if candidate else "") + product["prefix"] + "-" + version
+			url = f"https://github.com/{product['repository']}/releases/download/{tag}/{base}.{extension}"
+			request = urllib.request.Request(url, headers={"User-Agent": product["name"] + "-CPS"})
 			limit = 1024 * 1024 if extension == "bin" else 32 * 1024
 			try:
 				with urllib.request.urlopen(request, timeout=15) as response:
@@ -70,7 +86,7 @@ def make_handler(site, package_id):
 				if len(body) > limit:
 					raise ValueError("Release asset exceeds its size limit")
 			except (OSError, ValueError):
-				self.send_error(502, "DM32Plus release asset is unavailable")
+				self.send_error(502, "Release asset is unavailable")
 				return
 			self.send_response(200)
 			self.send_header("Content-Type", "application/octet-stream" if extension == "bin" else "application/json")

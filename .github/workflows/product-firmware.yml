@@ -1,17 +1,20 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Garrett Dothard
-name: DM32Plus firmware
+name: Product firmware
 
 on:
   push:
     branches: [Development, Testing]
-    tags: ["dm32plus-v*b*"]
+    tags: ["*-v*b*"]
+
+env:
+  PRODUCT_FILE: boards/dm32/product.json
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.ref == 'refs/heads/Testing' && 'dm32plus-testing-prerelease' || 'dm32plus-development-prerelease' }}
+  group: ${{ github.ref == 'refs/heads/Testing' && 'product-testing-prerelease' || 'product-development-prerelease' }}
   queue: max
 
 jobs:
@@ -32,9 +35,9 @@ jobs:
         id: version
         run: |
           set -euo pipefail
-          tag_prefix=dm32plus-
+          tag_prefix="$(jq -er .prefix "$PRODUCT_FILE")-"
           if [[ "$GITHUB_REF" == refs/heads/Testing ]]; then
-            tag_prefix=RC-dm32plus-
+            tag_prefix="RC-$tag_prefix"
           fi
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then
             version=${GITHUB_REF_NAME#"$tag_prefix"}
@@ -91,15 +94,17 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          ${RUN:+"$RUN"} make -j"$(nproc)" BOARD=dm32 RELEASE="$VERSION"
-          ${RUN:+"$RUN"} make BOARD=dm32 RELEASE="$VERSION" stack-check
-          python3 tools/release.py --board dm32 --product DM32Plus --version "$VERSION" \
-            --git "$(git rev-parse HEAD)" --bin build/dm32/rfoundry_dm32.bin --out dist \
+          board=$(jq -er .board "$PRODUCT_FILE")
+          product=$(jq -er .name "$PRODUCT_FILE")
+          ${RUN:+"$RUN"} make -j"$(nproc)" BOARD="$board" RELEASE="$VERSION"
+          ${RUN:+"$RUN"} make BOARD="$board" RELEASE="$VERSION" stack-check
+          python3 tools/release.py --board "$board" --product "$product" --version "$VERSION" \
+            --git "$(git rev-parse HEAD)" --bin "build/$board/rfoundry_$board.bin" --out dist \
             --toolchain "csky-elf-gcc $(${RUN:+"$RUN"} csky-elf-gcc -dumpfullversion | tail -n 1)"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: dm32plus-firmware
+          name: product-firmware
           path: dist/
           if-no-files-found: error
 
@@ -109,9 +114,12 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: dm32plus-firmware
+          name: product-firmware
           path: dist
 
       - name: Tag and publish the prerelease
@@ -123,7 +131,10 @@ jobs:
           set -euo pipefail
           (cd dist && sha256sum -c SHA256SUMS)
           tag="$TAG"
-          commit=$(jq -er .git_full "dist/dm32plus-dm32-$VERSION.json")
+          prefix=$(jq -er .prefix "$PRODUCT_FILE")
+          board=$(jq -er .board "$PRODUCT_FILE")
+          product=$(jq -er .name "$PRODUCT_FILE")
+          commit=$(jq -er .git_full "dist/$prefix-$board-$VERSION.json")
           if ! tagged=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha 2>/dev/null); then
             gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
               -f ref="refs/tags/$tag" -f sha="$commit" --silent
@@ -132,15 +143,15 @@ jobs:
           [[ "$tagged" == "$commit" ]] || { echo "::error::$tag points to a different commit"; exit 1; }
 
           args=(--repo "$GITHUB_REPOSITORY")
-          notes="Development prerelease for DM-32UV. Select Development in DM32Plus CPS to install or upgrade. The build and static task-stack checks passed."
-          title="DM32Plus $VERSION"
+          notes="Development prerelease. Select Development in the product CPS to install or upgrade. The build and static task-stack checks passed."
+          title="$product $VERSION"
           draft_options=()
           if [[ "$tag" == RC-* ]]; then
             title="RC $title"
-            notes="Testing release candidate for DM-32UV. The build and static task-stack checks passed."
+            notes="Testing release candidate. The build and static task-stack checks passed."
             draft_options=(--title "$title")
           fi
-          assets=("dist/dm32plus-dm32-$VERSION.bin" "dist/dm32plus-dm32-$VERSION.json" dist/SHA256SUMS)
+          assets=("dist/$prefix-$board-$VERSION.bin" "dist/$prefix-$board-$VERSION.json" dist/SHA256SUMS)
           if draft=$(gh release view "$tag" "${args[@]}" --json isDraft --jq .isDraft 2>/dev/null); then
             if [[ "$draft" == true ]]; then
               gh release upload "$tag" "${assets[@]}" "${args[@]}" --clobber

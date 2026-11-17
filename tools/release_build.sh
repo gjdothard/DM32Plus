@@ -1,6 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 #
 # Builds and packages every releasable board of one toolchain (docs/dev/release.md): each board whose board.toml has
 # [status] release = "stable", its default image and each build option value's image (tools/boards.py builds), each
@@ -12,16 +13,17 @@
 # Prints "no releasable board" and exits 0 when the toolchain has none.
 set -eu
 cd "$(dirname "$0")/.."
-TOOLCHAIN="" VERSION="" OUT=""
+TOOLCHAIN="" VERSION="" OUT="" BOARD=""
 while [ $# -gt 0 ]; do
 	case $1 in
 	--toolchain) TOOLCHAIN=$2; shift 2 ;;
+	--board) BOARD=$2; shift 2 ;;
 	--version) VERSION=$2; shift 2 ;;
 	--out) OUT=$2; shift 2 ;;
-	*) echo "usage: $0 --toolchain T --version V --out DIR" >&2; exit 2 ;;
+	*) echo "usage: $0 --toolchain T [--board ID] --version V --out DIR" >&2; exit 2 ;;
 	esac
 done
-[ -n "$TOOLCHAIN" ] && [ -n "$VERSION" ] && [ -n "$OUT" ] || { echo "usage: $0 --toolchain T --version V --out DIR" >&2; exit 2; }
+[ -n "$TOOLCHAIN" ] && [ -n "$VERSION" ] && [ -n "$OUT" ] || { echo "usage: $0 --toolchain T [--board ID] --version V --out DIR" >&2; exit 2; }
 PY=$(tools/rfoundry_python.sh)	# the registry reads TOML
 # A tag must be a release name (tools/release_version.py: vYY.M[.N][bN]); the image shows it (RELEASE=, the
 # Makefile's RFOUNDRY_RELEASE). A pull request's or a manual run's dev-<commit> builds show the commit
@@ -32,6 +34,12 @@ esac
 JOBS=${JOBS:-$(nproc 2>/dev/null || echo 4)}
 
 boards=$("$PY" tools/boards.py list --toolchain "$TOOLCHAIN" --release stable --comma)
+if [ -n "$BOARD" ]; then
+	case ,$boards, in
+	*,"$BOARD",*) boards=$BOARD ;;
+	*) echo "release_build: board is not releasable on this toolchain: $BOARD" >&2; exit 2 ;;
+	esac
+fi
 [ -n "$boards" ] || { echo "release_build: no releasable board on toolchain $TOOLCHAIN"; exit 0; }
 echo "release_build: $TOOLCHAIN: $boards"
 builds=$(mktemp)

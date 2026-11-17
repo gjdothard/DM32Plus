@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """DMR voice call features: private calls, emergency, talker alias, late entry, privacy marking (opt-in RF:
 --allow-rf --allow-service-stop; the SDR bench's transmitter is the other station), and the talk target / privacy key
 requests over the debug link (radio only, nothing transmits).
@@ -270,7 +271,7 @@ def test_aes_key_slots(radio, pytestconfig):
     assert bank[2] == 0 and not any(bank[4:])
 
 
-@pytest.mark.feature("dmr_aes_channels", optional=True)
+@pytest.mark.feature("dmr_aes256", optional=True)
 def test_channel_key_binding(radio, pytestconfig):
     """Read an owner-configured channel's binding and effective session. No writes or RF."""
     _on_dmr_channel(radio, pytestconfig)

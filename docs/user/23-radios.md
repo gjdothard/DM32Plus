@@ -402,7 +402,7 @@ and the [DMR](09-dmr.md#timeslot-and-color-code) and [FM](08-fm.md#quick-setting
 grids. The [operating talkgroup instructions](09-dmr.md#choosing-a-talk-target) show how to assign and select
 talkgroups for a repeater.
 
-Pushing to `Development` or `Testing` runs the [DM32Plus firmware workflow](../../.github/workflows/dm32plus-firmware.yml).
+Pushing to `Development` or `Testing` runs the [product firmware workflow](../../.github/workflows/product-firmware.yml).
 It assigns the next calendar prerelease version, builds the DM-32UV application, and checks task-stack usage.
 When those checks pass, it tags the built commit and publishes the image, manifest, and SHA-256 checksums used
 by the corresponding CPS channel. Testing prepends `RC-` to the GitHub tag, such as `RC-dm32plus-v26.11b1`.

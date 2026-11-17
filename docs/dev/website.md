@@ -3,8 +3,8 @@
 
 # The Web Site
 
-The DM32+ home page introduces the firmware for its target radio, links to installation and the CPS,
-and explains Stable, Testing, and Development releases. Its header uses the DM32+ name. Shared reference
+The product home page introduces the firmware for its target radio, links to installation and the CPS,
+and explains Stable, Testing, and Development releases. Its header uses the product name. Shared reference
 pages retain upstream branding, and the home page credits RadioFoundry and links to the original MIT license.
 Product claims describe implemented behavior; hardware verification remains in the bring-up records.
 
@@ -43,11 +43,11 @@ The package includes runtime and project licenses, build information, and file c
 codeplug or browser data. The launcher and server are in `tools/offline_cps/`; the HTTP tests are in
 `site/tests/offline_cps_test.py`.
 
-### Bundling a DM32Plus release
+### Bundling a product release
 
-Build the full application for the release tag, package it with `tools/release.py --product DM32Plus`,
+Build the full application for the release tag, package it with `tools/release.py --product <product-name>`,
 and pass its output directory to `site/build.py --firmware` before packaging the offline CPS.
-Both **Install DM32Plus** and **Upgrade to DM32Plus** load and verify that local release.
+Both the install and upgrade actions load and verify that local release.
 The package contains the application and manifest. The installer obtains a compatible codec locally
 from the radio or a stock firmware file supplied by the operator.
 

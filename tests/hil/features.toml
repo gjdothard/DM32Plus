@@ -35,6 +35,18 @@ switch = "TALKGROUP_EDIT"
 spec = "docs/spec/dmr-voice.md"
 source = ["core/ui/ui_menus.c", "core/ui/ui_svc_storage.c", "core/codeplug/codeplug.c"]
 
+[feature.dmr_talkgroup_entries]
+switch = "DMR_TALKGROUP_ENTRIES"
+spec = "docs/spec/dmr-voice.md"
+
+[feature.message_journal]
+switch = "MESSAGE_JOURNAL"
+spec = "docs/spec/message-journal.md"
+
+[feature.ui_card_menu]
+switch = "UI_CARD_MENU"
+spec = "docs/spec/ui.md"
+
 [feature.ref_trim]
 switch = "REF_TRIM"
 hardware = "a reference oscillator the board can trim (hal_radio_t.ref_trim)"
@@ -443,10 +455,6 @@ spec = "docs/spec/ui.md"
 [feature.radio_controls]
 spec = "docs/spec/radio-features.md"
 source = ["core/radio"]
-
-[feature.dmr_aes_channels]
-switch = "DMR_AES256"
-spec = "docs/spec/dmr-voice.md"
 
 [feature.settings_store]
 spec = "docs/spec/settings-store.md"

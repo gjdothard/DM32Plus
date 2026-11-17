@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // PPP on the serial host link (core/net/ppp.c) and its glue to the IP gateway (core/hostlink/hostlink_ppp.c), against a
 // scripted peer with its own table driven FCS: framing (escapes, the ACCM both ways, FCS good and bad, frames split
 // across reads, back-to-back flags, aborts), LCP (Configure-Ack / -Nak / -Reject both ways, Max-Failure, the magic
@@ -360,7 +361,8 @@ static int udp(uint8_t *p, uint32_t src, uint32_t dst, uint16_t sport, uint16_t 
 static void test_fcs(void)
 {
 	// The FCS-16 check value (CRC-16/X-25 of "123456789"): the peer's table is right
-	CHECK((uint16_t)~fcs(0xFFFF, (const uint8_t *)"123456789", 9) == 0x906E);
+	uint16_t actual = (uint16_t)~fcs(0xFFFF, (const uint8_t *)"123456789", 9);
+	CHECK(actual == 0x906E);
 }
 
 static void test_negotiation(void)

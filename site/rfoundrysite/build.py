@@ -61,7 +61,8 @@ class Site:
 	def __init__(self, out, repo_url, ref, firmware=None, strict=False, log=print, beta="", i18n_dir=None):
 		self.out = out
 		self.repo_url = repo_url.rstrip("/")
-		self.firmware_product = "DM32Plus" if self.repo_url.lower() == "https://github.com/gjdothard/dm32plus" else None
+		self.product = repo.product()
+		self.firmware_product = self.product["name"] if self.repo_url.lower() == ("https://github.com/" + self.product["repository"]).lower() else None
 		self.ref = ref
 		self.firmware = firmware
 		self.beta = beta	# a pre-release newer than the release in firmware (site/cloudflare-build.sh), or ""
@@ -92,6 +93,7 @@ class Site:
 		"""A short hash of site/static: the version stamped on scripts and styles, so it changes with their content
 		(an uncommitted change included) and a browser never mixes cached files of two builds."""
 		h = hashlib.sha256()
+		h.update(json.dumps(repo.product(), sort_keys=True).encode())
 		for dirpath, dirs, files in sorted(os.walk(repo.path("site", "static"))):
 			dirs.sort()
 			for f in sorted(files):
@@ -146,7 +148,7 @@ class Site:
 		self.releases = repo.releases(self.firmware)
 		if self.firmware_product:
 			self.releases = [(m, image) for m, image in self.releases
-					 if m.get("product") == self.firmware_product and m["board"] == "dm32"]
+					 if m.get("product") == self.firmware_product and m["board"] == self.product["board"]]
 		self.release, self.beta = release_and_beta([m["version"] for m, _ in self.releases], self.beta)
 
 	def feature_state(self, board, name, variant="full"):
@@ -196,7 +198,7 @@ class Site:
 		rels = self.repo_url + "/releases"
 		line = '<a href="%s">%s</a>' % (html.escape(rels), html.escape(self.i18n.t(lang, "footer.changelog")))
 		if self.release:
-			tag = "dm32plus-" + self.release if self.firmware_product else self.release
+			tag = self.product["prefix"] + "-" + self.release if self.firmware_product else self.release
 			line = '<a href="%s/tag/%s">%s</a> · %s' % (html.escape(rels), html.escape(tag),
 				html.escape(self.i18n.t(lang, "footer.firmware", version=self.release)), line)
 		return line
@@ -254,10 +256,10 @@ class Site:
 		if many:
 			alternates += '<link rel="alternate" hreflang="x-default" href="%s">\n' % html.escape(page_url(self.i18n.default))
 		is_cps = page_class == "codeplug"
-		brand, brand_accent = ("DM32", "+") if is_cps or page_class == "home" else ("Radio", "Foundry")
+		brand, brand_accent = (self.product["brand"], self.product["accent"]) if is_cps or page_class == "home" else ("Radio", "Foundry")
 		document_title = title if is_cps else title + " · " + brand + brand_accent
 		ctx = {"lang": lang, "dir": meta.get("dir", "ltr"), "document_title": document_title, "root": root,
-		       "brand": brand, "brand_accent": brand_accent,
+		       "brand": brand, "brand_accent": brand_accent, "product_board": self.product["board"],
 		       "brand_href": root + prefix + ("codeplug/index.html" if is_cps else "index.html"),
 		       "home": root + prefix, "content": content, "page_class": page_class,
 		       "description": description or self.i18n.t(lang, "site.tagline"), "scripts": scripts, "footer": footer,
@@ -272,7 +274,7 @@ class Site:
 		       "image_alt": self.t(lang, "home.product" if page_class == "home" else "site.preview_alt")}
 		ctx["nav"] = self.nav(lang, ctx["home"], nav)
 		if page_class == "home":
-			ctx["og_image"] = SITE_URL + "static/img/dm32plus-social.png?v=" + self.asset_version
+			ctx["og_image"] = SITE_URL + "static/img/product-social.png?v=" + self.asset_version
 		self.write(full, self.tpl.render("base", ctx, lang).replace("{{root}}", root).replace("{{home}}", root + prefix))
 
 	def nav(self, lang, home, current):
@@ -282,7 +284,7 @@ class Site:
 		if current == "codeplug":
 			items = [("docs", "docs/index.html"), ("tools", "tools/index.html")]
 		elif current == "home":
-			items = [("flash", "flash/index.html#radio=dm32"), ("codeplug", "codeplug/index.html"),
+			items = [("flash", "flash/index.html#radio=" + self.product["board"]), ("codeplug", "codeplug/index.html"),
 				 ("docs", "docs/index.html"), ("screenshots", "screenshots/index.html")]
 		return "".join('<a href="%s%s"%s>%s</a>' % (home, href, ' aria-current="page"' if key == current else "",
 							    html.escape(self.i18n.t(lang, "nav." + key)))
@@ -370,6 +372,7 @@ class Site:
 			shutil.copyfile(repo.path(name), os.path.join(self.out, name))
 		self.docs = docsmod.Docs(self.repo_url, self.ref, self.i18n.codes, self.i18n.default)
 		shutil.copytree(repo.path("site", "static"), os.path.join(self.out, "static"))
+		self.write("static/js/product.js", "// SPDX-License-Identifier: MIT\n// Copyright (c) 2026 Garrett Dothard\nexport default " + json.dumps(self.product) + ";\n")
 		self.version_imports(os.path.join(self.out, "static", "js"))
 		shutil.rmtree(os.path.join(self.out, "static", "img", "radios", "src"), ignore_errors=True)
 		# the drawings with the boot screen in them follow the pages: its copy's scale depends on where they show it
@@ -379,15 +382,15 @@ class Site:
 			b["frame_geometry"] = img["geometry"]
 			b["render"] = img
 			b["look_renders"] = {lk["id"]: device.render(b, lk["name"], lk["id"]) for lk in b["looks"]}
-		product_board = next(b for b in self.boards if b["id"] == "dm32")
+		product_board = next(b for b in self.boards if b["id"] == self.product["board"])
 		with open(repo.path("docs", "ux", "screens", product_board["gallery"], "home_dual.png"), "rb") as f:
 			product_screen = f.read()
-		self.write("static/img/radios/dm32plus-home.svg", social.with_screen(
+		self.write("static/img/radios/product-home.svg", social.with_screen(
 			product_board["render"]["frame"], product_board["render"]["geometry"], product_screen))
 		with open(os.path.join(self.out, "static", "img", "social.png"), "wb") as f:
 			f.write(social.png(social.card(self.boards)))
-		with open(os.path.join(self.out, "static", "img", "dm32plus-social.png"), "wb") as f:
-			f.write(social.png(social.card([next(b for b in self.boards if b["id"] == "dm32")])))
+		with open(os.path.join(self.out, "static", "img", "product-social.png"), "wb") as f:
+			f.write(social.png(social.card([next(b for b in self.boards if b["id"] == self.product["board"])])))
 		self.tool = toolzip.write(os.path.join(self.out, "downloads"))
 		data = self.json_data()
 		for name, obj in data.items():
@@ -537,9 +540,9 @@ class Site:
 		return out
 
 	def home(self, lang):
-		flagship = next(b for b in self.boards if b["id"] == "dm32")
+		flagship = next(b for b in self.boards if b["id"] == self.product["board"])
 		ctx = {"flagship_id": flagship["id"], "flagship_name": flagship["name"],
-		       "repo": self.repo_url}
+		       "repo": self.repo_url, "product_brand": self.product["brand"], "product_accent": self.product["accent"]}
 		content = self.tpl.render("home", ctx, lang)
 		# the carousel's screens, all one height (site.css --shot-h)
 		shot_h = shots.css_px(".carousel", "--shot-h")
@@ -762,7 +765,7 @@ class Site:
 		strings = json.dumps(self.i18n.subset(lang, ("editor.", "flash.part.", "report.")), ensure_ascii=False).replace("</", "<\\/")
 		scripts = ('<script type="application/json" id="i18n">%s</script>'
 			   '<script type="module" src="{{root}}static/js/editor/app.js?v=%s"></script>' % (strings, self.asset_version))
-		self.page(lang, "codeplug/index.html", self.t(lang, "editor.title"), self.tpl.render("codeplug", {}, lang),
+		self.page(lang, "codeplug/index.html", self.t(lang, "editor.title"), self.tpl.render("codeplug", {"product_board": self.product["board"]}, lang),
 			  "codeplug", description=self.t(lang, "editor.lead"), scripts=scripts, nav="codeplug", footer=self.reports_footer(lang))
 
 	def errors_paragraph(self, lang):

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The radio core's everyday features (docs/spec/radio-features.md): the scan, beep and battery modules on their own,
 // then scan, TX time-out warning, busy channel lockout, roger beep, 1750 Hz burst, VOX, battery monitor, receiver
 // battery saving and the DMR beeps through radio_sm.c, against a fake board whose receiver hears signals per frequency
@@ -10,6 +11,7 @@
 #include "board.h"
 #undef board
 #include "radio/radio_sm.h"
+#include "sim/radio_task.h"
 #include "radio/scan.h"
 #include "radio/beep.h"
 #include "radio/vibe.h"
@@ -362,10 +364,18 @@ static void setup_codeplug(void)
 
 static radio_sm_t sm;
 
+// The task resolves the saved encryption policy between requests. This fake
+// board has no flash and therefore no saved default key.
+static void resolve_default(void)
+{
+	sim_radio_resolve_default(&sm);
+}
+
 static void req2(uint8_t type, int32_t arg, uint32_t arg2)
 {
 	radio_req_t r = { type, arg, arg2 };
 	radio_sm_request(&sm, &r, now);
+	resolve_default();
 }
 static void req(uint8_t type, int32_t arg) { req2(type, arg, 0); }
 
