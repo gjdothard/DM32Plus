@@ -4,19 +4,34 @@
 import { h, t, button, notice } from "../flasher/dom.js";
 import { AesKeys, randomKey } from "../codeplug/aeskeys.js";
 
-export function encryptionTab({ connect, exclusive }) {
+export function encryptionTab({ connection, exclusive, isBusy = () => false }) {
 	const panel = h("div", { class: "ed-aes ed-key-manager" });
 	const status = h("div", { "aria-live": "polite" }), content = h("div");
-	let client, state, selected = 1, editing = false, keyInput;
+	const client = connection ? new AesKeys(connection.transport.link) : null;
+	let state, selected = 1, editing = false, keyInput, readTimer;
 	const wipe = () => {
 		if (keyInput) { keyInput.value = ""; keyInput.type = "password"; }
 	};
-	const observer = new MutationObserver(() => {
-		if (!panel.isConnected) { wipe(); observer.disconnect(); }
-	});
-	observer.observe(document.body, { childList: true, subtree: true });
+	panel.deactivate = () => { clearTimeout(readTimer); wipe(); editing = false; };
+	panel.activate = () => {
+		if (state) render();
+		else if (client) {
+			const read = () => {
+				if (!panel.isConnected) return;
+				if (isBusy()) readTimer = setTimeout(read, 100);
+				else run(refresh);
+			};
+			clearTimeout(readTimer);
+			readTimer = setTimeout(read, 0);
+		}
+	};
 	const discard = () => !keyInput?.value || confirm(t("editor.aes.discard_confirm"));
 	const run = action => exclusive(async () => {
+		if (connection?.transport.lost) {
+			wipe();
+			status.replaceChildren(notice(t("editor.connection.lost"), "warn"));
+			return;
+		}
 		panel.inert = true;
 		try { await action(); }
 		catch (error) {
@@ -154,15 +169,10 @@ export function encryptionTab({ connect, exclusive }) {
 			h("div", { class: "ed-key-workspace" }, nav, editor));
 	}
 	panel.append(h("h2", {}, t("editor.aes.title")), h("p", {}, t("editor.aes.lead")),
-		button(t("editor.aes.connect"), () => {
+		client ? button(t("editor.aes.read_status"), () => {
 			if (!discard()) return;
-			run(async () => {
-				const connection = await connect();
-				if (!connection || !panel.isConnected) return;
-				client = new AesKeys(connection.transport.link);
-				await refresh();
-				status.replaceChildren();
-			});
-		}), status, content, h("p", { class: "small muted" }, t("editor.aes.local")));
+			run(refresh);
+		}) : notice(t("editor.connection.help"), "info"),
+		status, content, h("p", { class: "small muted" }, t("editor.aes.local")));
 	return panel;
 }

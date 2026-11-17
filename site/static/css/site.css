@@ -724,3 +724,13 @@ abbr.gl:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bo
 	.ed-key-workspace { grid-template-columns: minmax(0, 1fr); }
 	.ed-key-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-right: 0; border-bottom: 1px solid var(--border); }
 }
+
+/* Connection state and local recovery are independent of codeplug transfers. */
+.ed-connection { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); padding-bottom: var(--space-3); margin-bottom: var(--space-3); border-bottom: 1px solid var(--border); }
+.ed-connection span { overflow-wrap: anywhere; }
+.ed-save-status { display: grid; gap: var(--space-1); min-width: 0; text-align: end; }
+.ed-draft { color: var(--muted); }
+.ed-draft-unavailable { color: var(--bad); }
+@media (max-width: 640px) {
+	.ed-save-status { text-align: start; }
+}

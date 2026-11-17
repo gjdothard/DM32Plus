@@ -19,8 +19,9 @@ import { convertOperatingTalkgroups } from "../codeplug/convert-talkgroups.js";
 import { FakeCpsRadio } from "../codeplug/fakecps.js";
 import { Grid } from "./grid.js";
 import { History } from "./undo.js";
+import { DraftSaver } from "./draft.js";
 import { bulkColumns, columns, channelForm, formDialog, membersDialog, refLabel } from "./views.js";
-import { openFile, saveBytes, tftpBytes, FileError, imageFrom, saveDraft, loadDraft, clearDraft } from "./files.js";
+import { openFile, saveBytes, tftpBytes, FileError, imageFrom, saveDraft, loadDraft } from "./files.js";
 import { extensions } from "./extensions.js";
 import "./parts.js";
 import * as diag from "../diag.js";
@@ -52,20 +53,25 @@ const toolbar = h("div", { class: "ed-toolbar" });
 const status = h("div", { class: "ed-status small muted", "aria-live": "polite" });
 const tabs = h("nav", { class: "ed-tabs", role: "tablist", "aria-label": t("editor.tabs") });
 const view = h("div", { class: "ed-view" });
+const connectionBar = h("div", { class: "ed-connection", "aria-live": "polite" });
+const draftStatus = h("span", { class: "ed-draft small", "aria-live": "polite" });
+let draftState = "saving", connecting = false, connectionLost = false;
+let encryptionView, encryptionConnection;
 const messages = h("div", { class: "ed-messages", "aria-live": "polite" });
 
 // --- Model changes ---
 
-function load(model, name, { fromRadio = false } = {}) {
+function load(model, name, { fromRadio = false, dirty = false, restored = false } = {}) {
 	S.model = model;
 	S.fileName = name;
 	S.history.reset();
-	S.dirty = false;
+	S.dirty = dirty;
 	S.iddbChanged = false;
 	S.iddbSkipped = null;
 	if (!fromRadio && S.conn) S.conn.dbKnown = false;
 	refresh();
-	draftSoon();
+	if (restored) drafts.restored();
+	else draftSoon();
 }
 
 // Run fn as one undoable change
@@ -82,17 +88,31 @@ function change(label, fn) {
 	return true;
 }
 
-let draftTimer = null;
+const drafts = new DraftSaver({
+	snapshot: () => ({
+		bytes: saveBytes(encode(S.model)), name: S.fileName, dirty: S.dirty, at: new Date().toISOString(),
+	}),
+	save: saveDraft,
+	update(state) {
+		draftState = state;
+		draftStatus.textContent = t("editor.draft." + state);
+		draftStatus.classList.toggle("ed-draft-unavailable", state === "unavailable");
+		draftStatus.title = state === "unavailable" ? t("editor.draft.help") : "";
+	},
+});
 function draftSoon() {
-	clearTimeout(draftTimer);
-	draftTimer = setTimeout(() => {
-		try {
-			saveDraft({ bytes: saveBytes(encode(S.model)), name: S.fileName, dirty: S.dirty, at: new Date().toISOString() });
-		} catch {
-			// an invalid model can't be encoded yet; the next change saves it
-		}
-	}, 800);
+	drafts.schedule();
 }
+document.addEventListener("visibilitychange", () => {
+	if (document.visibilityState === "hidden") drafts.flush();
+});
+window.addEventListener("pagehide", () => drafts.flush());
+window.addEventListener("beforeunload", event => {
+	if (draftState === "saved") return;
+	event.preventDefault();
+	event.returnValue = "";
+});
+let openingFile = false;
 
 // report: a failure worth a bug report gets the way to make one
 // report: the record of the error shown (diag.error's return): under the message, that it was sent automatically, or
@@ -129,9 +149,27 @@ function refresh() {
 			onclick: () => show(k) }, t(`editor.tab.${k}`), k in counts && k !== "radio" ? h("span", { class: "ed-count" }, String(counts[k])) : null);
 		return b;
 	}));
-	const conn = S.conn ? t("editor.status.connected", { radio: S.conn.radio.name }) : "";
-	status.textContent = [S.fileName, S.dirty ? t("editor.status.unsaved") : t("editor.status.saved"), conn].filter(Boolean).join(" · ");
+	status.textContent = [S.fileName, S.dirty ? t("editor.status.unsaved") : t("editor.status.saved")].join(" · ");
+	renderConnection();
 	renderView(p);
+}
+
+function renderConnection() {
+	const connected = S.conn && !S.conn.transport.lost;
+	const version = S.conn?.probe?.version?.release || S.conn?.probe?.release || S.conn?.probe?.git || "?";
+	const text = connecting ? t("editor.connection.connecting") : connected ?
+		t("editor.connection.connected", { radio: S.conn.radio.name, version }) :
+		t(connectionLost ? "editor.connection.lost" : "editor.connection.disconnected");
+	const toggle = button(t(connected ? "editor.connection.disconnect" : "editor.connection.connect"), () => exclusive(async () => {
+		try {
+			if (connected) await dropConnection();
+			else {
+				await connect();
+				refresh();
+			}
+		} catch (error) { await fail("connect radio", error); }
+	}), { disabled: connecting || radioBusy });
+	connectionBar.replaceChildren(h("span", {}, text), toggle);
 }
 
 function show(tab) {
@@ -171,7 +209,19 @@ function renderToolbar(errors) {
 function renderView(p) {
 	const tab = S.tab;
 	if (tab === "radio") return view.replaceChildren(radioTab());
-	if (tab === "encryption") return view.replaceChildren(encryptionTab({ connect, exclusive }));
+	if (tab !== "encryption" && view.firstChild === encryptionView) encryptionView.deactivate();
+	if (tab === "encryption") {
+		if (!encryptionView || encryptionConnection !== S.conn) {
+			encryptionView?.deactivate();
+			encryptionConnection = S.conn;
+			encryptionView = encryptionTab({ connection: S.conn, exclusive, isBusy: () => radioBusy });
+		}
+		if (view.firstChild !== encryptionView) {
+			view.replaceChildren(encryptionView);
+			encryptionView.activate();
+		}
+		return;
+	}
 	if (tab === "iddb") return view.replaceChildren(extensions.iddbTab(api()));
 	if (tab === "problems") return view.replaceChildren(problemsTab(p));
 	// a table: keep the grid (focus, sort, selection) when only its rows changed
@@ -470,8 +520,11 @@ function problemsTab(p) {
 // --- Files ---
 
 async function openPicked(name, bytes) {
+	if (openingFile) return;
+	openingFile = true;
 	try {
 		const f = await openFile(name, bytes);
+		if (f.kind !== "foreign" && S.dirty && !confirm(t("editor.open_confirm", { name }))) return;
 		if (f.kind === "image") {
 			load(decode(f.image), name.replace(/\.[^.]+$/, ""));
 			say(t("editor.opened", { name }), "ok");
@@ -496,6 +549,8 @@ async function openPicked(name, bytes) {
 	} catch (e) {
 		const rec = diag.error("open file", e, { name, size: bytes?.length });
 		say(e instanceof FileError ? t(`editor.err.${e.code}`, { name }) : t("editor.err.open_failed", { error: e.message }), "bad", { report: rec });
+	} finally {
+		openingFile = false;
 	}
 }
 
@@ -517,7 +572,6 @@ function saveFile(kind) {
 function newCodeplug() {
 	const go = () => {
 		load(empty(), "codeplug");
-		clearDraft();
 	};
 	if (S.dirty) confirmDialog(t("editor.new_confirm"), t("editor.new"), go);
 	else go();
@@ -533,45 +587,53 @@ async function connect() {
 		await dropConnection();
 	}
 	if (S.conn) return S.conn;
-	let stream, cable = false;
-	if (S.sim) {
-		// #sim-compact: firmware that reads a format C ID database; &release=vYY.M: a radio that runs that release;
-		// &git_time=N: a build of a commit from that time (Unix seconds)
-		const hash = location.hash;
-		S.fake = S.fake || new FakeCpsRadio({ board: "DM-1701", image: CodeplugImage.blank().bytes, foreign: hash === "#sim-foreign",
-			features: hash.startsWith("#sim-compact") ? "FM,DMR,IDDB_COMPACT" : "FM,DMR", release: hash.match(/[#&]release=([\w.]+)/)?.[1],
-			gitTime: Number(hash.match(/[#&]git_time=(\d+)/)?.[1]) || 0 });
-		stream = S.fake.stream();
-	} else {
-		if (!serialSupported()) throw new TransportError("no_serial");
-		// one chooser for both links: the radio's own USB port, or a programming cable, told apart by the port's USB ID.
-		// A port granted before where RadioFoundry answers needs no chooser
-		const known = await knownRadioPort([RFOUNDRY_USB, ...CABLES]);
-		let port = known?.port;
-		if (!port) {
-			try {
-				port = await navigator.serial.requestPort({ filters: [RFOUNDRY_USB, ...CABLES] });
-			} catch (e) {
-				if (e?.name !== "NotFoundError") throw e;
-				say(t("editor.connect.none"), "warn");
-				return null;
-			}
-		}
-		const info = port.getInfo?.() || {};
-		cable = !(info.usbVendorId === RFOUNDRY_USB.usbVendorId && info.usbProductId === RFOUNDRY_USB.usbProductId);
-		diag.note(known ? "port known" : "port chosen", { cable, ...info });
-		stream = known?.stream || await SerialStream.open(port);
-	}
-	const tr = new CpsSerial(stream, { cable });
+	connecting = true;
+	renderConnection();
 	try {
-		const { radio, probe } = await tr.identify(S.radios);
-		diag.note("radio found", { radio: radio.id, board: probe.board, git: probe.git, features: probe.features });
-		// dbKnown: the radio's ID database is the model's (read or written since the model was loaded)
-		S.conn = { transport: tr, radio: sizedRadio(tr), probe, image: null, uid: null, cable, dbKnown: false };
-		return S.conn;
-	} catch (e) {
-		await tr.close();
-		throw e;
+		let stream, cable = false;
+		if (S.sim) {
+			// #sim-compact: firmware that reads a format C ID database; &release=vYY.M: a radio that runs that release;
+			// &git_time=N: a build of a commit from that time (Unix seconds)
+			const hash = location.hash;
+			S.fake = S.fake || new FakeCpsRadio({ board: "DM-1701", image: CodeplugImage.blank().bytes, foreign: hash === "#sim-foreign",
+				features: hash.startsWith("#sim-compact") ? "FM,DMR,IDDB_COMPACT" : "FM,DMR", release: hash.match(/[#&]release=([\w.]+)/)?.[1],
+				gitTime: Number(hash.match(/[#&]git_time=(\d+)/)?.[1]) || 0 });
+			stream = S.fake.stream();
+		} else {
+			if (!serialSupported()) throw new TransportError("no_serial");
+			// one chooser for both links: the radio's own USB port, or a programming cable, told apart by the port's USB ID.
+			// A port granted before where RadioFoundry answers needs no chooser
+			const known = await knownRadioPort([RFOUNDRY_USB, ...CABLES]);
+			let port = known?.port;
+			if (!port) {
+				try {
+					port = await navigator.serial.requestPort({ filters: [RFOUNDRY_USB, ...CABLES] });
+				} catch (e) {
+					if (e?.name !== "NotFoundError") throw e;
+					say(t("editor.connect.none"), "warn");
+					return null;
+				}
+			}
+			const info = port.getInfo?.() || {};
+			cable = !(info.usbVendorId === RFOUNDRY_USB.usbVendorId && info.usbProductId === RFOUNDRY_USB.usbProductId);
+			diag.note(known ? "port known" : "port chosen", { cable, ...info });
+			stream = known?.stream || await SerialStream.open(port);
+		}
+		const tr = new CpsSerial(stream, { cable });
+		try {
+			const { radio, probe } = await tr.identify(S.radios);
+			diag.note("radio found", { radio: radio.id, board: probe.board, git: probe.git, features: probe.features });
+			// dbKnown: the radio's ID database is the model's (read or written since the model was loaded)
+			S.conn = { transport: tr, radio: sizedRadio(tr), probe, image: null, uid: null, cable, dbKnown: false };
+			connectionLost = false;
+			return S.conn;
+		} catch (e) {
+			await tr.close();
+			throw e;
+		}
+	} finally {
+		connecting = false;
+		renderConnection();
 	}
 }
 
@@ -647,10 +709,12 @@ let radioBusy = false;
 async function exclusive(fn) {
 	if (radioBusy) return diag.note("radio busy: click ignored");
 	radioBusy = true;
+	renderConnection();
 	try {
 		return await fn();
 	} finally {
 		radioBusy = false;
+		renderConnection();
 	}
 }
 
@@ -965,6 +1029,7 @@ function writeChosen(c, { want }, iddb, prepared) {
 			S.model.iddb = dbHeader(want.bytes);	// format N when it went to a radio that reads only that
 			S.dirty = false;
 			refresh();
+			draftSoon();
 			say(prepared + t("editor.write_done", { radio: c.radio.name, bytes: fmtNum(res.bytes) }), "ok");
 		} catch (e) {
 			await fail(step, e);
@@ -972,13 +1037,22 @@ function writeChosen(c, { want }, iddb, prepared) {
 	});
 }
 
-async function dropConnection() {
-	if (!S.conn) return;
-	S.lastRadioImage = S.conn.image || S.lastRadioImage;	// a bug report can still offer it
-	await S.conn.transport.close();
+async function dropConnection({ lost = false } = {}) {
+	const connection = S.conn;
+	if (!connection) return;
+	S.lastRadioImage = connection.image || S.lastRadioImage;
+	encryptionView?.deactivate();
 	S.conn = null;
+	connectionLost = lost;
 	refresh();
+	await connection.transport.close();
 }
+
+// Observe transport loss without polling the radio or taking its request lock.
+setInterval(() => {
+	if (S.conn?.transport.lost && !radioBusy)
+		dropConnection({ lost: true }).catch(error => diag.error("disconnect radio", error));
+}, 1000);
 
 // --- Undo ---
 
@@ -1086,7 +1160,9 @@ function reportFiles() {
 
 async function start() {
 	initReporting({ tool: "editor", context: reportContext, attachments: reportFiles });
-	root.replaceChildren(h("div", { class: "ed-head" }, toolbar, status), messages, tabs, view);
+	root.replaceChildren(connectionBar,
+		h("div", { class: "ed-head" }, toolbar, h("div", { class: "ed-save-status" }, status, draftStatus)),
+		messages, tabs, view);
 	try {
 		const r = await fetch(`${ROOT}data/radios.json`);
 		S.radios = (await r.json()).radios || [];
@@ -1095,9 +1171,7 @@ async function start() {
 	}
 	const draft = await loadDraft();
 	if (draft?.bytes) {
-		load(decode(imageFrom(draft.bytes)), draft.name || "codeplug");
-		S.dirty = !!draft.dirty;
-		refresh();
+		load(decode(imageFrom(draft.bytes)), draft.name || "codeplug", { dirty: !!draft.dirty, restored: true });
 		say(t("editor.draft_restored", { time: fmtDate(new Date(draft.at), { dateStyle: "medium", timeStyle: "short" }) }), "info");
 	} else load(empty(), "codeplug");
 	if (!serialSupported() && !S.sim) say(t("editor.no_serial"), "info");

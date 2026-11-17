@@ -6,6 +6,7 @@
 // nothing when the value was taken.
 
 import { h, button } from "../flasher/dom.js";
+import { guardDialog } from "./unsaved.js";
 import { parseFreq, parseTone, mhz } from "../codeplug/fields.js";
 import { LIMITS, POWER_NAMES } from "../codeplug/records.js";
 import { refNumber, listenBand, newContact } from "../codeplug/model.js";
@@ -580,6 +581,10 @@ export function formDialog(title, fields, record, t, onSave) {
 	body.addEventListener("input", sync);
 	sync();
 	const dlg = h("dialog", { class: "confirm editor-dialog ed-channel-dialog", "aria-labelledby": "channel-edit-title" });
+	const signature = () => JSON.stringify(rows.filter(row => row.input).map(({ f, input }) =>
+		f.read ? f.read(input, work) : input.type === "checkbox" ? input.checked : input.value));
+	const original = signature();
+	const cancel = guardDialog(dlg, () => signature() !== original, t("editor.dialog.discard"));
 	const save = () => {
 		const bad = [];
 		let first;
@@ -611,7 +616,7 @@ export function formDialog(title, fields, record, t, onSave) {
 	errs.setAttribute("role", "alert");
 	dlg.append(h("header", { class: "ed-channel-header" }, h("h2", { id: "channel-edit-title" }, title), nav),
 		body, h("footer", { class: "ed-channel-footer" }, errs, h("div", { class: "confirm-actions" },
-			button(t("editor.cancel"), () => dlg.close()), button(t("editor.form.save_channel"), save, { primary: true }))));
+			button(t("editor.cancel"), cancel), button(t("editor.form.save_channel"), save, { primary: true }))));
 	dlg.addEventListener("close", () => dlg.remove());
 	document.body.append(dlg);
 	dlg.showModal();
@@ -656,13 +661,16 @@ export function membersDialog(title, members, pool, max, t, label, onSave) {
 	chosen.addEventListener("dblclick", del);
 	fill();
 	const dlg = h("dialog", { class: "confirm editor-dialog" });
+	const cancel = guardDialog(dlg,
+		() => list.length !== members.length || list.some((item, index) => item !== members[index]),
+		t("editor.dialog.discard"));
 	dlg.append(h("h2", {}, title),
 		h("div", { class: "members" },
 			h("div", {}, h("h3", {}, t("editor.members.available")), filter, avail),
 			h("div", { class: "members-actions" }, button(t("editor.members.add"), add), button(t("editor.members.remove"), del),
 				button(t("editor.move_up"), () => move(-1)), button(t("editor.move_down"), () => move(1))),
 			h("div", {}, h("h3", {}, t("editor.members.chosen")), chosen, count)),
-		h("div", { class: "confirm-actions" }, button(t("editor.cancel"), () => dlg.close()),
+		h("div", { class: "confirm-actions" }, button(t("editor.cancel"), cancel),
 			button(t("editor.save_record"), () => {
 				onSave(list);
 				dlg.close();

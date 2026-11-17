@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Programming the Radio
 
@@ -22,6 +23,11 @@ Open **Codeplug Editor** in the site's menu. It reads and writes the radio from 
 server: files, the codeplug and your RadioID API key stay on your computer.
 
 ### Reading and writing the radio
+
+The connection bar shows the connected radio and its firmware. **Connect** identifies the radio and asks you
+to choose its port when needed. **Disconnect** releases that port for another application. A lost
+connection is shown in the same bar; choose **Connect** to reconnect. Read, Write and Encryption share this
+connection. Encryption retains the slot metadata when switching tabs and clears any draft key entry.
 
 1. Turn the radio on with RadioFoundry running and connect it: the USB cable on a radio with USB, otherwise the
    programming cable. The radio must be in USB serial mode, not USB network mode.
@@ -85,8 +91,13 @@ filter to narrow the rows. Check rows and choose **Bulk Edit** to set one field 
 edited in their own dialog). **Undo** and **Redo**
 cover every change, including an import.
 
-The page keeps the working codeplug in the browser, so closing or reloading the page doesn't lose edits. **New** starts
-over.
+The page keeps a draft of the working codeplug in this browser. The status shows **Saving draft**, **Draft saved in
+this browser**, or **Draft unavailable**. Wait for the saved status before leaving. If drafts are unavailable,
+keep the page open and download a codeplug file. A browser draft, a downloaded file, and a write to the radio are
+separate operations. **New** starts over.
+
+Opening a file over unsaved changes asks for confirmation. Channel and membership editors ask before discarding
+modified fields or lists, whether you choose **Cancel** or press Escape. Declining keeps the editor open.
 
 ### Files
 
