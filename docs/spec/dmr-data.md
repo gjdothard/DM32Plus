@@ -220,7 +220,8 @@ The inbox stamps accepted SMS with the board GPS UTC minute at receipt. The arch
 for incoming messages and samples it when an outgoing result is recorded. The existing record time field
 holds the UTC minute of day plus one, with zero for unavailable time and older records. It is independent of
 the monotonic receive timestamp used for duplicate detection. The tall card conversation view reads pages of up
-to seven full messages through the deferred journal reader, within the fixed text buffer. Adjacent windows overlap so each key press moves one message. The thread wraps their full text in variable-height
+to seven full messages through the deferred journal reader, within the fixed text buffer. Adjacent windows overlap so Up and Down move one message per step, including while an arrow is held.
+Navigation stops at the oldest and newest messages. The thread wraps their full text in variable-height
 bubbles, and OK opens the composer addressed to the conversation. An append for the open peer refreshes the latest
 page directly on the housekeeping task. An append for another peer leaves the page alone. The directory keys an outgoing
 or locally authored private message by its recipient, an incoming private message by its sender, and

@@ -52,7 +52,7 @@ activate the reserve. If it reports that blank storage is required, the existing
 preserved. Once enabled, new received messages and outgoing send results are saved in the
 archive. Under **Messages**, choose one of the six most recent private or
 talkgroup conversations. In the dark card layout, the conversation opens at the newest bubble at the bottom.
-Each Up or Down press moves one message. The thread fills the viewing area, and a bubble can be partially visible at its edge. **#** jumps to the newest. **OK** opens the text
+Use Up or Down to move one message at a time, or hold an arrow to keep scrolling. Scrolling stops at either end. The thread fills the viewing area, and a bubble can be partially visible at its edge. **#** jumps to the newest. **OK** opens the text
 composer for the thread. Sending a reply returns to that same thread. Delivery or failure appears on the outgoing bubble. New messages for an open conversation
 appear at the bottom automatically. A message from a different conversation still shows its banner.
 The standard layout opens the newest full message first.

@@ -1541,7 +1541,11 @@ static const char *thread_body(void)
 static bool thread_key(const input_event_t *ev)
 {
 	bool rotary = ev->action == ACT_ENC_STEP && ev->value;
-	if (!rotary && ev->gesture != GESTURE_PRESS && ev->gesture != GESTURE_REPEAT)
+	bool up = ev->action == ACT_NAV_UP || (rotary && ev->value < 0);
+	bool down = ev->action == ACT_NAV_DOWN || (rotary && ev->value > 0);
+	// The first event from a held arrow must use the same page boundaries as its repeats.
+	if (!rotary && ev->gesture != GESTURE_PRESS && ev->gesture != GESTURE_REPEAT &&
+	    !(ev->gesture == GESTURE_LONG && (up || down)))
 		return false;
 	message_history_view_t v;
 	ui_svc_history_view(&v, NULL, 0);
@@ -1551,8 +1555,6 @@ static bool thread_key(const input_event_t *ev)
 			ui_svc_history_thread(v.key, 0, false);
 		return true;
 	}
-	bool up = ev->action == ACT_NAV_UP || (rotary && ev->value < 0);
-	bool down = ev->action == ACT_NAV_DOWN || (rotary && ev->value > 0);
 	if (!v.timeline || v.status != HISTORY_READY || !v.count || (!up && !down))
 		return false;
 	uint16_t row = ui_frame()->focus;
