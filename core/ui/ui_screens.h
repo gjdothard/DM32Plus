@@ -224,6 +224,9 @@ typedef struct {
 	ui_item_fn item;
 	const char *empty;		// shown when count is 0
 	const char *hint;
+#if CONFIG_UI_CARD_MENU
+	bool name_in_title;		// join prefix and name in the card heading instead of a context line
+#endif
 } ui_list_t;
 
 void ui_draw_list(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l);

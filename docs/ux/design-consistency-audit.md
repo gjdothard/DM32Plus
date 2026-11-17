@@ -26,9 +26,13 @@ Each also passes 360 exact Quick Controls ordering checks. The final layout audi
 screens with zero problems. The gallery is regenerated across five display classes; only intended
 card-screen PNG changes are committed. Spanish and Italian catalogs and documentation links pass.
 
-Firmware CI and hardware checks have not run: this Windows environment lacks `make` and the firmware
-cross-compilers. Native UI checks use a local portable compiler. The repository's generic-name check
-still reports existing violations in unrelated workflows, site, release, and development documents.
+The C-SKY firmware build is now reproducible locally in a Linux build VM using the pinned CI compiler
+image. The first target build reproduced an 8-byte RAM overflow. Joining picker titles in the existing
+rendering buffer removes 48 bytes of permanent storage: RAM is 211,416 of 211,456 bytes. The default
+and card-disabled firmware builds link without warnings. All ten task stacks pass, including the 128-byte
+analysis margin; the least additional space is 40 bytes on the UI task. No hardware checks have run.
+The repository's generic-name check still reports existing violations in unrelated workflows, site,
+release, and development documents.
 
 ## Review method
 

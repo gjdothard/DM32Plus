@@ -1461,6 +1461,10 @@ int main(void)
 		run_flow(&card_quick[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
 #if CONFIG_UI_CARD_MENU
 	static const flow_t card_menu[] = {
+		{ "Dual Watch filtered picker retains both the pane title and query", "branded-home quick 3 ctx 3", "6",
+			"screen=dual_pick shows=Watch_on_B shows=Find:_6 dual=1", 1, false },
+		{ "Dual Watch picker title identifies pane A", "branded-home quick 3 ctx", "2",
+			"screen=dual_pick shows=Watch_on_A dual=1", 1, false },
 		{ "Card Delete Zone defaults to keeping the zone", "branded-home ok 4 ok up up up up ok", "4 ok",
 			"screen=zoneedit writes=0", 2, false },
 		{ "Card Factory Reset defaults to keeping settings", "branded-home ok 9 0 down down down ok", "ok",

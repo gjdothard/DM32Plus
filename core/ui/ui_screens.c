@@ -3309,8 +3309,9 @@ static void __attribute__((noinline)) draw_quick_list(const radio_view_t *v, con
 	quick_v = v;
 	quick_s = s;
 	quick_list_focus = s->quick_focus;
-	ui_list_t l = { TR("Quick"), v->vfo ? "VFO" : v->ch.name, NULL, NULL, UI_QUICK_TILES, quick_list_focus, &top,
-			quick_list_item, NULL, split_hint != NULL ? split_hint : TR("1-9 change  Hold OK save") };
+	ui_list_t l = { .prefix = TR("Quick"), .name = v->vfo ? "VFO" : v->ch.name,
+		.count = UI_QUICK_TILES, .focus = quick_list_focus, .top = &top, .item = quick_list_item,
+		.hint = split_hint != NULL ? split_hint : TR("1-9 change  Hold OK save") };
 	ui_draw_list(v, s, &l);
 }
 
@@ -3556,9 +3557,18 @@ void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kin
 	int step = kind == UI_CARD_PAGE_DETAILS ? 44 : actions ? 34 : 28;
 	char fit[64];
 	card_header(s, 24);
-	card_center_title(l->prefix ? l->prefix : l->name, 7, fit, sizeof fit);
+	if (l->name_in_title && l->prefix && l->name) {
+		// Keep the pane letter even when a translated prefix needs shortening, without a permanent title buffer.
+		int tail = gfx_text_width(font, l->name);
+		gfx_text_fit(font, l->prefix, width - 14 - tail - font->w, fit, sizeof fit);
+		sbuf_t title = { fit + strlen(fit), fit + sizeof fit - 1 };
+		sb_chr(&title, ' ');
+		sb_str(&title, l->name);
+		gfx_text(font, (width - gfx_text_width(font, fit)) / 2, 29, fit, ui_col.focus);
+	} else
+		card_center_title(l->prefix ? l->prefix : l->name, 7, fit, sizeof fit);
 	int y = 55;
-	if (l->prefix && l->name && strcmp(l->prefix, l->name) != 0) {
+	if (!l->name_in_title && l->prefix && l->name && strcmp(l->prefix, l->name) != 0) {
 		fit_end(meta, l->name, width - 12, fit, sizeof fit);
 		gfx_text(meta, 6, y, fit, ui_col.dim);
 		y += meta->h + 5;

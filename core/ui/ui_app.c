@@ -1883,16 +1883,7 @@ static void list_draw(const ui_scr_def_t *d)
 			return;
 		}
 		if (f->scr == SCR_DUAL || f->scr == SCR_DUAL_PICK || f->scr == SCR_DUAL_ZONE) {
-			if (f->scr != SCR_DUAL) {
-				static char pane_title[48];
-				sbuf_t title;
-				sb_init(&title, pane_title, sizeof pane_title);
-				sb_str(&title, l.prefix);
-				sb_chr(&title, ' ');
-				sb_str(&title, l.name);
-				l.prefix = pane_title;
-				l.name = NULL;
-			}
+			l.name_in_title = f->scr != SCR_DUAL;
 			ui_draw_card_page(&ui_st, &l, f->scr == SCR_DUAL ? UI_CARD_PAGE_ACTIONS :
 				f->scr == SCR_DUAL_PICK ? UI_CARD_PAGE_DETAILS : UI_CARD_PAGE_FIELDS);
 			return;

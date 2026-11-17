@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Building
 
@@ -15,6 +16,11 @@ pinned version of each toolchain is in `platform/<p>/platform.toml` `[toolchain]
 
 You also need make, git and Python 3. Clone with submodules: `git submodule update --init` fetches FreeRTOS, TinyUSB
 and ST's HAL and CMSIS into `third_party/`.
+
+On Windows, a local Linux VM can run the same pinned compiler image as CI without installing a native
+cross-compiler. Install Docker, make, git, and Python in the VM, then use the container command above.
+When exporting sources from Git for Linux, use `git -c core.autocrlf=false archive` to preserve shell
+script line endings. Host UI tests complement the target build; they do not check target RAM or task stacks.
 
 ## Make targets
 
