@@ -206,6 +206,14 @@ Its first reply after boot had valid RTC time with GPS still off. The RTC advanc
 seconds of wall time between the pre-shutdown and post-boot samples. The reported minimum free RTOS heap was
 13,904 bytes during this check (minimum required: 2,048 bytes). This was a radio-only check without RF traffic.
 
+The combined build with the held-arrow fix also retained time with GPS off. After about 66 seconds powered off,
+its RTC had advanced 97 seconds over 97.4 seconds of wall time between samples. The lowest reported free heap
+during that run was 7,664 bytes. GPS was restored and the combined firmware stayed installed.
+
+To repeat the check, acquire a GPS fix, confirm the clock is set, then disable GPS. Run
+`python3 -m pytest tests/hil/test_rtc.py --manual -s --radio-port PORT` and follow the power prompts.
+Restore the GPS setting afterward.
+
 ## 13. APRS
 
 The HR_C7000 copies its FM receive audio to the CPU (`modem-hrc7000.md` 8.5). APRS listens on the APRS frequency

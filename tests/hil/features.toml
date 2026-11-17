@@ -164,7 +164,6 @@ switch = "RTC"
 hardware = "a real-time clock"
 spec = "docs/spec/radio-features.md"
 source = ["core/app/wall_clock.c", "platform/hrc7000/rtc.c"]
-manual = ["Acquire an on-radio GPS fix, disable GPS, power the radio off, wait at least 60 seconds, and verify retained UTC advances across power-off."]
 
 # ── DMR data ──
 
