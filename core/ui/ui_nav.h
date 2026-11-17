@@ -42,7 +42,7 @@ typedef enum {
 	SCR_DMR_ID,			// the radio's own DMR ID (Settings > My radio)
 	SCR_REF_TRIM,			// the reference trim (Settings > Advanced > Freq trim)
 	SCR_GPS,			// Tools > Position's pages (CONFIG_GPS_SKY): status, sky, signal, grid
-	SCR_CONTACT_EDIT,		// the contact editor (CONFIG_CONTACT_EDIT): a new contact, from ui_target
+	SCR_CONTACT_EDIT,		// create or edit a saved DMR contact (CONFIG_CONTACT_EDIT)
 	SCR_LANGUAGE,			// Settings > Display > Language: every language, those not built dimmed
 	SCR_SMS_TEXT,			// write a custom message (CONFIG_DMR_SMS)
 	SCR_CONTACT_POSITION,		// last reported position of a private contact
@@ -142,6 +142,7 @@ void ui_open_actions(const ui_target_t *t);
 #if CONFIG_CONTACT_EDIT
 // The contact editor on a new contact for t: its ID, type and name (a talkgroup or ID as its name when it has none)
 void ui_new_contact(const ui_target_t *t);
+void ui_menus_contact_saved(void);
 #endif
 // Talk to a target: temporary (SELECT) or permanent (long SELECT); goes Home and says what happened
 void ui_talk(const ui_target_t *t, bool permanent);

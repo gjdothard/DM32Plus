@@ -90,6 +90,11 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "contacts", "ok 1" },
 	{ "contacts_find", "ok 1 5 6" },
 	{ "contact_actions", "ok 1 5 6 ctx" },
+#if CONFIG_CONTACT_EDIT
+	{ "talkgroup_more", "ok 1 ctx" },
+	{ "talkgroup_edit", "ok 1 ctx ok" },
+	{ "contact_add", "ok 1 up ok" },
+#endif
 	{ "messages", "msg:3101234,Meet_at_the_north_lot msg:3105678,On_my_way wait:9000 ok 2" },
 	{ "messages_empty", "ok 2" },
 	{ "recent", "call:3101234,91,g call:3105678,3100,g call:3102222,0,p ok 3" },
@@ -550,6 +555,23 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 			snprintf(script, slen, "branded-home ok 9");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "contacts"))
 			snprintf(script, slen, "branded-home ok 3");
+#if CONFIG_CONTACT_EDIT
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "talkgroup_more"))
+			snprintf(script, slen, "branded-home ok 3 ctx");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "talkgroup_edit"))
+			snprintf(script, slen, "branded-home ok 3 ctx ok");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "contact_add"))
+			snprintf(script, slen, "branded-home ok 3 up ok");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "channel"))
+			snprintf(script, slen, "branded-home ok 1 2 ok");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "channel_name"))
+			snprintf(script, slen, "branded-home ok 1 2 ok ok 4 4 4 wait:1200 6 6");
+#endif
+#if CONFIG_TALKGROUP_EDIT
+		else if (!strcmp(g->name, "240x320i10x5") && (!strcmp(name, "operating_talkgroups") ||
+			 !strcmp(name, "add_talkgroup") || !strcmp(name, "talkgroup_actions")))
+			snprintf(script, slen, "branded-home talkgroup-pool ok 1 2%s", gallery[i].script + strlen("talkgroup-pool ok 5"));
+#endif
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "home_dual_fm"))
 			snprintf(script, slen, "branded-home quick 3%s call:1001,3100,g,K4EXM msg:1001,Hello power:8 wait:11000",
 				 gallery[i].script + strlen("quick 7"));

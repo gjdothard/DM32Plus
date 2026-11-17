@@ -851,13 +851,29 @@ uint8_t codeplug_talkgroup_at(uint16_t channel, uint8_t index, codeplug_talkgrou
 #if CONFIG_CONTACT_EDIT
 bool ui_svc_write_contact(uint16_t index, const contact_t *c)
 {
-	if (n_ct_edits == SIM_CONTACT_EDITS)
-		return false;
-	sim_ct_edits[n_ct_edits].index = index;
-	sim_ct_edits[n_ct_edits].c = *c;
-	n_ct_edits++;
+	uint8_t i = 0;
+	while (i < n_ct_edits && sim_ct_edits[i].index != index)
+		i++;
+	if (i == n_ct_edits) {
+		if (n_ct_edits == SIM_CONTACT_EDITS)
+			return false;
+		n_ct_edits++;
+	}
+	sim_ct_edits[i].index = index;
+	sim_ct_edits[i].c = *c;
+	sim_cp_serial++;
 	sim_rec.codeplug_writes++;
+	ui_notify(&(ui_event_t){ .kind = UI_EV_CONTACT_SAVED });
 	return true;
+}
+
+bool ui_svc_set_channel_contact(uint16_t index)
+{
+	channel_t channel;
+	if (view.vfo || !codeplug_channel(view.channel_number, &channel) || channel.mode != RADIO_MODE_DMR)
+		return false;
+	channel.contact = index;
+	return ui_svc_write_channel(view.channel_number, &channel);
 }
 #endif
 

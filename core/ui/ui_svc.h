@@ -87,6 +87,7 @@ bool ui_svc_edit_talkgroups(uint16_t channel, uint16_t contact, ui_tg_edit_t op)
 // Store a contact (the contact editor, ui.md 2.4) at index 1..CODEPLUG_CONTACTS_MAX, as a storage job. false: a write
 // is still going on, or no codeplug storage in this build
 bool ui_svc_write_contact(uint16_t index, const contact_t *c);
+bool ui_svc_set_channel_contact(uint16_t index);
 #endif
 // The zone editor (ui.md 2.2): op is queued and runs as a storage job (zone_edit_apply), in order; the radio follows
 // zone indexes it moves. A refusal in the job raises UI_EV_SAVE_FAILED and drops what was queued after it. false:
@@ -391,6 +392,9 @@ typedef enum {
 	UI_EV_SCAN_STOPPED,	// the scan stopped on a channel
 	UI_EV_CALL_ALERT_RESULT,	// our call alert: ok = the radio answered, else no answer after the retries
 	UI_EV_SAVE_FAILED,	// a save to the codeplug the UI asked for failed later (text: what failed)
+#if CONFIG_CONTACT_EDIT
+	UI_EV_CONTACT_SAVED,
+#endif
 #if CONFIG_TALKGROUP_EDIT
 	UI_EV_TALKGROUPS_SAVED,
 #endif

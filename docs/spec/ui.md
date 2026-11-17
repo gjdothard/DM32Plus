@@ -289,13 +289,16 @@ screen says so and points to Settings > Location. Without `CONFIG_GPS_SKY` the s
 
 ### 2.4 Contact editor
 
-With `CONFIG_CONTACT_EDIT` (DMR and the channel editor), New Contact (`contactedit`) makes a contact on the radio. It
-opens from:
+With `CONFIG_CONTACT_EDIT` (DMR and the channel editor), `contactedit` makes and edits saved group and private
+contacts. It opens from:
 
 - Find: "Create contact 3100", the last row for a typed number no contact has as its ID. Up to 6 digits start it as a
   talkgroup, 7 and more (a DMR ID) as a person.
 - Actions: Save as contact (item 7 for a person, item 4 for a talkgroup), for a target that isn't a contact. Its ID,
   type and name come with it.
+- Contacts: select Add talkgroup or Add contact. On a tabbed directory the tab sets the entry's type.
+- Contacts: open More for a saved entry and select Edit. Talkgroup actions are Edit, Message, and Make channel
+  default. Private contact actions are Edit, Message, Radio check, Call alert, and Position.
 
 The name starts as the target's name, else "TG 3100" for a talkgroup or the ID for a person.
 
@@ -303,20 +306,18 @@ The name starts as the target's name, else "TG 3100" for a talkgroup or the ID f
 |---|---|
 | Name | opens Text entry (2.1) |
 | ID | opens an editor that takes digits, as the channel editor's Own ID: the first digit starts a new ID, a digit past 16777214 is refused, BACK takes back a digit and with none typed closes it, OK keeps (nothing typed: unchanged) |
-| Type | Talkgroup / Private, flips |
-| Timeslot | Channel's / TS 1 / TS 2: the contact's timeslot override |
+| Type | Talkgroup / Private, flips when creating an entry without a preset type |
+| Timeslot override | Channel default / TS 1 / TS 2 for a saved talkgroup or a new talkgroup from the directory |
 | Save | saves |
 
 - Long SELECT anywhere saves. BACK opens Unsaved Changes ("Discard this new contact?"), "No, keep editing" first.
 - Save checks first and names the first problem in a toast: an empty name, a private ID past 16776415
-  (`CODEPLUG_DMR_ID_MAX`), a contact with the same ID and type ("Already a contact: K1ABC Joe"), no free contact
+  (`CODEPLUG_DMR_ID_MAX`), a duplicate private ID or a duplicate group ID and override, no free contact
   ("No room for more contacts", 1024).
-- Save writes the lowest free contact with `codeplug_set_contact` as a storage job (`ui_svc_write_contact`). A failed
-  write raises `UI_EV_SAVE_FAILED`. The radio core's name cache follows `codeplug_serial()`.
-- After a save the editor closes. From actions they show again, "In contacts" and under the new name; from Find the
-  radio goes Home, since Find's rows are the number's.
-- Editing or deleting a stored contact is not built yet (#74). A CPS write afterwards replaces contacts made on the
-  radio.
+- Save updates the existing record or writes the lowest free slot as a storage job (`ui_svc_write_contact`). Assigned
+  operating talkgroups continue to reference the edited record. A failed write raises `UI_EV_SAVE_FAILED`.
+- After a directory save the editor returns to the directory or the saved entry's More menu. A save from Find returns
+  Home. Read the radio in the CPS before making changes there to pick up edits made on the radio.
 
 ### 2.5 Languages
 

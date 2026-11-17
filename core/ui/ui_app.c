@@ -30,7 +30,8 @@
 #include "hotspot/hotspot.h"
 #endif
 
-#define UI_STACK_MAX		6
+// Zone channel actions can open the channel editor, its assignment list, and then a picker.
+#define UI_STACK_MAX		(6 + 2 * CONFIG_TALKGROUP_EDIT)
 #define TOAST_MS		1800
 #define VOLUME_MS		3000	// the volume screen closes this long after the last key
 #define ENTRY_TIMEOUT_MS	10000
@@ -699,6 +700,11 @@ static void handle_event(const ui_event_t *ev)
 			ui_menus_save_failed();
 		break;
 	}
+#if CONFIG_CONTACT_EDIT
+	case UI_EV_CONTACT_SAVED:
+		ui_menus_contact_saved();
+		break;
+#endif
 #if CONFIG_TALKGROUP_EDIT
 	case UI_EV_TALKGROUPS_SAVED:
 		ui_dirty();
@@ -1854,11 +1860,41 @@ static void list_draw(const ui_scr_def_t *d)
 			ui_draw_numbered_menu(view, &ui_st, &l);
 			return;
 		}
+#if CONFIG_CONTACT_EDIT
+		if (f->scr == SCR_ACTIONS && f->arg) {
+			l.prefix = l.name;
+			ui_draw_numbered_menu(view, &ui_st, &l);
+			return;
+		}
+		if (f->scr == SCR_CONTACT_EDIT || f->scr == SCR_CHANNEL || f->scr == SCR_TEXT || f->scr == SCR_DISCARD) {
+			l.hint = TR("OK change  Back");
+			if (f->scr == SCR_TEXT) {
+				l.header = l.name;
+				l.hint = TR("Back del  # mode  OK keep");
+			} else if (f->scr == SCR_DISCARD) {
+				l.hint = TR("OK pick  Back");
+			}
+			ui_draw_card_list(&ui_st, &l, UI_CARD_FIELDS);
+			return;
+		}
+#endif
+#if CONFIG_TALKGROUP_EDIT
+		if (f->scr == SCR_TALKGROUPS || f->scr == SCR_TALKGROUP_ADD || f->scr == SCR_TALKGROUP_MOVE) {
+			l.hint = f->scr == SCR_TALKGROUP_ADD ? TR("0-9 find  OK pick  Back") : TR("OK pick  Back");
+			ui_draw_card_list(&ui_st, &l, UI_CARD_FIELDS);
+			return;
+		}
+#endif
 		if (f->scr == SCR_ZONES || f->scr == SCR_ZONE) {
 			ui_draw_card_list(&ui_st, &l, f->scr == SCR_ZONE ? UI_CARD_ZONE_CHANNELS : UI_CARD_ZONES);
 			return;
 		}
 		if (f->scr == SCR_CONTACTS && ui_contact_tabs_available()) {
+			l.hint = NULL;
+#if CONFIG_CONTACT_EDIT
+			if (l.count && ui_filter_raw(l.focus) == 0)
+				l.hint = TR("OK Add  Back");
+#endif
 			ui_draw_card_list(&ui_st, &l, f->arg ? UI_CARD_CONTACTS : UI_CARD_TALKGROUPS);
 			return;
 		}

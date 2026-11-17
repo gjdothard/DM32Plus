@@ -454,6 +454,22 @@ msgid "Tools & Utilities"
 msgstr "Herramientas y utilidades"
 
 #: core/ui/ui_app.c
+msgid "Back del  # mode  OK keep"
+msgstr "Atrás borra  # modo  OK guarda"
+
+#: core/ui/ui_app.c core/ui/ui_dual.c core/ui/ui_menus.c
+msgid "OK pick  Back"
+msgstr "OK elegir  Atrás"
+
+#: core/ui/ui_app.c core/ui/ui_menus.c
+msgid "0-9 find  OK pick  Back"
+msgstr "0-9 buscar  OK elegir  Atrás"
+
+#: core/ui/ui_app.c
+msgid "OK Add  Back"
+msgstr "OK añadir  Atrás"
+
+#: core/ui/ui_app.c
 msgid "OK reply  Back"
 msgstr "OK responder  Atrás"
 
@@ -937,10 +953,6 @@ msgstr "{OK escuchar  0-9 buscar  Atrás|OK escuchar  Atrás}"
 msgid "Zone for"
 msgstr "Zona para"
 
-#: core/ui/ui_dual.c core/ui/ui_menus.c
-msgid "OK pick  Back"
-msgstr "OK elegir  Atrás"
-
 #: core/ui/ui_find.c core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Contacts"
 msgstr "Contactos"
@@ -1242,6 +1254,10 @@ msgid "Save as contact"
 msgstr "Guardar contacto"
 
 #: core/ui/ui_menus.c
+msgid "Edit"
+msgstr "Editar"
+
+#: core/ui/ui_menus.c
 msgid "Speak status"
 msgstr "Decir estado"
 
@@ -1252,6 +1268,10 @@ msgstr "Guardar en canal"
 #: core/ui/ui_menus.c
 msgid "Make channel default"
 msgstr "Hacer canal predet."
+
+#: core/ui/ui_menus.c
+msgid "Saving..."
+msgstr "Guardando..."
 
 #: core/ui/ui_menus.c
 msgid "Messages: not in this build"
@@ -1336,6 +1356,14 @@ msgstr "Para"
 #: core/ui/ui_menus.c
 msgid "OK send  Back"
 msgstr "OK enviar  Atrás"
+
+#: core/ui/ui_menus.c
+msgid "Add talkgroup"
+msgstr "Añadir grupo"
+
+#: core/ui/ui_menus.c
+msgid "Add contact"
+msgstr "Añadir contacto"
 
 #: core/ui/ui_menus.c
 msgid "(no name)"
@@ -1890,6 +1918,10 @@ msgid "Yes, discard"
 msgstr "Sí, descartar"
 
 #: core/ui/ui_menus.c
+msgid "Discard contact changes?"
+msgstr "¿Descartar cambios del contacto?"
+
+#: core/ui/ui_menus.c
 msgid "Discard this new contact?"
 msgstr "¿Descartar este contacto nuevo?"
 
@@ -1922,12 +1954,36 @@ msgid "{Back del  # mode  OK send|Back del  OK send}"
 msgstr "{Atrás borr.  # modo  OK enviar|Borr.  OK env.}"
 
 #: core/ui/ui_menus.c
+msgid "Edit talkgroup"
+msgstr "Editar grupo"
+
+#: core/ui/ui_menus.c
+msgid "Edit contact"
+msgstr "Editar contacto"
+
+#: core/ui/ui_menus.c
+msgid "New Talkgroup"
+msgstr "Nuevo grupo"
+
+#: core/ui/ui_menus.c
+msgid "New Contact"
+msgstr "Contacto nuevo"
+
+#: core/ui/ui_menus.c
 msgid "Type"
 msgstr "Tipo"
 
 #: core/ui/ui_menus.c
+msgid "Timeslot override"
+msgstr "Ranura asignada"
+
+#: core/ui/ui_menus.c
 msgid "Talkgroup"
 msgstr "Grupo"
+
+#: core/ui/ui_menus.c
+msgid "Channel default"
+msgstr "Ranura del canal"
 
 #: core/ui/ui_menus.c
 msgid "Channel's"
@@ -1958,12 +2014,12 @@ msgid "Saved contact "
 msgstr "Guardado contacto "
 
 #: core/ui/ui_menus.c
-msgid "IDs go up to 16777214"
-msgstr "ID máximo es 16777214"
+msgid "Contact saved"
+msgstr "Contacto guardado"
 
 #: core/ui/ui_menus.c
-msgid "New Contact"
-msgstr "Contacto nuevo"
+msgid "IDs go up to 16777214"
+msgstr "ID máximo es 16777214"
 
 #: core/ui/ui_menus.c
 msgid "Move up"
@@ -2634,10 +2690,6 @@ msgid "Send To"
 msgstr "Enviar a"
 
 #: core/ui/ui_menus.c
-msgid "0-9 find  OK pick  Back"
-msgstr "0-9 buscar  OK elegir  Atrás"
-
-#: core/ui/ui_menus.c
 msgid "Crash report sent"
 msgstr "Informe de fallo enviado"
 
@@ -3300,10 +3352,6 @@ msgstr "Escaneo detenido aquí"
 #: core/ui/ui_menus.c
 msgid "In use"
 msgstr "En uso"
-
-#: core/ui/ui_menus.c
-msgid "Add talkgroup"
-msgstr "Añadir grupo"
 
 #: core/ui/ui_menus.c
 msgid "Channel talkgroup list is full"

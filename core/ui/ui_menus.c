@@ -341,7 +341,12 @@ static const ui_scr_def_t menu_section_screen = {
 // ======================= Actions on a station or talkgroup =======================
 
 enum { A_TALK, A_PRIVATE, A_MESSAGE, A_CHECK, A_ALERT, A_POSITION, A_SAVE_CONTACT, A_SPEAK, A_SAVE_CHANNEL,
-       A_MAKE_DEFAULT, A_LAST_POSITION };
+       A_MAKE_DEFAULT, A_LAST_POSITION, A_EDIT_CONTACT };
+
+#if CONFIG_CONTACT_EDIT
+static void ct_open_saved(uint16_t slot);
+static void ct_open_new(bool group, bool fixed_type);
+#endif
 
 #if CONFIG_CONTACT_POSITION
 static ui_target_t position_target;
@@ -356,6 +361,20 @@ bool ui_contact_position_shown(void)
 static uint8_t act_list(uint8_t *out)
 {
 	uint8_t n = 0;
+#if CONFIG_CONTACT_EDIT
+	if (ui_frame()->arg) {
+		out[n++] = A_EDIT_CONTACT;
+		out[n++] = A_MESSAGE;
+		if (ui_target.group) {
+			out[n++] = A_MAKE_DEFAULT;
+		} else {
+			out[n++] = A_CHECK;
+			out[n++] = A_ALERT;
+			out[n++] = A_POSITION;
+		}
+		return n;
+	}
+#endif
 	if (ui_target.group) {
 		out[n++] = A_TALK;
 		out[n++] = A_MAKE_DEFAULT;
@@ -457,6 +476,9 @@ static void act_item(uint16_t i, ui_item_t *it)
 		if (ui_target.saved || !CONFIG_CONTACT_EDIT)
 			it->flags |= UI_ITEM_DIM;
 		break;
+	case A_EDIT_CONTACT:
+		sb_str(&b, TR("Edit"));
+		break;
 	case A_SPEAK:
 		sb_str(&b, TR("Speak status"));
 		it->flags |= UI_ITEM_DIM;
@@ -468,7 +490,7 @@ static void act_item(uint16_t i, ui_item_t *it)
 		break;
 	case A_MAKE_DEFAULT:
 		sb_str(&b, TR("Make channel default"));
-		if (!(feats() & UI_FEAT_TALK_TARGET))
+		if (!(feats() & UI_FEAT_TALK_TARGET) || (ui_frame()->arg && (ui_view()->vfo || ui_view()->ch.mode != RADIO_MODE_DMR)))
 			it->flags |= UI_ITEM_DIM;
 		break;
 	default:
@@ -499,6 +521,17 @@ static void act_select(uint16_t i, bool hold)
 		ui_talk(&t, false);
 		break;
 	case A_MAKE_DEFAULT:
+#if CONFIG_CONTACT_EDIT
+		if (ui_frame()->arg) {
+			if (ui_svc_set_channel_contact(ui_frame()->arg)) {
+				ui_go_home();
+				ui_toast(TR("Saving..."));
+			} else {
+				ui_toast(TR("Couldn't save: try again"));
+			}
+			break;
+		}
+#endif
 		ui_talk(&ui_target, true);
 		break;
 	case A_MESSAGE:
@@ -554,6 +587,11 @@ static void act_select(uint16_t i, bool hold)
 		}
 #endif
 		ui_toast(ui_target.saved ? TR("Already in your contacts") : TR("Add contacts in qdmr"));
+		break;
+	case A_EDIT_CONTACT:
+#if CONFIG_CONTACT_EDIT
+		ct_open_saved(ui_frame()->arg);
+#endif
 		break;
 	case A_SPEAK:
 		ui_toast(TR("Voice prompts: not in this build"));
@@ -687,10 +725,38 @@ static bool contacts_card_active(void)
 	return CONFIG_UI_CARD_MENU && ui_frame()->scr == SCR_CONTACTS && ui_contact_tabs_available();
 }
 
+#if CONFIG_CONTACT_EDIT
+// The virtual first row belongs only to Contacts, not the other screens that share its contact lookup.
+static bool contacts_add_row(uint16_t raw) { return ui_frame()->scr == SCR_CONTACTS && raw == 0; }
+
+static uint16_t contacts_slot(uint16_t raw)
+{
+	return ui_frame()->scr == SCR_CONTACTS ? raw : (uint16_t)(raw + 1u);
+}
+
+static uint16_t contacts_screen_raw_count(void) { return (uint16_t)(contacts_raw_count() + 1u); }
+
+static const char *contacts_add_label(void)
+{
+	return contacts_card_active() && ui_frame()->arg == 0 ? TR("Add talkgroup") : TR("Add contact");
+}
+#else
+static uint16_t contacts_slot(uint16_t raw) { return (uint16_t)(raw + 1u); }
+#define contacts_screen_raw_count contacts_raw_count
+#endif
+
 static bool contacts_raw_label(uint16_t raw, char *buf, uint8_t len)
 {
+#if CONFIG_CONTACT_EDIT
+	if (contacts_add_row(raw)) {
+		if (ui_filter_text()[0])
+			return false;
+		str_copy(buf, len, contacts_add_label());
+		return true;
+	}
+#endif
 	contact_t c;
-	if (!codeplug_contact((uint16_t)(raw + 1u), &c))
+	if (!codeplug_contact(contacts_slot(raw), &c))
 		return false;
 	if (contacts_card_active() && ((c.type == CONTACT_PRIVATE) != (ui_frame()->arg != 0)))
 		return false;
@@ -705,7 +771,7 @@ static bool contacts_raw_label(uint16_t raw, char *buf, uint8_t len)
 static bool contacts_target(uint16_t i, ui_target_t *t)
 {
 	contact_t c;
-	if (i >= ui_filter_count() || !codeplug_contact((uint16_t)(ui_filter_raw(i) + 1u), &c))
+	if (i >= ui_filter_count() || !codeplug_contact(contacts_slot(ui_filter_raw(i)), &c))
 		return false;
 	memset(t, 0, sizeof *t);
 	t->id = c.id;
@@ -717,6 +783,12 @@ static bool contacts_target(uint16_t i, ui_target_t *t)
 
 static void contacts_item(uint16_t i, ui_item_t *it)
 {
+#if CONFIG_CONTACT_EDIT
+	if (contacts_add_row(ui_filter_raw(i))) {
+		str_copy(it->label, sizeof it->label, contacts_add_label());
+		return;
+	}
+#endif
 	ui_target_t t;
 	if (!contacts_target(i, &t))
 		return;
@@ -751,6 +823,13 @@ static void contacts_item(uint16_t i, ui_item_t *it)
 
 static void contacts_select(uint16_t i, bool hold)
 {
+#if CONFIG_CONTACT_EDIT
+	if (contacts_add_row(ui_filter_raw(i))) {
+		bool tabs = contacts_card_active();
+		ct_open_new(tabs && ui_frame()->arg == 0, tabs);
+		return;
+	}
+#endif
 	ui_target_t t;
 	if (contacts_target(i, &t))
 		ui_talk(&t, hold);
@@ -759,9 +838,26 @@ static void contacts_select(uint16_t i, bool hold)
 static void contacts_context(uint16_t i)
 {
 	ui_target_t t;
-	if (contacts_target(i, &t))
-		ui_open_actions(&t);
+	if (!contacts_target(i, &t))
+		return;
+#if CONFIG_CONTACT_EDIT
+	if (t.id != 0xFFFFFFu) {
+		ui_target = t;
+		ui_push(SCR_ACTIONS, contacts_slot(ui_filter_raw(i)));
+		return;
+	}
+#endif
+	ui_open_actions(&t);
 }
+
+#if CONFIG_CONTACT_EDIT
+static void contacts_enter(void)
+{
+	// Keep the normal talk shortcut on the first saved entry. Up from there reaches Add.
+	if (ui_filter_count() > 1)
+		ui_frame()->focus = 1;
+}
+#endif
 
 #if CONFIG_UI_CARD_MENU
 static bool contacts_key(const input_event_t *ev)
@@ -775,6 +871,9 @@ static bool contacts_key(const input_event_t *ev)
 		f->arg = tab;
 		f->top = f->focus = 0;
 		ui_filter_rebuild();
+#if CONFIG_CONTACT_EDIT
+		contacts_enter();
+#endif
 		ui_focus_changed();
 		ui_dirty();
 	}
@@ -787,7 +886,10 @@ static const ui_scr_def_t contacts_screen = {
 	.hint = TRN(TEXT_ALT_OPEN "0-9 find  OK talk  # more" TEXT_ALT_NEXT "0-9  OK talk  # more" TEXT_ALT_CLOSE),
 	.empty = TRN("No contacts: add them in qdmr"),
 	.count = ui_filter_count, .item = contacts_item, .select = contacts_select, .context = contacts_context,
-	.target = contacts_target, .raw_count = contacts_raw_count, .raw_label = contacts_raw_label,
+	.target = contacts_target, .raw_count = contacts_screen_raw_count, .raw_label = contacts_raw_label,
+#if CONFIG_CONTACT_EDIT
+	.enter = contacts_enter,
+#endif
 #if CONFIG_UI_CARD_MENU
 	.key = contacts_key,
 #endif
@@ -3387,7 +3489,9 @@ static void discard_select(uint16_t i, bool hold)
 
 static const char *discard_body(void)
 {
-	return discard_contact ? TR("Discard this new contact?") : TR("Discard the changes to this channel?");
+	if (discard_contact)
+		return ui_frame()->arg ? TR("Discard contact changes?") : TR("Discard this new contact?");
+	return TR("Discard the changes to this channel?");
 }
 
 static const ui_scr_def_t discard_screen = {
@@ -3655,7 +3759,8 @@ static const ui_scr_def_t sms_text_screen = {
 // A new contact: from Find's "Create contact" on a typed number, or a station's actions (Save as contact). Name (text
 // entry), ID (typed), type (talkgroup / private, flips on OK), timeslot (the channel's, 1, 2), Save. Long OK saves too
 
-enum { CT_NAME, CT_ID, CT_TYPE, CT_TS, CT_SAVE, CT_COUNT, CT_NONE = 0xFF };
+enum { CT_NAME, CT_ID, CT_TYPE, CT_TS, CT_SAVE, CT_COUNT, CT_PENDING, CT_NONE = 0xFF };
+enum { CT_NEW_FIXED = CODEPLUG_CONTACTS_MAX + 1, CT_NEW_ANY };
 #define CT_ID_DIGITS	8
 #define CT_GROUP_MAX	0xFFFFFEu	// 0xFFFFFF is all call
 #define CT_PRIVATE_MAX	((uint32_t)CODEPLUG_DMR_ID_MAX)
@@ -3684,14 +3789,58 @@ void ui_new_contact(const ui_target_t *t)
 	ui_push(SCR_CONTACT_EDIT, 0);
 }
 
-static uint16_t ct_count(void) { return CT_COUNT; }
+static void ct_open_saved(uint16_t slot)
+{
+	if (!codeplug_contact(slot, &ct) || ct.type == CONTACT_ALL_CALL) {
+		ui_toast(TR("Not set"));
+		return;
+	}
+	ct_edit = CT_NONE;
+	ui_push(SCR_CONTACT_EDIT, slot);
+}
+
+static void ct_open_new(bool group, bool fixed_type)
+{
+	ct = (contact_t){ .type = group ? CONTACT_GROUP : CONTACT_PRIVATE };
+	ct_edit = CT_NONE;
+	ui_push(SCR_CONTACT_EDIT, fixed_type ? CT_NEW_FIXED : CT_NEW_ANY);
+}
+
+static bool ct_fixed_type(void)
+{
+	uint16_t arg = ui_frame()->arg;
+	return arg != 0 && arg != CT_NEW_ANY;
+}
+
+static uint16_t ct_count(void)
+{
+	return ct_fixed_type() ? (ct.type == CONTACT_GROUP ? 4 : 3) : CT_COUNT;
+}
+
+static uint8_t ct_row(uint16_t i)
+{
+	if (ct_fixed_type() && i >= CT_TYPE)
+		i += ct.type == CONTACT_GROUP ? 1u : 2u;
+	return (uint8_t)i;
+}
+
+static const char *ct_title(void)
+{
+	uint16_t arg = ui_frame()->arg;
+	if (arg && arg <= CODEPLUG_CONTACTS_MAX)
+		return ct.type == CONTACT_GROUP ? TR("Edit talkgroup") : TR("Edit contact");
+	return ct.type == CONTACT_GROUP && arg == CT_NEW_FIXED ? TR("New Talkgroup") : TR("New Contact");
+}
 
 static void ct_item(uint16_t i, ui_item_t *it)
 {
 	static const char *const labels[CT_COUNT] = { TRN("Name"), "ID", TRN("Type"), TRN("Timeslot"), TRN("Save") };
-	if (i >= CT_COUNT)
+	if (i >= ct_count())
 		return;
+	i = ct_row(i);
 	str_copy(it->label, sizeof it->label, tr(labels[i]));
+	if (i == CT_TS && ct_fixed_type())
+		str_copy(it->label, sizeof it->label, TR("Timeslot override"));
 	sbuf_t b;
 	sb_init(&b, it->value, sizeof it->value);
 	switch (i) {
@@ -3703,7 +3852,7 @@ static void ct_item(uint16_t i, ui_item_t *it)
 			it->flags |= UI_ITEM_EDIT;
 			sb_str(&b, ced_digits);
 			sb_chr(&b, '_');
-		} else {
+		} else if (ct.id) {
 			sb_u32(&b, ct.id, 1);
 		}
 		break;
@@ -3712,7 +3861,7 @@ static void ct_item(uint16_t i, ui_item_t *it)
 		break;
 	case CT_TS:
 		if (ct.timeslot == 0) {
-			sb_str(&b, TR("Channel's"));
+			sb_str(&b, ct_fixed_type() ? TR("Channel default") : TR("Channel's"));
 		} else {
 			sb_str(&b, "TS ");
 			sb_u32(&b, ct.timeslot, 1);
@@ -3737,14 +3886,18 @@ static const char *ct_problem(uint16_t *slot)
 		return TR("Private IDs go up to 16776415");
 	if (group && ct.id > CT_GROUP_MAX)
 		return TR("Talkgroups go up to 16777214");
-	*slot = 0;
+	uint16_t arg = ui_frame()->arg;
+	uint16_t current = arg <= CODEPLUG_CONTACTS_MAX ? arg : 0;
+	*slot = current;
 	for (uint16_t i = 1; i <= CODEPLUG_CONTACTS_MAX; i++) {
+		if (i == current)
+			continue;
 		if (!codeplug_contact(i, &c)) {
 			if (*slot == 0)
 				*slot = i;
 			continue;
 		}
-		if (c.id == ct.id && (c.type != CONTACT_PRIVATE) == group) {
+		if (c.id == ct.id && c.type == ct.type && (!group || c.timeslot == ct.timeslot)) {
 			sbuf_t b;
 			sb_init(&b, toast_msg, sizeof toast_msg);
 			sb_str(&b, TR("Already a contact: "));
@@ -3767,6 +3920,11 @@ static void ct_save(void)
 		ui_toast(TR("Couldn't save now: try again"));
 		return;
 	}
+	if (ui_frame()->arg) {
+		ct_edit = CT_PENDING;
+		ui_toast(TR("Saving..."));
+		return;
+	}
 	sbuf_t b;
 	sb_init(&b, toast_msg, sizeof toast_msg);
 	sb_str(&b, TR("Saved contact "));
@@ -3781,13 +3939,27 @@ static void ct_save(void)
 	ui_toast(toast_msg);
 }
 
+void ui_menus_contact_saved(void)
+{
+	if (ui_frame()->scr != SCR_CONTACT_EDIT || ct_edit != CT_PENDING)
+		return;
+	ct_edit = CT_NONE;
+	ui_pop();
+	if (ui_frame()->scr == SCR_ACTIONS && ui_frame()->arg) {
+		ui_target.id = ct.id;
+		str_copy(ui_target.name, sizeof ui_target.name, ct.name);
+		ui_focus_changed();
+	}
+	ui_toast(TR("Contact saved"));
+}
+
 static void ct_select(uint16_t i, bool hold)
 {
 	if (hold) {
 		ct_save();
 		return;
 	}
-	switch (i) {
+	switch (ct_row(i)) {
 	case CT_NAME:
 		ui_text_open(ct.name, CODEPLUG_NAME_LEN);
 		break;
@@ -3814,11 +3986,14 @@ static void ct_select(uint16_t i, bool hold)
 
 static bool ct_key(const input_event_t *ev)
 {
+	if (ct_edit == CT_PENDING)
+		return true;
 	bool press = ev->gesture == GESTURE_PRESS || ev->gesture == GESTURE_LONG;
 	if (ct_edit == CT_NONE) {
 		if (ev->action == ACT_BACK && ev->gesture == GESTURE_PRESS) {
 			discard_contact = true;
-			ui_push(SCR_DISCARD, 0);
+			uint16_t arg = ui_frame()->arg;
+			ui_push(SCR_DISCARD, arg > 0 && arg <= CODEPLUG_CONTACTS_MAX);
 			return true;
 		}
 		return false;
@@ -3860,7 +4035,7 @@ static bool ct_key(const input_event_t *ev)
 }
 
 static const ui_scr_def_t contact_edit_screen = {
-	.name = "contactedit", .flags = SF_LIST | SF_FIELD, .prefix = TRN("New Contact"),
+	.name = "contactedit", .flags = SF_LIST, .title = ct_title,
 	.hint = TRN(TEXT_ALT_OPEN "OK change  hold OK save  Back" TEXT_ALT_NEXT "OK change  hold OK save" TEXT_ALT_CLOSE),
 	.count = ct_count, .item = ct_item, .select = ct_select, .key = ct_key,
 };
@@ -4615,6 +4790,10 @@ static uint16_t dmr_id_count(void) { return MY_COUNT; }
 
 void ui_menus_save_failed(void)
 {
+#if CONFIG_CONTACT_EDIT
+	if (ui_frame()->scr == SCR_CONTACT_EDIT && ct_edit == CT_PENDING)
+		ct_edit = CT_NONE;
+#endif
 #if CONFIG_ZONE_EDIT
 	zones_new_pending = false;	// nothing to focus
 #endif

@@ -59,6 +59,10 @@ or remove it from this channel. Edits save individually. You can also edit the l
 Each channel holds up to 63 assignments, subject to shared space. Each contact uses its own timeslot override
 when set. Otherwise, it follows the channel's timeslot.
 
+Use **Add talkgroup** or **Add contact** from the corresponding directory tab. For a saved entry, press **# More**
+and choose **Edit** to change its name or number. Talkgroups also have a **Timeslot override**. Saved assignments
+follow edits to their group contact. **Make channel default** sets the saved channel's TX contact.
+
 Hold **#** on a DMR channel to open the talk target picker: the channel's default, the reply target, the RX group
 list's talkgroups, recent talkgroups, and "Type a number..." to dial an ID or talkgroup by hand. The **Talk target**
 side key opens the same picker.
@@ -188,9 +192,8 @@ Make a contact on the radio from a number or a call:
 | Timeslot | Channel's, TS 1 or TS 2 |
 | Save | Saves it. Holding **OK** on any row saves too |
 
-The radio refuses a contact that is already there ("Already a contact: ..."). Editing or deleting a stored contact is
-not built yet: use qdmr. A codeplug write from a CPS replaces the contacts you made on the radio, so read the codeplug
-into the CPS first.
+The radio refuses a duplicate private ID or an identical talkgroup ID and timeslot override. Read the codeplug into
+the CPS before editing it there so it includes the contacts changed on the radio.
 
 ## Private calls
 

@@ -813,6 +813,8 @@ static void write_contact_job(void *ctx)
 	(void)ctx;
 	if (!codeplug_set_contact(job.channel, &job.contact)) {
 		save_failed(TRN("Couldn't write the codeplug: not saved"));
+	} else {
+		ui_notify(&(ui_event_t){ .kind = UI_EV_CONTACT_SAVED });
 	}
 }
 
@@ -824,6 +826,30 @@ bool ui_svc_write_contact(uint16_t index, const contact_t *c)
 	job.channel = index;
 	job.contact = *c;
 	return storage_job_post(write_contact_job, NULL);
+}
+
+static void set_channel_contact_job(void *ctx)
+{
+	(void)ctx;
+	contact_t contact;
+	uint16_t index = (uint16_t)job.id;
+	if (codeplug_channel(job.channel, &job_ch) && job_ch.mode == RADIO_MODE_DMR &&
+	    codeplug_contact(index, &contact) && contact.type == CONTACT_GROUP) {
+		job_ch.contact = index;
+		if (codeplug_set_channel(job.channel, &job_ch)) {
+			radio_req_dmr_target_clear();
+			return;
+		}
+	}
+	save_failed(TRN("Couldn't write the codeplug: not saved"));
+}
+
+bool ui_svc_set_channel_contact(uint16_t index)
+{
+	if (!index || index > CODEPLUG_CONTACTS_MAX || !take_channel() || v.ch.mode != RADIO_MODE_DMR)
+		return false;
+	job.id = index;
+	return storage_job_post(set_channel_contact_job, NULL);
 }
 #endif
 

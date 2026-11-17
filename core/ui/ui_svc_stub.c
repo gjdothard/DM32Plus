@@ -49,6 +49,7 @@ WEAK bool ui_svc_edit_talkgroups(uint16_t channel, uint16_t contact, ui_tg_edit_
 #endif
 #if CONFIG_CONTACT_EDIT
 WEAK bool ui_svc_write_contact(uint16_t index, const contact_t *c) { (void)index; (void)c; return false; }
+WEAK bool ui_svc_set_channel_contact(uint16_t index) { (void)index; return false; }
 #endif
 WEAK bool ui_svc_zone_edit(const zone_op_t *op) { (void)op; return false; }
 WEAK void ui_svc_zone_poll(void) { }

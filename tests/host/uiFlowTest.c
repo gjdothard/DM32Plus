@@ -1401,6 +1401,27 @@ int main(void)
 		{ "Message banner opens the thread instead of the old reader", "branded-home msg:3101234,From_the_banner",
 			"ctx", "screen=live-thread shows=From_the_banner", 1, false },
 		{ "Main Menu direct Contacts", "branded-home", "ok 3", "screen=contacts", 2, false },
+#if CONFIG_CONTACT_EDIT
+		{ "Saved talkgroup More lists Edit, Message, and Make Channel Default", "branded-home ok 3", "ctx",
+		  "screen=actions count=3 focus=Edit shows=Message shows=Make_channel_default", 1, false },
+		{ "Edit a saved talkgroup with a fixed type", "branded-home ok 3 ctx", "ok",
+		  "screen=contactedit count=4 shows=Timeslot_override hides=Type", 1, false },
+		{ "Add a talkgroup directly from its tab", "branded-home ok 3", "up ok",
+		  "screen=contactedit count=4 shows=New_Talkgroup", 2, false },
+		{ "Saving a talkgroup edit returns to its actions", "branded-home ok 3 ctx ok", "down down ok long:ok",
+		  "screen=actions count=3 writes=1", 4, true },
+		{ "Save a new group from the directory", "branded-home ok 3 up ok", "ok 2 ok down ok 9 1 1 1 ok long:ok",
+		  "screen=contacts writes=1", 11, true },
+#if CONFIG_TALKGROUP_EDIT
+		{ "A talkgroup added through the Radio menu returns to its assignment list",
+		  "branded-home talkgroup-pool ok 1 2 ok up ok", "ok ok",
+		  "screen=operatingtalkgroups count=2 writes=1", 2, true },
+		{ "A saved talkgroup edit follows its channel assignment",
+		  "branded-home talkgroup-pool ok 1 2 ok up ok ok ok long:back ok 3 ctx ok",
+		  "down ok 9 1 1 1 ok long:ok long:back ok 1 2 ok up ok",
+		  "screen=operatingtalkgroups shows=TG_9111 writes=2", 15, true },
+#endif
+#endif
 		{ "Main Menu direct Zones", "branded-home", "ok 4", "screen=zones", 2, false },
 		{ "Zone cards show counts and open the current zone", "branded-home",
 			"ok 4 expect:shows=Select_zone expect:shows=(16) ok", "screen=zone shows=Select_channel", 3, false },
@@ -1522,6 +1543,14 @@ int main(void)
 		run_flow(&scan_tabs[i], sim_geom_find("240x320i10x5"), SIM_MAP_M, "Tall color");
 #if CONFIG_DMR
 	static const flow_t card_directory[] = {
+#if CONFIG_CONTACT_EDIT
+		{ "Saved private More lists the contact actions", "branded-home ok 3 right", "ctx",
+		  "screen=actions count=5 focus=Edit shows=Message shows=Radio_check shows=Call_alert shows=Position", 1, false },
+		{ "Edit a private contact with a fixed type", "branded-home ok 3 right ctx", "ok",
+		  "screen=contactedit count=3 hides=Timeslot_override hides=Type", 1, false },
+		{ "Add a private contact directly from its tab", "branded-home ok 3 right", "up ok",
+		  "screen=contactedit count=3 shows=New_Contact", 2, false },
+#endif
 		{ "Talkgroups show the full saved ID", "branded-home worst", "ok 3",
 			"screen=contacts shows=TG_9100091 hides=PC_3109999", 2, false },
 		{ "The Contacts tab shows private calls only", "branded-home", "ok 3 right",
