@@ -19,7 +19,7 @@ import { convertOperatingTalkgroups } from "../codeplug/convert-talkgroups.js";
 import { FakeCpsRadio } from "../codeplug/fakecps.js";
 import { Grid } from "./grid.js";
 import { History } from "./undo.js";
-import { DraftSaver } from "./draft.js";
+import { DraftSaver, isUnusedDraft } from "./draft.js";
 import { keyboardTabs } from "./navigation.js";
 import { bulkColumns, columns, channelForm, recordForm, visibleChannelColumns, DEFAULT_CHANNEL_COLUMNS, formDialog, membersDialog, refLabel } from "./views.js";
 import { openFile, saveBytes, tftpBytes, FileError, imageFrom, saveDraft, loadDraft } from "./files.js";
@@ -36,6 +36,7 @@ const TABLE_MAX = { channels: LIMITS.channels, zones: LIMITS.zones, contacts: LI
 
 const S = {
 	model: null,
+	started: false,
 	history: new History(),
 	fileName: "codeplug",
 	dirty: false,
@@ -56,6 +57,22 @@ const tabs = h("nav", { class: "ed-tabs", role: "tablist", "aria-label": t("edit
 const view = h("div", { class: "ed-view", id: "editor-panel", role: "tabpanel" });
 const connectionBar = h("div", { class: "ed-connection", "aria-live": "polite" });
 const draftStatus = h("span", { class: "ed-draft small", "aria-live": "polite" });
+const editorHead = h("div", { class: "ed-head" }, toolbar, h("div", { class: "ed-save-status" }, status, draftStatus));
+const fileInput = h("input", { type: "file", accept: ".bin,.zip,.yaml,.yml,.csv,.txt", hidden: true, onchange: async () => {
+	const file = fileInput.files?.[0];
+	fileInput.value = "";
+	if (file) await openPicked(file.name, new Uint8Array(await file.arrayBuffer()));
+} });
+const welcome = h("section", { class: "ed-start", hidden: true, "aria-labelledby": "ed-start-title" },
+	h("h2", { id: "ed-start-title" }, t("editor.start.title")),
+	h("div", { class: "ed-start-actions" }, ...[
+		{ key: "read", label: t("editor.read"), action: readRadio, primary: true },
+		{ key: "open", label: t("editor.open"), action: () => fileInput.click() },
+		{ key: "create", label: t("editor.start.create"), action: newCodeplug },
+	].map(({ key, label, action, primary }) =>
+		h("button", { type: "button", class: "btn ed-start-action" + (primary ? " btn-primary" : ""),
+			"data-action": "start-" + key, "aria-label": label, "aria-describedby": "ed-start-" + key, onclick: action },
+			h("strong", {}, label), h("span", { id: "ed-start-" + key }, t("editor.start." + key + "_help"))))));
 let draftState = "saving", connecting = false, connectionLost = false;
 let encryptionView, encryptionConnection, radioView, radioModel;
 let channelColumns = DEFAULT_CHANNEL_COLUMNS;
@@ -68,8 +85,9 @@ const messages = h("div", { class: "ed-messages", "aria-live": "polite" });
 
 // --- Model changes ---
 
-function load(model, name, { fromRadio = false, dirty = false, restored = false } = {}) {
+function load(model, name, { fromRadio = false, dirty = false, restored = false, started = true } = {}) {
 	S.model = model;
+	S.started = started;
 	S.fileName = name;
 	S.history.reset();
 	S.dirty = dirty;
@@ -77,6 +95,7 @@ function load(model, name, { fromRadio = false, dirty = false, restored = false 
 	S.iddbSkipped = null;
 	if (!fromRadio && S.conn) S.conn.dbKnown = false;
 	refresh();
+	if (!started) return;
 	if (restored) drafts.restored();
 	else draftSoon();
 }
@@ -90,6 +109,7 @@ function change(label, fn) {
 		return false;
 	}
 	S.dirty = true;
+	S.started = true;
 	refresh();
 	draftSoon();
 	return true;
@@ -97,7 +117,7 @@ function change(label, fn) {
 
 const drafts = new DraftSaver({
 	snapshot: () => ({
-		bytes: saveBytes(encode(S.model)), name: S.fileName, dirty: S.dirty, at: new Date().toISOString(),
+		bytes: saveBytes(encode(S.model)), name: S.fileName, dirty: S.dirty, started: S.started, at: new Date().toISOString(),
 	}),
 	save: saveDraft,
 	update(state) {
@@ -115,7 +135,7 @@ document.addEventListener("visibilitychange", () => {
 });
 window.addEventListener("pagehide", () => drafts.flush());
 window.addEventListener("beforeunload", event => {
-	if (draftState === "saved") return;
+	if (!S.started || draftState === "saved") return;
 	event.preventDefault();
 	event.returnValue = "";
 });
@@ -143,6 +163,12 @@ function problems() {
 }
 
 function refresh() {
+	editorHead.hidden = tabs.hidden = view.hidden = !S.started;
+	welcome.hidden = S.started;
+	if (!S.started) {
+		renderConnection();
+		return;
+	}
 	const p = problems();
 	const errors = p.filter((x) => x.level === "error").length;
 	renderToolbar(errors);
@@ -204,15 +230,11 @@ function renderToolbar(errors) {
 	save.addEventListener("click", (e) => {
 		if (e.target.closest(".ed-menu-list button")) save.open = false;
 	});
-	const input = h("input", { type: "file", accept: ".bin,.zip,.yaml,.yml,.csv,.txt", hidden: true, onchange: async () => {
-		const f = input.files?.[0];
-		input.value = "";
-		if (f) await openPicked(f.name, new Uint8Array(await f.arrayBuffer()));
-	} });
+
 	toolbar.replaceChildren(
 		h("div", { class: "ed-group" },
 			button(t("editor.new"), newCodeplug),
-			button(t("editor.open"), () => input.click()), input,
+			button(t("editor.open"), () => fileInput.click()),
 			save),
 		h("div", { class: "ed-group" },
 			button(t("editor.read"), readRadio),
@@ -1246,9 +1268,8 @@ function reportFiles() {
 
 async function start() {
 	initReporting({ tool: "editor", context: reportContext, attachments: reportFiles });
-	root.replaceChildren(connectionBar,
-		h("div", { class: "ed-head" }, toolbar, h("div", { class: "ed-save-status" }, status, draftStatus)),
-		messages, tabs, view);
+	const loading = h("p", { class: "muted", role: "status" }, t("editor.loading"));
+	root.replaceChildren(loading, connectionBar, editorHead, messages, welcome, tabs, view, fileInput);
 	try {
 		const r = await fetch(`${ROOT}data/radios.json`);
 		S.radios = (await r.json()).radios || [];
@@ -1256,10 +1277,14 @@ async function start() {
 		S.radios = [];
 	}
 	const draft = await loadDraft();
-	if (draft?.bytes) {
-		load(decode(imageFrom(draft.bytes)), draft.name || "codeplug", { dirty: !!draft.dirty, restored: true });
+	const direct = TABS.includes(new URLSearchParams(location.search).get("tab")) || S.sim;
+	const fresh = !direct && (!draft?.bytes || isUnusedDraft(draft, saveBytes(encode(empty()))));
+	const restored = !!draft?.bytes && !fresh;
+	loading.remove();
+	load(restored ? decode(imageFrom(draft.bytes)) : empty(), restored ? draft.name || "codeplug" : "codeplug",
+		{ dirty: restored && !!draft.dirty, restored, started: !fresh });
+	if (restored)
 		say(t("editor.draft_restored", { time: fmtDate(new Date(draft.at), { dateStyle: "medium", timeStyle: "short" }) }), "info");
-	} else load(empty(), "codeplug");
 	if (!serialSupported() && !S.sim) say(t("editor.no_serial"), "info");
 	if (S.sim) say(t("editor.sim"), "info");
 }

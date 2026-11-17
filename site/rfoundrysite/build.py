@@ -258,6 +258,7 @@ class Site:
 		document_title = title if is_cps else title + " · " + brand + brand_accent
 		ctx = {"lang": lang, "dir": meta.get("dir", "ltr"), "document_title": document_title, "root": root,
 		       "brand": brand, "brand_accent": brand_accent,
+		       "brand_href": root + prefix + ("codeplug/index.html" if is_cps else "index.html"),
 		       "home": root + prefix, "content": content, "page_class": page_class,
 		       "description": description or self.i18n.t(lang, "site.tagline"), "scripts": scripts, "footer": footer,
 		       "languages": langs, "alternates": alternates, "og_locale": meta.get("locale", lang).replace("-", "_"),
@@ -275,6 +276,8 @@ class Site:
 		items = [("radios", "radios/index.html"), ("features", "features/index.html"),
 			 ("flash", "flash/index.html"), ("codeplug", "codeplug/index.html"), ("docs", "docs/index.html"),
 			 ("screenshots", "screenshots/index.html"), ("tools", "tools/index.html")]
+		if current == "codeplug":
+			items = [("docs", "docs/index.html"), ("tools", "tools/index.html")]
 		return "".join('<a href="%s%s"%s>%s</a>' % (home, href, ' aria-current="page"' if key == current else "",
 							    html.escape(self.i18n.t(lang, "nav." + key)))
 			       for key, href in items)

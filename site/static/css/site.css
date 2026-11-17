@@ -531,30 +531,7 @@ dialog.beta-notice .confirm-actions { position: sticky; bottom: calc(-1 * var(--
 .page-codeplug .wrap { max-width: 1400px; }
 .editor { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
 
-.editor, dialog.editor-dialog {
-	color-scheme: dark;
-	--bg: #05090e;
-	--surface: #101e29;
-	--surface-2: #162a37;
-	--text: #f2f7fa;
-	--muted: #aec3d0;
-	--border: #304653;
-	--accent: #39e5f1;
-	--accent-text: #05090e;
-	--accent-soft: #123641;
-	--link: #6beaf2;
-	--focus: #39e5f1;
-	--code-bg: #162a37;
-	--ok: #63ef91;
-	--ok-soft: #113526;
-	--warn: #ffd272;
-	--warn-soft: #362b17;
-	--bad: #ff9ea1;
-	--bad-soft: #391d24;
-	--info-soft: #123641;
-	background: var(--bg);
-	color: var(--text);
-}
+.editor, dialog.editor-dialog { background: var(--surface); color: var(--text); }
 
 .editor { padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius); }
 .operating-talkgroups { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
@@ -749,4 +726,27 @@ table.grid.has-pinned thead :is(.grid-check, .grid-open, .c-pinned) { z-index: 3
 .form-row [aria-invalid="true"], .ed-radio-form [aria-invalid="true"] { border-color: var(--bad); }
 @media (max-width: 640px) {
 	.ed-column-choices { right: auto; left: 0; }
+}
+
+/* The CPS uses the site's theme and keeps firmware and reference links secondary. */
+.page-codeplug .cps-page { padding-top: var(--space-5); }
+.cps-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.cps-heading h1 { margin: 0; font-size: var(--h2); }
+.cps-firmware { position: relative; font-size: var(--text-sm); }
+.cps-firmware summary { cursor: pointer; color: var(--muted); padding: var(--space-2); }
+.cps-firmware nav { position: absolute; right: 0; z-index: 6; display: grid; width: max-content; max-width: calc(100vw - 2rem); padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); box-shadow: var(--shadow); }
+.cps-firmware a { padding: var(--space-2); text-decoration: none; border-radius: var(--radius-sm); }
+.cps-firmware a:hover { background: var(--surface-2); }
+.page-codeplug .footer-help { display: none; }
+.page-codeplug .site-footer { font-size: var(--text-sm); }
+.ed-start { padding: var(--space-7) var(--space-4); max-width: 60rem; width: 100%; margin-inline: auto; }
+.ed-start h2 { margin-bottom: var(--space-5); }
+.ed-start-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.ed-start-action { display: flex; flex-direction: column; align-items: flex-start; text-align: start; gap: var(--space-2); white-space: normal; padding: var(--space-5); min-height: 9rem; }
+.ed-start-action strong { font-size: var(--text-lg); }
+.ed-start-action span { font-weight: 400; font-size: var(--text-sm); }
+@media (max-width: 680px) {
+	.ed-start { padding: var(--space-4) 0; }
+	.ed-start-actions { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+	.ed-start-action { min-height: auto; padding: var(--space-4); }
 }

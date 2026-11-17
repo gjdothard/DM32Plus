@@ -22,6 +22,10 @@ back in the others. How each radio is wired for this is in the [Radio reference]
 Open **Codeplug Editor** in the site's menu. It reads and writes the radio from the browser. Nothing is sent to a
 server: files, the codeplug and your RadioID API key stay on your computer.
 
+On a fresh visit, choose **Read from Radio**, **Open File**, or **Create codeplug**. A saved working draft opens
+directly in the editor. The header's theme control applies to the workspace and its dialogs. Firmware installation
+and upgrade links are in the **Firmware** menu beside the page title.
+
 ### Reading and writing the radio
 
 The connection bar shows the connected radio and its firmware. **Connect** identifies the radio and asks you

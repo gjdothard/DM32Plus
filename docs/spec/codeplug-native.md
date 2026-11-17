@@ -25,6 +25,9 @@ plan for a native format. Nothing in section 4 is built yet.
   saving, saved, or unavailable; a restored draft preserves whether it had unexported or unwritten edits.
 - Record creation is staged until the editor is saved. A new channel and any talkgroup contacts created in its
   editor are one undoable change. The Problems view opens the affected record section and labels its field.
+- A fresh CPS visit offers radio reading, file opening, or explicit codeplug creation. A working draft restores
+  directly; an untouched blank draft from an older CPS returns to the start screen. Explicitly created empty
+  codeplugs remain editing sessions. The workspace and its dialogs follow the selected site theme.
 - Radio-wide state, keys included, lives in the settings store, not in the codeplug. A codeplug file can be shared
   without leaking keys or the owner's last channel.
 

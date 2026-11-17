@@ -2,7 +2,23 @@
 // Copyright (c) 2026 Garrett Dothard
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DraftSaver } from "../static/js/editor/draft.js";
+import { DraftSaver, isUnusedDraft } from "../static/js/editor/draft.js";
+
+test("untouched legacy drafts return to the start screen without hiding edits", () => {
+	const blank = Uint8Array.of(1, 2, 3);
+	const draft = { name: "codeplug", dirty: false, bytes: blank.slice() };
+	assert.equal(isUnusedDraft(draft, blank), true);
+	assert.equal(isUnusedDraft({ ...draft, dirty: true }, blank), false);
+	assert.equal(isUnusedDraft({ ...draft, name: "radio-backup" }, blank), false);
+	assert.equal(isUnusedDraft({ ...draft, bytes: Uint8Array.of(1, 2, 4) }, blank), false);
+	assert.equal(isUnusedDraft({ ...draft, bytes: Uint8Array.of(1, 2, 3, 4) }, blank), false);
+});
+
+test("deliberately created empty codeplugs restore to the editing workspace", () => {
+	const blank = Uint8Array.of(1, 2, 3);
+	assert.equal(isUnusedDraft({ name: "codeplug", dirty: false, started: true, bytes: blank }, blank), false);
+	assert.equal(isUnusedDraft({ name: "codeplug", dirty: false, started: false, bytes: Uint8Array.of(4, 5, 6) }, blank), false);
+});
 
 test("rapid edits persist the latest snapshot and only report saved after completion", async () => {
 	let value = "first";

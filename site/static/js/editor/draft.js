@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Garrett Dothard
+// Older versions saved an untouched blank workspace on first visit.
+export function isUnusedDraft(draft, blank) {
+	if (draft.started === true || draft.dirty || draft.name !== "codeplug") return false;
+	const bytes = draft.bytes;
+	return bytes?.length === blank.length && blank.every((byte, index) => byte === bytes[index]);
+}
+
 // Serialize draft writes so an older transaction cannot replace a newer edit.
 export class DraftSaver {
 	constructor({ snapshot, save, update, delay = 800 }) {
