@@ -253,7 +253,7 @@ void ui_draw_position_footer(const ui_state_t *s);
 const char *ui_ars_status(uint8_t state);
 void ui_draw_data_dashboard(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l);
 void ui_draw_numbered_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l, bool uniform);
-typedef enum { UI_CARD_PAGE_DETAILS, UI_CARD_PAGE_FIELDS, UI_CARD_PAGE_ACTIONS } ui_card_page_kind_t;
+typedef enum { UI_CARD_PAGE_DETAILS, UI_CARD_PAGE_FIELDS, UI_CARD_PAGE_ACTIONS, UI_CARD_PAGE_CONFIRM } ui_card_page_kind_t;
 // value may separate the right-hand value and a secondary line with a newline.
 void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kind_t kind);
 typedef enum {

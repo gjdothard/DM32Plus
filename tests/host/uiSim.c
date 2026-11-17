@@ -151,6 +151,12 @@ static const struct { const char *name, *script; } gallery[] = {
 #endif
 	{ "tools", "ok 6" },
 #if CONFIG_UI_CARD_MENU
+	{ "usb_info", "branded-home ok 8 4" },
+	{ "repeater_info", "branded-home ok 8 5" },
+	{ "battery_info", "branded-home ok 8 9" },
+	{ "aprs_position", "branded-home ok 7 2 9" },
+	{ "aprs_heard", "branded-home ok 7 2 up ok" },
+	{ "contact_position_empty", "branded-home call:3101234,91,g wait:11000 ctx 9" },
 	{ "gps_data", "branded-home datastatus ok 7" },
 	{ "ars", "branded-home datastatus ok 7 3" },
 	{ "aprs", "branded-home ok 7 2" },
@@ -245,6 +251,27 @@ static const struct { const char *name, *script; } audit_extra[] = {
 	{ "dual_action_cards", "branded-home quick 3 ctx" },
 	{ "dual_picker_cards", "branded-home quick 3 ctx 3" },
 	{ "dual_zone_cards", "branded-home quick 3 ctx 3 up up up up ok" },
+	{ "workflow_0", "branded-home ok 4 ok ctx" },
+	{ "workflow_1", "branded-home ok 4 ok up up up up ok" },
+	{ "workflow_2", "branded-home ok 4 ok 2 ok" },
+	{ "workflow_3", "branded-home ok 1 2 ok up up up up ok" },
+	{ "workflow_4", "branded-home ok 4 ok ctx 5" },
+	{ "workflow_5", "branded-home zoneoffer:3101234 ctx" },
+	{ "workflow_6", "branded-home zoneoffer:3101234 ctx 2" },
+	{ "workflow_7", "branded-home zoneoffer:3101234,c ctx 1" },
+	{ "workflow_8", "branded-home ok 4 ok up up up up ok 4" },
+	{ "workflow_9", "branded-home ok 9 0 down down down ok" },
+	{ "workflow_10", "branded-home ok 8 3" },
+	{ "workflow_11", "branded-home ok 8 4" },
+	{ "workflow_12", "branded-home ok 8 5" },
+	{ "workflow_13", "branded-home ok 8 9" },
+	{ "workflow_14", "branded-home ok 8 6" },
+	{ "workflow_15", "branded-home call:3101234,91,g wait:11000 positionreply:3101234,423601000,-710189000 wait:15000 ctx 9" },
+	{ "workflow_16", "branded-home call:3101234,91,g wait:11000 ctx 9" },
+	{ "workflow_17", "branded-home ok 7 2 9" },
+	{ "workflow_18", "branded-home ok 7 2 up ok" },
+	{ "workflow_19", "branded-home crash:ask wait:2500" },
+	{ "workflow_20", "branded-home crash:on ok 9 0 down down down down ok 2" },
 	{ "setting_cards", "branded-home ok 9 2" },
 	{ "setting_edit_cards", "branded-home ok 9 2 ok down" },
 	{ "identity_cards", "branded-home ok 9 9 ok" },
@@ -560,7 +587,10 @@ static bool gallery_colors(void)
 static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_t nlen, char *script, size_t slen)
 {
 	unsigned flags = gallery_flags(i);
-	if ((!strcmp(gallery[i].name, "radio_menu") || !strcmp(gallery[i].name, "gps_data") || !strcmp(gallery[i].name, "ars") ||
+	if ((!strcmp(gallery[i].name, "usb_info") || !strcmp(gallery[i].name, "repeater_info") ||
+	     !strcmp(gallery[i].name, "aprs_position") || !strcmp(gallery[i].name, "aprs_heard") ||
+	     !strcmp(gallery[i].name, "battery_info") || !strcmp(gallery[i].name, "contact_position_empty") ||
+	     !strcmp(gallery[i].name, "radio_menu") || !strcmp(gallery[i].name, "gps_data") || !strcmp(gallery[i].name, "ars") ||
 	     !strcmp(gallery[i].name, "aprs") || !strcmp(gallery[i].name, "aprs_beacon")) &&
 	    strcmp(g->name, "240x320i10x5"))
 		return false;
@@ -577,6 +607,52 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 			 !strcmp(name, "gps_sky") || !strcmp(name, "gps_signal")))
 			snprintf(script, slen, "branded-home ok 7 1 %d",
 				 !strcmp(name, "position") ? 1 : !strcmp(name, "gps_sky") ? 2 : 3);
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "zone_actions"))
+			snprintf(script, slen, "branded-home ok 4 ok ctx");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "zone_add"))
+			snprintf(script, slen, "branded-home ok 4 ok 2 ok");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "zone_options"))
+			snprintf(script, slen, "branded-home ok 4 ok up up up up ok");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "zone_delete"))
+			snprintf(script, slen, "branded-home ok 4 ok up up up up ok 4");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "channel_zones"))
+			snprintf(script, slen, "branded-home ok 1 2 ok up up up up ok");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "zone_share_to"))
+			snprintf(script, slen, "branded-home ok 4 ok ctx 5");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "zone_share_to_id"))
+			snprintf(script, slen, "branded-home ok 4 ok ctx 5 3 1 0 9 8 7 6");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "zone_share_sending"))
+			snprintf(script, slen, "branded-home ok 4 ok ctx 5 2 ok");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "hotspot_info"))
+			snprintf(script, slen, "branded-home ok 8 3");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "roaming"))
+			snprintf(script, slen, "branded-home ok 8 6 1 wait:4000");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "factory_reset"))
+			snprintf(script, slen, "branded-home ok 9 0 down down down ok");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "crash_log"))
+			snprintf(script, slen, "branded-home crash:on ok 9 0 down down down down ok");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "crash_prompt"))
+			snprintf(script, slen, "branded-home crash:ask wait:2500");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "crash_send_to"))
+			snprintf(script, slen, "branded-home crash:on ok 9 0 down down down down ok 2");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "battery"))
+			snprintf(script, slen, "branded-home ok 8 9");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "contact_position"))
+			snprintf(script, slen, "branded-home call:3101234,91,g wait:11000 positionreply:3101234,423601000,-710189000 wait:15000 ctx 9");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "my_radio"))
+			snprintf(script, slen, "branded-home ok 9 9 ok");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "codeplug"))
+			snprintf(script, slen, "branded-home ok 9 0 down ok");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "zone_offer"))
+			snprintf(script, slen, "branded-home zoneoffer:3101234 ctx");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "zone_offer_preview"))
+			snprintf(script, slen, "branded-home zoneoffer:3101234 ctx 2");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "zone_offer_ch"))
+			snprintf(script, slen, "branded-home zoneoffer:3101234,c ctx");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "zone_offer_channel"))
+			snprintf(script, slen, "branded-home zoneoffer:3101234,c ctx 1");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "zone_imported"))
+			snprintf(script, slen, "branded-home zoneoffer:3101234 ctx 1 wait:300");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "settings"))
 			snprintf(script, slen, "branded-home ok 9");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "settings_display"))

@@ -2251,6 +2251,14 @@ static void share_to_item(uint16_t i, ui_item_t *it)
 	sb_str(&b, t.group ? "TG " : TR("Private ID "));
 	sb_u32(&b, t.id, 1);
 	str_copy(it->value, sizeof it->value, TR(TEXT_ALT_OPEN "Not saved" TEXT_ALT_NEXT TEXT_ALT_CLOSE));
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		sbuf_t value;
+		sb_init(&value, it->value, sizeof it->value);
+		sb_chr(&value, '\n');
+		sb_str(&value, TR(TEXT_ALT_OPEN "Not saved" TEXT_ALT_NEXT TEXT_ALT_CLOSE));
+	}
+#endif
 }
 
 static void share_to_select(uint16_t i, bool hold)
@@ -2439,6 +2447,19 @@ static void preview_item(uint16_t i, ui_item_t *it)
 	sb_init(&b, it->label, sizeof it->label);
 	sb_str(&b, ch.name[0] ? ch.name : TR("(no name)"));
 	sb_init(&b, it->value, sizeof it->value);
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		sb_str(&b, ch.dmr ? "DMR" : "FM");
+		sb_chr(&b, '\n');
+		if (ch.in_band)
+			sb_freq(&b, ch.rx_hz);
+		else {
+			sb_str(&b, TR(TEXT_ALT_OPEN "Not in band" TEXT_ALT_NEXT "Out" TEXT_ALT_CLOSE));
+			it->flags |= UI_ITEM_DIM;
+		}
+		return;
+	}
+#endif
 	if (!ch.in_band) {
 		sb_str(&b, TR(TEXT_ALT_OPEN "Not in band" TEXT_ALT_NEXT "Out" TEXT_ALT_CLOSE));
 		it->flags |= UI_ITEM_DIM;
@@ -4121,6 +4142,8 @@ static void zchan_item(uint16_t i, ui_item_t *it)
 	if (i == ZC_REMOVE)
 		it->flags |= UI_ITEM_WARN;
 #if CONFIG_ZONE_SHARE
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) && i == ZC_SEND)
+		str_copy(it->label, sizeof it->label, TR("Share channel to"));
 	if (i == ZC_SEND && !(feats() & UI_FEAT_ZONE_SHARE))
 		it->flags |= UI_ITEM_DIM;
 #endif
@@ -4217,6 +4240,12 @@ static void zpick_item(uint16_t i, ui_item_t *it)
 		return;
 	sbuf_t b;
 	sb_init(&b, it->value, sizeof it->value);
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		sb_str(&b, zpick_ch.mode == RADIO_MODE_DMR ? "DMR" : radio_am_channel(&zpick_ch) ? "AM" : "FM");
+		sb_chr(&b, '\n');
+	}
+#endif
 	sb_channel_row(&b, &zpick_ch);
 }
 

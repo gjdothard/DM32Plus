@@ -8,9 +8,27 @@ Reviewed November 17, 2026, at revision `7bb7191`.
 The six implementation families were approved after review of the proposed layouts. The table below records
 the findings before implementation; each family is tracked by its separate implementation commit.
 
-The next redesigns should cover Activity / Logs, the Radio submenu and all-channels list, Talk to and Find,
-Dual Watch menus, and Settings subpages. These are common paths that switch from the card design to the
-standard list presentation. Quick Controls keeps its current numbered order.
+All six approved families are implemented: Activity / Logs; Radio and Channels; Find and target pickers;
+Dual Watch menus; Settings fields and editors; and zone actions, sharing, confirmations, and tool pages.
+Quick Controls keeps its current numbered order. The shared card frame applies on the tall dark display;
+other display layouts retain their existing presentation.
+
+Specialized Volume, Frequency Trim, Diagnostics, active Hotspot, Emergency, and About layouts remain
+future work. Remaining improvements include gallery route coverage outside the approved screens,
+broader translation review, and Home call-state styling. The original improvement table is retained
+below; literal screen-ID checks are fixed, and the migrated screens now share footer placement and
+consistent page titles.
+
+## Implementation validation
+
+The normal, color-disabled, message-history-enabled, and card-disabled host UI flow suites pass.
+Each also passes 360 exact Quick Controls ordering checks. The final layout audit checks 5,447
+screens with zero problems. The gallery is regenerated across five display classes; only intended
+card-screen PNG changes are committed. Spanish and Italian catalogs and documentation links pass.
+
+Firmware CI and hardware checks have not run: this Windows environment lacks `make` and the firmware
+cross-compilers. Native UI checks use a local portable compiler. The repository's generic-name check
+still reports existing violations in unrelated workflows, site, release, and development documents.
 
 ## Review method
 

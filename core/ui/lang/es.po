@@ -446,6 +446,22 @@ msgid "OK change  Back"
 msgstr "OK cambiar  Atrás"
 
 #: core/ui/ui_app.c
+msgid "Zone Options"
+msgstr "Opciones de zona"
+
+#: core/ui/ui_app.c
+msgid "APRS Heard"
+msgstr "APRS recibidos"
+
+#: core/ui/ui_app.c
+msgid "APRS Position"
+msgstr "Posición APRS"
+
+#: core/ui/ui_app.c
+msgid "Last Position"
+msgstr "Última posición"
+
+#: core/ui/ui_app.c
 msgid "{Up/Dn change  OK keep  Back cancel|Up/Dn  OK keep  Back cancel}"
 msgstr "{Arr/Ab cambiar  OK guardar  Atrás cancelar|Arr/Ab  OK guardar  Atrás cancelar}"
 
@@ -2052,6 +2068,10 @@ msgstr "Editar canal"
 #: core/ui/ui_menus.c
 msgid "Remove from zone"
 msgstr "Quitar de la zona"
+
+#: core/ui/ui_menus.c
+msgid "Share channel to"
+msgstr "Compartir canal"
 
 #: core/ui/ui_menus.c
 msgid "Already first"

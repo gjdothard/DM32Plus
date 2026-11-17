@@ -26,6 +26,12 @@ Use the VFO's TX frequency control to edit a split while operating in VFO.
 The bottom line of most screens is the hint row. It shows what the nearest keys do there. What **Back** does is at
 its right end, above the **Back** key.
 
+On card displays, zone actions, sharing, and tool information use the same header and footer as the
+Main Menu. Numbered action cards retain their number shortcuts. Pickers keep the selected channel,
+recipient, or zone visible. Delete Zone and Factory Reset show the consequence above the choices;
+the initial choice keeps the zone or settings. APRS Position, APRS Heard, Last Position, and crash
+reporting use matching field or activity cards.
+
 ## Key reference
 
 The keys are named by their job ([Conventions](01-introduction.md#conventions-in-this-manual)).
