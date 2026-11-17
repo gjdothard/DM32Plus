@@ -880,13 +880,9 @@ bool codeplug_set_talkgroup_refs(uint16_t number, const uint16_t *refs, uint8_t 
 	return ok;
 }
 
-static bool clear_talkgroups(uint16_t number)
+// Keep the legacy decode workspace off the call stack of a journaled pool update.
+static bool __attribute__((noinline)) clear_legacy_talkgroups(uint16_t number)
 {
-	if (talkgroup_pool()) {
-		uint8_t count;
-		return codeplug_talkgroup_refs(number, NULL, &count) &&
-		       (!count || codeplug_set_talkgroup_refs(number, NULL, 0));
-	}
 	codeplug_talkgroup_t entries[CODEPLUG_TALKGROUP_MAX];
 	if (!read_talkgroups(number, entries))
 		return true;
@@ -895,6 +891,15 @@ static bool clear_talkgroups(uint16_t number)
 	if (talkgroup_has_overflow() && !flash_write(talkgroup_descriptor(number), erased, 2))
 		return false;
 	return flash_write(talkgroup_address(number), erased, sizeof erased);
+}
+
+static bool clear_talkgroups(uint16_t number)
+{
+	if (!talkgroup_pool())
+		return clear_legacy_talkgroups(number);
+	uint8_t count;
+	return codeplug_talkgroup_refs(number, NULL, &count) &&
+	       (!count || codeplug_set_talkgroup_refs(number, NULL, 0));
 }
 #endif
 
