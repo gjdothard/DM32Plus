@@ -406,6 +406,9 @@ It assigns the next calendar prerelease version, builds the DM-32UV application,
 When those checks pass, it tags the built commit and publishes the image, manifest, and SHA-256 checksums used
 by the CPS Development channel. The release image excludes the proprietary voice codec.
 
+Pushing to `Testing` runs the same build and checks with a separate version sequence. Its GitHub prerelease
+names start with `RC ` and its tags start with `RC-dm32plus-`. Find these release candidates on GitHub Releases.
+
 Development prerelease **v26.11b4** was confirmed working on a physical DM-32UV by the radio owner.
 
 ### Installing on the DM-32UV

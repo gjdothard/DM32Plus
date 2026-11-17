@@ -4,22 +4,24 @@ name: DM32Plus firmware
 
 on:
   push:
-    branches: [Development]
+    branches: [Development, Testing]
     tags: ["dm32plus-v*b*"]
 
 permissions:
   contents: read
 
 concurrency:
-  group: dm32plus-development-prerelease
+  group: ${{ github.ref == 'refs/heads/Testing' && 'dm32plus-testing-prerelease' || 'dm32plus-development-prerelease' }}
   queue: max
 
 jobs:
   firmware:
+    if: ${{ !github.event.deleted }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     outputs:
       version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -30,18 +32,25 @@ jobs:
         id: version
         run: |
           set -euo pipefail
+          tag_prefix=dm32plus-
+          if [[ "$GITHUB_REF" == refs/heads/Testing ]]; then
+            tag_prefix=RC-dm32plus-
+          fi
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then
-            version=${GITHUB_REF_NAME#dm32plus-}
+            version=${GITHUB_REF_NAME#"$tag_prefix"}
             git merge-base --is-ancestor HEAD refs/remotes/origin/Development
           else
-            version=$(PYTHONPATH=tools python3 - <<'PY'
+            version=$(PYTHONPATH=tools TAG_PREFIX="$tag_prefix" python3 - <<'PY'
           from datetime import datetime, timezone
+          import os
           import subprocess
           from release_version import is_prerelease, newest, parse
 
+          prefix = os.environ["TAG_PREFIX"]
+
           def versions(*options):
-              tags = subprocess.check_output(["git", "tag", "--list", *options, "dm32plus-v*"], text=True)
-              return [tag.removeprefix("dm32plus-") for tag in tags.splitlines()]
+              tags = subprocess.check_output(["git", "tag", "--list", *options, f"{prefix}v*"], text=True)
+              return [tag.removeprefix(prefix) for tag in tags.splitlines()]
 
           existing = newest(v for v in versions("--points-at", "HEAD") if is_prerelease(v))
           if existing:
@@ -65,7 +74,8 @@ jobs:
           fi
           python3 tools/release_version.py prerelease "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Building DM32Plus $version"
+          echo "tag=$tag_prefix$version" >> "$GITHUB_OUTPUT"
+          echo "Building $tag_prefix$version"
 
       - name: Check out the pinned FreeRTOS dependency
         run: git submodule update --init -- third_party/FreeRTOS-Kernel
@@ -104,14 +114,15 @@ jobs:
           name: dm32plus-firmware
           path: dist
 
-      - name: Tag and publish the Development prerelease
+      - name: Tag and publish the prerelease
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.firmware.outputs.version }}
+          TAG: ${{ needs.firmware.outputs.tag }}
         run: |
           set -euo pipefail
           (cd dist && sha256sum -c SHA256SUMS)
-          tag="dm32plus-$VERSION"
+          tag="$TAG"
           commit=$(jq -er .git_full "dist/dm32plus-dm32-$VERSION.json")
           if ! tagged=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha 2>/dev/null); then
             gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
@@ -122,15 +133,22 @@ jobs:
 
           args=(--repo "$GITHUB_REPOSITORY")
           notes="Development prerelease for DM-32UV. Select Development in DM32Plus CPS to install or upgrade. The build and static task-stack checks passed."
+          title="DM32Plus $VERSION"
+          draft_options=()
+          if [[ "$tag" == RC-* ]]; then
+            title="RC $title"
+            notes="Testing release candidate for DM-32UV. The build and static task-stack checks passed."
+            draft_options=(--title "$title")
+          fi
           assets=("dist/dm32plus-dm32-$VERSION.bin" "dist/dm32plus-dm32-$VERSION.json" dist/SHA256SUMS)
           if draft=$(gh release view "$tag" "${args[@]}" --json isDraft --jq .isDraft 2>/dev/null); then
             if [[ "$draft" == true ]]; then
               gh release upload "$tag" "${assets[@]}" "${args[@]}" --clobber
-              gh release edit "$tag" "${args[@]}" --draft=false --prerelease
+              gh release edit "$tag" "${args[@]}" --draft=false --prerelease "${draft_options[@]}"
             else
               echo "$tag is already published"
             fi
           else
             gh release create "$tag" "${assets[@]}" "${args[@]}" --verify-tag --prerelease \
-              --title "DM32Plus $VERSION" --notes "$notes"
+              --title "$title" --notes "$notes"
           fi
