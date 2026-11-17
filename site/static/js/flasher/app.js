@@ -1246,7 +1246,7 @@ function bundledBuildView() {
 		const picker = releasePicker(draw, !!busy);
 		const release = releaseForRadio();
 		out.replaceChildren(panel(t("flash.build.title"), picker,
-			release ? h("p", {}, `${PRODUCT} ${release.version} · ${S.radio.name}`) :
+			release ? h("p", {}, `${release.testing ? "RC " : ""}${PRODUCT} ${release.version} · ${S.radio.name}`) :
 				releaseChannel === "bundled" ? notice(t("flash.build.no_image"), "bad") : null,
 			S.build?.error ? buildErrorNotice(S.build.error) : busy ? h("p", { role: "status" }, spinner(), S.build.text) : null));
 		S.forward(button(t("flash.dm32plus.continue"), async () => {

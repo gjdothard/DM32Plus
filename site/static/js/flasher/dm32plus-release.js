@@ -7,16 +7,18 @@ export const PRODUCT = "DM32Plus";
 const BOARD = "dm32";
 const RELEASES = "https://api.github.com/repos/gjdothard/DM32Plus/releases";
 const VERSION = /^v(\d{2})\.(\d{1,2})(?:\.(\d+))?(?:b(\d+))?$/;
-export const CHANNELS = ["bundled", "stable", "development"];
+export const CHANNELS = ["bundled", "stable", "development", "testing"];
 
 export function newestRelease(releases, channel) {
-	if (channel !== "stable" && channel !== "development") return null;
+	if (!CHANNELS.includes(channel) || channel === "bundled") return null;
+	const testing = channel === "testing";
+	const tagPrefix = testing ? /^RC-dm32plus-(.+)$/ : /^dm32plus-(.+)$/;
 	const candidates = [];
 	for (const release of releases) {
-		const version = /^dm32plus-(.+)$/.exec(release.tag_name)?.[1];
+		const version = tagPrefix.exec(release.tag_name)?.[1];
 		const match = VERSION.exec(version ?? "");
 		if (!match || release.draft || typeof release.prerelease !== "boolean" ||
-			release.prerelease !== (channel === "development") || !Array.isArray(release.assets)) continue;
+			release.prerelease !== (channel !== "stable") || !Array.isArray(release.assets)) continue;
 		const base = `dm32plus-dm32-${version}`;
 		const image = release.assets.find((asset) => asset.name === base + ".bin" && asset.state === "uploaded");
 		const manifest = release.assets.find((asset) => asset.name === base + ".json" && asset.state === "uploaded");
@@ -33,7 +35,7 @@ export function newestRelease(releases, channel) {
 	const latest = candidates[0];
 	if (!latest) return null;
 	return {
-		board: BOARD, product: PRODUCT, variant: "full", version: latest.version, sha256: latest.digest, online: true,
+		board: BOARD, product: PRODUCT, variant: "full", version: latest.version, sha256: latest.digest, online: true, testing,
 		image: `firmware/dm32/${latest.base}.bin`, manifest: `firmware/dm32/${latest.base}.json`,
 	};
 }
@@ -65,7 +67,8 @@ export async function loadBundledRelease(release, root, boards, fetchFile = fetc
 	const filename = /^firmware\/dm32\/(dm32plus-dm32-[A-Za-z0-9.]+)\.bin$/.exec(release.image)?.[1];
 	if (!filename || release.manifest !== `firmware/dm32/${filename}.json`)
 		throw new Error("The bundled DM32Plus release has invalid file paths");
-	const path = (file) => release.online ? root + "_dm32plus_release/" + file.split("/").at(-1) : root + file;
+	const endpoint = release.testing ? "_dm32plus_release/RC/" : "_dm32plus_release/";
+	const path = (file) => release.online ? root + endpoint + file.split("/").at(-1) : root + file;
 	const [manifestResponse, imageResponse] = await Promise.all([fetchFile(path(release.manifest)), fetchFile(path(release.image))]);
 	if (!manifestResponse.ok || !imageResponse.ok) throw new Error("The bundled DM32Plus release files are missing");
 	const manifest = await manifestResponse.json();
@@ -75,5 +78,5 @@ export async function loadBundledRelease(release, root, boards, fetchFile = fetc
 		throw new Error("The firmware manifest does not match the bundled DM32Plus release");
 	const image = new Uint8Array(await imageResponse.arrayBuffer());
 	const board = await verify(manifest, image, boards, BOARD);
-	return { manifest, image, board, source: `${PRODUCT} ${manifest.version}`, origin: release.online ? "github" : "bundled", variant: "full" };
+	return { manifest, image, board, source: `${release.testing ? "RC " : ""}${PRODUCT} ${manifest.version}`, origin: release.online ? "github" : "bundled", variant: "full" };
 }

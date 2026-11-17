@@ -24,10 +24,9 @@ test("operating talkgroups use saved group contacts and preserve per-entry times
 		{ id: 0xFFFFFF, name: "All call", type: "all" },
 	);
 	const f = channelForm(model, t).find((item) => item.key === "talkGroups");
-	assert.deepEqual([...f.choices], [[3100, { label: "Nationwide · TG 3100", timeslot: 2 }],
-		[91, { label: "Worldwide · TG 91", timeslot: 0 }]]);
+	assert.deepEqual(f.contacts, model.contacts.slice(0, 3));
 	const channel = { timeslot: 1 };
-	const entries = f.resolve([3100, 91], f.choices, channel);
+	const entries = f.resolve(f.contacts.slice(0, 2), channel);
 	assert.equal(f.parse(channel, f.key, entries), undefined);
 	assert.deepEqual(channel.talkGroups, [{ id: 3100, timeslot: 2 }, { id: 91, timeslot: 1 }]);
 	assert.equal(f.parse(channel, f.key, [entries[0], entries[0]]), "editor.err.talkgroups");

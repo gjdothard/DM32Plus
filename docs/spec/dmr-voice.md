@@ -272,6 +272,11 @@ key and persistent MI allocation state. The selected bank slot is the radio defa
 Receive uses the effective selected key, including late entry. Selecting a slot loads it immediately when
 idle and saves the selection for the next boot. Programming a replacement requires selecting it to apply it now.
 
+The CPS shows programmed slots as status indicators. Changing a key requires confirmation before entering a
+replacement. Its optional generator obtains 32 bytes from Web Crypto `getRandomValues` and formats them as 64
+hexadecimal characters. Generation stays local; programming is a separate action. Draft key fields are cleared
+when changing slots, refreshing metadata, completing programming, or leaving the Encryption tab.
+
 The bank is an independent two-sector journal at the end of the reserved native area. It does not enlarge
 `settings_t` or keep the bank in RAM. See [settings-store.md](settings-store.md#7-private-aes-key-bank) for the record
 format. Codeplug file exports, browser drafts and metadata replies contain no key values. Keys are ordinary flash

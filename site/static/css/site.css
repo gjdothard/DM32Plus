@@ -664,6 +664,36 @@ dialog.editor-dialog { max-width: 52rem; max-height: calc(100vh - 4rem); overflo
 .members-actions { display: grid; gap: var(--space-2); align-self: center; }
 @media (max-width: 640px) { .members { grid-template-columns: 1fr; } .ed-status { text-align: start; } }
 
+/* Channel editing keeps section navigation and actions visible while fields scroll. */
+dialog.ed-channel-dialog { width: min(44rem, calc(100% - 2rem)); box-sizing: border-box; padding: 0; }
+.ed-channel-dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
+.ed-channel-header, .ed-channel-footer { padding: var(--space-3) var(--space-4); }
+.ed-channel-header { border-bottom: 1px solid var(--border); }
+.ed-channel-header h2 { margin: 0 0 var(--space-2); }
+.ed-channel-footer { border-top: 1px solid var(--border); }
+.ed-channel-footer .confirm-actions { margin: 0; }
+.ed-channel-body { min-height: 0; overflow: auto; padding: var(--space-4); }
+.ed-channel-body .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ed-channel-body .form-row { min-width: 0; }
+.ed-channel-body .form-row > :is(input:not([type=checkbox]), select) { width: 100%; min-width: 0; box-sizing: border-box; }
+.ed-channel-body .form-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-column: 1 / -1; }
+.ed-channel-body .pair-tools { grid-column: 1 / -1; flex-wrap: wrap; }
+.ed-channel-tabs, .ed-tg-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.ed-channel-tabs .btn { border-color: transparent; }
+.ed-channel-tabs .btn[aria-pressed="true"] { border-color: var(--border); background: var(--surface); color: var(--accent); }
+.ed-channel-dialog [hidden] { display: none; }
+.ed-channel-body .form-row:has(.ed-tg-editor) { grid-column: 1 / -1; }
+.ed-tg-editor .ed-tg-actions p { margin: 0; }
+.ed-tg-assigned { margin: var(--space-2) 0; padding-inline-start: 1.6rem; }
+.ed-tg-assigned li { border-bottom: 1px solid var(--border); padding: var(--space-2) 0; }
+.ed-tg-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
+.ed-tg-picker { padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-top: var(--space-2); }
+.ed-tg-picker input[type="search"] { width: 100%; box-sizing: border-box; }
+.ed-tg-picker > .btn { margin-top: var(--space-2); }
+@media (max-width: 480px) {
+	.ed-channel-body .form-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* glossary terms in the docs (site.js turns the title into a popover) */
 abbr.gl { text-decoration: underline dotted; text-decoration-thickness: 1.5px; text-underline-offset: 0.2em; cursor: help; }
 abbr.gl:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
@@ -671,3 +701,26 @@ abbr.gl:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; bo
 	background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm);
 	box-shadow: 0 4px 16px rgb(0 0 0 / 0.2); font-size: var(--text-sm); line-height: var(--line); }
 .gl-pop[hidden] { display: none; }
+
+/* Private AES slot management. */
+.ed-key-manager .ed-key-default { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-3); }
+.ed-key-workspace { display: grid; grid-template-columns: 12rem minmax(0, 1fr); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-block: var(--space-3); }
+.ed-key-slots { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border-right: 1px solid var(--border); }
+.ed-key-slots .btn { display: grid; text-align: start; margin: 0; gap: var(--space-1); }
+.ed-key-slots .btn span, .ed-key-slots small { font-size: var(--text-sm); }
+.ed-key-slots small { color: var(--accent); }
+.ed-key-slots [aria-pressed="true"] { border-color: var(--accent); background: var(--surface); }
+.ed-key-editor { padding: var(--space-4); min-width: 0; }
+.ed-key-editor h3 { margin-top: 0; }
+.ed-key-programmed { display: flex; align-items: center; gap: var(--space-3); margin-block: var(--space-4); }
+.ed-key-programmed p { margin: var(--space-1) 0 0; }
+.ed-key-lock { font-size: 1.5rem; }
+.ed-key-manager .ed-key-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
+.ed-key-manager .ed-key-actions > label { margin: 0; }
+.ed-key-manager .ed-key-actions .btn { margin: 0; }
+.ed-key-manager input[type="checkbox"] { margin-inline-end: var(--space-2); }
+.ed-key-existing { border-top: 1px solid var(--border); padding-top: var(--space-3); margin-top: var(--space-4); }
+@media (max-width: 640px) {
+	.ed-key-workspace { grid-template-columns: minmax(0, 1fr); }
+	.ed-key-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-right: 0; border-bottom: 1px solid var(--border); }
+}

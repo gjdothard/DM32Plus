@@ -16,7 +16,7 @@ import webbrowser
 
 APP = "radiofoundry-offline-cps"
 HEALTH = "/__offline_cps_health"
-RELEASE_ASSET = re.compile(r"/_dm32plus_release/(dm32plus-dm32-(v\d{2}\.\d{1,2}(?:\.\d+)?(?:b\d+)?))\.(bin|json)")
+RELEASE_ASSET = re.compile(r"/_dm32plus_release/(?:(RC)/)?(dm32plus-dm32-(v\d{2}\.\d{1,2}(?:\.\d+)?(?:b\d+)?))\.(bin|json)")
 
 
 class LocalHTTPServer(http.server.ThreadingHTTPServer):
@@ -59,8 +59,9 @@ def make_handler(site, package_id):
 				super().do_GET()
 
 		def _release_asset(self, match, head):
-			base, version, extension = match.groups()
-			url = f"https://github.com/gjdothard/DM32Plus/releases/download/dm32plus-{version}/{base}.{extension}"
+			candidate, base, version, extension = match.groups()
+			tag = f"RC-dm32plus-{version}" if candidate else f"dm32plus-{version}"
+			url = f"https://github.com/gjdothard/DM32Plus/releases/download/{tag}/{base}.{extension}"
 			request = urllib.request.Request(url, headers={"User-Agent": "DM32Plus-CPS"})
 			limit = 1024 * 1024 if extension == "bin" else 32 * 1024
 			try:

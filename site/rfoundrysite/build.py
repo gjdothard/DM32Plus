@@ -253,7 +253,11 @@ class Site:
 				     for l in self.i18n.languages) if many else ""
 		if many:
 			alternates += '<link rel="alternate" hreflang="x-default" href="%s">\n' % html.escape(page_url(self.i18n.default))
-		ctx = {"lang": lang, "dir": meta.get("dir", "ltr"), "title": title, "root": root,
+		is_cps = page_class == "codeplug"
+		brand, brand_accent = ("DM32", "+") if is_cps else ("Radio", "Foundry")
+		document_title = title if is_cps else title + " · " + brand + brand_accent
+		ctx = {"lang": lang, "dir": meta.get("dir", "ltr"), "document_title": document_title, "root": root,
+		       "brand": brand, "brand_accent": brand_accent,
 		       "home": root + prefix, "content": content, "page_class": page_class,
 		       "description": description or self.i18n.t(lang, "site.tagline"), "scripts": scripts, "footer": footer,
 		       "languages": langs, "alternates": alternates, "og_locale": meta.get("locale", lang).replace("-", "_"),
@@ -353,6 +357,8 @@ class Site:
 		if os.path.isdir(self.out):
 			shutil.rmtree(self.out)
 		os.makedirs(self.out)
+		for name in ("LICENSE", "AUTHORS"):
+			shutil.copyfile(repo.path(name), os.path.join(self.out, name))
 		self.docs = docsmod.Docs(self.repo_url, self.ref, self.i18n.codes, self.i18n.default)
 		shutil.copytree(repo.path("site", "static"), os.path.join(self.out, "static"))
 		self.version_imports(os.path.join(self.out, "static", "js"))

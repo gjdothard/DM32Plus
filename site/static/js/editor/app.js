@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The Codeplug Editor page: a codeplug from a file or a radio, edited in tables and forms, saved to a file or
 // written back to the radio. Everything runs in the page; the codeplug never leaves it unless the user puts it in a
 // bug report (report.js). The working codeplug is kept in this browser (IndexedDB) so a reload doesn't lose edits.
@@ -14,6 +15,7 @@ import { CpsSerial, TransportError, estimate, keepIdentity, IDENTITY, iddbRanges
 import { FastError } from "../codeplug/fastlink.js";
 import { convert as convertDb, readHeader as dbHeader } from "../codeplug/iddb.js";
 import { convertIddb, iddbEnd } from "../codeplug/sources/output.js";
+import { convertOperatingTalkgroups } from "../codeplug/convert-talkgroups.js";
 import { FakeCpsRadio } from "../codeplug/fakecps.js";
 import { Grid } from "./grid.js";
 import { History } from "./undo.js";
@@ -173,7 +175,7 @@ function renderView(p) {
 	if (tab === "iddb") return view.replaceChildren(extensions.iddbTab(api()));
 	if (tab === "problems") return view.replaceChildren(problemsTab(p));
 	// a table: keep the grid (focus, sort, selection) when only its rows changed
-	if (S.grid && S.grid.table === tab) {
+	if (S.grid?.table === tab && S.grid.sharedTalkgroups === S.model.sharedTalkgroups) {
 		S.grid.g.setRows(S.model[tab]);
 		S.grid.update();
 		return;
@@ -200,9 +202,31 @@ function renderView(p) {
 		} });
 	const actions = h("div", { class: "ed-actions" });
 	const update = () => actions.replaceChildren(...tableActions(tab, g));
-	S.grid = { table: tab, g, update };
+	S.grid = { table: tab, g, update, sharedTalkgroups: S.model.sharedTalkgroups };
 	update();
 	view.replaceChildren(h("div", { class: "ed-bar" }, actions, filter), g.el);
+}
+
+function convertTalkgroups() {
+	const model = S.model;
+	let converted, report;
+	try {
+		const result = convertOperatingTalkgroups(encode(model).bytes);
+		report = result.report;
+		converted = decode(result.image);
+	} catch (error) {
+		diag.note("talkgroup conversion failed", { detail: error.message });
+		say(t("editor.tg.convert_failed"), "bad");
+		return;
+	}
+	const body = [h("p", {}, t("editor.tg.convert_summary", {
+		assignments: report.assignments, contacts: report.created.length,
+	}))];
+	if (report.unrecognizedOverflow) body.push(notice(t("editor.tg.convert_overflow"), "warn"));
+	dialog(t("editor.tg.convert"), body, t("editor.tg.convert"), (close) => {
+		close();
+		change(t("editor.tg.convert"), () => Object.assign(model, converted));
+	});
 }
 
 function tableActions(tab, g) {
@@ -219,6 +243,8 @@ function tableActions(tab, g) {
 		button(t("editor.move_down"), () => move(tab, g, 1), { disabled: !g.targets().length, quiet: true }),
 	].filter(Boolean);
 	if (numbered) out.push(button(t("editor.renumber"), () => renumber(tab), { quiet: true }));
+	if (tab === "channels" && !S.model.sharedTalkgroups && S.model.channels.length)
+		out.push(button(t("editor.tg.convert"), convertTalkgroups));
 	out.push(...extensions.tableActions(tab, api()));
 	return out;
 }
@@ -358,7 +384,23 @@ function bulkSet(tab, g) {
 
 function openRecord(tab, r) {
 	if (tab === "channels") {
-		formDialog(t("editor.channel_title", { name: r.name }), channelForm(S.model, t), r, t, (work) => change(t("editor.undo.edit"), () => Object.assign(r, work)));
+		const model = S.model;
+		const draftContacts = [];
+		formDialog(t("editor.channel_title", { name: r.name }), channelForm(model, t, draftContacts), r, t, (work) => {
+			change(t("editor.undo.edit"), () => {
+				if (work.mode === "dmr") {
+					const assigned = model.sharedTalkgroups ?
+						contact => work.talkgroupRefs.includes(contact) :
+						contact => work.talkGroups.some(entry => entry.id === contact.id);
+					const created = draftContacts.filter(assigned);
+					if (created.length) {
+						model.contacts.push(...created);
+						assignNumbers(model.contacts, LIMITS.contacts);
+					}
+				}
+				Object.assign(r, work);
+			});
+		});
 	} else if (tab === "zones") {
 		membersDialog(t("editor.zone_title", { name: r.name }), r.channels, [...S.model.channels].sort((a, b) => a.number - b.number), LIMITS.zoneChannels, t,
 			(c) => `${c.number} · ${c.name}`, (list) => change(t("editor.undo.edit"), () => (r.channels = list)));

@@ -78,3 +78,19 @@ test("checks all release pages and uses only the fixed local asset endpoint", as
 	assert.deepEqual(requested, [`../_dm32plus_release/${name}.json`, `../_dm32plus_release/${name}.bin`]);
 	await assert.rejects(lookupRelease("stable", async () => new Response("", { status: 502 })), /unavailable/);
 });
+
+test("Testing selects only RC prereleases and checks the unchanged firmware manifest", async () => {
+	const candidate = (version) => ({ ...published(version, true), tag_name: "RC-dm32plus-" + version });
+	const releases = [published("v26.12b4", true), candidate("v26.11b1"), candidate("v26.10b9")];
+	assert.equal(newestRelease(releases, "development").version, "v26.12b4");
+	assert.equal(newestRelease(releases, "stable"), null);
+	const selected = await lookupRelease("testing", async () => Response.json(releases));
+	assert.equal(selected.version, "v26.11b1");
+	const requested = [];
+	const fw = await loadBundledRelease(selected, "../", fb, async (url) => {
+		requested.push(url);
+		return new Response(url.endsWith(".json") ? JSON.stringify(manifest) : bytes);
+	});
+	assert.equal(fw.source, "RC DM32Plus v26.11b1");
+	assert.deepEqual(requested, [`../_dm32plus_release/RC/${name}.json`, `../_dm32plus_release/RC/${name}.bin`]);
+});

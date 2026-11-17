@@ -15,6 +15,10 @@ plan for a native format. Nothing in section 4 is built yet.
 - The open-firmware layout keeps working for as long as qdmr and the open-firmware CPS are the tools people have.
 - The native format carries what the open-firmware one can't: per-channel privacy key slot, more zones, longer names, and
   per-channel features without overloading vendor flag bits.
+- The CPS can explicitly convert legacy operating talkgroup assignments to saved group-contact references.
+  Conversion reuses matching contacts, creates missing contacts, and preserves the legacy bytes in the output.
+- The channel editor stages new talkgroup contacts until Save channel. It saves the channel and any newly
+  assigned contacts together as one undoable edit.
 - Radio-wide state, keys included, lives in the settings store, not in the codeplug. A codeplug file can be shared
   without leaking keys or the owner's last channel.
 
