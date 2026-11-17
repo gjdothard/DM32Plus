@@ -1461,6 +1461,16 @@ int main(void)
 		run_flow(&card_quick[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
 #if CONFIG_UI_CARD_MENU
 	static const flow_t card_menu[] = {
+		{ "Activity cards keep the Main Menu title and empty state", "branded-home", "ok 6",
+			"screen=recent shows=Activity_/_Logs shows=No_calls_heard_yet shows=20:12", 2, false },
+		{ "Activity cards separate caller, target, direction, and age", "branded-home " CALLER, "ok 6",
+			"screen=recent shows=K1ABC_Joe shows=RX_TG_91 shows=ago", 2, false },
+		{ "Activity card PTT talks to the heard group", "branded-home " CALLER, "ok 6 ptt",
+			"txid=91 txpriv=0", 3, false },
+		{ "Activity card context opens caller Actions", "branded-home " CALLER, "ok 6 ctx",
+			"screen=actions", 3, false },
+		{ "Activity cards return to Main Menu", "branded-home " CALLER, "ok 6 back",
+			"screen=hub", 3, false },
 		{ "Home caller actions use the numbered cards", "branded-home " CALLER, "ctx",
 			"screen=actions shows=20:12 shows=OK_Select shows=Talk_to_TG_91 shows=Private_call centered=K1ABC_Joe", 1, false },
 		{ "Caller cards keep talkgroup PTT", "branded-home " CALLER, "ctx ptt",

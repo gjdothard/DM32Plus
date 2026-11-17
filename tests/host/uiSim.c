@@ -233,6 +233,8 @@ static const struct { const char *name, *script; } audit_extra[] = {
 	{ "caller_actions", "call:3101234,91,g wait:11000 ctx" DOWN12 },
 #if CONFIG_UI_CARD_MENU
 	{ "caller_cards", "branded-home call:3101234,91,g wait:11000 ctx" },
+	{ "recent_cards", "branded-home call:3101234,91,g call:3105678,0,p wait:11000 ok 6" },
+	{ "recent_cards_empty", "branded-home ok 6" },
 	{ "caller_cards_temporary", "branded-home quick 1 up ok back call:3101234,91,g wait:11000 ctx up" },
 	{ "caller_cards_rx", "branded-home rx:3101234,91,g ctx" },
 #endif
@@ -563,6 +565,8 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 			snprintf(script, slen, "branded-home ok 9");
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "contacts"))
 			snprintf(script, slen, "branded-home ok 3");
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "recent"))
+			snprintf(script, slen, "branded-home call:3101234,91,g call:3105678,3100,g call:3102222,0,p wait:11000 ok 6");
 #if CONFIG_CONTACT_EDIT
 		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "talkgroup_more"))
 			snprintf(script, slen, "branded-home ok 3 ctx");

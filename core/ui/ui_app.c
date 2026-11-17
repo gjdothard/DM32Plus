@@ -1838,6 +1838,11 @@ static void list_draw(const ui_scr_def_t *d)
 	if (CONFIG_UI_SETTINGS && CONFIG_DMR_ARS && f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_ARS)
 		l.hint = TR("OK change  Back");
 	if (ui_card_layout(&ui_st)) {
+		if (f->scr == SCR_RECENT) {
+			l.prefix = TR("Activity / Logs");
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_DETAILS);
+			return;
+		}
 		if (f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_GPS) {
 			l.prefix = l.name;
 			ui_draw_numbered_menu(view, &ui_st, &l, false);

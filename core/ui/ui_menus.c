@@ -1638,6 +1638,28 @@ static void recent_item(uint16_t i, ui_item_t *it)
 	sb_init(&b, it->label, sizeof it->label);
 	sbuf_t vb;
 	sb_init(&vb, it->value, sizeof it->value);
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		if (r->name[0])
+			sb_str(&b, r->name);
+		else
+			sb_u32(&b, r->out ? r->dst : r->src, 1);
+		sb_age_long(&vb, ui_st.now_ms - r->ms);
+		sb_chr(&vb, '\n');
+		sb_str(&vb, r->out ? "TX " : "RX ");
+		sb_str(&vb, r->group ? "TG " : TR("Private"));
+		if (r->group)
+			sb_u32(&vb, r->dst, 1);
+		if (r->gps_range) {
+			sb_chr(&vb, ' ');
+			sb_u32(&vb, (r->gps_dist_m + 500u) / 1000u, 1);
+			sb_str(&vb, "km");
+		}
+		if (r->to_us)
+			it->flags |= UI_ITEM_WARN;
+		return;
+	}
+#endif
 	if (r->out) {
 		sb_str(&b, GLYPH_ARROW);
 		sb_str(&b, r->group ? "TG " : "");

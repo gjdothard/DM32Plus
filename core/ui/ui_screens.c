@@ -3482,6 +3482,132 @@ static void card_list_footer(const ui_state_t *s, int y, const char *keys, const
 	}
 }
 
+static void card_page_footer(const ui_state_t *s, int y, const char *hint)
+{
+	char text[80], left[80], back[32], fit[40];
+	bool more = true;
+	const font_t *font = &font_6x12;
+	for (int level = 0; more; level++) {
+		gfx_text_alt(hint ? hint : TR("Back"), level, text, sizeof text, &more);
+		hint_split(text, left, sizeof left, back, sizeof back);
+		if (!back[0])
+			str_copy(back, sizeof back, TR("Back"));
+		if (gfx_text_width(font, left) + gfx_text_width(font, back) + 8 <= gfx_width())
+			break;
+	}
+	while (gfx_text_width(font, left) + gfx_text_width(font, back) + 8 > gfx_width()) {
+		char *last = NULL;
+		for (char *p = strstr(left, "  "); p; p = strstr(p + 2, "  "))
+			last = p;
+		if (!last) {
+			left[0] = 0;
+			break;
+		}
+		*last = 0;
+	}
+	card_list_footer(s, y, left, back, fit, sizeof fit);
+}
+
+void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kind_t kind)
+{
+	const font_t *font = ui_layout.small, *meta = &font_6x12;
+	const int width = gfx_width(), footer = gfx_height() - 19;
+	bool actions = kind == UI_CARD_PAGE_ACTIONS;
+	int step = kind == UI_CARD_PAGE_DETAILS ? 44 : actions ? 34 : 28;
+	char fit[64];
+	card_header(s, 24);
+	card_center_title(l->prefix ? l->prefix : l->name, 7, fit, sizeof fit);
+	int y = 55;
+	if (l->prefix && l->name && strcmp(l->prefix, l->name) != 0) {
+		fit_end(meta, l->name, width - 12, fit, sizeof fit);
+		gfx_text(meta, 6, y, fit, ui_col.dim);
+		y += meta->h + 5;
+	}
+	if (l->body && l->body[0]) {
+		int limit = footer - (l->count ? step + 10 : 4);
+		int height = wrap_text(meta, l->body, 0, limit - y - 12, false, 0) + 12;
+		card_list_row(y, width - 2, height, CARD_EDGE, CARD_SURFACE);
+		wrap_text(meta, l->body, y + 6, y + height - 6, true, ui_col.fg);
+		y += height + 5;
+	}
+	if (l->header && l->header[0]) {
+		card_list_row(y, width - 2, meta->h + 9, ui_col.focus, CARD_SURFACE);
+		fit_end(meta, l->header, width - 14, fit, sizeof fit);
+		gfx_text(meta, 6, y + 4, fit, ui_col.fg);
+		y += meta->h + 14;
+	}
+	// Values can move below labels; a translation never makes one row use a smaller label font.
+	if (kind == UI_CARD_PAGE_FIELDS) {
+		for (uint16_t i = 0; i < l->count; i++) {
+			ui_item_t item = { 0 };
+			l->item(i, &item);
+			if (gfx_text_width(font, item.label) + gfx_text_width(font, item.value) + 8 > width - 16)
+				step = 44;
+			if (gfx_text_width(font, item.label) > width - 16)
+				step = 2 * font->h + meta->h + 12;
+		}
+	}
+	int rows = (footer - y - 4) / step;
+	if (rows < 1)
+		rows = 1;
+	uint16_t top = list_window(l, rows);
+	for (int row = 0; row < rows && top + row < l->count; row++) {
+		uint16_t i = (uint16_t)(top + row);
+		ui_item_t item = { 0 };
+		l->item(i, &item);
+		char *detail = strchr(item.value, '\n');
+		if (detail)
+			*detail++ = 0;
+		int yy = y + row * step, x = 7;
+		bool focus = i == l->focus && !(item.flags & UI_ITEM_INFO);
+		color_t highlight = item.flags & UI_ITEM_EDIT ? ui_col.warn : ui_col.focus;
+		color_t fg = focus && !actions ? CARD_INK : item.flags & UI_ITEM_DIM ? ui_col.dim : ui_col.fg;
+		color_t secondary = focus && !actions ? fg : ui_col.dim;
+		if (!focus && (item.flags & UI_ITEM_WARN))
+			fg = ui_col.warn;
+		card_list_row(yy, width - 2, step - 4, focus ? highlight : CARD_EDGE,
+			focus ? actions ? CARD_SELECTED : highlight : CARD_SURFACE);
+		if (actions && item.num) {
+			char key[] = { item.num, 0 };
+			gfx_round_fill(5, yy + 8, 15, meta->h + 2, focus ? highlight : CARD_EDGE);
+			gfx_text(meta, 9, yy + 9, key, focus ? CARD_INK : fg);
+			x = 25;
+		}
+		int right = width - (actions ? 17 : 9);
+		if (actions)
+			gfx_text(meta, width - 12, yy + 9, ">", focus ? highlight : CARD_EDGE);
+		if (kind == UI_CARD_PAGE_DETAILS) {
+			int vw = gfx_text_width(meta, item.value);
+			fit_end(font, item.label, right - x - (vw ? vw + 6 : 0), fit, sizeof fit);
+			gfx_text(font, x, yy + 4, fit, fg);
+			if (vw)
+				gfx_text(meta, right - vw, yy + 6, item.value, secondary);
+			if (detail) {
+				fit_end(meta, detail, right - x, fit, sizeof fit);
+				gfx_text(meta, x, yy + 25, fit, secondary);
+			}
+		} else if (kind == UI_CARD_PAGE_FIELDS && step > 28) {
+			const char *tail = wrap_line(font, item.label, right - x, fit, sizeof fit);
+			gfx_text(font, x, yy + 3, fit, fg);
+			if (*tail) {
+				fit_end(font, tail, right - x, fit, sizeof fit);
+				gfx_text(font, x, yy + 3 + font->h, fit, fg);
+			}
+			row_text(meta, x, yy + step - meta->h - 7, right, "", item.value, fg, secondary, false);
+		} else {
+			row_text(font, x, yy + (step - 4 - font->h) / 2, right,
+				item.label, item.value, fg, secondary, (item.flags & UI_ITEM_PREVIEW) != 0);
+		}
+	}
+	if (!l->count && l->empty)
+		wrap_text(font, l->empty, y + 8, footer, true, ui_col.dim);
+	if (top)
+		gfx_fill(width - 3, y, 3, 2, ui_col.focus);
+	if (top + rows < l->count)
+		gfx_fill(width - 3, y + rows * step - 5, 3, 2, ui_col.focus);
+	card_page_footer(s, footer, l->hint);
+}
+
 #if CONFIG_GPS_SKY
 int ui_draw_position_tabs(const ui_state_t *s, const char *const *names, uint8_t count, uint8_t active)
 {

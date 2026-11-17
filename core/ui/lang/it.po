@@ -445,6 +445,10 @@ msgstr "Nessun risultato: Indietro cancella"
 msgid "OK change  Back"
 msgstr "OK cambia  Indietro"
 
+#: core/ui/ui_app.c core/ui/ui_menus.c
+msgid "Activity / Logs"
+msgstr "Attività / Registri"
+
 #: core/ui/ui_app.c core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Back"
 msgstr "Indietro"
@@ -1166,10 +1170,6 @@ msgid "Zones / Channels"
 msgstr "Zone / Canali"
 
 #: core/ui/ui_menus.c
-msgid "Activity / Logs"
-msgstr "Attività / Registri"
-
-#: core/ui/ui_menus.c
 msgid " new"
 msgstr " nuovi"
 
@@ -1482,12 +1482,12 @@ msgid "OK choose  Back cancel"
 msgstr "OK scegli  Indietro annulla"
 
 #: core/ui/ui_menus.c core/ui/ui_screens.c
-msgid "To you"
-msgstr "A te"
-
-#: core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Private"
 msgstr "Privati"
+
+#: core/ui/ui_menus.c core/ui/ui_screens.c
+msgid "To you"
+msgstr "A te"
 
 #: core/ui/ui_menus.c
 msgid "PTT talk  # more  Back"
