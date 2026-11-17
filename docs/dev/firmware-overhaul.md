@@ -42,6 +42,28 @@ List pages use the same item initialization for initial focus, scrolling, and nu
 Keep the existing screenshots as the baseline for refactors and document intended visual changes
 when a screen design changes.
 
+## Operating talkgroup pool checkpoint
+
+The installed baseline is v26.11b16 (`a8dcba73`). The connected-radio CPS test found the cause of the overflow
+failure. The firmware advertised the feature, and the two independent reads agreed, but the existing overflow
+sector had programmed bytes and lacked its recognized header. The CPS encoder correctly refused before sending.
+A four-byte write to an erased pool slot passed a live CPS write and readback. The original talkgroup region
+was restored and verified byte for byte. Six assignments through the current editor remain unverified because
+its encoder still refuses the unknown sector.
+
+Use two separately committed 16 KiB banks at codeplug image offsets `0x34000` and `0x38000`. Both banks were
+read from the connected radio and were fully erased. The draft format holds 7,159 two-byte references per bank,
+with a maximum of 63 per channel. Checksums cover the generation and payload. A torn inactive bank leaves
+the previous generation readable. A migrated entry with an ambiguous or missing saved record retains a tagged
+reference into its original legacy bytes. Those legacy bytes must remain available while any such entry exists.
+Never claim an unrecognized bank containing data.
+
+The bank codec, legacy conversion helper, and firmware indexed reader have host coverage. The knob and picker
+use indexed reads. The normal CPS write does not yet use the new bank. Next
+implement the radio's recoverable bank writer and CPS transfer and migration, then add assignment controls and
+the directory Add, Edit, and More screens. Verify both transfer directions and interrupted writes before building
+and flashing. Contact Position behavior is a separate follow-up. Hardware RTC remains a separate feature branch.
+
 ## Next slice: conversation storage
 
 The [DMR data service](../../core/dmr/dmrDataService.h) gives each record in its four-entry RAM inbox

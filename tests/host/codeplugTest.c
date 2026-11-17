@@ -8,6 +8,7 @@
 #include "codeplug/codeplug.h"
 #include "codeplug/dmr_iddb.h"
 #include "board.h"
+#include "storage/storage.h"
 
 static int failures;
 
@@ -686,6 +687,12 @@ static void test_aprs_records(void)
 #endif
 
 #if CONFIG_DMR_TALKGROUP_ENTRIES
+static void put_pool_u32(uint8_t *p, uint32_t value)
+{
+	put16(p, (uint16_t)value);
+	put16(p + 2, (uint16_t)(value >> 16));
+}
+
 static void test_talkgroup_records(void)
 {
 	build_openfw();
@@ -719,6 +726,31 @@ static void test_talkgroup_records(void)
 	CHECK(entries[4].id == 13 && entries[4].timeslot == 2);
 	put16(&image[EE + 0xF00A], (1u << 9) | 511u);
 	CHECK(codeplug_talkgroups(2, entries) == 4);
+
+	codeplug_talkgroup_t item;
+	CHECK(codeplug_talkgroup_at(2, 1, &item) == 4 && item.id == 3100000);
+
+	// A 63-entry list is indexed directly. A torn newer bank cannot shadow the committed bank.
+	uint8_t *older = &image[FL + 0x14000], *newer = older + 0x4000;
+	const uint8_t pool_magic[] = { 'R', 'F', 'T', 'P', 1, 0, 0, 0 };
+	const unsigned entries_start = 16 + 2 * (CODEPLUG_CHANNELS_MAX + 1);
+	memcpy(older, pool_magic, sizeof pool_magic);
+	put_pool_u32(older + 8, 1);
+	for (uint16_t i = 0; i <= CODEPLUG_CHANNELS_MAX; i++)
+		put16(older + 16 + i * 2, i < 2 ? 0 : 63);
+	for (unsigned i = 0; i < 62; i++)
+		put16(older + entries_start + i * 2, (uint16_t)(i + 1));
+	put16(older + entries_start + 62 * 2, 0x8004);	// exact legacy bytes of channel 2 entry 1
+	put_pool_u32(older + 12, storage_crc32(storage_crc32(0, older + 8, 4), older + 16, 0x4000 - 16));
+	memcpy(newer, older, 0x4000);
+	put_pool_u32(newer + 8, 2);	// until the new checksum is present this bank must be ignored
+	CHECK(codeplug_reload() == CODEPLUG_OPENFW);
+	CHECK(codeplug_talkgroup_at(2, 62, &item) == 63 && item.id == 3100 && item.timeslot == 1);
+
+	put16(newer + entries_start + 62 * 2, 0x8005);
+	put_pool_u32(newer + 12, storage_crc32(storage_crc32(0, newer + 8, 4), newer + 16, 0x4000 - 16));
+	CHECK(codeplug_reload() == CODEPLUG_OPENFW);
+	CHECK(codeplug_talkgroup_at(2, 62, &item) == 63 && item.id == 3100000 && item.timeslot == 2);
 }
 #endif
 

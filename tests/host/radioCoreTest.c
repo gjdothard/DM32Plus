@@ -225,6 +225,13 @@ uint8_t codeplug_talkgroups(uint16_t number, codeplug_talkgroup_t out[CODEPLUG_T
 	out[1] = (codeplug_talkgroup_t){ .id = 3100000, .timeslot = 2 };
 	return 2;
 }
+uint8_t codeplug_talkgroup_at(uint16_t number, uint8_t index, codeplug_talkgroup_t *out)
+{
+	codeplug_talkgroup_t entries[CODEPLUG_TALKGROUP_MAX];
+	uint8_t count = codeplug_talkgroups(number, entries);
+	*out = index < count ? entries[index] : (codeplug_talkgroup_t){0};
+	return count;
+}
 #endif
 bool codeplug_channel(uint16_t n, channel_t *out)
 {

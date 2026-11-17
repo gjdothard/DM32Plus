@@ -156,6 +156,10 @@ typedef struct {
 	uint8_t timeslot;
 } codeplug_talkgroup_t;
 uint8_t codeplug_talkgroups(uint16_t number, codeplug_talkgroup_t out[CODEPLUG_TALKGROUP_MAX]);
+// Resolve one ordered assignment. Returns the list length, with *out cleared for a missing reference.
+#define CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL 63
+uint8_t codeplug_talkgroup_at(uint16_t number, uint8_t index, codeplug_talkgroup_t *out);
+
 #endif
 #define CODEPLUG_CONTACTS_MAX	1024
 #define CODEPLUG_LISTS_MAX	76	// RX group lists (listen lists)

@@ -6542,15 +6542,7 @@ typedef struct {
 	ui_target_t t;
 	const char *tag;
 } pick_t;
-#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
-static union {
-	pick_t normal[PICK_MAX];
-	codeplug_talkgroup_t operating[CODEPLUG_TALKGROUP_MAX];
-} picker_entries;
-#define picks picker_entries.normal
-#else
 static pick_t picks[PICK_MAX];
-#endif
 static uint8_t n_picks;
 
 #if CONFIG_DMR
@@ -6576,7 +6568,8 @@ static void picker_enter(void)
 	contact_t c;
 #if CONFIG_DMR_TALKGROUP_ENTRIES
 	if (ui_frame()->arg == 1) {
-		n_picks = codeplug_talkgroups(v->channel_number, picker_entries.operating);
+		codeplug_talkgroup_t entry;
+		n_picks = codeplug_talkgroup_at(v->channel_number, 0, &entry);
 		ui_frame()->focus = v->talkgroup_index < n_picks ? v->talkgroup_index : 0;
 		return;
 	}
@@ -6648,14 +6641,20 @@ static void picker_item(uint16_t i, ui_item_t *it)
 {
 #if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
 	if (ui_frame()->arg == 1 && i < n_picks) {
-		const codeplug_talkgroup_t *entry = &picker_entries.operating[i];
-		ui_target_t target = { .id = entry->id, .group = true };
+		codeplug_talkgroup_t entry;
+		codeplug_talkgroup_at(ui_view()->channel_number, (uint8_t)i, &entry);
+		if (!entry.id) {
+			str_copy(it->label, sizeof it->label, TR("Not set"));
+			it->flags |= UI_ITEM_DIM;
+			return;
+		}
+		ui_target_t target = { .id = entry.id, .group = true };
 		contact_t contact;
-		if (codeplug_contact_find(entry->id, true, &contact))
+		if (codeplug_contact_find(entry.id, true, &contact))
 			str_copy(target.name, sizeof target.name, contact.name);
 		ui_sb_target(it->label, sizeof it->label, &target);
 		it->flags |= UI_ITEM_PREVIEW;	// keep the leading TG ID when a long contact name needs ellipsis
-		str_copy(it->value, sizeof it->value, entry->timeslot == 2 ? "TS2" : "TS1");
+		str_copy(it->value, sizeof it->value, entry.timeslot == 2 ? "TS2" : entry.timeslot == 1 ? "TS1" : TR("Channel's"));
 		return;
 	}
 #endif

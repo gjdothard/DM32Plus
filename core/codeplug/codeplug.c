@@ -91,6 +91,9 @@ static uint32_t fl_base = DEFAULT_FLASH_BASE;
 
 static codeplug_source_t source = CODEPLUG_NONE;
 static uint32_t serial;
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+static bool talkgroup_pool_checked;
+#endif
 
 // Open-firmware codeplug index
 static uint8_t used[CH_MAX / 8];	// bit set = channel record passed the checks
@@ -382,6 +385,9 @@ static codeplug_source_t index_all(void)
 codeplug_source_t codeplug_init(void)
 {
 	storage_lock();
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+	talkgroup_pool_checked = false;
+#endif
 	codeplug_source_t s = index_all();
 	storage_unlock();
 	return s;
@@ -628,6 +634,92 @@ uint8_t codeplug_talkgroups(uint16_t number, codeplug_talkgroup_t out[CODEPLUG_T
 		return 0;
 	storage_lock();
 	uint8_t count = source == CODEPLUG_OPENFW && is_used(number) ? read_talkgroups(number, out) : 0;
+	storage_unlock();
+	return count;
+}
+
+// Two generations in the open-firmware flash image. The legacy EEPROM records
+// stay in place so unresolved assignments can point to their original ID/slot bytes.
+#define TG_BANK_START FL(0x14000u)
+#define TG_BANK_SIZE 0x4000u
+#define TG_BANK_HEADER 16u
+#define TG_ENTRY_BASE (TG_BANK_HEADER + (CH_MAX + 1u) * 2u)
+#define TG_BANK_CAPACITY ((TG_BANK_SIZE - TG_ENTRY_BASE) / 2u)
+#define TG_LEGACY_TAG 0x8000u
+static const uint8_t talkgroup_bank_magic[] = { 'R', 'F', 'T', 'P', 1, 0, 0, 0 };
+static uint32_t talkgroup_pool_base, talkgroup_pool_serial;
+
+static bool talkgroup_bank(uint32_t addr, uint32_t *generation)
+{
+	uint8_t bytes[64];
+	if (!flash_read(addr, bytes, TG_BANK_HEADER) ||
+	    memcmp(bytes, talkgroup_bank_magic, sizeof talkgroup_bank_magic))
+		return false;
+	uint32_t crc = storage_crc32(0, bytes + 8, 4);
+	uint32_t expected = le32(bytes + 12);
+	*generation = le32(bytes + 8);
+	for (uint32_t off = TG_BANK_HEADER; off < TG_BANK_SIZE;) {
+		uint32_t n = TG_BANK_SIZE - off < sizeof bytes ? TG_BANK_SIZE - off : sizeof bytes;
+		if (!flash_read(addr + off, bytes, n))
+			return false;
+		crc = storage_crc32(crc, bytes, n);
+		off += n;
+	}
+	return crc == expected;
+}
+
+static uint32_t talkgroup_pool(void)
+{
+	if (!talkgroup_pool_checked || talkgroup_pool_serial != serial) {
+		uint32_t a, b;
+		bool first = talkgroup_bank(TG_BANK_START, &a);
+		bool second = talkgroup_bank(TG_BANK_START + TG_BANK_SIZE, &b);
+		talkgroup_pool_base = second && (!first || (int32_t)(b - a) > 0) ? TG_BANK_START + TG_BANK_SIZE :
+									first ? TG_BANK_START : 0;
+		talkgroup_pool_checked = true;
+		talkgroup_pool_serial = serial;
+	}
+	return talkgroup_pool_base;
+}
+
+uint8_t codeplug_talkgroup_at(uint16_t number, uint8_t index, codeplug_talkgroup_t *out)
+{
+	*out = (codeplug_talkgroup_t){0};
+	if (number == 0 || number > CH_MAX)
+		return 0;
+	storage_lock();
+	uint8_t count = 0;
+	if (source == CODEPLUG_OPENFW && is_used(number)) {
+		uint32_t pool = talkgroup_pool();
+		if (!pool) {
+			codeplug_talkgroup_t legacy[CODEPLUG_TALKGROUP_MAX];
+			count = read_talkgroups(number, legacy);
+			if (index < count)
+				*out = legacy[index];
+		} else {
+			uint8_t bounds[4];
+			if (flash_read(pool + TG_BANK_HEADER + 2u * (number - 1u), bounds, sizeof bounds)) {
+				unsigned first = le16(bounds), end = le16(bounds + 2);
+				if (end >= first && end <= TG_BANK_CAPACITY && end - first <= CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL) {
+					count = (uint8_t)(end - first);
+					if (index < count && flash_read(pool + TG_ENTRY_BASE + 2u * (first + index), bounds, 2)) {
+						uint16_t ref = le16(bounds);
+						if (ref & TG_LEGACY_TAG) {
+							uint32_t addr = EE(0xB000u) + 4u * (ref - TG_LEGACY_TAG);
+							if ((addr < TALKGROUP_OVERFLOW ||
+							     (addr >= TALKGROUP_POOL && addr < EE(0x10000u) && talkgroup_has_overflow())) &&
+							    flash_read(addr, bounds, sizeof bounds))
+								append_talkgroup(bounds, out, 0);
+						} else {
+							contact_t contact;
+							if (codeplug_contact(ref, &contact) && contact.type == CONTACT_GROUP)
+								*out = (codeplug_talkgroup_t){ .id = contact.id, .timeslot = contact.timeslot };
+						}
+					}
+				}
+			}
+		}
+	}
 	storage_unlock();
 	return count;
 }
