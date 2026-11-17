@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Garrett Dothard
 # Copyright (c) 2026 The RadioFoundry Authors
 """The board registry: one place for every fact about a radio that isn't the build itself (issue #106).
 
@@ -155,7 +156,7 @@ BOARD_SCHEMA = {
     # what is missing (docs/build-config.md, "Unsupported, not written, unconfirmed")
     "hardware": _req({"cpu": _opt(str), "bands": _req(str), "power": _req(str), "display": _req(str),
                       "gallery": _req(str), "unconfirmed": _opt(("map", str)),
-                      # the real-time clock (CLOCKS) and the source of that fact; no driver uses it yet
+                      # the real-time clock (CLOCKS) and the source of that fact
                       "clock": _req({"rtc": _req(CLOCKS), "note": _req(str)}),
                       # hardware variants sold under this model that the radio itself names (variant_pattern: a regular
                       # expression whose first group is the code, in the version text the stock firmware reports;

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """The site's string catalogs (docs/dev/website.md "Translating"): the check every catalog must pass
 (site/rfoundrysite/i18n.py check), plural forms, and a whole build with a second language made up for the test.
 Needs site/requirements.txt (tools/ci.sh runs it with the site build's Python).
@@ -138,7 +139,7 @@ class SecondLanguage(unittest.TestCase):
 		cls.out = os.path.join(cls.tmp, "site")
 		os.makedirs(os.path.join(cls.tmp, "i18n"))
 		cats = catalogs(os.path.join(cls.tmp, "i18n"),
-				{"nav.radios": "Radios (es)", "home.title": "Inicio", "flash.title": "Instalar (es)",
+				{"nav.docs": "Documentos (es)", "home.title": "Inicio", "flash.title": "Instalar (es)",
 				 "screens.count.one": "una captura · {display}", "screens.count.other": "{n} capturas · {display}"})
 		site = build.Site(cls.out, "https://github.com/o/r", "main", log=lambda *a: None, i18n_dir=cats)
 		cls.warnings = site.build()
@@ -178,11 +179,12 @@ class SecondLanguage(unittest.TestCase):
 
 	def test_translated_and_fallback(self):
 		page = self.read("es/index.html")
-		self.assertIn("<title>Inicio · RadioFoundry</title>", page)
-		self.assertIn(">Radios (es)</a>", page)
-		self.assertIn(">Features</a>", page)	# not in the catalog: English
+		product = repo.product()
+		self.assertIn(f"<title>Inicio · {product['brand']}{product['accent']}</title>", page)
+		self.assertIn(">Documentos (es)</a>", page)
+		self.assertIn(">Codeplug</a>", page)	# not in the catalog: English
 		# links between pages stay in the language
-		self.assertIn('href="../es/features/index.html"', page)
+		self.assertIn('href="../es/docs/index.html"', page)
 		self.assertIn("capturas · ", self.read("es/screenshots/index.html"))
 
 	def test_scripts_get_the_language(self):

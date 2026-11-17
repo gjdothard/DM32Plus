@@ -62,7 +62,14 @@ static const keymap_entry_t keymap[] = {
 static const uint8_t side_keys[] = { KEY_SK1, KEY_SK2 };
 static const char *const side_key_names[] = { "SK1", "SK2" };
 
+#if CONFIG_RTC
+extern const hal_rtc_t hrc_rtc;
+#endif
+
 const board_t board = {
+#if CONFIG_RTC
+	.rtc = &hrc_rtc,
+#endif
 	.name = "DM-32UV",
 	.home_brand = "DM32",
 	.caps = CAP_KEYPAD | CAP_ENCODER | (CONFIG_GPS ? CAP_GPS : 0) | (CONFIG_DMR ? CAP_DMR : 0) |
@@ -202,7 +209,9 @@ static const hal_flash_map_t flash_map = {
 	.journal_addr = 0x719000u,	// 2 sectors
 	.openfw_eeprom = 0x700000u,
 	.openfw_flash = 0x720000u,
-	.openfw_end = 0xF00000u,
+	.openfw_end = 0xE80000u,	// leave the next 512 KiB available for conversation storage
+	.message_addr = 0xE80000u,
+	.message_size = 0x080000u,
 	.calibration_addr = 0,
 	.calibration_size = 0,
 	.native_addr = 0xF00000u,

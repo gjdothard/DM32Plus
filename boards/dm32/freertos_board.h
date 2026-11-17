@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // FreeRTOS settings this radio changes from platform/hrc7000/FreeRTOSConfig.h (read before its defaults)
 #ifndef FREERTOS_BOARD_H
@@ -11,6 +12,11 @@
 // tests/hil/test_task_stacks.py asks for, and gives the rest to main RAM (AES sessions need the next 1 KB after
 // the air MTU's lists took 34 down to 33). Recheck that budget on hardware; the debug link's tasks view reports
 // the least free since start (tasks.heap_min_free).
+// The enabled clock needs 24 bytes beyond the previous RAM budget. Leave 40 more bytes for alignment and headroom.
+#if CONFIG_RTC
+#define configTOTAL_HEAP_SIZE	(32 * 1024 - 64)
+#else
 #define configTOTAL_HEAP_SIZE	(32 * 1024)
+#endif
 
 #endif

@@ -26,6 +26,12 @@ Use the VFO's TX frequency control to edit a split while operating in VFO.
 The bottom line of most screens is the hint row. It shows what the nearest keys do there. What **Back** does is at
 its right end, above the **Back** key.
 
+On card displays, zone actions, sharing, and tool information use the same header and footer as the
+Main Menu. Numbered action cards retain their number shortcuts. Pickers keep the selected channel,
+recipient, or zone visible. Delete Zone and Factory Reset show the consequence above the choices;
+the initial choice keeps the zone or settings. APRS Position, APRS Heard, Last Position, and crash
+reporting use matching field or activity cards.
+
 ## Key reference
 
 The keys are named by their job ([Conventions](01-introduction.md#conventions-in-this-manual)).
@@ -71,6 +77,9 @@ Home
 ```
 
 In numbered lists (the menu, Tools, Settings, actions, quick settings), a number key opens the corresponding row.
+On the dark card layout, **#** on Home opens numbered action cards for the current or last caller.
+The caller stays in the title. Use a number key, or move the focus and press **OK**. **PTT** talks to the focused
+target, and **Back** returns Home.
 On the standard Hub, **OK**, **6** opens Tools. On the dark card layout, **OK** opens the Main Menu:
 
 | Key | Opens |
@@ -82,8 +91,22 @@ On the standard Hub, **OK**, **6** opens Tools. On the dark card layout, **OK** 
 | **5** | Scan controls. Select **Start scan** to begin |
 | **6** | Activity / Logs, which opens Recent calls |
 | **7** | GPS / APRS, with Position and APRS |
-| **8** | Tools |
+| **8** | Tools & Utilities |
 | **9** | Settings |
+
+On the card layout, **Activity / Logs** shows callers as cards, with their call direction, target, and age.
+**PTT** talks to the focused call's target. **#** opens its actions.
+**Radio > Channels** uses cards with the channel number, name, mode, and details. Digits filter the list;
+**OK** opens the channel editor and **#** tunes to the focused channel.
+Find and Talk to keep their existing key actions in the card layout. Names and IDs have separate places,
+and a second line identifies the result type or why a talk target appears in the list.
+Dual Watch actions use numbered cards. Its channel and zone pickers name the pane being changed;
+the channel already used by the other pane is dimmed and marked in use.
+
+The 24-hour clock is to the right of the battery percentage on the tall branded display. It uses fresh GPS time or a valid hardware
+clock, with the saved **Settings > Location > UTC offset**. On a radio with RTC support, let GPS acquire a fix once
+so the hardware clock can keep time when GPS is unavailable. The display shows `--:--` when neither source has valid time.
+See the [feature matrix](../feature-matrix.md) for which radios have RTC support.
 
 <img src="../ux/screens/240x320i10x5/hub.png" width="200" alt="Main Menu on the card layout">
 

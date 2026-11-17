@@ -33,8 +33,8 @@ A feature that needs a part only some radios have (a vibration motor, a GPS rece
 `tools/boards.py check` enforces that.
 The accelerometer is the next one: today its driver (`drivers/sensor/lis3dh`) only feeds a board's
 diagnostics page under `CONFIG_DIAG`, so it has no switch. The first feature that uses motion brings a hardware
-switch with it. A real-time clock driver is the same: none exists yet, and it arrives as `CONFIG_RTC`, a hardware
-switch ([radio-features.md](spec/radio-features.md) 5.6).
+switch with it. The real-time clock uses the `CONFIG_RTC` hardware switch
+([radio-features.md](spec/radio-features.md#56-time-of-day)).
 
 ### Unsupported, not written, unconfirmed
 
@@ -103,10 +103,12 @@ below are for an STM32F4 radio.
 | `CONFIG_DMR` | y | DMR voice: modem driver, call stack, AMBE FEC, vocoder hosting, PCM audio |
 | `CONFIG_DMR_PRIVACY` | = DMR | basic privacy (Motorola / Anytone BP) on the voice path, `core/dmr/dmrPrivacy.c` (`docs/spec/dmr-voice.md` 5) |
 | `CONFIG_DMR_TALKGROUP_ENTRIES` | = DMR | Per-channel DMR operating entries with timeslot and talkgroup ID. Memory Home's encoder cycles through them |
+| `CONFIG_TALKGROUP_EDIT` | Channel editing and DMR operating entries | Add, reorder, and remove saved group contacts from the shared operating talkgroup pool on the radio |
 | `CONFIG_DMR_AES256` | = DMR_PRIVACY | AES-256/OFB voice, PI and late-entry MI signaling; needs DMR_PRIVACY; RAM session provisioning (`docs/spec/dmr-voice.md` 5.1) |
 | `CONFIG_DMR_TALKER_ALIAS` | = DMR | talker alias decode and our own alias TX (`docs/spec/dmr-voice.md` 3) |
 | `CONFIG_DMR_GPS` | = DMR | ETSI GPS Info in the embedded LC (FLCO 8): the caller's position on the receive screen (with distance and bearing when ours is known), in Recent and on the debug link; ours sent in the alias superframes when the position-in-DMR-calls setting under Tools > APRS is on and a position source has a fix (the APRS position: GPS, host, fixed; `docs/spec/dmr-voice.md`) |
 | `CONFIG_DMR_SMS` | = DMR | text messages: ETSI IP text (the default format) and ETSI defined short data, received (inbox, ETSI response) and sent (docs/spec/dmr-data.md 5). Includes the keypad composer even without `CONFIG_CHANNEL_EDIT`. |
+| `CONFIG_MESSAGE_JOURNAL` | n | Enables the [message journal](spec/message-journal.md) for new SMS and outgoing results. On a board with a reserve, it activates an erased reserve at startup. Requires DMR SMS support. |
 | `CONFIG_DMR_TMS` | = DMR_SMS | Motorola TMS format support for text messages: TMS receive (inbox, the TMS ACK) and send with retries, the Motorola entry of the format setting. Off: a TMS heard is neither kept nor acknowledged (confirmed data still gets its ETSI response; the IP gateway still forwards it) and a stored TMS default sends ETSI IP text (docs/spec/dmr-data.md 5.1) |
 | `CONFIG_DMR_ARS` | = DMR | ARS registration with a presence server, at power-up and channel change, refreshed (off until a server ID is set) |
 | `CONFIG_DMR_LRRP` | = DMR | LRRP location answers (a radio without GPS answers "no fix"); builds core/dmr/dmrLrrp.c into the image |

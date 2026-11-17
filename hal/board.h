@@ -16,6 +16,7 @@
 #include "hal_dmr_modem.h"
 #include "hal_audio.h"
 #include "hal_audio_tap.h"
+#include "hal_rtc.h"
 #include "hal_vocoder.h"
 #include "hal_stream.h"
 #include "hal_system.h"
@@ -90,6 +91,7 @@ typedef struct {
 	const hal_netif_t *netif;
 	// Optional: taps on the audio path (hal_audio_tap.h); NULL when the board has none
 	const hal_audio_tap_t *audio_tap;
+	const hal_rtc_t *rtc;	// optional backed UTC clock
 	// Optional: the broadcast FM receiver (hal_bcast.h); NULL when the board has none or it isn't built
 	const hal_bcast_t *bcast;
 	// Optional: APRS AFSK through the FM transmitter, and received audio for the demodulator (hal_afsk.h); NULL when

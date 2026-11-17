@@ -13,6 +13,7 @@
 CONFIG_FONT_XL ?= y
 CONFIG_FONT_AA ?= y
 CONFIG_FONT_BIG ?= y
+CONFIG_MESSAGE_JOURNAL ?= $(if $(filter y,$(CONFIG_DMR_SMS)),y,n)
 CONFIG_UI_CARD_MENU ?= $(if $(and $(filter y,$(CONFIG_UI_COLOR)),$(filter y,$(CONFIG_DUAL_WATCH))),y,n)
 # The bezel hides the panel's edges, in panel pixels: text 6 px from the left or right edge was still clipped on the
 # radio, so 10 px left and right (the 8 px measured on the right leaves no more 8 px columns), 5 px top and bottom
@@ -28,5 +29,7 @@ CONFIG_VOX ?= n
 BOARD_UNSUPPORTED += NAND_STORAGE	# the data flash is SPI NOR, GD25Q128 class (docs/spec/hardware-dm32.md 10)
 # What the hardware can do but this radio's driver or glue doesn't yet (docs/build-config.md, "Unsupported, not
 # written, unconfirmed"): off by default, and off in ci's maximal configuration too
+CONFIG_RTC ?= y
+
 BOARD_NOT_WRITTEN += VOX	# no hal_power_t.mic_level hook yet
 BOARD_NOT_WRITTEN += AUDIO_PROBE	# no board.audio_tap yet

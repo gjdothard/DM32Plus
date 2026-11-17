@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """The UI driven by injected keys over the debug link (docs/spec/ui.md): channel up / down on Home, the Hub and its
 destinations, Quick settings, type-to-find, the key lock, long BACK = Home from anywhere, the diagnostics page,
 screenshots that change with the screen.
@@ -204,6 +205,38 @@ def test_zones_and_channels_lists(home):
     wait_screen(r, "channel", "a channel's settings on OK")
     r.press("back", LONG)
     wait_screen(r, "home")
+
+
+@pytest.mark.feature("talkgroup_edit")
+def test_operating_talkgroups_picker(home):
+    """Open the assignment list and picker on a converted DMR channel without writing to flash."""
+    r = home
+    if "TALKGROUP_EDIT" not in r.features():
+        skip("not_built", "built without the operating talkgroup editor")
+    if r.core().get("mode") != "dmr":
+        skip("state", "select a saved DMR channel")
+    r.press("ok")
+    wait_screen(r, "hub")
+    r.press("1")
+    if ui(r).get("ui.screen") == "menu-section":
+        r.press("2")
+    else:
+        r.press("back", LONG)
+        r.press("ok")
+        wait_screen(r, "hub")
+        r.press("5")
+    wait_screen(r, "channels")
+    r.press("ok")
+    wait_screen(r, "channel")
+    r.press("up")
+    if ui(r).get("ui.talkgroup_edit_focused") != "1":
+        skip("state", "select a saved DMR channel with a converted codeplug")
+    r.press("ok")
+    page = wait_screen(r, "operatingtalkgroups")
+    if as_int(page.get("ui.count")) > 63:
+        skip("state", "the channel's operating talkgroup list is full")
+    r.press("ok")
+    wait_screen(r, "addtalkgroup")
 
 
 @pytest.mark.feature("diag")

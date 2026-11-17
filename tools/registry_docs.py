@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Garrett Dothard
 # Copyright (c) 2026 The RadioFoundry Authors
 """The docs blocks generated from the board registry (tools/boards.py docs), and the radio survey's rows.
 
@@ -297,7 +298,7 @@ def feature_defaults(root, boards):
         out.append("| `%s` | %s |" % (s, " | ".join(marks)))
     # not a switch: what the board measures (hal/board.h board_volts), for the battery or supply features
     out.append("| Voltage reading (board, no switch) | %s |" % " | ".join(VOLTS_WORD[b.volts] for b in bs))
-    # not a switch either: board.toml [hardware] clock, the real-time clock (no driver uses it yet)
+    # not a switch either: board.toml [hardware] clock, the real-time clock's retention hardware
     out.append("| Clock kept through power-off (board, no switch) | %s |"
                % " | ".join(CLOCK_WORD[b.data["hardware"]["clock"]["rtc"]] for b in bs))
     return out

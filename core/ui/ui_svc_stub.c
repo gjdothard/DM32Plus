@@ -6,6 +6,9 @@
 // owns one of these defines it without the weak attribute and the linker takes that one.
 #include <stddef.h>
 #include "ui_svc.h"
+#if CONFIG_UI_CARD_MENU
+#include "dmr/dmrDataService.h"
+#endif
 
 #define WEAK __attribute__((weak))
 
@@ -37,8 +40,16 @@ WEAK bool ui_svc_monitor(bool on) { (void)on; return false; }
 WEAK bool ui_svc_vox(bool on) { (void)on; return false; }
 WEAK bool ui_svc_save_channel(void) { return false; }
 WEAK bool ui_svc_write_channel(uint16_t number, const channel_t *ch) { (void)number; (void)ch; return false; }
+#if CONFIG_TALKGROUP_EDIT
+WEAK bool ui_svc_edit_talkgroups(uint16_t channel, uint16_t contact, ui_tg_edit_t op)
+{
+	(void)channel; (void)contact; (void)op;
+	return false;
+}
+#endif
 #if CONFIG_CONTACT_EDIT
 WEAK bool ui_svc_write_contact(uint16_t index, const contact_t *c) { (void)index; (void)c; return false; }
+WEAK bool ui_svc_set_channel_contact(uint16_t index) { (void)index; return false; }
 #endif
 WEAK bool ui_svc_zone_edit(const zone_op_t *op) { (void)op; return false; }
 WEAK void ui_svc_zone_poll(void) { }
@@ -46,6 +57,9 @@ WEAK bool ui_svc_zone_pending(void) { return false; }
 WEAK bool ui_svc_save_talk_target(uint32_t id, bool private_call) { (void)id; (void)private_call; return false; }
 
 WEAK bool ui_svc_scan(bool on) { (void)on; return false; }
+#if CONFIG_UI_CARD_MENU
+WEAK void ui_svc_scan_prefs(ui_scan_prefs_t *out) { *out = (ui_scan_prefs_t){0}; }
+#endif
 WEAK bool ui_svc_roam(uint8_t cmd) { (void)cmd; return false; }
 WEAK bool ui_svc_scan_skip(void) { return false; }
 WEAK bool ui_svc_dual(const ui_dual_ref_t ref[2], uint8_t sel) { (void)ref; (void)sel; return false; }
@@ -64,6 +78,7 @@ WEAK void ui_svc_apply(uint8_t id, int32_t value) { (void)id; (void)value; }
 WEAK uint16_t ui_svc_msg_count(void) { return 0; }
 WEAK uint16_t ui_svc_msg_unread(void) { return 0; }
 WEAK bool ui_svc_msg_get(uint16_t i, ui_msg_t *out) { (void)i; (void)out; return false; }
+WEAK int ui_svc_msg_by_token(uint16_t token, ui_msg_t *out) { (void)token; (void)out; return -1; }
 WEAK void ui_svc_msg_read(uint16_t i) { (void)i; }
 WEAK bool ui_svc_msg_delete(uint16_t i) { (void)i; return false; }
 WEAK bool ui_svc_msg_send(uint32_t dst, bool group, const char *text) { (void)dst; (void)group; (void)text; return false; }
@@ -71,12 +86,39 @@ WEAK bool ui_svc_radio_check(uint32_t id) { (void)id; return false; }
 WEAK bool ui_svc_position_request(uint32_t id) { (void)id; return false; }
 WEAK bool ui_svc_call_alert(uint32_t id) { (void)id; return false; }
 
+#if CONFIG_UI_CARD_MENU
+WEAK uint8_t ui_svc_ars_state(void) { return 0; }
+WEAK void ui_svc_data_dashboard(dmrDataDashboard_t *out) { *out = (dmrDataDashboard_t){0}; }
+WEAK bool ui_svc_ars_register_now(void) { return false; }
+#endif
+WEAK uint16_t ui_svc_utc_minute(void) { return 0; }
 WEAK bool ui_svc_position(ui_position_t *out) { (void)out; return false; }
 WEAK bool ui_svc_gps_sat(uint8_t i, ui_gps_sat_t *out) { (void)i; (void)out; return false; }
 WEAK bool ui_svc_emergency(bool on) { (void)on; return false; }
 WEAK void ui_svc_emergency_dismiss(void) { }
 WEAK bool ui_svc_emergency_active(void) { return false; }
 WEAK bool ui_svc_factory_reset(void) { return false; }
+#if CONFIG_MESSAGE_JOURNAL
+WEAK bool ui_svc_message_history_available(void) { return false; }
+WEAK bool ui_svc_message_history_activate(void) { return false; }
+WEAK bool ui_svc_history_active(void) { return false; }
+WEAK void ui_svc_history_browse(uint32_t key, uint32_t before) { (void)key; (void)before; }
+WEAK void ui_svc_history_thread(uint32_t key, uint32_t anchor, bool forward) { (void)key; (void)anchor; (void)forward; }
+WEAK void ui_svc_history_thread_text(uint16_t revision, unsigned index, char *text, size_t size)
+{
+	(void)revision;
+	(void)index;
+	if (size)
+		text[0] = 0;
+}
+
+WEAK void ui_svc_history_view(message_history_view_t *out, char *text, size_t size)
+{
+	*out = (message_history_view_t){ .status = HISTORY_EMPTY };
+	if (text && size)
+		text[0] = 0;
+}
+#endif
 
 WEAK bool ui_svc_crash_get(ui_crash_t *out) { (void)out; return false; }
 WEAK void ui_svc_crash_seen(void) { }

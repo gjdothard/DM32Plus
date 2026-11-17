@@ -1,0 +1,776 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
+#include "config.h"
+
+#if CONFIG_MESSAGE_JOURNAL
+#include <string.h>
+#include "storage/message_journal.h"
+#include "storage/storage.h"
+
+#define MAGIC		0x31474D52u	// RMG1
+#define HEADER_SIZE	16u
+#define HEADER_CRC	8u
+#define TEXT_OFFSET	17u
+#define RECORD_CRC	(TEXT_OFFSET + MESSAGE_JOURNAL_TEXT)
+#define SECTOR		STORAGE_SECTOR
+#define SLOT		MESSAGE_JOURNAL_SCRATCH
+#define SLOTS		((SECTOR - HEADER_SIZE) / SLOT)
+#define MAX_GENERATION	(UINT32_MAX / SLOTS - 1u)
+#define PAGE_SCAN_SLOTS	32u
+
+static uint32_t get32(const uint8_t *p)
+{
+	return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
+}
+
+static void put32(uint8_t *p, uint32_t v)
+{
+	for (unsigned i = 0; i < 4; i++) {
+		p[i] = (uint8_t)(v >> (8u * i));
+	}
+}
+
+static uint32_t sector_addr(const message_journal_t *j, uint32_t generation)
+{
+	return j->base + ((generation - 1u) % j->sectors) * SECTOR;
+}
+
+static bool sector_header(const message_journal_t *j, uint32_t addr, uint32_t *generation, bool prepared)
+{
+	uint8_t h[HEADER_SIZE];
+	if (!j->flash->read(addr, h, sizeof(h))) {
+		return false;
+	}
+	uint32_t g = get32(h + 4);
+	*generation = 0;
+	if (g != 0 && g <= MAX_GENERATION && sector_addr(j, g) == addr && get32(h) == MAGIC &&
+	    (h[HEADER_SIZE - 1u] != 0) == prepared &&
+	    get32(h + HEADER_CRC) == storage_crc32(0, h, HEADER_CRC)) {
+		*generation = g;
+	}
+	return true;
+}
+
+bool message_journal_mount(message_journal_t *j, const hal_flash_t *flash, uint32_t base, uint32_t size)
+{
+	*j = (message_journal_t){0};
+	if (!flash || !flash->read || !flash->write || !flash->erase || flash->erase_size != SECTOR ||
+	    base % SECTOR || size % SECTOR || size < 2u * SECTOR || base > flash->size || size > flash->size - base) {
+		return false;
+	}
+	message_journal_t scan = { flash, base, size / SECTOR, 0 };
+	for (uint32_t offset = 0; offset < size; offset += SECTOR) {
+		uint32_t generation;
+		if (!sector_header(&scan, base + offset, &generation, false)) {
+			return false;
+		}
+		if (generation > scan.generation) {
+			scan.generation = generation;
+		}
+	}
+	*j = scan;
+	return true;
+}
+
+static bool erased(const uint8_t *data, uint32_t len)
+{
+	while (len-- > 0) {
+		if (*data++ != 0xFFu) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static bool sector_erased(const hal_flash_t *flash, uint32_t addr, uint8_t *scratch, bool *blank)
+{
+	*blank = false;
+	for (uint32_t offset = 0; offset < SECTOR; offset += SLOT) {
+		uint32_t len = SECTOR - offset < SLOT ? SECTOR - offset : SLOT;
+		if (!flash->read(addr + offset, scratch, len)) {
+			return false;
+		}
+		if (!erased(scratch, len)) {
+			return true;
+		}
+	}
+	*blank = true;
+	return true;
+}
+
+static void record_encode(uint8_t *dst, const message_journal_record_t *record, uint32_t key)
+{
+	memset(dst, 0, RECORD_CRC);
+	put32(dst, key);
+	put32(dst + 4, record->src);
+	put32(dst + 8, record->dst);
+	put32(dst + 12, record->time);
+	dst[16] = record->flags;
+	memcpy(dst + TEXT_OFFSET, record->text, strlen(record->text) + 1u);
+	put32(dst + RECORD_CRC, storage_crc32(0, dst, RECORD_CRC));
+}
+
+static bool record_valid(const uint8_t *data, uint32_t key)
+{
+	return data[SLOT - 1u] == 0 && get32(data) == key &&
+	       memchr(data + TEXT_OFFSET, '\0', MESSAGE_JOURNAL_TEXT) &&
+	       get32(data + RECORD_CRC) == storage_crc32(0, data, RECORD_CRC);
+}
+
+static bool rollover(message_journal_t *j, uint32_t g, const message_journal_record_t *record,
+		     bool (*replace)(uint32_t, const uint8_t *), uint8_t *scratch, bool *recovered)
+{
+	const hal_flash_t *flash = j->flash;
+	uint32_t addr = sector_addr(j, g);
+	uint32_t key = (g - 1u) * SLOTS + 1u;
+	uint32_t pending;
+	if (!sector_header(j, addr, &pending, true)) {
+		return false;
+	}
+	*recovered = pending == g;
+	if (*recovered) {
+		if (!flash->read(addr + HEADER_SIZE, scratch, SLOT) || !record_valid(scratch, key)) {
+			return false;
+		}
+	} else {
+		uint32_t prior;
+		bool blank;
+		if (!sector_header(j, addr, &prior, false) || !sector_erased(flash, addr, scratch, &blank)) {
+			return false;
+		}
+		bool expired = prior != 0 && prior < g && g - prior >= j->sectors;
+		if (!blank && !expired) {
+			return false;
+		}
+		memset(scratch, 0xFF, SECTOR);
+		put32(scratch, MAGIC);
+		put32(scratch + 4, g);
+		put32(scratch + HEADER_CRC, storage_crc32(0, scratch, HEADER_CRC));
+		record_encode(scratch + HEADER_SIZE, record, key);
+		scratch[HEADER_SIZE + SLOT - 1u] = 0;
+		if (!replace(addr, scratch)) {
+			return false;
+		}
+	}
+	// The old live window survives until the replacement's complete first record can be read.
+	uint8_t commit = 0;
+	if (!flash->write(addr + HEADER_SIZE - 1u, &commit, 1)) {
+		return false;
+	}
+	j->generation = g;
+	return true;
+}
+
+bool message_journal_append(message_journal_t *j, const message_journal_record_t *record,
+			    bool (*replace)(uint32_t, const uint8_t *), uint8_t *scratch, uint32_t *id)
+{
+	if (!j->flash || !replace || !memchr(record->text, '\0', sizeof(record->text))) {
+		return false;
+	}
+	const hal_flash_t *flash = j->flash;
+	uint32_t g = j->generation, slot = SLOTS, addr = 0;
+	if (g != 0) {
+		addr = sector_addr(j, g);
+		// Continue after the highest programmed slot even if a power cut left a hole.
+		while (slot != 0) {
+			if (!flash->read(addr + HEADER_SIZE + (slot - 1u) * SLOT, scratch, SLOT)) {
+				return false;
+			}
+			if (!erased(scratch, SLOT)) {
+				break;
+			}
+			slot--;
+		}
+	}
+	if (slot == SLOTS) {
+		if (g == MAX_GENERATION) {
+			return false;
+		}
+		bool recovered;
+		if (!rollover(j, ++g, record, replace, scratch, &recovered)) {
+			return false;
+		}
+		if (!recovered) {
+			*id = (g - 1u) * SLOTS + 1u;
+			return true;
+		}
+		addr = sector_addr(j, g);
+		slot = 1;
+	}
+	uint32_t key = (g - 1u) * SLOTS + slot + 1u;
+	uint32_t at = addr + HEADER_SIZE + slot * SLOT;
+	record_encode(scratch, record, key);
+	uint8_t commit = 0;
+	if (!flash->write(at, scratch, RECORD_CRC + 4u) || !flash->write(at + SLOT - 1u, &commit, 1)) {
+		return false;
+	}
+	*id = key;
+	return true;
+}
+
+typedef enum { SLOT_MISSING, SLOT_VALID, SLOT_READ_ERROR } slot_result_t;
+
+static slot_result_t read_slot(const message_journal_t *j, uint32_t id, uint8_t *scratch)
+{
+	if (!j->flash || id == 0) {
+		return SLOT_MISSING;
+	}
+	uint32_t g = (id - 1u) / SLOTS + 1u;
+	// Leave one sector outside the live window so a rollover can fail without losing a live record.
+	if (g > j->generation || j->generation - g >= j->sectors - 1u) {
+		return SLOT_MISSING;
+	}
+	uint32_t addr = sector_addr(j, g), actual;
+	uint32_t at = addr + HEADER_SIZE + ((id - 1u) % SLOTS) * SLOT;
+	if (!sector_header(j, addr, &actual, false))
+		return SLOT_READ_ERROR;
+	if (actual != g)
+		return SLOT_MISSING;
+	if (!j->flash->read(at, scratch, SLOT))
+		return SLOT_READ_ERROR;
+	return record_valid(scratch, id) ? SLOT_VALID : SLOT_MISSING;
+}
+
+static void record_decode(const uint8_t *scratch, message_journal_record_t *record)
+{
+	record->src = get32(scratch + 4);
+	record->dst = get32(scratch + 8);
+	record->time = get32(scratch + 12);
+	record->flags = scratch[16];
+	memcpy(record->text, scratch + TEXT_OFFSET, MESSAGE_JOURNAL_TEXT);
+}
+
+bool message_journal_read(const message_journal_t *j, uint32_t id, uint8_t scratch[SLOT], message_journal_record_t *record)
+{
+	if (read_slot(j, id, scratch) != SLOT_VALID)
+		return false;
+	record_decode(scratch, record);
+	return true;
+}
+
+static bool overlaps(uint32_t base, uint32_t size, uint32_t addr, uint32_t length)
+{
+	return length != 0 && (addr >= base ? addr - base < size : base - addr < length);
+}
+
+static bool reserve_valid(const hal_flash_map_t *m)
+{
+	uint32_t base = m->message_addr, size = m->message_size;
+	return size != 0 && m->openfw_end >= m->openfw_flash &&
+	       !overlaps(base, size, m->openfw_flash, m->openfw_end - m->openfw_flash) &&
+	       !overlaps(base, size, m->openfw_eeprom, 0x10000u) &&
+	       !overlaps(base, size, m->settings_addr, m->settings_size) &&
+	       !overlaps(base, size, m->journal_addr, 2u * SECTOR) &&
+	       !overlaps(base, size, m->calibration_addr, m->calibration_size) &&
+	       !overlaps(base, size, m->native_addr, m->native_size) &&
+	       !overlaps(base, size, m->staging_addr, m->staging_size);
+}
+
+// This marker occupies its own sector, outside the record ring. A new marker is allowed
+// only on an erased reserve, or on a retry of a torn marker with the reserve still blank.
+static const uint8_t activation[] = { 'R', 'F', 'M', 'S', 'G', '1', 0x3C, 0xA5, 0x00 };
+static message_history_t *history;	// owned by the housekeeping task, synchronized by the quick lock
+
+static message_journal_result_t activate_reserve(const hal_flash_t *flash, const hal_flash_map_t *m, uint8_t *scratch)
+{
+	uint32_t i = 0;
+	while (i < sizeof(activation) && scratch[i] == activation[i]) {
+		i++;
+	}
+	// A NOR interruption can program some bits in the next byte. Later bytes must be erased.
+	if (i < sizeof(activation) && (scratch[i] & activation[i]) != activation[i]) {
+		return MESSAGE_JOB_FOREIGN;
+	}
+	uint32_t first = i < sizeof(activation) ? i + 1u : i;
+	if (!erased(scratch + first, SECTOR - first)) {
+		return MESSAGE_JOB_FOREIGN;
+	}
+	for (uint32_t offset = SECTOR; offset < m->message_size; offset += SECTOR) {
+		if (!flash->read(m->message_addr + offset, scratch, SECTOR)) {
+			return MESSAGE_JOB_FAILED;
+		}
+		if (!erased(scratch, SECTOR)) {
+			return MESSAGE_JOB_FOREIGN;
+		}
+	}
+	// Program a byte at a time so a cut always leaves a recognizable prefix.
+	for (; i < sizeof(activation); i++) {
+		if (!flash->write(m->message_addr + i, activation + i, 1)) {
+			return MESSAGE_JOB_FAILED;
+		}
+	}
+	return MESSAGE_JOB_OK;
+}
+
+static message_journal_result_t run_job(const hal_flash_map_t *m, const message_journal_job_t *job,
+					       bool activate, uint8_t *scratch, uint32_t *id)
+{
+	message_journal_t journal;
+	const hal_flash_t *flash = board.flash;
+	if (!storage_ready() || m->message_size < 3u * SECTOR ||
+	    m->message_addr > flash->size || m->message_size > flash->size - m->message_addr ||
+	    !message_journal_mount(&journal, flash, m->message_addr + SECTOR, m->message_size - SECTOR)) {
+		return MESSAGE_JOB_UNAVAILABLE;
+	}
+	if (!flash->read(m->message_addr, scratch, activate ? SECTOR : sizeof(activation))) {
+		return MESSAGE_JOB_FAILED;
+	}
+	bool active = memcmp(scratch, activation, sizeof(activation)) == 0;
+	if (activate) {
+		return active ? MESSAGE_JOB_OK : activate_reserve(flash, m, scratch);
+	}
+	if (!active) {
+		return MESSAGE_JOB_INACTIVE;
+	}
+	return message_journal_append(&journal, job->record, storage_sector_write, scratch, id)
+		? MESSAGE_JOB_OK : MESSAGE_JOB_FAILED;
+}
+
+static message_journal_result_t execute_job(const message_journal_job_t *job, bool activate, uint32_t *id)
+{
+	const hal_flash_map_t *m = storage_map();
+	if (!m || !reserve_valid(m)) {
+		return MESSAGE_JOB_UNAVAILABLE;
+	}
+	uint8_t *scratch = storage_buffer_acquire();
+	if (!scratch) {
+		return MESSAGE_JOB_BUSY;
+	}
+	storage_lock();
+	message_journal_result_t result = run_job(m, job, activate, scratch, id);
+	storage_unlock();
+	storage_buffer_release();
+	return result;
+}
+
+static void activation_job(void *ctx)
+{
+	const message_journal_job_t *job = ctx;
+	uint32_t id = 0;
+	message_journal_result_t result = execute_job(job, true, &id);
+	if (result == MESSAGE_JOB_OK) {
+		storage_quick_lock();
+		if (history)
+			history->active = true;
+		storage_quick_unlock();
+	}
+	job->complete(result, id);
+}
+
+static void append_job(void *ctx)
+{
+	const message_journal_job_t *job = ctx;
+	uint32_t id = 0;
+	message_journal_result_t result = execute_job(job, false, &id);
+	job->complete(result, id);
+}
+
+bool message_journal_available(void)
+{
+	const hal_flash_map_t *m = storage_map();
+	return storage_ready() && m && reserve_valid(m) && m->message_size >= 3u * SECTOR &&
+	       m->message_addr % SECTOR == 0 && m->message_size % SECTOR == 0 &&
+	       m->message_addr <= board.flash->size && m->message_size <= board.flash->size - m->message_addr;
+}
+
+bool message_journal_activate(const message_journal_job_t *job)
+{
+	// The storage queue also takes mutable contexts. This particular job only reads it.
+	return job && job->complete && storage_job_post(activation_job, (void *)job);
+}
+
+bool message_journal_submit(message_journal_job_t *job)
+{
+	return job && job->complete && job->record && storage_job_post(append_job, job);
+}
+
+static uint32_t record_peer(uint32_t src, uint32_t dst, uint8_t flags)
+{
+	bool group = (flags & MESSAGE_RECORD_GROUP) != 0;
+	uint32_t target = group || (flags & (MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_LOCAL_AUTHOR)) ? dst : src;
+	return target | (group ? MESSAGE_HISTORY_GROUP_KEY : 0);
+}
+
+static uint32_t peer_key(const uint8_t *scratch)
+{
+	return record_peer(get32(scratch + 4), get32(scratch + 8), scratch[16]);
+}
+
+static uint32_t first_live(const message_journal_t *j)
+{
+	return j->generation >= j->sectors ? (j->generation - j->sectors + 1u) * SLOTS + 1u : 1u;
+}
+
+static uint32_t start_slot(const message_journal_t *j, uint32_t before)
+{
+	uint32_t last = j->generation * SLOTS;
+	return before && before <= last ? before - 1u : last;
+}
+
+static bool page_read(const message_journal_t *j, const message_history_page_t *page,
+		      uint8_t *scratch, uint8_t *count, uint32_t *next)
+{
+	uint32_t key = page->peer.id | (page->peer.group ? MESSAGE_HISTORY_GROUP_KEY : 0);
+	uint32_t first = first_live(j), id = start_slot(j, page->before);
+	for (unsigned scanned = 0; id >= first && scanned < PAGE_SCAN_SLOTS && *count < page->capacity; scanned++, id--) {
+		slot_result_t result = read_slot(j, id, scratch);
+		if (result == SLOT_READ_ERROR)
+			return false;
+		if (result == SLOT_VALID && (!page->peer.id || peer_key(scratch) == key)) {
+			message_history_item_t *item = &page->items[(*count)++];
+			item->id = id;
+			record_decode(scratch, &item->record);
+		}
+	}
+	*next = id >= first ? id + 1u : 0;
+	return true;
+}
+
+static void read_page_job(void *ctx)
+{
+	const message_history_page_t *page = ctx;
+	uint8_t *scratch = storage_buffer_acquire();
+	if (!scratch) {
+		page->complete(MESSAGE_JOB_BUSY, 0, 0);
+		return;
+	}
+	uint8_t count = 0;
+	uint32_t next = 0;
+	message_journal_result_t result = MESSAGE_JOB_UNAVAILABLE;
+	storage_lock();
+	if (message_journal_available()) {
+		const hal_flash_map_t *m = storage_map();
+		message_journal_t j;
+		result = MESSAGE_JOB_FAILED;
+		if (board.flash->read(m->message_addr, scratch, sizeof(activation))) {
+			if (memcmp(scratch, activation, sizeof(activation)) != 0)
+				result = MESSAGE_JOB_INACTIVE;
+			else if (message_journal_mount(&j, board.flash, m->message_addr + SECTOR, m->message_size - SECTOR) &&
+				 page_read(&j, page, scratch, &count, &next))
+				result = MESSAGE_JOB_OK;
+		}
+	}
+	storage_unlock();
+	storage_buffer_release();
+	page->complete(result, result == MESSAGE_JOB_OK ? count : 0, result == MESSAGE_JOB_OK ? next : 0);
+}
+
+bool message_history_read_page(message_history_page_t *page)
+{
+	return page && page->items && page->complete && page->capacity && page->capacity <= MESSAGE_HISTORY_PAGE_MAX &&
+	       storage_job_post(read_page_job, page);
+}
+
+bool message_history_active(void)
+{
+	storage_quick_lock();
+	bool active = history && history->active;
+	storage_quick_unlock();
+	return active;
+}
+
+static void browse(uint32_t key, uint32_t anchor, bool timeline, bool forward)
+{
+	storage_quick_lock();
+	if (history && history->active) {
+		uint16_t revision = history->view.revision + 1u;
+		history->view = (message_history_view_t){ .key = key, .revision = revision,
+			.before = timeline ? anchor : 0, .timeline = timeline, .forward = forward };
+		history->scan_before = anchor;
+	}
+	storage_quick_unlock();
+}
+
+void message_history_browse(uint32_t key, uint32_t before) { browse(key, before, false, false); }
+void message_history_thread(uint32_t key, uint32_t anchor, bool forward) { browse(key, anchor, true, forward); }
+
+void message_history_view(message_history_view_t *out, char *text, size_t size)
+{
+	storage_quick_lock();
+	*out = history ? history->view : (message_history_view_t){ .status = HISTORY_EMPTY };
+	if (text && size) {
+		text[0] = '\0';
+		if (history && out->status == HISTORY_READY) {
+			if (!out->key) {
+				if (size >= MESSAGE_JOURNAL_TEXT)
+					memcpy(text, history->view_text, MESSAGE_JOURNAL_TEXT);
+			} else if (!out->timeline) {
+				strncpy(text, history->view_text, size - 1u);
+				text[size - 1u] = '\0';
+			}
+		}
+	}
+	storage_quick_unlock();
+}
+
+void message_history_thread_text(uint16_t revision, unsigned index, char *text, size_t size)
+{
+	if (!size)
+		return;
+	storage_quick_lock();
+	text[0] = 0;
+	if (history && history->view.revision == revision && history->view.timeline &&
+	    history->view.status == HISTORY_READY && index < history->view.count) {
+		unsigned offset = 0;
+		for (unsigned i = 0; i < index; i++)
+			offset += history->view.thread[i].bytes;
+		strncpy(text, history->view_text + offset, size - 1u);
+		text[size - 1u] = 0;
+	}
+	storage_quick_unlock();
+}
+
+static void browser_scan(const message_journal_t *j, message_history_view_t *v, uint32_t *cursor, uint8_t *scratch)
+{
+	uint32_t first = first_live(j), id = start_slot(j, *cursor);
+	for (unsigned scanned = 0; id >= first && scanned < PAGE_SCAN_SLOTS; scanned++, id--) {
+		slot_result_t result = read_slot(j, id, scratch);
+		if (result == SLOT_READ_ERROR) {
+			v->status = HISTORY_ERROR;
+			return;
+		}
+		if (result != SLOT_VALID)
+			continue;
+		uint32_t key = peer_key(scratch);
+		if (v->key) {
+			if (v->key == key) {
+				v->flags = scratch[16];
+				v->time = get32(scratch + 12);
+				v->before = id > first ? id : 0;
+				v->status = HISTORY_READY;
+				return;
+			}
+		} else if (key & ~MESSAGE_HISTORY_GROUP_KEY) {
+			unsigned i = 0;
+			while (i < v->count && v->peers[i] != key)
+				i++;
+			if (i == v->count) {
+				uint8_t *preview = scratch + MESSAGE_JOURNAL_SCRATCH + i * MESSAGE_DIRECTORY_PREVIEW;
+				uint32_t time = get32(scratch + 12);
+				if (time > 1440u)
+					time = 0;
+				preview[0] = (uint8_t)time;
+				preview[1] = (uint8_t)(time >> 8);
+				strncpy((char *)preview + 2, (const char *)scratch + TEXT_OFFSET, MESSAGE_DIRECTORY_PREVIEW - 3u);
+				preview[MESSAGE_DIRECTORY_PREVIEW - 1u] = 0;
+				v->peers[v->count++] = key;
+			}
+			if (v->count == MESSAGE_HISTORY_PEERS) {
+				v->status = HISTORY_READY;
+				return;
+			}
+		}
+	}
+	*cursor = id >= first ? id + 1u : 0;
+	if (!*cursor)
+		v->status = v->count ? HISTORY_READY : HISTORY_EMPTY;
+}
+
+#define THREAD_AT_START 0x04u
+#define THREAD_AT_END   0x08u
+
+static void thread_scan(const message_journal_t *j, message_history_view_t *v, uint32_t *cursor, uint8_t *scratch)
+{
+	uint32_t first = first_live(j), last = start_slot(j, 0);
+	uint32_t id = v->forward ? *cursor + 1u : start_slot(j, *cursor);
+	if (v->forward && id < first)
+		id = first;
+	uint8_t *messages = scratch + MESSAGE_JOURNAL_SCRATCH;
+	unsigned used = 0;
+	for (unsigned i = 0; i < v->count; i++)
+		used += v->thread[i].bytes;
+	bool full = false;
+	for (unsigned scanned = 0; id >= first && id <= last && scanned < PAGE_SCAN_SLOTS;
+	     scanned++, id = v->forward ? id + 1u : id - 1u) {
+		slot_result_t result = read_slot(j, id, scratch);
+		if (result == SLOT_READ_ERROR) {
+			v->status = HISTORY_ERROR;
+			return;
+		}
+		if (result != SLOT_VALID || peer_key(scratch) != v->key)
+			continue;
+		uint32_t time = get32(scratch + 12);
+		unsigned bytes = (unsigned)strlen((const char *)scratch + TEXT_OFFSET) + 1u;
+		if (bytes > MESSAGE_THREAD_TEXT - used) {
+			full = true;
+			break;
+		}
+		unsigned i = v->count++;
+		v->thread[i] = (message_thread_entry_t){ .id = id, .time = time <= 1440u ? (uint16_t)time : 0,
+			.flags = scratch[16], .bytes = (uint8_t)bytes };
+		memcpy(messages + used, scratch + TEXT_OFFSET, bytes);
+		used += bytes;
+		if (v->count == MESSAGE_THREAD_ROWS) {
+			full = true;
+			break;
+		}
+	}
+	if (!full && id >= first && id <= last && v->count < ((v->before || v->forward) ? 2u : 1u)) {
+		*cursor = v->forward ? id - 1u : id + 1u;
+		return;
+	}
+	if (v->count) {
+		uint32_t a = v->thread[0].id, b = v->thread[v->count - 1u].id;
+		bool older = (id >= first || v->forward) && !(v->flags & THREAD_AT_START) && (a < b ? a : b) > first;
+		bool newer = (v->before || v->forward) && (id <= last || !v->forward) && !(v->flags & THREAD_AT_END) &&
+			(a > b ? a : b) < last;
+		v->flags = (older ? MESSAGE_THREAD_OLDER : 0) | (newer ? MESSAGE_THREAD_NEWER : 0);
+		v->status = HISTORY_READY;
+	} else if (id < first || id > last) {
+		if (v->before && !(v->flags & (THREAD_AT_START | THREAD_AT_END))) {
+			// Other peers can occupy the remaining slots. Return to the anchor
+			// instead of dropping the visible page when there are no more matches.
+			v->flags = v->forward ? THREAD_AT_END : THREAD_AT_START;
+			v->forward = !v->forward;
+			*cursor = v->forward ? v->before - 1u : v->before + 1u;
+		} else {
+			v->status = HISTORY_EMPTY;
+		}
+	}
+}
+
+static void browser_poll(void)
+{
+	storage_quick_lock();
+	bool pending = history && history->active && history->view.status == HISTORY_LOADING;
+	message_history_view_t view;
+	uint32_t cursor;
+	if (pending) {
+		view = history->view;
+		cursor = history->scan_before;
+	}
+	storage_quick_unlock();
+	if (!pending)
+		return;
+	uint8_t *scratch = storage_buffer_acquire();
+	if (!scratch)
+		return;
+	if (!view.key || view.timeline) {
+		uint8_t *preview = scratch + MESSAGE_JOURNAL_SCRATCH;
+		size_t size = view.timeline ? MESSAGE_THREAD_TEXT : MESSAGE_JOURNAL_TEXT;
+		storage_quick_lock();
+		if (view.count && view.revision == history->view.revision)
+			memcpy(preview, history->view_text, size);
+		else
+			memset(preview, 0, size);
+		storage_quick_unlock();
+	}
+	storage_lock();
+	const hal_flash_map_t *m = storage_map();
+	message_journal_t j;
+	if (message_journal_available() && board.flash->read(m->message_addr, scratch, sizeof(activation)) &&
+	    memcmp(scratch, activation, sizeof(activation)) == 0 &&
+	    message_journal_mount(&j, board.flash, m->message_addr + SECTOR, m->message_size - SECTOR))
+	{
+		if (view.timeline)
+			thread_scan(&j, &view, &cursor, scratch);
+		else
+			browser_scan(&j, &view, &cursor, scratch);
+	} else
+		view.status = HISTORY_ERROR;
+	storage_unlock();
+	storage_quick_lock();
+	if (view.revision == history->view.revision) {
+		if (!view.key || view.timeline || view.status == HISTORY_READY)
+			memcpy(history->view_text, scratch + (!view.key || view.timeline ? MESSAGE_JOURNAL_SCRATCH : TEXT_OFFSET),
+			       view.timeline ? MESSAGE_THREAD_TEXT : MESSAGE_JOURNAL_TEXT);
+		view.revision++;
+		history->view = view;
+		history->scan_before = cursor;
+	}
+	storage_quick_unlock();
+	storage_buffer_release();
+}
+
+void message_history_start(message_history_t *state, bool enable_by_default)
+{
+	uint8_t marker[sizeof(activation)];
+	*state = (message_history_t){0};
+	state->view.status = HISTORY_EMPTY;
+	storage_lock();
+	state->active = message_journal_available() &&
+		board.flash->read(storage_map()->message_addr, marker, sizeof(marker)) &&
+		memcmp(marker, activation, sizeof(activation)) == 0;
+	storage_unlock();
+	if (enable_by_default && !state->active && message_journal_available()) {
+		uint32_t unused;
+		state->active = execute_job(NULL, true, &unused) == MESSAGE_JOB_OK;
+	}
+	storage_quick_lock();
+	history = state;
+	storage_quick_unlock();
+}
+
+void message_history_capture(uint32_t src, uint32_t dst, uint8_t flags, uint16_t utc_minute, const char *text)
+{
+	storage_quick_lock();
+	if (history && history->active) {
+		if (history->count < MESSAGE_HISTORY_QUEUE) {
+			unsigned tail = (history->head + history->count) % MESSAGE_HISTORY_QUEUE;
+			message_journal_record_t *r = &history->pending[tail];
+			r->src = src;
+			r->dst = dst;
+			r->time = utc_minute;
+			r->flags = flags;
+			strncpy(r->text, text, sizeof(r->text) - 1u);
+			r->text[sizeof(r->text) - 1u] = '\0';
+			history->count++;
+		} else {
+			history->dropped++;
+		}
+	}
+	storage_quick_unlock();
+}
+
+uint32_t message_history_dropped(void)
+{
+	storage_quick_lock();
+	uint32_t dropped = history ? history->dropped : 0;
+	storage_quick_unlock();
+	return dropped;
+}
+
+void message_history_poll(void)
+{
+	browser_poll();
+	storage_quick_lock();
+	const message_journal_record_t *record = history && history->count ? &history->pending[history->head] : NULL;
+	storage_quick_unlock();
+	if (!record)
+		return;
+	// A producer only fills tail slots. The head stays reserved until the append finishes.
+	message_journal_job_t job = { .record = record };
+	uint32_t id;
+	message_journal_result_t result = execute_job(&job, false, &id);
+	if (result == MESSAGE_JOB_BUSY)
+		return;
+	storage_quick_lock();
+	uint32_t key = history->view.key;
+	bool timeline = history->view.timeline;
+	bool refresh = result == MESSAGE_JOB_OK &&
+		(!key || (timeline && key == record_peer(record->src, record->dst, record->flags)));
+	if (refresh) {
+		uint16_t revision = history->view.revision + 1u;
+		history->view = (message_history_view_t){ .key = key, .timeline = timeline,
+			.revision = revision, .status = HISTORY_LOADING };
+		history->scan_before = 0;
+	}
+	if (result == MESSAGE_JOB_INACTIVE || result == MESSAGE_JOB_UNAVAILABLE) {
+		history->dropped += history->count;
+		history->count = 0;
+		history->active = false;
+		history->view.status = HISTORY_ERROR;
+		history->view.count = 0;
+		history->view.before = 0;
+		history->view.revision++;
+	} else {
+		history->head = (history->head + 1u) % MESSAGE_HISTORY_QUEUE;
+		history->count--;
+		if (result != MESSAGE_JOB_OK)
+			history->dropped++;
+	}
+	storage_quick_unlock();
+	if (refresh)
+		browser_poll();
+}
+#endif

@@ -373,6 +373,17 @@ nine bits are a zero-based index in the pool at 0xF808, and the high seven bits 
 The pool uses the same four-byte entries as the first four. Invalid descriptors or extra entries leave
 the four inline entries in effect.
 
+One-time operating talkgroup conversion: run `node tools/convert-talkgroups.mjs input.bin output.bin`
+against a binary codeplug backup. Omit `output.bin` for a preview report. The converter preserves the original
+file, channel order, and effective timeslots. It reuses saved group records where possible and creates a
+fixed-slot group record when needed. The report lists created records, ambiguous matches, and any
+unrecognized legacy overflow sector. Unrecognized bytes and occupied contact slots are preserved.
+
+The new shared list uses saved contact slot numbers exclusively. The converter writes one checksummed
+bank at codeplug image offset `0x34000` and reserves the second bank at `0x38000`. Each bank is 16 KiB.
+The new assignments read from the saved contact records and do not depend on the old EEPROM bytes.
+The converted file requires firmware and CPS with support for the shared pool before it can be deployed.
+
 Zone layout detection: the firmware reads the 16 bytes at 0x8060 and looks at the last one (0x806F). In the 16-channel
 layout, 0x806F is the last byte of the second zone's name, so it is 0xFF. In the 80-channel layout, it is the high byte
 of a channel number (at most 0x04). A value 0x00-0x04 therefore selects 80 channels per zone. Current tools always

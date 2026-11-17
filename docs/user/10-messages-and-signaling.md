@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Messages, Call Alert and Radio Check
 
@@ -20,24 +21,49 @@ Messages.
 
 ## Reading messages
 
-1. Press **OK**, **2** (Messages). The newest message is first. Unread messages are highlighted.
-2. Focus a message and press **OK**. The radio shows the sender, how long ago it arrived and the text. It marks the
-   message read.
-3. Below the text:
+1. Press **OK**, **2** (Messages). Each row names the other radio or talkgroup. The newest conversation is first at the top.
+2. Press **OK** to open a conversation. On the dark card layout, bubbles expand to show the full message. Press **OK** to write a reply to the conversation.
+3. A live received message opened from the banner or the volatile inbox is marked read and has these actions below the text:
 
    | Row | Does |
    |---|---|
-   | Reply "OK" | Sends "OK" to the sender |
-   | Reply "On my way" | Sends "On my way" to the sender |
-   | Call | Makes the sender the talk target for now |
+   | Reply "OK" | Sends "OK" to the message's reply target |
+   | Reply "On my way" | Sends "On my way" to the message's reply target |
+   | Call | Temporarily selects the message's reply target for voice |
    | Delete | Deletes the message. There is no undo |
 
-**#** on a message opens the actions for its sender. **PTT** in an open message calls the sender.
+The reply target is the sender for a private message and the destination talkgroup for a group message.
+**#** opens actions for that target. **PTT** calls that target from the open message.
 
 <img src="../ux/screens/160x120i5/messages.png" width="200" alt="Messages">
 <img src="../ux/screens/160x120i5/message_view.png" width="200" alt="A message">
 
-The radio keeps the last 4 messages received, in memory. They are lost when the radio turns off.
+The radio keeps the last 4 messages received, in memory. If an open message drops out of the inbox,
+the screen reports that the message is gone. The inbox is cleared when the radio turns off.
+
+Builds with a message history reserve prepare it automatically when it is blank. If the reserve already contains
+the message archive, it is used as-is. With message history active, **Messages** opens directly to one row per
+private contact or talkgroup, including threads you started. The other party or talkgroup names the row.
+The dark card layout shows the latest message preview and its time beneath that conversation name.
+
+If needed, **Settings → Advanced → Message history** retries preparing the
+radio's reserved storage. Select **Enable** to confirm. The radio reports whether it could
+activate the reserve. If it reports that blank storage is required, the existing bytes are
+preserved. Once enabled, new received messages and outgoing send results are saved in the
+archive. Under **Messages**, choose one of the six most recent private or
+talkgroup conversations. In the dark card layout, the conversation opens at the newest bubble at the bottom.
+Use Up or Down to move one message at a time, or hold an arrow to keep scrolling. Scrolling stops at either end. The thread fills the viewing area, and a bubble can be partially visible at its edge. **#** jumps to the newest. **OK** opens the text
+composer for the thread. Sending a reply returns to that same thread. Delivery or failure appears on the outgoing bubble. New messages for an open conversation
+appear at the bottom automatically. A message from a different conversation still shows its banner.
+The standard layout opens the newest full message first.
+When history is unavailable, Messages groups the four live received messages by the other party or talkgroup. On the dark card layout, unread live messages have a dot
+and each live inbox card shows the other party, local receipt time, and a short preview. Inside a conversation, **You** identifies this radio's DMR ID.
+The radio takes UTC from a recent GPS fix and applies **Settings → Location → UTC offset** when it displays
+the time in 24-hour format. If no time was captured, including for older archive entries,
+the time is shown as `--:--`. Incoming messages show the sender first. Archived outgoing messages show the time first,
+then the recipient and a **You** label with the send result. The outgoing time is when that result was recorded.
+Select a conversation to read the full messages. The dark layout also applies to the canned-message list and the text composer.
+Archived text is stored in plaintext.
 
 ## Sending a message
 

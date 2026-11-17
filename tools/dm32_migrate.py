@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """dm32_migrate: move a Baofeng DM-32UV from its stock firmware to RadioFoundry, keeping the channels, zones,
 contacts, RX group lists and your DMR ID, and adding the DMR ID (callsign) database. Untested on a radio.
 
@@ -54,7 +55,7 @@ NAME_MAX = 16                 # names in the open-firmware layout (open-firmware
 BANDS = ((136000000, 174000000), (400000000, 480000000))     # boards/dm32/board.c
 CPS_BLOCK = 32                # bytes per CPS request, as qdmr
 BULK_BLOCK = 512              # bytes per CPS read for the data flash backup
-CPS_CEILING = 0xF00000        # the native codeplug's last 1 MB starts here: open-firmware data stays below (board.c)
+CPS_CEILING = 0xE80000        # the open-firmware area ends before the conversation storage reserve (board.c)
 IDDB_AREA1 = (0x50000, 0x40000)   # the ID database's header and area 1 in the open-firmware image (open-firmware-cps.md 7.5)
 IDDB_AREA2 = 0xD8000
 LIST_SECTIONS = ("radioIDs", "contacts", "groupLists", "channels", "zones", "scanLists", "positioning",
@@ -730,7 +731,7 @@ def cmd_package(sess, args):
 class FakeCpsRadio:
     """RadioFoundry's CPS shim on a DM-32 (cps-protocol.md 2, boards/dm32/flash_dm32.c map) as a cps_client transport:
     physical addresses, writes only inside the open-firmware EEPROM image (0x700000..0x710000) and flash image
-    (0x720000..0xF00000), nothing below 0x700000."""
+    (0x720000 up to CPS_CEILING), nothing below 0x700000."""
 
     def __init__(self):
         self.sectors = {}
@@ -754,7 +755,7 @@ class FakeCpsRadio:
 
     @staticmethod
     def writable(a):
-        return 0x700000 <= a < 0x710000 or 0x720000 <= a < 0xF00000
+        return 0x700000 <= a < 0x710000 or 0x720000 <= a < CPS_CEILING
 
     def write(self, req):
         c = req[0]
@@ -907,7 +908,7 @@ def self_test():
         return [("Codeplug FLASH", elems)]
     check(iddb_fit(iddb(5000)) is None, "a small ID database fits")
     fit = iddb_fit(iddb(330000))    # about 8.9 MB, the size dmrconf encoded for the world in 2026
-    check(fit == (0x40000 - 12) // 27 + (0x800000 - 0xD8000) // 27, "ID database records that fit: %r" % fit)
+    check(fit == (0x40000 - 12) // 27 + (0x780000 - 0xD8000) // 27, "ID database records that fit: %r" % fit)
     check(iddb_fit(iddb(fit)) is None, "the cut database fits")
     check(iddb_fit(iddb(fit + 1)) == fit, "one record more doesn't")
 

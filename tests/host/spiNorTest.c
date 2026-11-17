@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // drivers/flash/spi_nor against a model of a W25Q / GD25Q class chip at the SPI bus (the command set of the Winbond
 // W25Q128JV and GigaDevice GD25Q128 data sheets: 03 read, 02 page program, 20 sector erase, 06 write enable,
 // 05 / 35 / 15 status, 9F JEDEC ID, 48 security register read, 4B unique ID). The model keeps what the driver must get right:
@@ -12,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "config.h"
 #include "flash/spi_nor/spi_nor.h"
 #include "storage/storage.h"
 #include "settings/settings.h"
@@ -491,9 +493,19 @@ static void test_store_16mb(void)
 	CHECK(storage_sector_write(0xFFF000u, a) && memcmp(&chip.mem[0xFFF000u], a, sizeof(a)) == 0);
 	CHECK(chip.mem[0] == 0xFF && chip.mem[0xFFF] == 0xFF);	// no wrap to the bottom
 	static const uint8_t magic[4] = { 0x4F, 0x44, 0x52, 0x4E };
-	CHECK(f_write(map16.native_addr, magic, 4) && f_write(map16.native_addr + 0xFF000u, a, 64));
+	uint32_t last_native = map16.native_addr + map16.native_size - STORAGE_SECTOR;
+#if CONFIG_DMR_AES256
+	last_native -= 2 * STORAGE_SECTOR;
+	uint32_t key_bank = last_native + STORAGE_SECTOR;
+	CHECK(f_write(key_bank, a, 64) && f_write(key_bank + STORAGE_SECTOR, a, 64));
+#endif
+	CHECK(f_write(map16.native_addr, magic, 4) && f_write(last_native, a, 64));
 	CHECK(storage_native_erase() == STORAGE_NATIVE_ERASED);
-	CHECK(chip.mem[map16.native_addr] == 0xFF && chip.mem[map16.native_addr + 0xFF000u] == 0xFF);
+	CHECK(chip.mem[map16.native_addr] == 0xFF && chip.mem[last_native] == 0xFF);
+#if CONFIG_DMR_AES256
+	// Native-codeplug reset must preserve the separately managed private key bank.
+	CHECK(memcmp(chip.mem + key_bank, a, 64) == 0 && memcmp(chip.mem + key_bank + STORAGE_SECTOR, a, 64) == 0);
+#endif
 	CHECK(!storage_sector_write(16u << 20, a));		// past the end
 	// Settings round trip through the driver
 	settings_begin()->squelch = 6;

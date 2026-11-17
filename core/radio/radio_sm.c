@@ -997,18 +997,28 @@ static void dmr_load_channel(radio_sm_t *sm)
 		add_name(sm, &c);
 	}
 #if CONFIG_DMR_TALKGROUP_ENTRIES
-	codeplug_talkgroup_t entries[CODEPLUG_TALKGROUP_MAX];
-	sm->view.talkgroup_count = codeplug_talkgroups(sm->view.channel_number, entries);
-	if (sm->view.talkgroup_index >= sm->view.talkgroup_count)
-		sm->view.talkgroup_index = 0;
-	if (sm->view.talkgroup_count) {
-		const codeplug_talkgroup_t *entry = &entries[sm->view.talkgroup_index];
-		sm->talk_id = entry->id;
-		sm->talk_ts = entry->timeslot;
+	codeplug_talkgroup_t entry;
+	uint16_t number = sm->view.channel_number;
+	uint8_t index = sm->view.talkgroup_index;
+	uint8_t count = codeplug_talkgroup_at(number, index, &entry);
+	if (count && !entry.id) {
+		// A stale selection or a missing contact: find the first usable assignment.
+		for (index = 0; index < count; index++) {
+			codeplug_talkgroup_at(number, index, &entry);
+			if (entry.id)
+				break;
+		}
+	}
+	sm->view.talkgroup_count = entry.id ? count : 0;
+	sm->view.talkgroup_index = entry.id ? index : 0;
+	if (entry.id) {
+		sm->talk_id = entry.id;
+		sm->talk_ts = entry.timeslot;
 		sm->talk_private = false;
-		find_name(sm, entry->id, true, c.name);
+		if (!entry.contact_number || !codeplug_contact(entry.contact_number, &c))
+			find_name(sm, entry.id, true, c.name);
 		if (c.name[0]) {
-			c.id = entry->id;
+			c.id = entry.id;
 			c.type = CONTACT_GROUP;
 			add_name(sm, &c);
 		}
@@ -1275,6 +1285,17 @@ static void dmr_select_talkgroup(radio_sm_t *sm, const radio_req_t *req, bool bu
 	if (req->type == RREQ_DMR_TALKGROUP_STEP)
 		index = (sm->view.talkgroup_index + index % count + count) % count;
 	if (index < 0 || index >= count)
+		return;
+	codeplug_talkgroup_t entry;
+	for (int remaining = count; remaining > 0; remaining--) {
+		codeplug_talkgroup_at(sm->view.channel_number, (uint8_t)index, &entry);
+		if (entry.id)
+			break;
+		if (req->type != RREQ_DMR_TALKGROUP_STEP)
+			return;
+		index = (index + (req->arg < 0 ? -1 : 1) + count) % count;
+	}
+	if (!entry.id)
 		return;
 	sm->view.talkgroup_index = (uint8_t)index;
 	sm->manual = false;

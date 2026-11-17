@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The radio view as key=value text for GET_VIEW (docs/spec/debuglink.md 3.7). One key per line; keys are stable
 // (DL_VIEW_VERSION is bumped when one changes meaning or goes away); new keys may appear anywhere in a section.
 #include "config.h"
 #include "board.h"
 #include "hal_time.h"
+#if CONFIG_RTC
+#include "app/wall_clock.h"
+#endif
 #include "debuglink/debuglink.h"
 #include "hostlink/hostlink.h"
 #include "input/input.h"
@@ -294,11 +298,17 @@ static void link_section(dl_text_t *t)
 
 	debuglink_link_counters(c);
 	dl_text(t, "uptime_ms=%u\n", (unsigned)hal_millis());
+#if CONFIG_RTC
+	dl_text(t, "rtc.utc_seconds_plus_one=%u\n", (unsigned)wall_clock_rtc_seconds());
+#endif
 	dl_text(t, "ui.screen=%s\n", ui_screen_name());
 	ui_app_status_t u;
 	ui_get_status(&u);
 #if CONFIG_CONTACT_POSITION
 	dl_text(t, "ui.contact_position_valid=%u\n", (unsigned)u.contact_position_valid);
+#endif
+#if CONFIG_TALKGROUP_EDIT
+	dl_text(t, "ui.talkgroup_edit_focused=%u\n", (unsigned)u.talkgroup_edit_focused);
 #endif
 	dl_text(t, "ui.depth=%u\nui.focus=%u\nui.count=%u\nui.locked=%u\n", (unsigned)u.depth, (unsigned)u.focus,
 		(unsigned)u.count, (unsigned)u.locked);

@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 # Information architecture
 
 How the UI is organized: the Home screen, the logical input layer, what each key does in each context, quick settings, the six top-level destinations, settings grouped by intent, and the key maps for the four reference radios. Principles referenced as P1 to P10 are in `principles.md`.
@@ -116,6 +117,7 @@ Large-text mode (accessibility, or chosen by the user) shows only the status str
 | 6 | **Tools** | Scan, Position (GPS), Hotspot, USB network, Single frequency repeater, ID lookup, Signal meter, DTMF, APRS, Registration (ARS), Battery |
 | 7 | **Settings** | Grouped by intent (below), with search |
 
+The dark card layout opens **Tools & Utilities** from Main Menu item 8. It shows the same tools and live values as the standard Tools list.
 Each Tools item keeps its number on every radio and build, so a key path such as `SELECT`, `6`, `7` (Diagnostics) is
 the same everywhere. An item a radio may not have goes last (Battery, 9, on a mobile), so commonly used items have no
 gaps.
@@ -155,7 +157,8 @@ DMR channel with no codec installed (any DMR tile, and the VFO's Mode tile switc
 
 ## 6. Settings by intent
 
-Settings has a search field on top (T9). Groups, in this order:
+Find on Home searches Settings (T9). On the dark card layout, Main Menu item 9 opens Settings as numbered cards.
+Both layouts use the same groups, shortcuts, and editors. Groups, in this order:
 
 | Group | Contents |
 |---|---|

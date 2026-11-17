@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 #
 # The radio's strings in Italiano (it; docs/dev/translating.md). Kept in step with the source by
 # tools/i18n.py --sync: translate the empty msgstr lines; an empty one shows the English.
@@ -56,7 +57,7 @@ msgstr "Ora predef.: "
 msgid "Talking to "
 msgstr "Parli con "
 
-#: core/ui/ui_app.c core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/ui_app.c core/ui/ui_dual.c core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "No calls heard yet"
 msgstr "Nessuna chiamata ancora"
 
@@ -159,6 +160,10 @@ msgstr " canali, solo RX"
 #: core/ui/ui_app.c
 msgid "Zone not imported"
 msgstr "Zona non importata"
+
+#: core/ui/ui_app.c core/ui/ui_menus.c
+msgid "Message deleted"
+msgstr "Messaggio eliminato"
 
 #: core/ui/ui_app.c
 msgid "Bands: "
@@ -264,7 +269,7 @@ msgstr "Torna ai canali"
 msgid "Scan: not in this build"
 msgstr "Scansione: non in questa build"
 
-#: core/ui/ui_app.c
+#: core/ui/ui_app.c core/ui/ui_menus.c
 msgid "Scan stopped"
 msgstr "Scansione ferma"
 
@@ -308,7 +313,7 @@ msgstr "Color code: non in questa build"
 msgid "FM only: this is a DMR channel"
 msgstr "Solo FM: questo è un canale DMR"
 
-#: core/ui/ui_app.c core/ui/ui_menus.c
+#: core/ui/ui_app.c core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Not in this build"
 msgstr "Non incluso in questa versione"
 
@@ -435,6 +440,70 @@ msgstr "Cerca: "
 #: core/ui/ui_app.c core/ui/ui_find.c
 msgid "No match: Back deletes a key"
 msgstr "Nessun risultato: Indietro cancella"
+
+#: core/ui/ui_app.c core/ui/ui_aprs.c core/ui/ui_menus.c
+msgid "OK change  Back"
+msgstr "OK cambia  Indietro"
+
+#: core/ui/ui_app.c
+msgid "Zone Options"
+msgstr "Opzioni zona"
+
+#: core/ui/ui_app.c
+msgid "APRS Heard"
+msgstr "APRS ricevuti"
+
+#: core/ui/ui_app.c
+msgid "APRS Position"
+msgstr "Posizione APRS"
+
+#: core/ui/ui_app.c
+msgid "Last Position"
+msgstr "Ultima posizione"
+
+#: core/ui/ui_app.c
+msgid "{Up/Dn change  OK keep  Back cancel|Up/Dn  OK keep  Back cancel}"
+msgstr "{Su/Giù cambia  OK tieni  Indietro annulla|Su/Giù  OK tieni  Indietro annulla}"
+
+#: core/ui/ui_app.c
+msgid "Find"
+msgstr "Cerca"
+
+#: core/ui/ui_app.c core/ui/ui_menus.c
+msgid "Activity / Logs"
+msgstr "Attività / Registri"
+
+#: core/ui/ui_app.c core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
+msgid "Back"
+msgstr "Indietro"
+
+#: core/ui/ui_app.c
+msgid "Tools & Utilities"
+msgstr "Strumenti e utilità"
+
+#: core/ui/ui_app.c
+msgid "Back del  # mode  OK keep"
+msgstr "Indietro canc.  # modo  OK salva"
+
+#: core/ui/ui_app.c core/ui/ui_dual.c core/ui/ui_menus.c
+msgid "OK pick  Back"
+msgstr "OK scegli  Indietro"
+
+#: core/ui/ui_app.c core/ui/ui_menus.c
+msgid "0-9 find  OK pick  Back"
+msgstr "0-9 cerca  OK scegli  Indietro"
+
+#: core/ui/ui_app.c
+msgid "OK Add  Back"
+msgstr "OK aggiungi  Indietro"
+
+#: core/ui/ui_app.c
+msgid "OK reply  Back"
+msgstr "OK rispondi  Indietro"
+
+#: core/ui/ui_app.c core/ui/ui_menus.c
+msgid "VFO band"
+msgstr "Banda VFO"
 
 #: core/ui/ui_app.c
 msgid "Emergency: not in this build"
@@ -613,6 +682,14 @@ msgid "No position"
 msgstr "Nessuna posizione"
 
 #: core/ui/ui_aprs.c
+msgid "No timed beacon"
+msgstr "Nessun beacon programmato"
+
+#: core/ui/ui_aprs.c
+msgid "Beacons off"
+msgstr "Beacon off"
+
+#: core/ui/ui_aprs.c
 msgid "Next in "
 msgstr "Prossimo tra "
 
@@ -652,7 +729,7 @@ msgstr "SmartBeaconing"
 msgid "Send via"
 msgstr "Invia via"
 
-#: core/ui/ui_aprs.c core/ui/ui_menus.c
+#: core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Position"
 msgstr "Posizione"
 
@@ -693,10 +770,6 @@ msgid "Beacons on"
 msgstr "Beacon on"
 
 #: core/ui/ui_aprs.c
-msgid "Beacons off"
-msgstr "Beacon off"
-
-#: core/ui/ui_aprs.c
 msgid "DMR position: not in this build"
 msgstr "Posizione DMR: non in questa build"
 
@@ -732,10 +805,6 @@ msgstr "Non impostato"
 msgid "Up to 90 N/S, 180 E/W"
 msgstr "Fino a 90 N/S, 180 E/O"
 
-#: core/ui/ui_aprs.c core/ui/ui_menus.c
-msgid "OK change  Back"
-msgstr "OK cambia  Indietro"
-
 #: core/ui/ui_aprs.c
 msgid "0-9 pick  Back"
 msgstr "0-9 scegli  Indietro"
@@ -743,10 +812,6 @@ msgstr "0-9 scegli  Indietro"
 #: core/ui/ui_aprs.c
 msgid "Heard"
 msgstr "Sentite"
-
-#: core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
-msgid "Back"
-msgstr "Indietro"
 
 #: core/ui/ui_aprs.c
 msgid "Nothing heard yet"
@@ -904,6 +969,10 @@ msgstr "1-5 scegli  Indietro"
 msgid "Zone"
 msgstr "Zona"
 
+#: core/ui/ui_dual.c core/ui/ui_menus.c
+msgid "In use"
+msgstr "In uso"
+
 #: core/ui/ui_dual.c
 msgid "Watch on"
 msgstr "Ascolta su"
@@ -915,10 +984,6 @@ msgstr "{OK ascolta  0-9 cerca  Indietro|OK ascolta  Indietro}"
 #: core/ui/ui_dual.c
 msgid "Zone for"
 msgstr "Zona per"
-
-#: core/ui/ui_dual.c core/ui/ui_menus.c
-msgid "OK pick  Back"
-msgstr "OK scegli  Indietro"
 
 #: core/ui/ui_find.c core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Contacts"
@@ -1036,7 +1101,7 @@ msgstr "Fix 3D"
 msgid "2D Fix"
 msgstr "Fix 2D"
 
-#: core/ui/ui_gps.c
+#: core/ui/ui_gps.c core/ui/ui_menus.c
 msgid "Fix"
 msgstr "Fix"
 
@@ -1104,7 +1169,7 @@ msgstr "Niente GPS, o spento"
 msgid "Settings > Location"
 msgstr "Impostazioni > Posizione"
 
-#: core/ui/ui_gps.c
+#: core/ui/ui_gps.c core/ui/ui_screens.c
 msgid "Up Down page  Back"
 msgstr "Su Giù pagina  Indietro"
 
@@ -1125,16 +1190,12 @@ msgid "Scan"
 msgstr "Scansione"
 
 #: core/ui/ui_menus.c
-msgid "GPS / APRS"
-msgstr "GPS / APRS"
+msgid "GPS, APRS, and Data"
+msgstr "GPS, APRS e dati"
 
 #: core/ui/ui_menus.c
 msgid "Zones / Channels"
 msgstr "Zone / Canali"
-
-#: core/ui/ui_menus.c
-msgid "Activity / Logs"
-msgstr "Attività / Registri"
 
 #: core/ui/ui_menus.c
 msgid " new"
@@ -1156,9 +1217,37 @@ msgstr "Menu principale"
 msgid "1-7 open  Back"
 msgstr "1-7 apri  Indietro"
 
+#: core/ui/ui_menus.c
+msgid "ARS & LRRP"
+msgstr "ARS e LRRP"
+
+#: core/ui/ui_menus.c core/ui/ui_svc_data.c
+msgid "No GPS fix"
+msgstr "Nessuna posizione GPS"
+
+#: core/ui/ui_menus.c
+msgid "Register Now"
+msgstr "Registra ora"
+
+#: core/ui/ui_menus.c
+msgid "Answer GPS requests"
+msgstr "Rispondi a GPS"
+
+#: core/ui/ui_menus.c
+msgid "Server ID"
+msgstr "ID server"
+
 #: core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Quick Controls"
 msgstr "Controlli rapidi"
+
+#: core/ui/ui_menus.c
+msgid "Registration queued"
+msgstr "Registrazione in coda"
+
+#: core/ui/ui_menus.c
+msgid "Cannot register now"
+msgstr "Registrazione non disponibile"
 
 #: core/ui/ui_menus.c
 msgid "Talk to "
@@ -1193,6 +1282,10 @@ msgid "Save as contact"
 msgstr "Salva come contatto"
 
 #: core/ui/ui_menus.c
+msgid "Edit"
+msgstr "Modifica"
+
+#: core/ui/ui_menus.c
 msgid "Speak status"
 msgstr "Leggi stato"
 
@@ -1201,8 +1294,16 @@ msgid "Save to channel"
 msgstr "Salva nel canale"
 
 #: core/ui/ui_menus.c
+msgid "Make CH Default"
+msgstr "Canale predef."
+
+#: core/ui/ui_menus.c
 msgid "Make channel default"
 msgstr "Rendi canale predef."
+
+#: core/ui/ui_menus.c
+msgid "Saving..."
+msgstr "Salvataggio..."
 
 #: core/ui/ui_menus.c
 msgid "Messages: not in this build"
@@ -1289,6 +1390,14 @@ msgid "OK send  Back"
 msgstr "OK invia  Indietro"
 
 #: core/ui/ui_menus.c
+msgid "Add talkgroup"
+msgstr "Aggiungi gruppo"
+
+#: core/ui/ui_menus.c
+msgid "Add contact"
+msgstr "Aggiungi contatto"
+
+#: core/ui/ui_menus.c
 msgid "(no name)"
 msgstr "(senza nome)"
 
@@ -1329,10 +1438,6 @@ msgid "Delete"
 msgstr "Elimina"
 
 #: core/ui/ui_menus.c
-msgid "Message deleted"
-msgstr "Messaggio eliminato"
-
-#: core/ui/ui_menus.c
 msgid "Couldn't delete: try again"
 msgstr "Eliminazione non riuscita: riprova"
 
@@ -1345,16 +1450,72 @@ msgid "From "
 msgstr "Da "
 
 #: core/ui/ui_menus.c
+msgid "You"
+msgstr "Tu"
+
+#: core/ui/ui_menus.c
 msgid "OK choose  # more  Back"
 msgstr "OK scegli  # altro  Indietro"
 
-#: core/ui/ui_menus.c core/ui/ui_screens.c
-msgid "To you"
-msgstr "A te"
+#: core/ui/ui_menus.c
+msgid "OK open  Back"
+msgstr "OK apri  Indietro"
+
+#: core/ui/ui_menus.c
+msgid "Reading history..."
+msgstr "Lettura cronologia..."
+
+#: core/ui/ui_menus.c
+msgid "Couldn't read history"
+msgstr "Impossibile leggere la cronologia"
+
+#: core/ui/ui_menus.c
+msgid "Older message"
+msgstr "Messaggio precedente"
+
+#: core/ui/ui_menus.c
+msgid "Newest message"
+msgstr "Messaggio più recente"
+
+#: core/ui/ui_menus.c
+msgid "No more messages"
+msgstr "Nessun altro messaggio"
+
+#: core/ui/ui_menus.c
+msgid "Received message"
+msgstr "Messaggio ricevuto"
+
+#: core/ui/ui_menus.c
+msgid "Send failed"
+msgstr "Invio non riuscito"
+
+#: core/ui/ui_menus.c
+msgid "Delivered"
+msgstr "Consegnato"
+
+#: core/ui/ui_menus.c
+msgid "Sent"
+msgstr "Inviato"
+
+#: core/ui/ui_menus.c
+msgid "OK reply  # newest  Back"
+msgstr "OK risp.  # ultimo  Indietro"
+
+#: core/ui/ui_menus.c
+msgid "Conversation"
+msgstr "Conversazione"
+
+#: core/ui/ui_menus.c
+msgid "OK choose  Back cancel"
+msgstr "OK scegli  Indietro annulla"
 
 #: core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Private"
 msgstr "Privati"
+
+#: core/ui/ui_menus.c core/ui/ui_screens.c
+msgid "To you"
+msgstr "A te"
 
 #: core/ui/ui_menus.c
 msgid "PTT talk  # more  Back"
@@ -1681,6 +1842,10 @@ msgid "Save as new channel"
 msgstr "Salva come nuovo canale"
 
 #: core/ui/ui_menus.c
+msgid "Operating talkgroups"
+msgstr "Gruppi operativi"
+
+#: core/ui/ui_menus.c
 msgid "Yes"
 msgstr "Sì"
 
@@ -1785,6 +1950,10 @@ msgid "Yes, discard"
 msgstr "Sì, scarta"
 
 #: core/ui/ui_menus.c
+msgid "Discard contact changes?"
+msgstr "Scartare le modifiche al contatto?"
+
+#: core/ui/ui_menus.c
 msgid "Discard this new contact?"
 msgstr "Scartare questo nuovo contatto?"
 
@@ -1817,12 +1986,32 @@ msgid "{Back del  # mode  OK send|Back del  OK send}"
 msgstr "{Indietro canc.  # modo  OK invia|Canc.  OK invia}"
 
 #: core/ui/ui_menus.c
+msgid "Edit talkgroup"
+msgstr "Modifica gruppo"
+
+#: core/ui/ui_menus.c
+msgid "Edit contact"
+msgstr "Modifica contatto"
+
+#: core/ui/ui_menus.c
+msgid "New Talkgroup"
+msgstr "Nuovo gruppo"
+
+#: core/ui/ui_menus.c
+msgid "New Contact"
+msgstr "Nuovo contatto"
+
+#: core/ui/ui_menus.c
 msgid "Type"
 msgstr "Tipo"
 
 #: core/ui/ui_menus.c
 msgid "Talkgroup"
 msgstr "Gruppo"
+
+#: core/ui/ui_menus.c
+msgid "Channel default"
+msgstr "Slot del canale"
 
 #: core/ui/ui_menus.c
 msgid "Channel's"
@@ -1853,12 +2042,12 @@ msgid "Saved contact "
 msgstr "Salvato contatto "
 
 #: core/ui/ui_menus.c
-msgid "IDs go up to 16777214"
-msgstr "Gli ID arrivano a 16777214"
+msgid "Contact saved"
+msgstr "Contatto salvato"
 
 #: core/ui/ui_menus.c
-msgid "New Contact"
-msgstr "Nuovo contatto"
+msgid "IDs go up to 16777214"
+msgstr "Gli ID arrivano a 16777214"
 
 #: core/ui/ui_menus.c
 msgid "Move up"
@@ -1879,6 +2068,10 @@ msgstr "Modifica canale"
 #: core/ui/ui_menus.c
 msgid "Remove from zone"
 msgstr "Rimuovi dalla zona"
+
+#: core/ui/ui_menus.c
+msgid "Share channel to"
+msgstr "Condividi canale"
 
 #: core/ui/ui_menus.c
 msgid "Already first"
@@ -1991,10 +2184,6 @@ msgstr "? I canali restano."
 #: core/ui/ui_menus.c
 msgid "Delete Zone"
 msgstr "Elimina zona"
-
-#: core/ui/ui_menus.c
-msgid "OK choose  Back cancel"
-msgstr "OK scegli  Indietro annulla"
 
 #: core/ui/ui_menus.c
 msgid "TX Contact"
@@ -2533,10 +2722,6 @@ msgid "Send To"
 msgstr "Invia a"
 
 #: core/ui/ui_menus.c
-msgid "0-9 find  OK pick  Back"
-msgstr "0-9 cerca  OK scegli  Indietro"
-
-#: core/ui/ui_menus.c
 msgid "Crash report sent"
 msgstr "Rapporto crash inviato"
 
@@ -2845,8 +3030,8 @@ msgid "Send position"
 msgstr "Invia posizione"
 
 #: core/ui/ui_menus.c
-msgid "Answer GPS requests"
-msgstr "Rispondi a GPS"
+msgid "UTC offset"
+msgstr "Scarto UTC"
 
 #: core/ui/ui_menus.c
 msgid "Hotspot allowed"
@@ -2925,6 +3110,10 @@ msgid "Crash log"
 msgstr "Log crash"
 
 #: core/ui/ui_menus.c
+msgid "Message history"
+msgstr "Cronologia messaggi"
+
+#: core/ui/ui_menus.c
 msgid "Freq trim"
 msgstr "Trim freq."
 
@@ -2971,6 +3160,10 @@ msgstr "Avanzate"
 #: core/ui/ui_menus.c
 msgid "0-9 open  Back"
 msgstr "0-9 apri  Indietro"
+
+#: core/ui/ui_menus.c
+msgid "0 (Off)"
+msgstr "0 (Disattivato)"
 
 #: core/ui/ui_menus.c
 msgid "Talk permit tone: not in this build"
@@ -3021,6 +3214,10 @@ msgid "No GPS on this radio"
 msgstr "Niente GPS su questa radio"
 
 #: core/ui/ui_menus.c
+msgid "Backlight"
+msgstr "Retroilluminaz."
+
+#: core/ui/ui_menus.c
 msgid "Diagnostics: not in this build"
 msgstr "Diagnostica: non in questa build"
 
@@ -3041,12 +3238,24 @@ msgid ", steps of "
 msgstr ", passi di "
 
 #: core/ui/ui_menus.c
+msgid "Cancel"
+msgstr "Annulla"
+
+#: core/ui/ui_menus.c
+msgid "Enable"
+msgstr "Attiva"
+
+#: core/ui/ui_menus.c
 msgid "No, keep settings"
 msgstr "No, tienile"
 
 #: core/ui/ui_menus.c
 msgid "Yes, reset"
 msgstr "Sì, ripristina"
+
+#: core/ui/ui_menus.c core/ui/ui_svc_storage.c
+msgid "Storage busy"
+msgstr "Memoria occupata"
 
 #: core/ui/ui_menus.c
 msgid "Factory settings restored"
@@ -3055,6 +3264,10 @@ msgstr "Impostazioni ripristinate"
 #: core/ui/ui_menus.c
 msgid "Reset: not in this build"
 msgstr "Ripristino: non in questa build"
+
+#: core/ui/ui_menus.c
+msgid "Enable message history on this radio?"
+msgstr "Attivare la cronologia messaggi su questa radio?"
 
 #: core/ui/ui_menus.c
 msgid "Reset all settings to factory defaults? Channels stay. This can't be undone."
@@ -3093,8 +3306,64 @@ msgid "{PTT once  OK use  Hold OK set|OK use  Hold OK set}"
 msgstr "{PTT una volta  OK usa  Tieni OK imposta|OK usa  Tieni OK imposta}"
 
 #: core/ui/ui_menus.c
+msgid "Scan paused"
+msgstr "Scansione in pausa"
+
+#: core/ui/ui_menus.c
+msgid "Resume delay"
+msgstr "Ritardo ripresa"
+
+#: core/ui/ui_menus.c
+msgid "Holding on signal"
+msgstr "In sosta sul segnale"
+
+#: core/ui/ui_menus.c
 msgid "Skip channel for now"
 msgstr "Salta canale per ora"
+
+#: core/ui/ui_menus.c
+msgid "Stop scan"
+msgstr "Ferma scansione"
+
+#: core/ui/ui_menus.c
+msgid "Start scan"
+msgstr "Avvia scansione"
+
+#: core/ui/ui_menus.c
+msgid "Scan source"
+msgstr "Origine scansione"
+
+#: core/ui/ui_menus.c
+msgid "Zone channels"
+msgstr "Canali zona"
+
+#: core/ui/ui_menus.c
+msgid "Edit scan skips in CPS"
+msgstr "Modifica esclusioni in CPS"
+
+#: core/ui/ui_menus.c
+msgid "Scan resume"
+msgstr "Ripresa scansione"
+
+#: core/ui/ui_menus.c
+msgid "Scan dwell"
+msgstr "Tempo di ascolto"
+
+#: core/ui/ui_menus.c
+msgid "Priority channel"
+msgstr "Canale prioritario"
+
+#: core/ui/ui_menus.c
+msgid "Timed"
+msgstr "A tempo"
+
+#: core/ui/ui_menus.c
+msgid "Stop on signal"
+msgstr "Ferma al segnale"
+
+#: core/ui/ui_menus.c
+msgid "Carrier"
+msgstr "Portante"
 
 #: core/ui/ui_menus.c
 msgid "Stay here"
@@ -3103,10 +3372,6 @@ msgstr "Resta qui"
 #: core/ui/ui_menus.c
 msgid "Always skip"
 msgstr "Salta sempre"
-
-#: core/ui/ui_menus.c
-msgid "Start scan"
-msgstr "Avvia scansione"
 
 #: core/ui/ui_menus.c
 msgid "Skipped until the scan stops"
@@ -3121,12 +3386,12 @@ msgid "Scan stopped here"
 msgstr "Scansione ferma qui"
 
 #: core/ui/ui_menus.c
-msgid "Edit scan lists in qdmr"
-msgstr "Modifica liste scan in qdmr"
+msgid "Channel talkgroup list is full"
+msgstr "Elenco gruppi pieno"
 
 #: core/ui/ui_menus.c
-msgid "In use"
-msgstr "In uso"
+msgid "Remove talkgroup"
+msgstr "Rimuovi gruppo"
 
 #: core/ui/ui_screens.c
 msgid "IDLE"
@@ -3673,12 +3938,88 @@ msgid "Offset"
 msgstr "Scarto"
 
 #: core/ui/ui_screens.c
+msgid "Registering"
+msgstr "Registrazione"
+
+#: core/ui/ui_screens.c
+msgid "Registered"
+msgstr "Registrato"
+
+#: core/ui/ui_screens.c
+msgid "Refused"
+msgstr "Rifiutato"
+
+#: core/ui/ui_screens.c core/ui/ui_svc_data.c
+msgid "No answer"
+msgstr "Nessuna risposta"
+
+#: core/ui/ui_screens.c
+msgid "Active subscriptions"
+msgstr "Sottoscrizioni attive"
+
+#: core/ui/ui_screens.c
+msgid "No active subscriptions"
+msgstr "Nessuna sottoscrizione"
+
+#: core/ui/ui_screens.c
+msgid "Waiting for GPS"
+msgstr "In attesa del GPS"
+
+#: core/ui/ui_screens.c
+msgid "Check due"
+msgstr "Controllo in attesa"
+
+#: core/ui/ui_screens.c
+msgid "Next check "
+msgstr "Prossimo controllo "
+
+#: core/ui/ui_screens.c
+msgid "Next refresh"
+msgstr "Prossimo rinnovo"
+
+#: core/ui/ui_screens.c
+msgid "Next retry"
+msgstr "Prossimo tentativo"
+
+#: core/ui/ui_screens.c
+msgid "Due"
+msgstr "In attesa"
+
+#: core/ui/ui_screens.c
+msgid "Registered for"
+msgstr "Registrato da"
+
+#: core/ui/ui_screens.c
+msgid "Attempts"
+msgstr "Tentativi"
+
+#: core/ui/ui_screens.c
+msgid " min"
+msgstr " min"
+
+#: core/ui/ui_screens.c
+msgid "Refresh interval"
+msgstr "Intervallo di rinnovo"
+
+#: core/ui/ui_screens.c
+msgid "OK Select"
+msgstr "OK scegli"
+
+#: core/ui/ui_screens.c
 msgid "Contacts & Talkgroups"
 msgstr "Contatti e gruppi"
 
 #: core/ui/ui_screens.c
 msgid "Channels & Zones"
 msgstr "Canali e zone"
+
+#: core/ui/ui_screens.c
+msgid "Scan Lists"
+msgstr "Liste"
+
+#: core/ui/ui_screens.c
+msgid "Options"
+msgstr "Opzioni"
 
 #: core/ui/ui_screens.c
 msgid "Talkgroups"
@@ -3691,6 +4032,14 @@ msgstr "2  Scegli canale"
 #: core/ui/ui_screens.c
 msgid "1  Select zone"
 msgstr "1  Scegli zona"
+
+#: core/ui/ui_screens.c
+msgid "P1/P2 tabs  OK pick  Back"
+msgstr "P1/P2 schede  OK scegli  Indietro"
+
+#: core/ui/ui_screens.c
+msgid "P1/P2 tabs  Back"
+msgstr "P1/P2 schede  Indietro"
 
 #: core/ui/ui_screens.c
 msgid "P1/P2 tabs  OK talk  # more  Back"
@@ -3709,20 +4058,8 @@ msgid "OK/# open  Hold OK go  Back"
 msgstr "OK/# apri  Tieni OK vai  Indietro"
 
 #: core/ui/ui_screens.c
-msgid "OK Select"
-msgstr "OK scegli"
-
-#: core/ui/ui_screens.c
 msgid "* more  Back"
 msgstr "* altro  Indietro"
-
-#: core/ui/ui_svc_data.c
-msgid "No answer"
-msgstr "Nessuna risposta"
-
-#: core/ui/ui_svc_data.c
-msgid "No GPS fix"
-msgstr "Nessuna posizione GPS"
 
 #: core/ui/ui_svc_data.c
 msgid "Position request refused"
@@ -3775,6 +4112,18 @@ msgstr "Ripristino: area nativa non cancellabile"
 #: core/ui/ui_svc_storage.c
 msgid "Reset: the settings couldn't be saved"
 msgstr "Ripristino: impostazioni non salvabili"
+
+#: core/ui/ui_svc_storage.c
+msgid "History activation failed"
+msgstr "Attivazione cronologia non riuscita"
+
+#: core/ui/ui_svc_storage.c
+msgid "Message history enabled"
+msgstr "Cronologia messaggi attivata"
+
+#: core/ui/ui_svc_storage.c
+msgid "History needs blank storage"
+msgstr "La cronologia richiede spazio vuoto"
 
 #: core/ui/ui_svc_storage.c
 msgid "Couldn't save the keys: for now only"

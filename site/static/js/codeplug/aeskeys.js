@@ -1,9 +1,20 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Key programming is separate from codeplug files and browser drafts. No key bytes are returned by the radio.
 import { concat, le32, sleep } from "../flasher/bytes.js";
 
 export class AesKeyError extends Error {}
+
+export function randomKey(random = bytes => crypto.getRandomValues(bytes)) {
+	const bytes = new Uint8Array(32);
+	try {
+		random(bytes);
+		return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
+	} finally {
+		bytes.fill(0);
+	}
+}
 
 export function keyBytes(text) {
 	if (!/^[0-9a-f]{64}$/i.test(text.trim())) throw new AesKeyError("key");

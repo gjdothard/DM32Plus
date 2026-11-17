@@ -24,7 +24,7 @@ import * as stockfw from "./stockfw.js";
 import { openVendorFile, describe as describeVendorFile, analysisCandidate, offerFile, logId, whyNot } from "./vendorfile.js";
 import { pickProblem, errorProblem, vendorContext, supportedFiles, foldSupported, keepNote, nowFor, nowChoice, OFFER } from "./explain.js";
 import { confirmNoCodec } from "./nocodec.js";
-import { PRODUCT, CHANNELS, bundledRelease, loadBundledRelease, lookupRelease, supportsBundledFirmware } from "./dm32plus-release.js";
+import { PRODUCT, CHANNELS, bundledRelease, loadBundledRelease, lookupRelease, supportsBundledFirmware } from "./release-channels.js";
 import { makePlan, KEEP, MERGE } from "./plan.js";
 import { radioPicture, holdKeys } from "./radiotop.js";
 import { validRef, refShort, defaultRef, firmwareName, betaLink } from "./version.js";
@@ -419,15 +419,15 @@ function releasePicker(draw, busy) {
 		S.firmware = S.build = null;
 		draw();
 	} }, ...CHANNELS.map((channel) => h("option", { value: channel, selected: channel === releaseChannel },
-		t(`flash.dm32plus.channel_${channel}`))));
+		t(`flash.product.channel_${channel}`))));
 	const lookup = releaseLookup;
 	return h("div", {},
-		h("label", {}, t("flash.dm32plus.channel"), " ", select),
-		releaseChannel === "bundled" ? notice(t("flash.dm32plus.bundled"), "info") :
-			lookup?.pending ? h("p", { role: "status" }, spinner(), t("flash.dm32plus.checking")) :
-			lookup?.failed ? notice(t("flash.dm32plus.unavailable"), "bad") :
-			!lookup?.release ? notice(t("flash.dm32plus.no_release"), "info") : null,
-		releaseChannel === "bundled" ? null : button(t("flash.dm32plus.refresh"), () => {
+		h("label", {}, t("flash.product.channel"), " ", select),
+		releaseChannel === "bundled" ? notice(t("flash.product.bundled"), "info") :
+			lookup?.pending ? h("p", { role: "status" }, spinner(), t("flash.product.checking")) :
+			lookup?.failed ? notice(t("flash.product.unavailable"), "bad") :
+			!lookup?.release ? notice(t("flash.product.no_release"), "info") : null,
+		releaseChannel === "bundled" ? null : button(t("flash.product.refresh"), () => {
 			S.firmware = S.build = null;
 			refresh();
 			draw();
@@ -887,7 +887,7 @@ async function connectForUpdate(status) {
 		if (!p) throw await noAnswer(link);
 		r = S.data.radios.find((x) => S.data.fb.boards[x.flash.board]?.debuglink_names.includes(p.board));
 		if (!r) throw new Error(t("flash.err.unknown_board", { board: p.board }));
-		if (bundledMode() && !supportsBundledFirmware(r.id)) throw new Error(t("flash.dm32plus.board_only"));
+		if (bundledMode() && !supportsBundledFirmware(r.id)) throw new Error(t("flash.product.board_only"));
 	} catch (e) {
 		// the port isn't S.link's or the cable session's yet, so dropSerial and dropC7 can't close it: the next Connect
 		// would find it open
@@ -973,7 +973,7 @@ function updateView() {
 		const backupPanel = S.updateBackup && !c7ui.isC7000(S.radio, fb()) && !S.backupDone ? backupNow({ when: "before", onDone: draw }) : null;
 		const busy = building && !S.build.error;
 		const picker = bundled ? releasePicker(draw, !!busy) : null;
-		out.replaceChildren(panel(t(bundled ? "flash.dm32plus.upgrade" : "flash.update.title"),
+		out.replaceChildren(panel(t(bundled ? "flash.product.upgrade" : "flash.update.title"),
 			h("dl", { class: "kv-list" },
 				h("dt", {}, t("flash.update.radio")), h("dd", {}, S.radio.name),
 				h("dt", {}, t("flash.update.version")), h("dd", {}, t("flash.update.from_to", { from: firmwareName(p.version), to: updateVersion() })),
@@ -1016,7 +1016,7 @@ function radioView() {
 			const r = S.data.radios.find((x) => S.data.fb.boards[x.flash.board]?.debuglink_names.includes(p.board));
 			if (!r) throw new Error(t("flash.err.unknown_board", { board: p.board }));
 			if (bundledMode() && S.task === "install" && !supportsBundledFirmware(r.id))
-				throw new Error(t("flash.dm32plus.board_only"));
+				throw new Error(t("flash.product.board_only"));
 			selectRadio(r);
 			optionsFromProbe(p);
 			S.now = await rfoundryNow(link, p);
@@ -1246,10 +1246,10 @@ function bundledBuildView() {
 		const picker = releasePicker(draw, !!busy);
 		const release = releaseForRadio();
 		out.replaceChildren(panel(t("flash.build.title"), picker,
-			release ? h("p", {}, `${PRODUCT} ${release.version} · ${S.radio.name}`) :
+			release ? h("p", {}, `${release.testing ? "RC " : ""}${PRODUCT} ${release.version} · ${S.radio.name}`) :
 				releaseChannel === "bundled" ? notice(t("flash.build.no_image"), "bad") : null,
 			S.build?.error ? buildErrorNotice(S.build.error) : busy ? h("p", { role: "status" }, spinner(), S.build.text) : null));
-		S.forward(button(t("flash.dm32plus.continue"), async () => {
+		S.forward(button(t("flash.product.continue"), async () => {
 			if (!S.firmware) await requestBuild(draw);
 			if (S.firmware) next();
 		}, { primary: true, disabled: !release || !!busy }));

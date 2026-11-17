@@ -224,6 +224,9 @@ typedef struct {
 	ui_item_fn item;
 	const char *empty;		// shown when count is 0
 	const char *hint;
+#if CONFIG_UI_CARD_MENU
+	bool name_in_title;		// join prefix and name in the card heading instead of a context line
+#endif
 } ui_list_t;
 
 void ui_draw_list(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l);
@@ -244,10 +247,25 @@ void ui_draw_home_dual(const radio_view_t *v, const ui_state_t *s);
 #endif
 void ui_draw_quick(const radio_view_t *v, const ui_state_t *s);
 bool ui_card_layout(const ui_state_t *s);
+void ui_local_time(char out[6], uint32_t utc_minute);
 #if CONFIG_UI_CARD_MENU
-void ui_draw_main_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l);
-typedef enum { UI_CARD_ZONES, UI_CARD_ZONE_CHANNELS, UI_CARD_TALKGROUPS, UI_CARD_CONTACTS } ui_card_list_kind_t;
+#if CONFIG_GPS_SKY
+int ui_draw_position_tabs(const ui_state_t *s, const char *const *names, uint8_t count, uint8_t active);
+void ui_draw_position_footer(const ui_state_t *s);
+#endif
+const char *ui_ars_status(uint8_t state);
+void ui_draw_data_dashboard(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l);
+void ui_draw_numbered_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l, bool uniform);
+typedef enum { UI_CARD_PAGE_DETAILS, UI_CARD_PAGE_FIELDS, UI_CARD_PAGE_ACTIONS, UI_CARD_PAGE_CONFIRM } ui_card_page_kind_t;
+// value may separate the right-hand value and a secondary line with a newline.
+void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kind_t kind);
+typedef enum {
+	UI_CARD_ZONES, UI_CARD_ZONE_CHANNELS, UI_CARD_TALKGROUPS, UI_CARD_CONTACTS,
+	UI_CARD_SCAN, UI_CARD_SCAN_LISTS, UI_CARD_SCAN_OPTIONS,
+	UI_CARD_MESSAGES, UI_CARD_COMPOSER, UI_CARD_APRS, UI_CARD_FIELDS, UI_CARD_CONTACT_EDITOR,
+} ui_card_list_kind_t;
 void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kind_t kind);
+void ui_draw_card_thread(const ui_state_t *s, const ui_list_t *l, const char *(*text)(uint16_t));
 #endif
 #if CONFIG_HOTSPOT
 // Hotspot mode (hostlink in MMDVM mode): frequencies, color code, TX / RX, last call, how to leave

@@ -143,17 +143,17 @@ channel it stopped on is the one copied).
 
 ### DMR Memory talkgroup entries
 
-A zone contains channels. A DMR channel can contain an ordered list of operating entries. Each entry
-contains a timeslot (1 or 2) and a group ID. The channel supplies the RX and TX frequencies, color
-code, power, encryption, and other shared settings. A matching group contact supplies the display
-name. The codeplug editor uses the contact's timeslot override when assigning an entry, or the
-channel's timeslot when the contact has no override. The radio uses the stored entry's timeslot.
+A zone contains channels. A DMR channel can contain an ordered list of saved group contact references. The channel
+supplies the RX and TX frequencies, color code, power, encryption, and other shared settings. The contact supplies
+the name and group ID. The radio uses the contact's timeslot override when present and the channel's timeslot otherwise.
+The channel editor can add, reorder, and remove up to 63 references on a converted codeplug, subject to shared pool
+capacity. Each edit runs in the storage task and commits a new pool generation.
 The first entry is the default when entering the channel. Cycling the entries does not write to the codeplug.
 
 Selecting an entry changes the base receive timeslot and the normal PTT destination and timeslot
 together. The RX group list remains an independent receive filter on the active timeslot. An entry
-selection does not write to that list or turn its members into operating entries. The group ID and
-timeslot together identify the entry, so the same group can be assigned to both slots.
+selection does not write to that list or turn its members into operating entries. Two distinct saved contacts with
+the same group ID and different timeslot overrides can both be assigned.
 
 On DMR Memory Home with an entry list, the encoder cycles through that list. Up and Down change
 channels. Quick Controls opens the same list for direct selection. A selection applies to the chosen
@@ -271,6 +271,11 @@ The web CPS Encryption tab programs four slots through RADIO op 36. Each holds a
 key and persistent MI allocation state. The selected bank slot is the radio default; channel bindings can override it (section 5.3).
 Receive uses the effective selected key, including late entry. Selecting a slot loads it immediately when
 idle and saves the selection for the next boot. Programming a replacement requires selecting it to apply it now.
+
+The CPS shows programmed slots as status indicators. Changing a key requires confirmation before entering a
+replacement. Its optional generator obtains 32 bytes from Web Crypto `getRandomValues` and formats them as 64
+hexadecimal characters. Generation stays local; programming is a separate action. Draft key fields are cleared
+when changing slots, refreshing metadata, completing programming, or leaving the Encryption tab.
 
 The bank is an independent two-sector journal at the end of the reserved native area. It does not enlarge
 `settings_t` or keep the bank in RAM. See [settings-store.md](settings-store.md#7-private-aes-key-bank) for the record

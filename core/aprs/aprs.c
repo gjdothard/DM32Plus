@@ -1,15 +1,22 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // The APRS engine (aprs.h). One state block, a: the radio task changes it in aprs_tick / aprs_rf_* / aprs_rx_*, other
 // tasks through the any-task calls; every access is under LOCK() (the scheduler held: short copies only). Settings
 // and codeplug reads take the storage mutex, so they happen outside LOCK().
 #include <string.h>
 #include "aprs/aprs.h"
+#if CONFIG_RTC && CONFIG_GPS
+#include "app/wall_clock.h"
+#endif
 #include "aprs/aprs_fmt.h"
 #include "aprs/aprs_beacon.h"
 #include "aprs/aprs_nmea.h"
 #include "aprs/aprs_igate.h"
 #include "aprs/aprs_dmr.h"
+#if CONFIG_DMR_SMS && CONFIG_GPS
+#include "dmr/dmrDataService.h"
+#endif
 #include "aprs/hdlc.h"
 #include "aprs/kiss.h"
 #include "aprs/afsk.h"
@@ -1558,6 +1565,22 @@ void aprs_host_is_line(const char *line, size_t n, uint32_t now_ms)
 #endif
 }
 
+#if CONFIG_RTC && CONFIG_GPS
+static bool gps_rtc_valid;
+static uint32_t gps_rtc_utc, gps_rtc_ms;
+
+bool aprs_gps_rtc_utc(uint32_t now_ms, uint32_t *utc)
+{
+	LOCK();
+	uint32_t age = now_ms - gps_rtc_ms;
+	bool valid = gps_rtc_valid && !a.gps_off && a.gps.valid && age < 3000u;
+	if (valid)
+		*utc = gps_rtc_utc + age / 1000u;
+	UNLOCK();
+	return valid;
+}
+#endif
+
 void aprs_nmea(const char *s, size_t n, bool gps, uint32_t now_ms)
 {
 	nmea_fix_t x;
@@ -1589,6 +1612,14 @@ void aprs_nmea(const char *s, size_t n, bool gps, uint32_t now_ms)
 			a.gps_hdop10 = x.hdop10;
 		}
 	}
+#if CONFIG_RTC && CONFIG_GPS
+	if (gps && !x.fix) {
+		gps_rtc_valid = false;
+	} else if (gps && x.kind == NMEA_RMC) {
+		gps_rtc_valid = wall_clock_from_rmc(x.date, x.utc_hms, &gps_rtc_utc);
+		gps_rtc_ms = now_ms;
+	}
+#endif
 	if (!x.fix) {
 		f->valid = false;
 	} else {
@@ -1617,6 +1648,9 @@ void aprs_gps_enable(bool on)
 	a.gps_off = !on;
 	if (!on) {
 		a.gps.valid = false;
+#if CONFIG_RTC && CONFIG_GPS
+		gps_rtc_valid = false;
+#endif
 		a.gps_heard = false;
 #if CONFIG_GPS_SKY
 		nmea_sky_init(&a.sky);
@@ -1624,6 +1658,24 @@ void aprs_gps_enable(bool on)
 	}
 	UNLOCK();
 }
+
+#if CONFIG_GPS
+uint16_t aprs_utc_minute(uint32_t now_ms)
+{
+	LOCK();
+	uint32_t age = now_ms - a.gps.ms;
+	uint32_t utc = !a.gps_off && a.gps.valid && age < POS_STALE_MS ? a.gps.utc_hms : UINT32_MAX;
+	UNLOCK();
+	if (utc >= 240000u || utc / 100u % 100u >= 60u || utc % 100u >= 60u)
+		return 0;
+	uint32_t seconds = utc / 10000u * 3600u + utc / 100u % 100u * 60u + utc % 100u;
+	return (uint16_t)(((seconds + age / 1000u) / 60u) % 1440u + 1u);
+}
+
+#if CONFIG_DMR_SMS && !CONFIG_RTC
+uint16_t dmrDataServiceUtcMinute(uint32_t nowMs) { return aprs_utc_minute(nowMs); }
+#endif
+#endif
 
 bool aprs_gps(aprs_gps_t *out, uint32_t now_ms)
 {

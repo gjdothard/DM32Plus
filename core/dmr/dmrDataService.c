@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 /*
  * DMR data service, see dmrDataService.h. Single task (the host's, the radio task in the firmware), except the
  * dmr_data_api.h calls at the end, which only touch the mailbox and copies under the lock.
@@ -10,6 +11,9 @@
 #include "config.h"
 #include "dmr/dmrDataService.h"
 #include "dmr/dmr_data_api.h"
+#if CONFIG_MESSAGE_JOURNAL
+#include "storage/message_journal.h"
+#endif
 #if CONFIG_DMR_EMERGENCY
 #include "dmr/dmr_emergency.h"
 #endif
@@ -90,9 +94,9 @@ static void unlock(void)
 // --- The burst list being sent ---
 
 // What the list on air is for, so that its end reaches the right owner
-enum { TXK_OTHER, TXK_SMS, TXK_SIGNAL, TXK_ARS, TXK_REPLY, TXK_EMERGENCY, TXK_IP, TXK_UDP, TXK_POSITION, TXK_COUNT };
+enum { TXK_OTHER, TXK_SMS, TXK_SIGNAL, TXK_ARS, TXK_REPLY, TXK_EMERGENCY, TXK_IP, TXK_UDP, TXK_POSITION, TXK_LRRP, TXK_COUNT };
 static const char *const txKindNames[TXK_COUNT] = {
-	"other", "sms", "signal", "ars", "reply", "emergency", "ip", "udp", "position"
+	"other", "sms", "signal", "ars", "reply", "emergency", "ip", "udp", "position", "lrrp"
 };
 
 DMR_DATA_BUFFER static dmrBurst_t txBursts[DMR_DATA_MAX_BURSTS];
@@ -166,6 +170,9 @@ static struct
 	uint8_t seq;
 	bool waiting;
 	uint32_t due;
+#if CONFIG_MESSAGE_JOURNAL
+	uint32_t src;
+#endif
 	char text[sizeof(((dmrDataTMS_t *)0)->text)];
 } sms;
 #if CONFIG_DMR_CONFIRMED
@@ -197,6 +204,7 @@ static struct
 	uint8_t sigKind;
 	uint32_t sigDst;
 	bool settingsPending;
+	bool lrrpClear;
 	dmrDataSettings_t settings;
 } mailbox;
 
@@ -213,6 +221,7 @@ static struct
 	uint32_t due;							// the next attempt
 	uint8_t attempts;
 	bool registered;						// the server acknowledged
+	bool manual;							// one manual attempt requested by the UI
 	bool refused;							// the server's last answer refused the registration
 	uint32_t registeredAt;
 	uint32_t refreshMs;						// re-register after this, 0: never
@@ -229,12 +238,14 @@ static bool arsQueryReceived = false;
 DMR_DATA_BUFFER static dmrDataMessage_t inbox[DMR_DATA_INBOX_SIZE];
 static uint8_t inboxNewest = 0;
 static uint8_t inboxUsed = 0;
+static uint16_t inboxToken;
 
-static void post(uint8_t kind, uint32_t id)
+static void post_message(uint8_t kind, uint32_t id, uint16_t token)
 {
 	lock();
 	lastEvent.serial++;
 	lastEvent.kind = kind;
+	lastEvent.message_token = token;
 	lastEvent.id = id;
 	lastEvent.atMs = now;
 	dataSerial++;
@@ -244,6 +255,11 @@ static void post(uint8_t kind, uint32_t id)
 	{
 		env.notify(&copy, env.ctx);
 	}
+}
+
+static void post(uint8_t kind, uint32_t id)
+{
+	post_message(kind, id, 0);
 }
 
 static bool canTransmit(void)
@@ -933,12 +949,29 @@ static bool ipResponse(const dmrDataPacket_t *packet)
 }
 #endif
 
+#ifndef DMR_DATA_SERVICE_TEST
+__attribute__((weak)) uint16_t dmrDataServiceUtcMinute(uint32_t nowMs)
+{
+	(void)nowMs;
+	return 0;
+}
+
+#endif
+
 // --- Our SMS ---
 
 static void smsFinish(uint8_t state)
 {
 	sms.state = state;
 	sms.waiting = false;
+#if CONFIG_MESSAGE_JOURNAL
+	uint8_t flags = MESSAGE_RECORD_OUTGOING | (sms.group ? MESSAGE_RECORD_GROUP : 0);
+	if (state != DMR_REQ_OK)
+		flags |= MESSAGE_RECORD_FAILED;
+	else if (sms.ack)
+		flags |= MESSAGE_RECORD_DELIVERED;
+	message_history_capture(sms.src, sms.dst, flags, dmrDataServiceUtcMinute(now), sms.text);
+#endif
 	if (state == DMR_REQ_OK)
 	{
 		post(DMR_DATA_EV_SMS_SENT, sms.dst);
@@ -962,6 +995,9 @@ static bool smsTransmit(void)
 		smsSeq = (smsSeq + 1) & 0x1F;
 		sms.seq = smsSeq;
 	}
+#if CONFIG_MESSAGE_JOURNAL
+	sms.src = channel.ownId;
+#endif
 	int count = 0;
 #if CONFIG_DMR_CONFIRMED
 	if ((sms.format == DMR_SMS_FORMAT_ETSI_IP) && sms.ack)
@@ -1054,6 +1090,9 @@ bool dmrDataServiceSendSMSFormat(bool group, uint32_t dst, const char *text, boo
 	}
 
 	sms.dst = dst;
+#if CONFIG_MESSAGE_JOURNAL
+	sms.src = channel.ownId;
+#endif
 	sms.group = group;
 	// ETSI IP text has no acknowledgment of its own: an individual one goes as confirmed data, so the ETSI response
 	// confirms delivery, unless confirmed IP data is off; a group one is done once on air
@@ -1349,6 +1388,25 @@ static uint32_t arsContext(uint32_t server)
 	return (h != 0) ? h : 1;
 }
 
+// A manual retry shares the normal send queue, and can't duplicate a request still awaiting its answer.
+static bool arsManualAvailable(void)
+{
+	return CONFIG_DMR_ARS && !passthrough && ars.powerOff == ARS_POWER_OFF_NONE &&
+		settings.arsServer != 0 && canTransmit() && !ars.manual &&
+		!(txKind == TXK_ARS && dmrDataServiceIsBusy()) &&
+		(ars.registered || !ars.attempts || now - stats.arsLastMs >= START_TIMEOUT_MS);
+}
+
+bool dmrDataServiceArsRegisterNow(void)
+{
+	lock();
+	bool ok = arsManualAvailable() && !mailbox.settingsPending;
+	if (ok)
+		ars.manual = true;
+	unlock();
+	return ok;
+}
+
 static bool arsSend(uint32_t server, bool registration)
 {
 	uint8_t pdu[DMR_ARS_MAX_PDU];
@@ -1441,6 +1499,22 @@ static void arsTick(void)
 			}
 		}
 	}
+
+	lock();
+	if (ars.manual && (context == 0 || (context == ars.context && context == ars.seen &&
+			now - ars.seenSince >= ars.settleMs)))
+	{
+		ars.manual = false;
+		if (context != 0)
+		{
+			if (ars.registered || ars.attempts > ARS_RETRIES)
+				ars.attempts = 0;
+			ars.registered = false;
+			ars.refused = false;
+			ars.due = now;
+		}
+	}
+	unlock();
 
 	uint8_t state = dmrDataServiceArsState();
 
@@ -1594,7 +1668,7 @@ static void positionReceived(uint32_t src, const uint8_t *doc, int len)
 // every n seconds or every n meters (checked every interval, 30 s when it gives none), and stops them. Without a
 // position source (settings.hasGps false: a radio without GPS) every answer says "no fix" and no trigger is started
 #define LRRP_QUEUE_SIZE				3		// one slot kept free
-#define LRRP_TRIGGERS_MAX			2
+#define LRRP_TRIGGERS_MAX			DMR_LRRP_ACTIVE_MAX
 #define LRRP_MIN_INTERVAL_S			5
 #define LRRP_DISTANCE_CHECK_S		30
 #define LRRP_FIRST_REPORT_MS		5000	// a new trigger's first report, after its start response
@@ -1661,7 +1735,7 @@ static bool lrrpSend(uint32_t dst, const uint8_t *doc, int length, int preambles
 	}
 
 	if (!queueTx(dmrDataBuildUDP(false, dst, channel.ownId, DMR_UDP_PORT_LRRP, DMR_UDP_PORT_LRRP, doc, length,
-								 DT_RATE_12_DATA, preambles, txBursts, DMR_DATA_MAX_BURSTS), TXK_OTHER))
+								 DT_RATE_12_DATA, preambles, txBursts, DMR_DATA_MAX_BURSTS), TXK_LRRP))
 	{
 		return false;
 	}
@@ -1796,9 +1870,17 @@ static bool lrrpHandleRequest(const lrrpPendingRequest_t *pending)
 	return true;
 }
 
+static void lrrpClear(void)
+{
+	lrrpReadIdx = lrrpWriteIdx;
+	memset(lrrpTriggers, 0, sizeof(lrrpTriggers));
+	if (txPending && txKind == TXK_LRRP)
+		txPending = false;
+}
+
 static void lrrpTick(void)
 {
-	if (!CONFIG_DMR_LRRP || passthrough)
+	if (!CONFIG_DMR_LRRP || !settings.lrrpReply || passthrough)
 	{
 		return;
 	}
@@ -1863,6 +1945,28 @@ int dmrDataServiceLrrpTriggerCount(void)
 		n += lrrpTriggers[i].active ? 1 : 0;
 	}
 	return n;
+}
+
+void dmrDataServiceDashboard(dmrDataDashboard_t *out)
+{
+	lock();
+	dmrArsState_t state = dmrDataServiceArsState();
+	*out = (dmrDataDashboard_t){
+		.nextMs = state == DMR_ARS_STATE_OFF ? 0 : stats.arsNextMs,
+		.registeredAt = ars.registeredAt, .refreshMs = ars.refreshMs,
+		.attempts = state == DMR_ARS_STATE_OFF ? 0 : ars.attempts, .maxAttempts = ARS_RETRIES + 1,
+		.arsState = state, .canRegister = arsManualAvailable() && !mailbox.settingsPending,
+	};
+	if (CONFIG_DMR_LRRP && !mailbox.lrrpClear && settings.lrrpReply && !passthrough)
+		for (unsigned i = 0; i < LRRP_TRIGGERS_MAX; i++)
+		{
+			const lrrpTrigger_t *t = &lrrpTriggers[i];
+			if (t->active)
+				out->subscription[out->count++] = (dmrLrrpSubscription_t){
+					t->requester, t->intervalMs, t->distanceMeters, t->due,
+				};
+		}
+	unlock();
 }
 
 uint32_t dmrDataServiceLocationNeededInMs(void)
@@ -1933,7 +2037,7 @@ void dmrDataServicePowerOffCanceled(void)
 
 static void takeMailbox(void)
 {
-	bool smsReq = false, sigReq = false, setReq = false;
+	bool smsReq = false, sigReq = false, setReq = false, clearLrrp;
 	uint32_t smsDst = 0, sigDst = 0;
 	bool smsGroup = false, smsAck = false;
 	uint8_t smsFormat = DMR_SMS_FORMAT_DEFAULT;
@@ -1965,14 +2069,22 @@ static void takeMailbox(void)
 		newSettings = mailbox.settings;
 		mailbox.settingsPending = false;
 	}
+	clearLrrp = mailbox.lrrpClear;
+	mailbox.lrrpClear = false;
 	unlock();
 
+	if (CONFIG_DMR_LRRP && clearLrrp)
+		lrrpClear();
 	if (setReq)
 	{
 		dmrDataServiceSetSettings(&newSettings);
 	}
 	if (smsReq && !dmrDataServiceSendSMSFormat(smsGroup, smsDst, text, smsAck, smsFormat) && (sms.state != DMR_REQ_FAILED))
 	{
+#if CONFIG_MESSAGE_JOURNAL
+		message_history_capture(channel.ownId, smsDst, MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_FAILED |
+					(smsGroup ? MESSAGE_RECORD_GROUP : 0), dmrDataServiceUtcMinute(now), text);
+#endif
 		post(DMR_DATA_EV_SMS_FAILED, smsDst);// another one still running
 	}
 	if (sigReq && !signalStart(sigKind, sigDst) && (sig.state != DMR_REQ_FAILED))
@@ -2479,14 +2591,22 @@ static void handlePacket(const dmrDataPacket_t *packet)
 		}
 	}
 
+	uint16_t utcMinute = dmrDataServiceUtcMinute(now);
+	bool own = packet->src && packet->src == channel.ownId;
 	lock();
 	uint8_t next = (inboxUsed == 0) ? 0 : ((inboxNewest + 1) % DMR_DATA_INBOX_SIZE);// replaces the oldest when full
 	dmrDataMessage_t *message = &inbox[next];
+	if (++inboxToken == 0)
+		++inboxToken;
+	message->token = inboxToken;
+	uint16_t token = message->token;
 	message->src = packet->src;
 	message->dst = packet->dst;
 	message->group = packet->group;
 	message->seq = tms.seq;
 	message->receivedAt = now;
+	message->utcMinute = utcMinute;
+	message->own = own;
 	message->unread = true;
 	message->format = format;
 	memcpy(message->text, tms.text, sizeof(message->text));
@@ -2496,10 +2616,16 @@ static void handlePacket(const dmrDataPacket_t *packet)
 		inboxUsed++;
 	}
 	unlock();
+#if CONFIG_MESSAGE_JOURNAL
+	uint8_t flags = packet->group ? MESSAGE_RECORD_GROUP : 0;
+	if (own)
+		flags |= MESSAGE_RECORD_LOCAL_AUTHOR;
+	message_history_capture(packet->src, packet->dst, flags, utcMinute, tms.text);
+#endif
 	stats.smsReceived++;
 	stats.etsiSmsReceived += (format == DMR_SMS_FORMAT_ETSI) ? 1 : 0;
 	stats.ipTextReceived += (format == DMR_SMS_FORMAT_ETSI_IP) ? 1 : 0;
-	post(DMR_DATA_EV_SMS_RECEIVED, packet->src);
+	post_message(DMR_DATA_EV_SMS_RECEIVED, packet->src, token);
 }
 
 static uint32_t getId(const uint8_t *p)
@@ -2716,6 +2842,10 @@ void dmrDataServiceInit(const dmrDataEnv_t *e)
 
 void dmrDataServiceSetSettings(const dmrDataSettings_t *s)
 {
+	if (CONFIG_DMR_LRRP && !s->lrrpReply)
+		lrrpClear();
+	if (s->arsServer != settings.arsServer)
+		ars.manual = false;
 	settings = *s;
 	dmrDataSetUdpCompression(settings.udpCompress);
 }
@@ -2731,8 +2861,8 @@ void dmrDataServiceSetPassthrough(bool on)
 	if (on && !passthrough)
 	{
 		// Location requests and triggers belong to the PC from now on: nothing queued is answered later
-		lrrpReadIdx = lrrpWriteIdx;
-		memset(lrrpTriggers, 0, sizeof(lrrpTriggers));
+		lrrpClear();
+		ars.manual = false;
 	}
 	passthrough = on;
 }
@@ -2845,9 +2975,26 @@ bool sms_inbox_get(int i, dmrDataMessage_t *out)
 	return m != NULL;
 }
 
-void sms_inbox_mark_read(int i)
+static int inbox_find_locked(uint16_t token)
+{
+	for (int i = 0; token != 0 && i < inboxUsed; i++)
+		if (dmrDataServiceMessage(i)->token == token)
+			return i;
+	return -1;
+}
+
+int sms_inbox_get_token(uint16_t token, dmrDataMessage_t *out)
 {
 	lock();
+	int i = inbox_find_locked(token);
+	if (i >= 0 && out != NULL)
+		*out = *dmrDataServiceMessage(i);
+	unlock();
+	return i;
+}
+
+static void inbox_mark_read_locked(int i)
+{
 	dmrDataMessage_t *m = (dmrDataMessage_t *)dmrDataServiceMessage(i);
 
 	if ((m != NULL) && m->unread)
@@ -2855,14 +3002,25 @@ void sms_inbox_mark_read(int i)
 		m->unread = false;
 		dataSerial++;
 	}
+}
+
+void sms_inbox_mark_read(int i)
+{
+	lock();
+	inbox_mark_read_locked(i);
 	unlock();
 }
 
-bool sms_inbox_delete(int i)
+void sms_inbox_mark_read_token(uint16_t token)
+{
+	lock();
+	inbox_mark_read_locked(inbox_find_locked(token));
+	unlock();
+}
+
+static bool inbox_delete_locked(int i)
 {
 	bool ok = false;
-
-	lock();
 	if ((i >= 0) && (i < inboxUsed))
 	{
 		// Logical index k is inbox[(newest - k) mod N]: each older message moves one place towards the newest, the
@@ -2876,6 +3034,21 @@ bool sms_inbox_delete(int i)
 		dataSerial++;
 		ok = true;
 	}
+	return ok;
+}
+
+bool sms_inbox_delete(int i)
+{
+	lock();
+	bool ok = inbox_delete_locked(i);
+	unlock();
+	return ok;
+}
+
+bool sms_inbox_delete_token(uint16_t token)
+{
+	lock();
+	bool ok = inbox_delete_locked(inbox_find_locked(token));
 	unlock();
 	return ok;
 }
@@ -3042,6 +3215,8 @@ void dmr_data_set_settings(const dmrDataSettings_t *in)
 	lock();
 	mailbox.settings = *in;
 	mailbox.settingsPending = true;
+	if (CONFIG_DMR_LRRP && !in->lrrpReply)
+		mailbox.lrrpClear = true;
 	unlock();
 }
 

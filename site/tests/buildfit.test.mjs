@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // A build too big for the radio (flasher/buildfit.js): the build service's error read as the memory and how far over,
 // and the build step telling the user what to turn off instead of reporting a fault.
 
@@ -19,10 +20,10 @@ test("the service's too-big error gives the memory and the kilobytes over, round
 });
 
 test("the build step shows a build that doesn't fit as what to change, in every language", () => {
-	const src = readFileSync(new URL("../static/js/flasher/app.js", import.meta.url), "utf8");
+	const src = readFileSync(new URL("../static/js/flasher/app.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 	assert.match(src, /const fit = tooBig\(why\);\n\t+if \(fit\) throw new FitError\(fit\);/);
 	assert.match(src, /err\.fit \? notice\(err\.text, "bad"\) : errorNotice\(err\.text, err\.rec\)/);
-	assert.equal((src.match(/buildErrorNotice\(S\.build\.error\)/g) || []).length, 2);	// the build step and the update's
+	assert.equal((src.match(/buildErrorNotice\(S\.build\.error\)/g) || []).length, 3);	// install, upgrade, and custom build
 	for (const lang of ["en", "es", "it"]) {
 		const cat = JSON.parse(readFileSync(new URL(`../i18n/${lang}.json`, import.meta.url), "utf8"));
 		for (const k of ["flash.build.too_big", "flash.build.too_big_ram"]) assert.match(cat[k], /\{kb\}/, `${lang}: ${k}`);

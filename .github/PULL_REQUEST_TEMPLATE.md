@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 <!-- Read docs/dev/contributing.md and docs/CLEANROOM.md first. Delete what doesn't apply. -->
 
 ## What and why
@@ -17,7 +18,7 @@ end generated
 
 | Check | Result |
 |---|---|
-| `JOBS=8 tools/ci.sh` ends with "all checks passed" | <!-- yes; list any skips --> |
+| `JOBS=8 tools/ci.sh --board <product-board-id>` ends with "all checks passed" | <!-- yes; list any skips --> |
 | Host unit tests added or changed (required for code changes) | <!-- test names; docs-only PRs: "docs only" --> |
 | HIL (`tests/hil`) | <!-- tests run and radio, or "not run" --> |
 | On the radio, on air | <!-- radio, firmware commit, what you tried; or "not tried" --> |

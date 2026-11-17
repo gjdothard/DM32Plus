@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Zone sharing's codeplug side (zone_import.h, docs/spec/zone-share.md 4 and 5)
 #include "config.h"
 #if CONFIG_ZONE_SHARE	// the whole file
@@ -189,13 +190,13 @@ static uint8_t power_on_air(uint8_t p)
 	return (p + 1u >= board.power_count) ? ZS_POWER_HIGH : ZS_POWER_MID;
 }
 
-static void channel_here(const zsChannel_t *z, int position, channel_t *ch)
+static void channel_here(const zsChannel_t *z, uint16_t position, channel_t *ch)
 {
 	memset(ch, 0, sizeof(*ch));
 	if (z->name[0] != '\0') {
 		strncpy(ch->name, z->name, CODEPLUG_NAME_LEN);
 	} else {
-		snprintf(ch->name, sizeof(ch->name), "Channel %d", position + 1);
+		snprintf(ch->name, sizeof(ch->name), "Channel %u", (unsigned)position + 1u);
 	}
 	ch->rx_hz = z->rxHz;
 	ch->tx_hz = (uint32_t)((int64_t)z->rxHz + z->txOffsetHz);

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The factory update mode's write step (iapui.js iapPanel) against a small stand-in for the DOM: a step the user left
 // while the page listens for update mode stops listening and draws nothing. The stock console route against a simulated
 // radio: the hardware variant it reports decides what the page offers. Run with site/tests/run.sh.
@@ -258,13 +259,15 @@ test("stock console: the try on an untried build loads the stub and marks the se
 	const { r, rt, seen, parts } = await stockRoute(t, { variant: "DBB" });
 	olderBuild(r);
 	let loaded = 0;
-	parts.onLoaded = async () => { loaded++; };
+	let complete;
+	const finished = new Promise(resolve => { complete = resolve; });
+	parts.onLoaded = async () => { loaded++; complete(); };
 	await rt.routes.stockFound(parts);
 	seen.acts.find((b) => label(b) === "Try Backup Anyway").click();
 	await sleep(50);
 	assert.match(seen.shown.textContent, /new to the radio programming utility/);
 	seen.acts.find((b) => label(b) === "Switch to Update Mode").click();
-	for (let i = 0; i < 400 && !loaded; i++) await sleep(50);
+	await finished;
 	assert.equal(loaded, 1);
 	assert.equal(r.state, "stub");
 	assert.deepEqual(rt.state.c7.stockUntried, { version: "909E.DBB.EARSAB.018" });

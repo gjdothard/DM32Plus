@@ -783,6 +783,118 @@
   "about": {
    "group": "settings",
    "needs": []
+  },
+  "add_talkgroup": {
+   "group": "channels",
+   "needs": [
+    "TALKGROUP_EDIT"
+   ]
+  },
+  "operating_talkgroups": {
+   "group": "channels",
+   "needs": [
+    "TALKGROUP_EDIT"
+   ]
+  },
+  "talkgroup_actions": {
+   "group": "channels",
+   "needs": [
+    "TALKGROUP_EDIT"
+   ]
+  },
+  "talkgroup_edit": {
+   "group": "channels",
+   "needs": [
+    "CONTACT_EDIT"
+   ]
+  },
+  "talkgroup_more": {
+   "group": "channels",
+   "needs": [
+    "CONTACT_EDIT"
+   ]
+  },
+  "contact_add": {
+   "group": "channels",
+   "needs": [
+    "CONTACT_EDIT"
+   ]
+  },
+  "aprs": {
+   "group": "tools",
+   "needs": [
+    "APRS"
+   ]
+  },
+  "aprs_beacon": {
+   "group": "tools",
+   "needs": [
+    "APRS"
+   ]
+  },
+  "aprs_heard": {
+   "group": "tools",
+   "needs": [
+    "APRS_RX"
+   ]
+  },
+  "aprs_position": {
+   "group": "tools",
+   "needs": [
+    "APRS"
+   ]
+  },
+  "ars": {
+   "group": "tools",
+   "needs": [
+    "DMR_ARS"
+   ]
+  },
+  "battery_info": {
+   "group": "tools",
+   "needs": []
+  },
+  "contact_position": {
+   "group": "calls",
+   "needs": [
+    "CONTACT_POSITION"
+   ]
+  },
+  "contact_position_empty": {
+   "group": "calls",
+   "needs": [
+    "CONTACT_POSITION"
+   ]
+  },
+  "gps_data": {
+   "group": "tools",
+   "needs": []
+  },
+  "radio_menu": {
+   "group": "channels",
+   "needs": [
+    "UI_CARD_MENU"
+   ]
+  },
+  "repeater_info": {
+   "group": "tools",
+   "needs": [
+    "SFR"
+   ]
+  },
+  "usb_info": {
+   "group": "tools",
+   "needs": [
+    "USB_NETWORK"
+   ]
+  },
+  "sms-write": {
+   "group": "messages",
+   "needs": [
+    "DMR_SMS"
+   ]
   }
- }
+ },
+ "_copyright": "Copyright (c) 2026 Garrett Dothard",
+ "_license": "SPDX-License-Identifier: MIT"
 }

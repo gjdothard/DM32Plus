@@ -40,6 +40,10 @@ is `tools/bringup.py list --radio <id>`.
 | Feature | DM-32UV | DM-1701 | DM-1801 Pro | DB25-D PRO | MD-380 | MD-UV380 |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
 | `fm` | pass (seed) | pass (seed) | pass (seed) | pass (seed) | pass (seed) | not recorded |
+| `talkgroup_edit` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
+| `dmr_talkgroup_entries` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
+| `message_journal` | not recorded | off | off | off | off | off |
+| `ui_card_menu` | not recorded | off | off | off | off | off |
 | `ref_trim` | pass (seed) | pass (seed) | pass (seed) | pass (seed) | pass (seed) | not recorded |
 | `subtone` | pass (seed) | pass (seed) | pass (seed) | not recorded | pass (seed) | not recorded |
 | `fm_tx_tones` | not recorded | pass (seed) | not recorded | not recorded | not written | not recorded |
@@ -69,11 +73,13 @@ is `tools/bringup.py list --radio <id>`.
 | `beep` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `vibrate` | off | ✕ | not recorded | ✕ | ✕ | ✕ |
 | `gps` | pass (seed) | not recorded | ✕ | not recorded | not recorded | not recorded |
+| `rtc` | not recorded | not written | not written | not written | not written | not written |
 | `dmr_data_rx` | not recorded | pass (seed) | pass (seed) | not recorded | not recorded | not recorded |
 | `dmr_sms` | not recorded | pass (seed) | pass (seed) | not recorded | pass (seed) | not recorded |
 | `dmr_tms` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `dmr_ars` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `dmr_lrrp` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
+| `contact_position` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `dmr_udp_compress` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `dmr_confirmed` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `sfr` | not recorded | pass (seed) | pass (seed) | not recorded | ✕ | not recorded |
@@ -158,7 +164,7 @@ has the part it needs (`board.toml` `[hardware] unconfirmed`). The rule:
 that needs hardware some radios lack (`hardware` in `tests/hil/features.toml`) is never ○. The last two rows are not
 switches. Voltage reading: what the radio measures, its battery, its DC input (Supply) or none (`board_volts()` in
 `hal/board.h`). Clock: whether the radio's real-time clock keeps time through power-off (`board.toml` `[hardware]
-clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](spec/radio-features.md) 5.6).
+clock`; ? = not known yet). The `RTC` row lists firmware support ([radio-features.md](spec/radio-features.md#56-time-of-day)).
 
 <!-- generated: tools/boards.py docs feature-defaults; edit config/features.mk and boards/*/config.mk -->
 | Feature switch | DM-32UV | DM-1701 | DM-1801 Pro | DB25-D PRO | MD-380 | MD-UV380 |
@@ -171,10 +177,13 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `DMR_TALKER_ALIAS` | ● | ● | ● | ● | ● | ● |
 | `DMR_GPS` | ● | ● | ● | ● | ● | ● |
 | `DMR_SMS` | ● | ● | ● | ● | ● | ● |
+| `MESSAGE_JOURNAL` | ● | ○ | ○ | ○ | ○ | ○ |
 | `DMR_TMS` | ● | ● | ● | ● | ● | ● |
 | `DMR_ARS` | ● | ● | ● | ● | ● | ● |
 | `DMR_LRRP` | ● | ● | ● | ● | ● | ● |
 | `DMR_TALKGROUP_ENTRIES` | ● | ● | ● | ● | ● | ● |
+| `TALKGROUP_EDIT` | ● | ● | ● | ● | ● | ● |
+| `CONTACT_POSITION` | ● | ● | ● | ● | ● | ● |
 | `DMR_SIGNALING` | ● | ● | ● | ● | ● | ● |
 | `DMR_EMERGENCY` | ● | ● | ● | ● | ● | ● |
 | `DMR_ROAMING` | ● | ● | ● | ● | ● | ● |
@@ -233,6 +242,7 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `BATTERY_SAVE` | ● | ● | ● | ● | ● | ● |
 | `VIBRATE` | ? | ✕ | ● | ✕ | ✕ | ✕ |
 | `GPS` | ● | ● | ✕ | ● | ● | ● |
+| `RTC` | ● | … | … | … | … | … |
 | `AUDIO_PROBE` | … | ○ | … | … | … | ○ |
 | `STUB_ENTRY` | ● | ● | ● | ● | ● | ● |
 | `NAND_STORAGE` | ✕ | ✕ | ✕ | ● | ✕ | ✕ |
@@ -261,6 +271,8 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | Feature | Switch | Bytes DM-1701 | Bytes MD-380 | Notes |
 |---|---|---:|---:|---|
 | Analog FM receive and transmit | `FM` | 29,296 | 28,056 | Includes its children (tones, VOX, APRS, FM VFO) |
+| Saved operating talkgroup assignments | `DMR_TALKGROUP_ENTRIES` | — | — | Shared saved-contact references per channel ([dmr-voice.md](spec/dmr-voice.md)) |
+| Edit operating talkgroups | `TALKGROUP_EDIT` | — | — | Add, reorder, and remove channel assignments on the radio |
 | CTCSS / DCS encode and decode | `SUBTONE` | 904 | 3,292* | MD-380: software decode (ADC) and PWM encode; CTCSS 100.0 Hz works on air both ways (2026-10-19), DCS not yet checked |
 | FM TX tones: roger beep, 1750 Hz burst | `FM_TX_TONES` | 568 | — | MD-380: TX tone path not written |
 | DTMF transmit from the keys | `DTMF` | 920 | — | MD-380: TX tone path not written |
@@ -295,8 +307,10 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 
 | Feature | Switch | Bytes DM-1701 | Bytes MD-380 | Notes |
 |---|---|---:|---:|---|
+| Persistent conversation history | `MESSAGE_JOURNAL` | — | — | Deferred flash journal and conversation browsing; requires a board-provided reserve ([message-journal.md](spec/message-journal.md)) |
 | Text messages (ETSI IP text by default) | `DMR_SMS` | 2,640 | 5,072 | Includes the TMS format. Individual ETSI IP texts go confirmed ("Delivered to") |
 | Motorola TMS text format | `DMR_TMS` | 784 | 740 | Optional format next to ETSI IP text |
+| Contact position controls | `CONTACT_POSITION` | — | — | Saved contact position and location subscription controls ([dmr-data.md](spec/dmr-data.md)) |
 | ARS registration | `DMR_ARS` | 1,112 | 1,324 |  |
 | LRRP location | `DMR_LRRP` | 8,548 | 2,048 |  |
 | Compressed UDP/IP headers on transmit (SAP 3) | `DMR_UDP_COMPRESS` | 408 | 356 | Auto: not for ports 4000-4099 or ETSI IP text |
@@ -355,6 +369,8 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 
 | Feature | Switch | Bytes DM-1701 | Bytes MD-380 | Notes |
 |---|---|---:|---:|---|
+| Card menu layout | `UI_CARD_MENU` | — | — | Card navigation on supported color displays ([ui.md](spec/ui.md)) |
+| Hardware wall clock | `RTC` | — | — | Board-provided clock with GPS synchronization and local-time display ([radio-features.md](spec/radio-features.md)) |
 | Settings menu on the radio | `UI_SETTINGS` | 5,304 | 5,640 |  |
 | Diagnostics page | `DIAG` | 3,752 | 3,532 |  |
 | Color screen settings (theme, highlight color, filled status bar) | `UI_COLOR` | 672 | 608 | Off on the DM-1801 Pro (monochrome screen; 628 B there). Measured 2026-10-17; DM-1701 with LTO 612 B |

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 /*
  * DMR data service: text messages (ETSI IP text, ETSI defined short data and, with CONFIG_DMR_TMS, Motorola TMS)
  * with their ACKs, ETSI responses to
@@ -29,9 +30,11 @@ typedef struct
 	uint32_t src;
 	uint32_t dst;
 	uint32_t receivedAt;					// the service's clock (ms)
-	bool     group;
+	uint16_t token;						// nonzero, stable while a message is in the inbox
+	uint16_t utcMinute;					// UTC minute of day plus one, or zero if unknown
+	bool     group : 1;
 	uint8_t  seq;							// TMS sequence number, to spot a sender's retries
-	bool     unread;						// not shown on the radio yet
+	bool     unread : 1, own : 1;						// not shown on the radio yet
 	uint8_t  format;						// dmr_sms_format_t it came in (a reply goes the same way)
 	char     text[sizeof(((dmrDataTMS_t *)0)->text)];
 } dmrDataMessage_t;
@@ -104,6 +107,7 @@ typedef struct
 {
 	uint32_t serial;						// bumped with every event
 	uint8_t  kind;							// dmrDataEventKind_t
+	uint16_t message_token;					// SMS_RECEIVED only
 	uint32_t id;
 	uint32_t atMs;
 } dmrDataEvent_t;
@@ -318,10 +322,23 @@ bool dmrDataServicePassthrough(void);
 
 dmrArsState_t dmrDataServiceArsState(void);
 int dmrDataServiceLrrpTriggerCount(void);
+#define DMR_LRRP_ACTIVE_MAX 2
+typedef struct {
+	uint32_t requester, intervalMs, distanceMeters, due;
+} dmrLrrpSubscription_t;
+typedef struct dmrDataDashboard {
+	dmrLrrpSubscription_t subscription[DMR_LRRP_ACTIVE_MAX];
+	uint32_t nextMs, registeredAt, refreshMs;
+	uint8_t count, attempts, maxAttempts, arsState;
+	bool canRegister;
+} dmrDataDashboard_t;
+void dmrDataServiceDashboard(dmrDataDashboard_t *out);
+bool dmrDataServiceArsRegisterNow(void);
 // When the service next needs a position, in ms (0: now or any time, UINT32_MAX: never): GPS power management
 uint32_t dmrDataServiceLocationNeededInMs(void);
 // The platform's position for LRRP (weak: none). Only asked when the settings say hasGps
 bool dmrDataServiceGetPosition(lrrpPosition_t *position);
+uint16_t dmrDataServiceUtcMinute(uint32_t nowMs);	// optional GPS clock, minute plus one
 
 // The inbox: the last DMR_DATA_INBOX_SIZE messages, newest first; a new message replaces the oldest
 int dmrDataServiceMessageCount(void);

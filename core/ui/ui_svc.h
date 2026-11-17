@@ -14,6 +14,9 @@
 #include "config.h"
 #include "radio/radio.h"
 #include "codeplug/zone_edit.h"
+#if CONFIG_MESSAGE_JOURNAL
+#include "storage/message_journal.h"
+#endif
 
 // --- What is available (screens gray out what isn't, and say why on SELECT) ---
 #define UI_FEAT_TALK_TARGET	(1u << 0)	// ui_svc_talk_to / ui_svc_focus_target (dmr-voice)
@@ -76,10 +79,15 @@ bool ui_svc_save_channel(void);
 // Store a whole channel (the channel editor, ui.md 2.1) at number 1..CODEPLUG_CHANNELS_MAX, as a storage job like
 // ui_svc_save_channel. false: a write is still going on, or no codeplug storage in this build
 bool ui_svc_write_channel(uint16_t number, const channel_t *ch);
+#if CONFIG_TALKGROUP_EDIT
+typedef enum { UI_TG_ADD, UI_TG_UP, UI_TG_DOWN, UI_TG_REMOVE } ui_tg_edit_t;
+bool ui_svc_edit_talkgroups(uint16_t channel, uint16_t contact, ui_tg_edit_t op);
+#endif
 #if CONFIG_CONTACT_EDIT
 // Store a contact (the contact editor, ui.md 2.4) at index 1..CODEPLUG_CONTACTS_MAX, as a storage job. false: a write
 // is still going on, or no codeplug storage in this build
 bool ui_svc_write_contact(uint16_t index, const contact_t *c);
+bool ui_svc_set_channel_contact(uint16_t index);
 #endif
 // The zone editor (ui.md 2.2): op is queued and runs as a storage job (zone_edit_apply), in order; the radio follows
 // zone indexes it moves. A refusal in the job raises UI_EV_SAVE_FAILED and drops what was queued after it. false:
@@ -93,6 +101,14 @@ bool ui_svc_save_talk_target(uint32_t id, bool private_call);
 
 // --- Scan (radio-features). Whether a scan runs is radio_view_t.scan ---
 bool ui_svc_scan(bool on);			// on: the zone (in the VFO: the band); off: stop where it is
+#if CONFIG_UI_CARD_MENU
+typedef struct {
+	uint16_t dwell_ms, delay_ms;
+	uint8_t resume;
+	bool priority;
+} ui_scan_prefs_t;
+void ui_svc_scan_prefs(ui_scan_prefs_t *out);
+#endif
 bool ui_svc_scan_skip(void);			// nuisance delete of the channel that stopped the scan
 // Dual watch (docs/ux/dual-watch.md): two channels, each a channel of any zone or the VFO. ref[sel] is the selected
 // one: PTT transmits on it (and the watch goes on after), keys and quick settings act on it. NULL refs stop the
@@ -141,23 +157,34 @@ void ui_svc_dtmf_block(bool blocked);
 #define UI_MSG_TEXT_MAX	143
 typedef struct {
 	uint32_t src;		// sender (or, for sent ones, recipient)
+	uint32_t dst;
+	uint16_t token;		// stable until this inbox record is removed
 	bool group;		// sent to a talkgroup
 	bool unread;
 	bool sent;		// one we sent
-	uint32_t age_ms;	// how long ago
+	uint16_t utc_minute;	// minute of day plus one, or zero
+	bool own;		// the author ID is this radio
 	char name[17];		// sender's name if known
 	char text[UI_MSG_TEXT_MAX + 1];
 } ui_msg_t;
 uint16_t ui_svc_msg_count(void);		// inbox, newest first
 uint16_t ui_svc_msg_unread(void);
 bool ui_svc_msg_get(uint16_t i, ui_msg_t *out);
-void ui_svc_msg_read(uint16_t i);		// mark read
-bool ui_svc_msg_delete(uint16_t i);
+int ui_svc_msg_by_token(uint16_t token, ui_msg_t *out);	// current list index, -1 when absent
+void ui_svc_msg_read(uint16_t token);
+bool ui_svc_msg_delete(uint16_t token);
 // Queue a text message; the result comes back as a ui_notify() event
 bool ui_svc_msg_send(uint32_t dst, bool group, const char *text);
 bool ui_svc_radio_check(uint32_t id);
 bool ui_svc_position_request(uint32_t id);
 bool ui_svc_call_alert(uint32_t id);
+
+#if CONFIG_UI_CARD_MENU
+uint8_t ui_svc_ars_state(void);	// dmrArsState_t
+struct dmrDataDashboard;
+void ui_svc_data_dashboard(struct dmrDataDashboard *out);
+bool ui_svc_ars_register_now(void);
+#endif
 
 // --- Location ---
 typedef struct {
@@ -172,6 +199,7 @@ typedef struct {
 	uint16_t speed_kmh, course;	// 0xFFFF unknown
 	uint32_t utc_hms;	// hhmmss, 0xFFFFFFFF unknown
 } ui_position_t;
+uint16_t ui_svc_utc_minute(void);	// current UTC minute plus one, or zero
 bool ui_svc_position(ui_position_t *out);	// false: no GPS on this radio (or off)
 // One satellite for the GPS screen's sky plot and signal bars
 enum { UI_GNSS_GPS, UI_GNSS_GLONASS, UI_GNSS_GALILEO, UI_GNSS_BEIDOU, UI_GNSS_QZSS, UI_GNSS_COUNT };
@@ -199,6 +227,15 @@ void ui_svc_emergency_dismiss(void);
 // calibration: those would need a second, explicit confirmation), then the radio restarts. Done by the housekeeping
 // task, not the UI's; false if it can't be started (no flash, or a save still going on)
 bool ui_svc_factory_reset(void);
+#if CONFIG_MESSAGE_JOURNAL
+bool ui_svc_message_history_available(void);
+bool ui_svc_message_history_activate(void);
+bool ui_svc_history_active(void);
+void ui_svc_history_browse(uint32_t key, uint32_t before);
+void ui_svc_history_thread(uint32_t key, uint32_t anchor, bool forward);
+void ui_svc_history_view(message_history_view_t *out, char *text, size_t size);
+void ui_svc_history_thread_text(uint16_t revision, unsigned index, char *text, size_t size);
+#endif
 
 // --- The crash log (CONFIG_CRASH_LOG) and its report (CONFIG_CRASH_REPORT; ui_svc_crash.c, docs/spec/crash-log.md) ---
 typedef struct {
@@ -321,6 +358,8 @@ typedef enum {
 	UI_SET_DMR_ID,		// the radio's own DMR ID in the codeplug, 1..CODEPLUG_DMR_ID_MAX (a set is a codeplug write job)
 	UI_SET_REF_TRIM,	// reference oscillator trim, ppb -10000..+10000 (Settings > Advanced; settings_t.ref_trim_ppb)
 	UI_SET_LANGUAGE,	// the UI's language, i18n.h lang_value: "en" English, 0 never picked (Settings > Display; settings_t.lang)
+	UI_SET_UTC_OFFSET_MIN,	// local time offset, in minutes
+	UI_SET_ARS_SERVER,	// DMR ARS server ID, 0 disables registration
 	UI_SET_COUNT
 } ui_setting_t;
 
@@ -342,7 +381,7 @@ int32_t ui_svc_reply_shown(const radio_settings_t *s);
 
 // --- Inbound: events other packages hand to the UI (any task; the UI picks them up on its next pass) ---
 typedef enum {
-	UI_EV_MESSAGE,		// a message arrived: index (inbox), id, name, text
+	UI_EV_MESSAGE,		// a message arrived: index holds the inbox token, plus id, name, text
 	UI_EV_MESSAGE_SENT,	// ok = delivered (confirmed; index 1: sent, the format or a group has no confirmation) /
 				// failed after retries
 	UI_EV_CALL_ALERT,	// call alert received from id
@@ -353,6 +392,15 @@ typedef enum {
 	UI_EV_SCAN_STOPPED,	// the scan stopped on a channel
 	UI_EV_CALL_ALERT_RESULT,	// our call alert: ok = the radio answered, else no answer after the retries
 	UI_EV_SAVE_FAILED,	// a save to the codeplug the UI asked for failed later (text: what failed)
+#if CONFIG_CONTACT_EDIT
+	UI_EV_CONTACT_SAVED,
+#endif
+#if CONFIG_TALKGROUP_EDIT
+	UI_EV_TALKGROUPS_SAVED,
+#endif
+#if CONFIG_MESSAGE_JOURNAL
+	UI_EV_HISTORY_RESULT,	// translated on the UI task (text: activation result)
+#endif
 	UI_EV_POWER_OFF_FAILED,	// auto power off dropped the power latch but the radio is still on (the knob holds it)
 	UI_EV_ZONE_OFFER,	// another radio (id, name) offers a zone or channel (index 1): text "Zone Club, 24 channels"
 	UI_EV_ZONE_SENT,	// our zone to id (index 1: a talkgroup): ok = it went out whole

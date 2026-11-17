@@ -566,6 +566,43 @@ static void test_channel_keys(void)
 	CHECK(codeplug_set_channel(1, &ch) && sim_flash_data[EE + 0x5400] == 0x42);
 }
 
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+static void test_talkgroup_pool_edits(void)
+{
+	fresh();
+	channel_t ch = make("Repeater", 443000000, 448000000);
+	ch.mode = RADIO_MODE_DMR;
+	CHECK(codeplug_set_channel(1, &ch));
+	CHECK(codeplug_set_channel(2, &ch));
+	contact_t contact = { .name = "Group", .type = CONTACT_GROUP, .id = 1234567, .timeslot = 1 };
+	CHECK(codeplug_set_contact(1, &contact));
+	contact.timeslot = 2;
+	CHECK(codeplug_set_contact(2, &contact));
+	uint8_t *bank = sim_flash_data + FL + 0x14000u;
+	memcpy(bank, "RFTP\x01\0\0\0\x01\0\0\0", 12);
+	memset(bank + 16, 0, (CODEPLUG_CHANNELS_MAX + 1u) * 2u);
+	uint32_t crc = storage_crc32(0, bank + 8, 4);
+	crc = storage_crc32(crc, bank + 16, 0x4000u - 16);
+	for (unsigned i = 0; i < 4; i++)
+		bank[12 + i] = (uint8_t)(crc >> (8u * i));
+	codeplug_init();
+	uint16_t refs[CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL], order[] = { 2, 1 };
+	uint8_t count;
+	CHECK(codeplug_set_talkgroup_refs(1, order, 2));
+	CHECK(codeplug_set_talkgroup_refs(2, order + 1, 1));
+	sim_flash_cut_after(6000);
+	CHECK(!codeplug_set_talkgroup_refs(1, NULL, 0) && sim_flash_is_cut());
+	sim_flash_power_on();
+	CHECK(storage_init());
+	codeplug_init();
+	CHECK(codeplug_talkgroup_refs(1, refs, &count) && count == 2 && refs[0] == 2 && refs[1] == 1);
+	CHECK(codeplug_delete_channel(1));
+	CHECK(codeplug_set_channel(1, &ch));
+	CHECK(codeplug_talkgroup_refs(1, refs, &count) && count == 0);
+	CHECK(codeplug_talkgroup_refs(2, refs, &count) && count == 1 && refs[0] == 1);
+}
+#endif
+
 int main(void)
 {
 	test_encode();
@@ -581,6 +618,9 @@ int main(void)
 	test_quick_keys();
 	test_round_trip();
 	test_edit_cuts();
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+	test_talkgroup_pool_edits();
+#endif
 	sim_flash_free();
 	printf("# codeplugEditTest %s (%d failures)\n", failures ? "FAILED" : "PASSED", failures);
 	return failures ? 1 : 0;

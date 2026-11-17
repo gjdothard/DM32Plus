@@ -31,6 +31,7 @@ CONFIG_DMR_TALKER_ALIAS ?= $(CONFIG_DMR)
 CONFIG_DMR_GPS ?= $(CONFIG_DMR)
 # DMR text messages (SMS; needs DMR): ETSI IP text and ETSI defined short data, sent and received (docs/spec/dmr-data.md 5)
 CONFIG_DMR_SMS ?= $(CONFIG_DMR)
+CONFIG_MESSAGE_JOURNAL ?= n
 # Motorola TMS format support for text messages: send, receive, the TMS ACK (needs DMR_SMS; docs/spec/dmr-data.md 5.1)
 CONFIG_DMR_TMS ?= $(CONFIG_DMR_SMS)
 # ARS registration with a presence server (needs DMR; docs/spec/dmr-data.md)
@@ -188,6 +189,8 @@ CONFIG_CHANNEL_LIST ?= y
 # editing a channel on the radio, New channel from current settings, keypad text entry (docs/spec/ui.md 2.1): with
 # the Channels list
 CONFIG_CHANNEL_EDIT ?= $(CONFIG_CHANNEL_LIST)
+# On-radio editing of saved contact assignments in the shared operating talkgroup pool.
+CONFIG_TALKGROUP_EDIT ?= $(if $(and $(filter y,$(CONFIG_CHANNEL_EDIT)),$(filter y,$(CONFIG_DMR)),$(filter y,$(CONFIG_DMR_TALKGROUP_ENTRIES))),y,n)
 # the zone editor in a zone's list: add, move, copy here, remove channels; rename, copy, delete zones (docs/spec/ui.md
 # 2.2): with the channel editor
 CONFIG_ZONE_EDIT ?= $(CONFIG_CHANNEL_EDIT)
@@ -214,6 +217,8 @@ CONFIG_VIBRATE ?= n
 # the GPS receiver: the board's module driver and its NMEA parsing (drivers/gps, platform/*/gps*, CAP_GPS). Off, the
 # radio has no GPS: DMR_GPS, LRRP and APRS keep a fixed position and answer "no fix". Off where the radio has none
 CONFIG_GPS ?= y
+# A board with an RTC driver enables this in its config.mk.
+CONFIG_RTC ?= n
 # air band AM receive: FM channels and the VFO in 108-137 MHz are received in AM, receive only, on radios whose
 # receiver does AM (CAP_AM_RX; needs FM; docs/spec/airband-and-broadcast.md). Off where the receiver can't
 CONFIG_AM_RX ?= $(CONFIG_FM)
@@ -269,9 +274,9 @@ CONFIG_APRS_IGATE ?= $(if $(and $(filter y,$(CONFIG_APRS_RX)),$(filter y,$(CONFI
 CONFIG_GPS_SKY ?= $(if $(and $(filter y,$(CONFIG_GPS)),$(filter y,$(CONFIG_APRS))),y,n)
 
 
-FEATURES := FM SUBTONE DMR DMR_PRIVACY DMR_AES256 DMR_TALKER_ALIAS DMR_GPS DMR_SMS DMR_TMS DMR_ARS DMR_LRRP DMR_TALKGROUP_ENTRIES CONTACT_POSITION DMR_SIGNALING DMR_EMERGENCY DMR_ROAMING DMR_IP_GATEWAY ZONE_SHARE DMR_UDP_COMPRESS DMR_CONFIRMED NET_TCP NET_KISS NET_HTTP NET_HTTP_GZIP NET_WEBCTL NET_RIGCTL NET_APRSIS NET_USRP MDNS TFTP TFTP_IDDB IDDB_COMPACT DMR_CONTROL_STATION SNMP SFR SFR_DUALPATH_RX SFR_CWID TASK_STACKS \
+FEATURES := FM SUBTONE DMR DMR_PRIVACY DMR_AES256 DMR_TALKER_ALIAS DMR_GPS DMR_SMS MESSAGE_JOURNAL DMR_TMS DMR_ARS DMR_LRRP DMR_TALKGROUP_ENTRIES TALKGROUP_EDIT CONTACT_POSITION DMR_SIGNALING DMR_EMERGENCY DMR_ROAMING DMR_IP_GATEWAY ZONE_SHARE DMR_UDP_COMPRESS DMR_CONFIRMED NET_TCP NET_KISS NET_HTTP NET_HTTP_GZIP NET_WEBCTL NET_RIGCTL NET_APRSIS NET_USRP MDNS TFTP TFTP_IDDB IDDB_COMPACT DMR_CONTROL_STATION SNMP SFR SFR_DUALPATH_RX SFR_CWID TASK_STACKS \
 	USB HOSTLINK USB_NETWORK NET_PPP HOTSPOT HOTSPOT_SPLIT DEBUGLINK CPS_OPENFW CPS_FAST VFO VFO_FM VFO_DMR DIAG FONT_XL FONT_AA FONT_BIG LANG_ES LANG_IT LANG_DEFAULT_ES LANG_DEFAULT_IT UI_COLOR UI_SETTINGS SCAN DUAL_WATCH UI_CARD_MENU BEEP FM_TX_TONES DTMF \
-	VOX REF_TRIM BATTERY_SAVE VIBRATE GPS AUDIO_PROBE STUB_ENTRY NAND_STORAGE CRASH_LOG CRASH_SCREEN CRASH_REPORT WATCHDOG FAULT_TRACE AM_RX BCAST_FM APRS APRS_RX APRS_IGATE GPS_SKY KEY_ASSIGN CHANNEL_LIST CHANNEL_EDIT ZONE_EDIT CONTACT_EDIT
+	VOX REF_TRIM BATTERY_SAVE VIBRATE GPS RTC AUDIO_PROBE STUB_ENTRY NAND_STORAGE CRASH_LOG CRASH_SCREEN CRASH_REPORT WATCHDOG FAULT_TRACE AM_RX BCAST_FM APRS APRS_RX APRS_IGATE GPS_SKY KEY_ASSIGN CHANNEL_LIST CHANNEL_EDIT ZONE_EDIT CONTACT_EDIT
 
 # Dependencies
 ifeq ($(CONFIG_DMR_AES256),y)
@@ -297,6 +302,11 @@ endif
 ifneq ($(call feature_on,ZONE_EDIT),)
   ifeq ($(call feature_on,CHANNEL_EDIT),)
     $(error CONFIG_ZONE_EDIT=y needs CONFIG_CHANNEL_EDIT=y)
+  endif
+endif
+ifneq ($(call feature_on,TALKGROUP_EDIT),)
+  ifeq ($(and $(call feature_on,CHANNEL_EDIT),$(call feature_on,DMR),$(call feature_on,DMR_TALKGROUP_ENTRIES)),)
+    $(error CONFIG_TALKGROUP_EDIT=y needs channel editing and DMR operating talkgroups)
   endif
 endif
 ifneq ($(call feature_on,CONTACT_EDIT),)
@@ -382,6 +392,11 @@ $(foreach f,TFTP_IDDB,$(if $(and $(call feature_on,$(f)),$(if $(call feature_on,
 ifneq ($(call feature_on,DMR_TMS),)
   ifeq ($(call feature_on,DMR_SMS),)
     $(error CONFIG_DMR_TMS=y needs CONFIG_DMR_SMS=y)
+  endif
+endif
+ifneq ($(call feature_on,MESSAGE_JOURNAL),)
+  ifeq ($(call feature_on,DMR_SMS),)
+    $(error CONFIG_MESSAGE_JOURNAL=y needs CONFIG_DMR_SMS=y)
   endif
 endif
 ifneq ($(call feature_on,DMR_CONTROL_STATION),)

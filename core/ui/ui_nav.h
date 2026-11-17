@@ -14,6 +14,15 @@
 #include "ui_svc.h"
 #include "i18n.h"
 
+#if CONFIG_UI_CARD_MENU
+const char *ui_thread_text(uint16_t row);
+const char *ui_compose_peer(void);
+#endif
+
+bool ui_thread_receive(uint16_t token);
+bool ui_thread_send_result(uint32_t id);
+bool ui_open_message_thread(uint16_t token);
+
 typedef enum {
 	SCR_HOME, SCR_QUICK, SCR_HUB, SCR_FIND, SCR_ACTIONS, SCR_CONTACTS, SCR_MESSAGES, SCR_MESSAGE, SCR_COMPOSE,
 	SCR_RECENT, SCR_ZONES, SCR_ZONE, SCR_TOOLS, SCR_SETTINGS, SCR_GROUP, SCR_PICKER, SCR_INFO, SCR_CONFIRM,
@@ -33,13 +42,23 @@ typedef enum {
 	SCR_DMR_ID,			// the radio's own DMR ID (Settings > My radio)
 	SCR_REF_TRIM,			// the reference trim (Settings > Advanced > Freq trim)
 	SCR_GPS,			// Tools > Position's pages (CONFIG_GPS_SKY): status, sky, signal, grid
-	SCR_CONTACT_EDIT,		// the contact editor (CONFIG_CONTACT_EDIT): a new contact, from ui_target
+	SCR_CONTACT_EDIT,		// create or edit a saved DMR contact (CONFIG_CONTACT_EDIT)
 	SCR_LANGUAGE,			// Settings > Display > Language: every language, those not built dimmed
 	SCR_SMS_TEXT,			// write a custom message (CONFIG_DMR_SMS)
 	SCR_CONTACT_POSITION,		// last reported position of a private contact
-	SCR_MENU_SECTION,		// a Main Menu section (arg: Radio or GPS / APRS)
+	SCR_MENU_SECTION,		// a Main Menu section (MENU_SECTION_*)
+#if CONFIG_MESSAGE_JOURNAL
+	SCR_CONVERSATION, SCR_THREAD,
+#endif
+	SCR_LIVE_THREAD,
+#if CONFIG_TALKGROUP_EDIT
+	SCR_TALKGROUPS, SCR_TALKGROUP_ADD, SCR_TALKGROUP_MOVE,
+#endif
 	SCR_COUNT
 } ui_scr_t;
+
+enum { DATA_ANSWER, DATA_REGISTER, DATA_SERVER, DATA_ROWS };
+enum { MENU_SECTION_RADIO, MENU_SECTION_GPS, MENU_SECTION_ARS };
 
 // Screen flags
 #define SF_LIST		0x01u	// drawn and driven as a list (ui_draw_list)
@@ -99,7 +118,14 @@ bool ui_contact_position_shown(void);
 #endif
 
 const radio_view_t *ui_view(void);
+#if CONFIG_UI_CARD_MENU
+bool ui_scan_card_active(void);
+const char *ui_scan_card_status(void);
+#endif
 ui_frame_t *ui_frame(void);
+#if CONFIG_MESSAGE_JOURNAL
+void ui_history_tick(void);
+#endif
 uint8_t ui_depth(void);
 void ui_push(uint8_t scr, uint16_t arg);
 void ui_pop(void);
@@ -116,6 +142,7 @@ void ui_open_actions(const ui_target_t *t);
 #if CONFIG_CONTACT_EDIT
 // The contact editor on a new contact for t: its ID, type and name (a talkgroup or ID as its name when it has none)
 void ui_new_contact(const ui_target_t *t);
+void ui_menus_contact_saved(void);
 #endif
 // Talk to a target: temporary (SELECT) or permanent (long SELECT); goes Home and says what happened
 void ui_talk(const ui_target_t *t, bool permanent);
@@ -154,6 +181,9 @@ const char *ui_filter_text(void);
 void ui_filter_reset(void);
 void ui_filter_rebuild(void);
 void ui_menus_save_failed(void);	// a codeplug write failed: what waited for it is dropped (ui_menus.c)
+#if CONFIG_TALKGROUP_EDIT
+bool ui_talkgroup_edit_focused(void);
+#endif
 #if CONFIG_ZONE_EDIT
 // A list shows again, or the codeplug changed under it (ui_menus.c): the zone editor's focus follows its change
 void ui_menus_resume(void);

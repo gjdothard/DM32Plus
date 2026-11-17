@@ -12,6 +12,13 @@ Which radios have scan and dual watch verified is in the [Radio reference](23-ra
 | **OK**, **6** (Tools), **1** (Scan) | **Back** on Home |
 | A side key set to **Scan** (Settings > Keys) | The same key again |
 
+On the card-style main menu, **OK**, **5** (Scan) opens the scan overview. **OK** on
+**Start scan** or **Stop scan** performs that action. The status card shows the current
+zone or VFO band and the channel or frequency being checked. Use the lateral keys to
+switch tabs. **Scan Lists** shows the current source and the zone's channel count.
+**Options** shows the configured resume mode, dwell time, resume delay, and priority.
+Edit a channel's scan-skip flag in CPS.
+
 On a channel the radio scans the current zone ("Scanning this zone"). In the VFO it sweeps the band the VFO frequency
 is in ("Scanning the band"). The status line shows SCAN, and the channel name changes as the scan moves.
 
@@ -45,7 +52,7 @@ The scan actions:
 |---|---|---|
 | 1 | Skip channel for now | Skips the channel until the scan stops ("Skipped until the scan stops") |
 | 2 | Stay here | Stops the scan on this channel |
-| 3 | Always skip | Not built yet. Edit scan lists in qdmr |
+| 3 | Always skip | Edit the channel's scan-skip flag in CPS |
 
 ## Dual watch
 

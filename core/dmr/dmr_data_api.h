@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The DMR data features for the UI (and the debug link): text messages, call alert, radio check, ARS state. Safe
 // from any task: requests go through a mailbox the radio task empties at its next tick (10 ms), reads are copies
 // taken under the service's lock. Built without the data features (CONFIG_DMR_DATA_CORE=0) every call is a no-op
@@ -66,6 +67,10 @@ bool sms_inbox_get(int i, dmrDataMessage_t *out);
 void sms_inbox_mark_read(int i);
 // Delete message i (0 = newest): the older ones move up. False when there is none
 bool sms_inbox_delete(int i);
+// Stable inbox token: resolves to the current index or -1. Pass NULL to look up the position only.
+int sms_inbox_get_token(uint16_t token, dmrDataMessage_t *out);
+void sms_inbox_mark_read_token(uint16_t token);
+bool sms_inbox_delete_token(uint16_t token);
 // Queue a message (group: to a talkgroup, no ACK). False when the mailbox is full (one SMS at a time) or the text is
 // empty. The text is cut at DMR_DATA_TEXT_MAX characters (Latin-1; ETSI: DMR_ETSI_TEXT_MAX). format: ETSI_IP, ETSI, TMS
 // (refused when CONFIG_DMR_TMS is off), or DEFAULT for the radio's setting; a reply uses the message's own
@@ -107,6 +112,9 @@ static inline int sms_inbox_unread(void) { return 0; }
 static inline bool sms_inbox_get(int i, dmrDataMessage_t *out) { (void)i; (void)out; return false; }
 static inline void sms_inbox_mark_read(int i) { (void)i; }
 static inline bool sms_inbox_delete(int i) { (void)i; return false; }
+static inline int sms_inbox_get_token(uint16_t token, dmrDataMessage_t *out) { (void)token; (void)out; return -1; }
+static inline void sms_inbox_mark_read_token(uint16_t token) { (void)token; }
+static inline bool sms_inbox_delete_token(uint16_t token) { (void)token; return false; }
 static inline bool sms_send(uint32_t dst, bool group, const char *text, bool ack, dmr_sms_format_t f)
 { (void)dst; (void)group; (void)text; (void)ack; (void)f; return false; }
 static inline dmr_req_state_t sms_send_state(void) { return DMR_REQ_IDLE; }
@@ -116,7 +124,7 @@ static inline bool dmr_signal_radio_check(uint32_t dst) { (void)dst; return fals
 static inline dmr_req_state_t dmr_signal_state(uint8_t *kind, uint32_t *dst)
 { if (kind) *kind = 0; if (dst) *dst = 0; return DMR_REQ_IDLE; }
 static inline uint32_t dmr_data_serial(void) { return 0; }
-static inline dmrDataEvent_t dmr_data_last_event(void) { dmrDataEvent_t e = { 0, 0, 0, 0 }; return e; }
+static inline dmrDataEvent_t dmr_data_last_event(void) { return (dmrDataEvent_t){ 0 }; }
 static inline void dmr_data_get_settings(dmrDataSettings_t *out) { (void)out; }
 static inline void dmr_data_set_settings(const dmrDataSettings_t *in) { (void)in; }
 static inline dmrArsState_t dmr_data_ars_state(void) { return DMR_ARS_STATE_OFF; }

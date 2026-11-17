@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The codeplug editor's table: one row per record, cells shown as text and edited in place (double-click, Enter or
 // typing on a focused cell), sorting by a column, a filter, row selection for bulk edits, and keyboard movement
 // between cells. Only the cell being edited holds an input, so a table of 1024 channels stays light.
@@ -26,8 +27,8 @@ function pencil() {
 // A column: {key, label, type: "text" | "number" | "select" | "bool", get(row), set(row, value) -> error string or
 // undefined, format(value), options(row) -> [[value, label]], width, readOnly}
 export class Grid {
-	constructor({ columns, rows, onChange, onSelect, onOpen, t, empty = "" }) {
-		Object.assign(this, { columns, rows, onChange, onSelect, onOpen, t, empty });
+	constructor({ columns, searchColumns = columns, rows, onChange, onSelect, onOpen, t, empty = "" }) {
+		Object.assign(this, { columns, searchColumns, rows, onChange, onSelect, onOpen, t, empty });
 		this.filter = "";
 		this.sort = null;	// {key, dir}
 		this.selected = new Set();
@@ -53,11 +54,19 @@ export class Grid {
 		this.render();
 	}
 
+	setColumns(columns) {
+		const key = this.columns[this.focus.col]?.key;
+		this.columns = columns;
+		this.focus.col = Math.max(0, columns.findIndex(column => column.key === key));
+		if (this.sort && !columns.some(column => column.key === this.sort.key)) this.sort = null;
+		this.render();
+	}
+
 	shown() {
 		let list = this.rows;
 		if (this.filter) {
 			const f = this.filter.toLowerCase();
-			list = list.filter((r) => this.columns.some((c) => this.text(c, r).toLowerCase().includes(f)));
+			list = list.filter((r) => (this.searchColumns || this.columns).some((c) => this.text(c, r).toLowerCase().includes(f)));
 		}
 		if (this.sort) {
 			const c = this.columns.find((x) => x.key === this.sort.key);
@@ -87,6 +96,7 @@ export class Grid {
 	}
 
 	render() {
+		this.table.classList.toggle("has-pinned", this.columns.some(column => column.pinned));
 		this.view = this.shown();
 		const all = h("input", {
 			type: "checkbox", "aria-label": this.t("editor.grid.select_all"),
@@ -99,7 +109,7 @@ export class Grid {
 		all.checked = this.view.length > 0 && this.view.every((r) => this.selected.has(r));
 		const head = h("tr", {}, h("th", { class: "grid-check" }, all), this.onOpen ? h("th", { class: "grid-open" }) : null, ...this.columns.map((c) => {
 			const dir = this.sort?.key === c.key ? (this.sort.dir > 0 ? "ascending" : "descending") : "none";
-			return h("th", { scope: "col", "aria-sort": dir, style: c.width ? `width:${c.width}` : null },
+			return h("th", { scope: "col", "aria-sort": dir, "data-key": c.key, class: c.pinned ? "c-pinned" : null, style: c.width ? `width:${c.width}` : null },
 				h("button", { type: "button", class: "grid-sort", onclick: () => this.sortBy(c.key) }, c.label));
 		}));
 		const body = h("tbody");
@@ -116,7 +126,7 @@ export class Grid {
 			const tr = h("tr", { "data-i": i, class: this.selected.has(r) ? "selected" : "" }, h("td", { class: "grid-check" }, check));
 			if (this.onOpen) tr.append(h("td", { class: "grid-open" }, h("button", { type: "button", class: "btn-quiet", "aria-label": this.t("editor.grid.open"), title: this.t("editor.grid.open"), onclick: () => this.onOpen(r) }, pencil())));
 			this.columns.forEach((c, j) => {
-				const cls = [c.type === "bool" ? "c-bool" : "", c.type === "number" || c.numeric ? "c-num" : "", this.locked(c, r) ? "c-ro" : ""].join(" ");
+				const cls = [c.pinned ? "c-pinned" : "", c.type === "bool" ? "c-bool" : "", c.type === "number" || c.numeric ? "c-num" : "", this.locked(c, r) ? "c-ro" : ""].join(" ");
 				tr.append(h("td", { "data-col": j, tabindex: -1, class: cls.trim(), title: c.title ? c.title(r) : null }, this.text(c, r)));
 			});
 			body.append(tr);
@@ -132,6 +142,7 @@ export class Grid {
 	sortBy(key) {
 		this.sort = this.sort?.key === key ? (this.sort.dir > 0 ? { key, dir: -1 } : null) : { key, dir: 1 };
 		this.render();
+		this.table.querySelector(`th[data-key="${key}"] button`)?.focus();
 	}
 
 	setFilter(text) {

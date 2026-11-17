@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The UI's behavior without the RTOS: one navigation stack of screens, logical actions in, drawing out
 // (docs/ux/information-architecture.md, docs/spec/ui.md). ui.c runs it in the UI task; the host simulator
 // (tests/host/sim/ui_sim.c) runs the same code against a simulated radio, codeplug and display.
@@ -41,6 +42,9 @@ typedef struct {
 	const char *query;	// Find text so far, "" = none
 	uint32_t draws;		// frames drawn so far
 	bool strip_drawn;	// the last frame drew the status strip with the state pill or a merged title (P2)
+#if CONFIG_TALKGROUP_EDIT
+	bool talkgroup_edit_focused;
+#endif
 #if CONFIG_CONTACT_POSITION
 	bool contact_position_valid;	// the open contact position page has a report
 #endif

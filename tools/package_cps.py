@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """Package an already-built site with a verified Windows embeddable Python ZIP. No network access."""
 import argparse
 import datetime
@@ -35,6 +36,10 @@ def package(site, runtime_zip, runtime_info, out):
 	root = Path(__file__).resolve().parent.parent
 	for name in ("server.py", "Start CPS.cmd", "README.md"):
 		shutil.copyfile(root / "tools" / "offline_cps" / name, out / name)
+	products = []
+	for path in sorted((root / "boards").glob("*/product.json")):
+		products.append({**json.loads(path.read_text(encoding="utf-8")), "board": path.parent.name})
+	(out / "release-products.json").write_text(json.dumps(products, indent=2) + "\n", encoding="utf-8")
 	# cmd.exe expects CRLF even when the source checkout uses LF.
 	launcher = out / "Start CPS.cmd"
 	launcher.write_bytes(launcher.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))

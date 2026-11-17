@@ -28,7 +28,7 @@ typedef struct {
 } flow_t;
 
 #define CALLER	"call:3101234,91,g wait:11000 "
-#define TALK_BACK	"ok 7 3 down down down down down down down down down ok long:back quick 7 ctx 3 5 ok "	// on, and A 3 / B 5
+#define TALK_BACK	"ok 7 3 down down down down down down down down down ok long:back quick:dual ctx 3 5 ok "	// on, and A 3 / B 5
 
 static const flow_t flows[] = {
 	{ "1 next channel", "", "up", "pos=4", 1, false },
@@ -67,6 +67,8 @@ static const flow_t flows[] = {
 #endif
 	{ "7 read message, banner up", "msg:3101234,Meet_at_the_north_lot", "ctx", "screen=message", 1, false },
 	{ "7 read message later", "msg:3101234,Meet_at_the_north_lot wait:9000", "ok 2 ok", "screen=message", 3, false },
+	{ "7 opening a message keeps its text when another arrives", "msg:3101234,First_message ctx",
+	  "msg:3105678,New_message wait:9000", "screen=message shows=First_message hides=New_message", 0, false },
 #if CONFIG_ZONE_SHARE
 	// An offer's banner has no timer: it waits for #, BACK or the offer's end (zone-share.md 5.2)
 	{ "zone offer banner still up a minute later", "zoneoffer:3101234", "wait:60000", "shows=Zone_from", 0, false },
@@ -103,40 +105,40 @@ static const flow_t flows[] = {
 #endif
 #endif
 	{ "9 power one step", "", "quick 1 back", "power=8 screen=home", 3, false },
-	{ "9 squelch 2 steps (FM)", "down", "quick 2 up up back", "sq=7 screen=home", 5, false },
-	{ "10 privacy", "", "quick 6 back", "privacy=1 screen=home", 3, false },
+	{ "9 squelch 2 steps (FM)", "down", "quick:squelch up up back", "sq=7 screen=home", 5, false },
+	{ "10 privacy", "", "quick:privacy back", "privacy=1 screen=home", 3, false },
 	{ "11 scan start (Tools > Scan)", "", "ok 6 1", "scanning=1", 3, false },
 	{ "11 nuisance skip", "ok 6 1", "ctx 1", "pos=4 scanning=1", 2, false },
 	{ "11 scan stop", "ok 6 1", "back", "scanning=0", 1, false },
 	// Dual watch (docs/ux/dual-watch.md): on in a few presses, PTT on the selected channel, the other one press away
-	{ "11 dual watch: start, B the next channel", "", "quick 7", "dual=1 sel=A pos=3 bpos=4 screen=home", 2, false },
-	{ "11 dual watch: start, then B by number", "", "quick 7 ctx 3 5 ok", "dual=1 sel=A pos=3 bpos=5 screen=home", 6, false },
-	{ "11 dual watch: again with the last B", "quick 7 ctx 3 5 ok back back", "quick 7", "dual=1 sel=A", 2, false },
-	{ "11 dual watch: B in another zone", "", "quick 7 ctx 1 zone+", "dual=1 sel=B bzone=1 screen=home", 5, false },
-	{ "11 dual watch: B on the VFO", "", "quick 7 ctx 1 vfokey", "dual=1 bvfo=1 sel=B", 5, false },
-	{ "11 dual watch: talk on B from #", "quick 7 ctx 3 5 ok", "ctx 1", "dual=1 sel=B uipos=5", 2, false },
-	{ "11 dual watch: the A/B key", "quick 7 ctx 3 5 ok", "abkey", "dual=1 sel=B", 1, false },
-	{ "11 dual watch: PTT keeps it on", "quick 7 ctx 3 5 ok ctx 1", "pttdown wait:1000 pttup wait:1000", "dual=1 sel=B pos=5", 2, false },
-	{ "11 dual watch: Up moves the selected", "quick 7 ctx 3 5 ok", "up", "dual=1 sel=A pos=4", 1, false },
-	{ "11 dual watch: stop stays on B", "quick 7 ctx 3 5 ok ctx 1", "back back", "dual=0 pos=5", 2, false },
+	{ "11 dual watch: start, B the next channel", "", "quick:dual", "dual=1 sel=A pos=3 bpos=4 screen=home", 2, false },
+	{ "11 dual watch: start, then B by number", "", "quick:dual ctx 3 5 ok", "dual=1 sel=A pos=3 bpos=5 screen=home", 6, false },
+	{ "11 dual watch: again with the last B", "quick:dual ctx 3 5 ok back back", "quick:dual", "dual=1 sel=A", 2, false },
+	{ "11 dual watch: B in another zone", "", "quick:dual ctx 1 zone+", "dual=1 sel=B bzone=1 screen=home", 5, false },
+	{ "11 dual watch: B on the VFO", "", "quick:dual ctx 1 vfokey", "dual=1 bvfo=1 sel=B", 5, false },
+	{ "11 dual watch: talk on B from #", "quick:dual ctx 3 5 ok", "ctx 1", "dual=1 sel=B uipos=5", 2, false },
+	{ "11 dual watch: the A/B key", "quick:dual ctx 3 5 ok", "abkey", "dual=1 sel=B", 1, false },
+	{ "11 dual watch: PTT keeps it on", "quick:dual ctx 3 5 ok ctx 1", "pttdown wait:1000 pttup wait:1000", "dual=1 sel=B pos=5", 2, false },
+	{ "11 dual watch: Up moves the selected", "quick:dual ctx 3 5 ok", "up", "dual=1 sel=A pos=4", 1, false },
+	{ "11 dual watch: stop stays on B", "quick:dual ctx 3 5 ok ctx 1", "back back", "dual=0 pos=5", 2, false },
 	// One Back press says how to stop it; it goes on. A second one later is a first press again
-	{ "11 dual watch: one Back keeps it", "quick 7 ctx 3 5 ok", "back", "dual=1 toast=Press_Back_again", 1, false },
-	{ "11 dual watch: Back, later Back", "quick 7 ctx 3 5 ok", "back wait:2500 back", "dual=1 toast=Press_Back_again", 2,
+	{ "11 dual watch: one Back keeps it", "quick:dual ctx 3 5 ok", "back", "dual=1 toast=Press_Back_again", 1, false },
+	{ "11 dual watch: Back, later Back", "quick:dual ctx 3 5 ok", "back wait:2500 back", "dual=1 toast=Press_Back_again", 2,
 	  false },
 	// Back clears the selected channel's changes first, then asks
-	{ "11 dual watch: Back undoes changes first", "quick 7 ctx 3 5 ok quick 2 back", "back", "dual=1 temporary=0 toast=Changes_undone",
+	{ "11 dual watch: Back undoes changes first", "quick:dual ctx 3 5 ok quick:timeslot back", "back", "dual=1 temporary=0 toast=Changes_undone",
 	  1, false },
-	{ "11 dual watch: quick 7 stops it", "quick 7 ctx 3 5 ok", "quick 7", "dual=0 pos=3", 2, false },
-	{ "11 dual watch: a quick setting keeps it on", "down quick 7 ctx 3 5 ok", "quick 8 back", "dual=1 sel=A", 3, false },
-	{ "11 dual watch, two receivers: a call on each", "receivers:2 quick 7 ctx 3 5 ok",
+	{ "11 dual watch: Quick control stops it", "quick:dual ctx 3 5 ok", "quick:dual", "dual=0 pos=3", 2, false },
+	{ "11 dual watch: a quick setting keeps it on", "down quick:dual ctx 3 5 ok", "quick 8 back", "dual=1 sel=A", 3, false },
+	{ "11 dual watch, two receivers: a call on each", "receivers:2 quick:dual ctx 3 5 ok",
 	  "rxa:3101234,91,g wait:300 rxb:3107777,3100,g wait:300", "dual=1 sel=A rx=A calls=0", 0, false },
-	{ "11 dual watch, two receivers: A's call ends", "receivers:2 quick 7 ctx 3 5 ok",
+	{ "11 dual watch, two receivers: A's call ends", "receivers:2 quick:dual ctx 3 5 ok",
 	  "rxa:3101234,91,g wait:300 rxb:3107777,3100,g wait:300 rxaend wait:300", "dual=1 rx=B calls=1 last=A", 0, false },
-	{ "11 dual watch, two receivers: talk on B", "receivers:2 quick 7 ctx 3 5 ok rxb:3107777,3100,g wait:300 rxbend",
+	{ "11 dual watch, two receivers: talk on B", "receivers:2 quick:dual ctx 3 5 ok rxb:3107777,3100,g wait:300 rxbend",
 	  "ctx 1", "dual=1 sel=B last=B uipos=5", 2, false },
-	{ "11 dual watch: long SK2", "quick 7 ctx 3 5 ok back back", "long:user2", "dual=1 sel=A bpos=5", 1, false },
-	{ "11 dual watch: Tools > Scan, a zone scan instead", "quick 7 ctx 3 5 ok", "ok 6 1", "dual=0 scanning=1", 3, false },
-	{ "11 dual watch: the last B after power off", "quick 7 ctx 3 5 ok back back reboot", "quick 7", "dual=1 sel=A bpos=5",
+	{ "11 dual watch: long SK2", "quick:dual ctx 3 5 ok back back", "long:user2", "dual=1 sel=A bpos=5", 1, false },
+	{ "11 dual watch: Tools > Scan, a zone scan instead", "quick:dual ctx 3 5 ok", "ok 6 1", "dual=0 scanning=1", 3, false },
+	{ "11 dual watch: the last B after power off", "quick:dual ctx 3 5 ok back back reboot", "quick:dual", "dual=1 sel=A bpos=5",
 	  2, false },
 	{ "S freq trim opens its page", "trim", "ok 7 0 up ok", "screen=freq-trim shows=440_MHz shows=144_MHz", 9, false },
 	{ "S freq trim: Down steps 0.1 ppm at once", "trim ok 7 0 up ok", "down down",
@@ -172,38 +174,40 @@ static const flow_t flows[] = {
 	{ "11 dual watch talk back: # 1 goes back at once", TALK_BACK "tune:b call:3101234,91,g wait:4000", "ctx 1",
 	  "dual=1 sel=A", 2, false },
 	// A reply target lapses with its window: B's pane shows B's own talk group once the receiver has gone back to A
-	{ "11 dual watch: no stale reply target on B", "quick 7 ctx 3 5 ok wait:3000",
+	{ "11 dual watch: no stale reply target on B", "quick:dual ctx 3 5 ok wait:3000",
 	  "tune:b call:3101234,91,g tune:a call:3107777,3100,g wait:4000", "dual=1 sel=A hides=World", 0, false },
 	// B on the VFO, selected before the receiver has been there (a new selection doesn't retune): digits are a frequency
-	{ "11 dual watch: digits on B the VFO, receiver on A", "quick 7 ctx 1 vfokey ctx 1 wait:3000 tune:a ctx 1", "4 4",
+	{ "11 dual watch: digits on B the VFO, receiver on A", "quick:dual ctx 1 vfokey ctx 1 wait:3000 tune:a ctx 1", "4 4",
 	  "dual=1 sel=B entry=44", 2, false },
 	// Stopped with B selected, the radio stays on B: the next start keeps the pair (A the channel it is on)
-	{ "11 dual watch: again after a stop on B", "quick 7 ctx 1 back back", "quick 7", "dual=1 sel=A apos=4 bpos=3", 2,
+	{ "11 dual watch: again after a stop on B", "quick:dual ctx 1 back back", "quick:dual", "dual=1 sel=A apos=4 bpos=3", 2,
 	  false },
-	{ "11 dual watch: again after a stop on B and power off", "quick 7 ctx 1 back back reboot", "quick 7",
+	{ "11 dual watch: again after a stop on B and power off", "quick:dual ctx 1 back back reboot", "quick:dual",
 	  "dual=1 sel=A apos=4 bpos=3", 2, false },
-	{ "11 dual watch: again on the last B's channel", "quick 7 back back up", "quick 7", "dual=1 sel=A apos=4 bpos=3", 2,
+	{ "11 dual watch: again on the last B's channel", "quick:dual back back up", "quick:dual", "dual=1 sel=A apos=4 bpos=3", 2,
 	  false },
-	{ "11 dual watch key on and off", "quick 7 ctx 3 5 ok back back", "dualkey", "dual=1", 1, false },
+	{ "11 dual watch key on and off", "quick:dual ctx 3 5 ok back back", "dualkey", "dual=1", 1, false },
 	// Changes and requests act on the selected channel wherever the receiver is, and stay with it over hops
-	{ "11 dual watch: power goes to the selected", "quick 7 ctx 3 5 ok tune:b", "quick 2 back", "dual=1 sel=A pos=3 temporary=1",
+	{ "11 dual watch: power goes to the selected", "quick:dual ctx 3 5 ok tune:b", "quick:timeslot back", "dual=1 sel=A pos=3 temporary=1",
 	  3, false },
-	{ "11 dual watch: the screens show the selected", "quick 7 ctx 3 5 ok quick 2 back tune:b", "",
+	{ "11 dual watch: the screens show the selected", "quick:dual ctx 3 5 ok quick:timeslot back tune:b", "",
 	  "dual=1 pos=5 temporary=0 uipos=3 uitemp=1", 0, false },
-	{ "11 dual watch: changes kept over hops", "quick 7 ctx 3 5 ok quick 2 back", "tune:b tune:a", "pos=3 temporary=1", 0,
+	{ "11 dual watch: changes kept over hops", "quick:dual ctx 3 5 ok quick:timeslot back", "tune:b tune:a", "pos=3 temporary=1", 0,
 	  false },
-	{ "11 dual watch: talk target for the selected", "quick 7 tune:b", "tt", "dual=1 screen=picker", 1, false },
-	{ "11 dual watch: VFO entry over a hop", "quick 7 ctx 1 vfokey ctx 1 ctx 1", "1 4 6 tune:a 5", "dual=1 sel=B entry=1465",
+	{ "11 named Quick control follows the selected mode while receiving the other", "quick:dual tune:b",
+	  "quick:timeslot back", "dual=1 sel=A uipos=3 uitemp=1", 3, false },
+	{ "11 dual watch: talk target for the selected", "quick:dual tune:b", "tt", "dual=1 screen=picker", 1, false },
+	{ "11 dual watch: VFO entry over a hop", "quick:dual ctx 1 vfokey ctx 1 ctx 1", "1 4 6 tune:a 5", "dual=1 sel=B entry=1465",
 	  4, false },
 	// Up / Down with nothing to step to says why
-	{ "11 dual watch: one channel in the zone", "zonesize:1,1 quick 7 ctx 1 zone+", "up",
+	{ "11 dual watch: one channel in the zone", "zonesize:1,1 quick:dual ctx 1 zone+", "up",
 	  "dual=1 sel=B toast=Only_one_channel", 1, false },
-	{ "11 dual watch: the zone's other channel is A", "zonesize:0,2 quick 7 ctx 1", "up",
+	{ "11 dual watch: the zone's other channel is A", "zonesize:0,2 quick:dual ctx 1", "up",
 	  "dual=1 sel=B apos=1 bpos=2 toast=No_other_channel_here", 1, false },
 	// Nothing ends it but the user: a channel change from elsewhere becomes the selected channel or selects the other
-	{ "11 dual watch: a channel from elsewhere", "quick 7 ctx 3 5 ok", "dlpos:7 wait:1000", "dual=1 sel=A apos=7 bpos=5",
+	{ "11 dual watch: a channel from elsewhere", "quick:dual ctx 3 5 ok", "dlpos:7 wait:1000", "dual=1 sel=A apos=7 bpos=5",
 	  0, false },
-	{ "11 dual watch: the other channel from elsewhere", "quick 7 ctx 3 5 ok", "dlpos:5 wait:1000",
+	{ "11 dual watch: the other channel from elsewhere", "quick:dual ctx 3 5 ok", "dlpos:5 wait:1000",
 	  "dual=1 sel=B apos=3 bpos=5 toast=Talking_on_B", 0, false },
 	// The debug link: its stop is the user's (the watch stays off); A or B selected there is followed, and a channel it
 	// sets after that goes to that one
@@ -216,52 +220,52 @@ static const flow_t flows[] = {
 	// Started again right after its stop (before START_GRACE_MS): the UI takes it on, so the B change goes on watching
 	{ "11 dual watch: the debug link's stop, then its start", "dldual:5 wait:1000 dlstop wait:100",
 	  "dldual:5 dlsel:b wait:100 dlpos:7 wait:1000", "dual=1 sel=B bpos=7", 0, false },
-	{ "11 dual watch: stopped by the debug link", "quick 7 ctx 3 5 ok", "dlstop wait:1500",
+	{ "11 dual watch: stopped by the debug link", "quick:dual ctx 3 5 ok", "dlstop wait:1500",
 	  "dual=0 pos=3 toast=Dual_watch_off:_on_A", 0, false },
-	{ "11 dual watch: stopped by the debug link on B", "quick 7 ctx 3 5 ok ctx 1", "dlstop wait:1500",
+	{ "11 dual watch: stopped by the debug link on B", "quick:dual ctx 3 5 ok ctx 1", "dlstop wait:1500",
 	  "dual=0 pos=5 toast=Dual_watch_off:_on_B", 0, false },
-	{ "11 dual watch: B selected by the debug link", "quick 7 ctx 3 5 ok", "dlsel:b wait:500",
+	{ "11 dual watch: B selected by the debug link", "quick:dual ctx 3 5 ok", "dlsel:b wait:500",
 	  "dual=1 sel=B toast=Talking_on_B", 0, false },
-	{ "11 dual watch: B selected and a channel at once", "quick 7 ctx 3 5 ok", "dlsel:b dlpos:7 wait:1000",
+	{ "11 dual watch: B selected and a channel at once", "quick:dual ctx 3 5 ok", "dlsel:b dlpos:7 wait:1000",
 	  "dual=1 sel=B apos=3 bpos=7", 0, false },
-	{ "11 dual watch: a channel for B from the debug link", "quick 7 ctx 3 5 ok", "dlsel:b wait:200 dlpos:7 wait:1000",
+	{ "11 dual watch: a channel for B from the debug link", "quick:dual ctx 3 5 ok", "dlsel:b wait:200 dlpos:7 wait:1000",
 	  "dual=1 sel=B apos=3 bpos=7", 0, false },
-	{ "11 dual watch: Zones menu sets the selected", "quick 7 ctx 3 5 ok", "ok 4 down ok wait:1000",
+	{ "11 dual watch: Zones menu sets the selected", "quick:dual ctx 3 5 ok", "ok 4 down ok wait:1000",
 	  "dual=1 sel=A azone=1 apos=1 bzone=0 bpos=5", 4, false },
-	{ "11 dual watch: after hotspot mode", "quick 7 ctx 3 5 ok", "hotspot:on wait:1000 hotspot:off wait:1000",
+	{ "11 dual watch: after hotspot mode", "quick:dual ctx 3 5 ok", "hotspot:on wait:1000 hotspot:off wait:1000",
 	  "dual=1 sel=A apos=3 bpos=5", 0, false },
-	{ "11 dual watch: a codeplug write", "quick 7 ctx 3 5 ok", "cpwrite wait:1000", "dual=1 sel=A apos=4 bpos=6 pos=4", 0,
+	{ "11 dual watch: a codeplug write", "quick:dual ctx 3 5 ok", "cpwrite wait:1000", "dual=1 sel=A apos=4 bpos=6 pos=4", 0,
 	  false },
-	{ "11 dual watch: B deleted", "quick 7 ctx 3 5 ok", "cpdel:5 wait:1000", "dual=0 pos=3 toast=Dual_watch_off:_on_COUNTY",
+	{ "11 dual watch: B deleted", "quick:dual ctx 3 5 ok", "cpdel:5 wait:1000", "dual=0 pos=3 toast=Dual_watch_off:_on_COUNTY",
 	  0, false },
 	// It comes back at power on, as it was
-	{ "11 dual watch: back after power off", "quick 7 ctx 3 5 ok reboot wait:1000", "", "dual=1 sel=A apos=3 bpos=5", 0,
+	{ "11 dual watch: back after power off", "quick:dual ctx 3 5 ok reboot wait:1000", "", "dual=1 sel=A apos=3 bpos=5", 0,
 	  false },
-	{ "11 dual watch: back with B selected", "quick 7 ctx 3 5 ok ctx 1 reboot wait:1000", "", "dual=1 sel=B apos=3 bpos=5",
+	{ "11 dual watch: back with B selected", "quick:dual ctx 3 5 ok ctx 1 reboot wait:1000", "", "dual=1 sel=B apos=3 bpos=5",
 	  0, false },
-	{ "11 dual watch: off stays off", "quick 7 ctx 3 5 ok back back reboot wait:1000", "", "dual=0", 0, false },
+	{ "11 dual watch: off stays off", "quick:dual ctx 3 5 ok back back reboot wait:1000", "", "dual=0", 0, false },
 	// The VFO key and Copy to VFO act on the selected channel
-	{ "11 dual watch: VFO key", "quick 7 ctx 3 5 ok", "vfokey", "dual=1 sel=A avfo=1 bpos=5", 1, false },
-	{ "11 dual watch: VFO key back", "quick 7 ctx 3 5 ok vfokey", "vfokey", "dual=1 sel=A avfo=0 apos=3 bpos=5", 1, false },
+	{ "11 dual watch: VFO key", "quick:dual ctx 3 5 ok", "vfokey", "dual=1 sel=A avfo=1 bpos=5", 1, false },
+	{ "11 dual watch: VFO key back", "quick:dual ctx 3 5 ok vfokey", "vfokey", "dual=1 sel=A avfo=0 apos=3 bpos=5", 1, false },
 	// Each channel has its own VFO: with B on one, the VFO key takes A to the other (apos / bpos: which VFO, 1 or 2)
-	{ "11 dual watch: VFO key, B the VFO", "quick 7 ctx 1 vfokey ctx 1", "vfokey",
+	{ "11 dual watch: VFO key, B the VFO", "quick:dual ctx 1 vfokey ctx 1", "vfokey",
 	  "dual=1 sel=A avfo=1 apos=2 bvfo=1 bpos=1", 1, false },
-	{ "11 dual watch: VFO key, B the VFO, and back", "quick 7 ctx 1 vfokey ctx 1 vfokey", "vfokey",
+	{ "11 dual watch: VFO key, B the VFO, and back", "quick:dual ctx 1 vfokey ctx 1 vfokey", "vfokey",
 	  "dual=1 sel=A avfo=0 apos=3 bvfo=1 bpos=1", 1, false },
-	{ "11 dual watch: Copy to VFO", "quick 7 ctx 3 5 ok", "quick 4 wait:1000", "dual=1 sel=A avfo=1 bpos=5", 2, false },
-	{ "11 dual watch: Copy to VFO, B the VFO", "quick 7 ctx 1 vfokey ctx 1", "quick 4 wait:1000",
+	{ "11 dual watch: Copy to VFO", "quick:dual ctx 3 5 ok", "copykey wait:1000", "dual=1 sel=A avfo=1 bpos=5", 2, false },
+	{ "11 dual watch: Copy to VFO, B the VFO", "quick:dual ctx 1 vfokey ctx 1", "copykey wait:1000",
 	  "dual=1 sel=A avfo=1 apos=2 bvfo=1 bpos=1", 2, false },
 	// The A/B key only switches; off, it says how to start
 	{ "11 dual watch: A/B with the watch off", "", "abkey", "dual=0 pos=3 toast=Turn_on_dual_watch_first", 1, false },
 	// The zone keys move the selected channel to another zone; the watch goes on
-	{ "11 dual watch: next zone moves A", "quick 7 ctx 3 5 ok", "zone+", "dual=1 sel=A azone=1 apos=1 bzone=0 bpos=5 toast=A_zone:_Simplex", 1, false },
-	{ "11 dual watch: previous zone moves B", "quick 7 ctx 3 5 ok ctx 1", "zone-", "dual=1 sel=B bzone=2 bpos=1 azone=0 apos=3", 1, false },
-	{ "11 dual watch: home zone", "quick 7 ctx 3 5 ok zone+ zone+", "homekey", "dual=1 azone=0 apos=1 bzone=0 bpos=5", 1, false },
+	{ "11 dual watch: next zone moves A", "quick:dual ctx 3 5 ok", "zone+", "dual=1 sel=A azone=1 apos=1 bzone=0 bpos=5 toast=A_zone:_Simplex", 1, false },
+	{ "11 dual watch: previous zone moves B", "quick:dual ctx 3 5 ok ctx 1", "zone-", "dual=1 sel=B bzone=2 bpos=1 azone=0 apos=3", 1, false },
+	{ "11 dual watch: home zone", "quick:dual ctx 3 5 ok zone+ zone+", "homekey", "dual=1 azone=0 apos=1 bzone=0 bpos=5", 1, false },
 	// The first channel of the zone is the other pane's: the next one
-	{ "11 dual watch: the zone's first channel is A", "down down quick 7 ctx 3 5 ok ctx 1 zone+", "homekey",
+	{ "11 dual watch: the zone's first channel is A", "down down quick:dual ctx 3 5 ok ctx 1 zone+", "homekey",
 	  "dual=1 sel=B azone=0 apos=1 bzone=0 bpos=2", 1, false },
-	{ "11 dual watch: the zone key on the VFO", "quick 7 ctx 1 vfokey ctx 1 ctx 1", "zone+", "dual=1 sel=B bvfo=0 bzone=0 bpos=1", 1, false },
-	{ "11 dual watch: Up/Down on zone moves the selected", "ok 7 8 down down ok long:back quick 7 ctx 3 5 ok", "up",
+	{ "11 dual watch: the zone key on the VFO", "quick:dual ctx 1 vfokey ctx 1 ctx 1", "zone+", "dual=1 sel=B bvfo=0 bzone=0 bpos=1", 1, false },
+	{ "11 dual watch: Up/Down on zone moves the selected", "ok 7 8 down down ok long:back quick:dual ctx 3 5 ok", "up",
 	  "dual=1 azone=1 bzone=0", 1, false },
 #if CONFIG_CHANNEL_LIST
 	// task-flows.md 12 says 3: the VFO row is first but Channels opens on the current zone (flow 2), so one Up
@@ -312,6 +316,18 @@ static const flow_t flows[] = {
 	  "writes=1 toast=Saved_as_channel_41", 7, true },
 	// The channel editor's rules (ui.md 2.1). Channel 1 is an FM repeater (146.940, TX 600 kHz below), channel 3 DMR
 	// simplex; on channel 3 the own ID is row 12 and the TX time-out row 17
+#if CONFIG_TALKGROUP_EDIT
+	{ "Operating talkgroups opens on a converted channel", "talkgroup-pool", "ok 5 ok up ok",
+	  "screen=operatingtalkgroups focus=Add_talkgroup", 5, false },
+	{ "Operating talkgroups opens a saved group picker", "talkgroup-pool ok 5 ok up ok", "ok",
+	  "screen=addtalkgroup shows=TG", 1, false },
+	{ "Operating talkgroups offers move and remove", "talkgroup-pool ok 5 ok up ok ok ok", "down ok",
+	  "screen=talkgroupactions shows=Move_up shows=Move_down shows=Remove_talkgroup", 2, true },
+	{ "Operating talkgroups removes an assignment", "talkgroup-pool ok 5 ok up ok ok ok down ok", "down down ok",
+	  "screen=operatingtalkgroups count=1 writes=2", 3, true },
+	{ "Operating talkgroups reorders saved references", "talkgroup-pool ok 5 ok up ok ok ok ok down ok down down ok", "ok",
+	  "screen=operatingtalkgroups count=3 focus=TG_91 writes=3", 1, true },
+#endif
 	{ "E new RX keeps the repeater offset", "ok 5 up up ok down down down", "ok 1 4 7 0 0 ok",
 	  "shows=147.000 shows=146.4 shows=600_kHz", 7, false },
 	{ "E new RX in another band: simplex", "ok 5 up up ok down down down", "ok 4 4 6 0 0 0 ok",
@@ -419,29 +435,28 @@ static const flow_t flows[] = {
 	{ "18 VFO split on DMR: tile 6", "ok 4 up ok quick 4", "6 up ok", "mode=dmr txfreq=147120000", 3, false },
 	{ "18 VFO split: transmitting shows the TX frequency", "ok 4 up ok quick 5 up ok back", "pttdown",
 	  "shows=147.120", 1, false },
-	{ "18 a channel keeps Monitor", "down", "quick 5", "hides=TX_freq hides=TXFreq txfreq=147660000", 2, false },
-	{ "18 Copy to VFO from a DMR channel", "", "quick 4", "vfo=1 mode=dmr screen=home toast=Copied_to_VFO temporary=0",
+	{ "18 FM memory Monitor keeps the stored TX frequency", "down", "quick:monitor",
+	  "monitor=1 vfo=0 txfreq=147660000", 2, false },
+	{ "18 Copy to VFO from a DMR channel", "", "copykey", "vfo=1 mode=dmr screen=home toast=Copied_to_VFO temporary=0",
 	  2, false },
-	{ "18 Copy to VFO from an FM channel", "down", "quick 4", "vfo=1 mode=fm freq=147060000 toast=Copied_to_VFO", 2,
+	{ "18 Copy to VFO from an FM channel", "down", "copykey", "vfo=1 mode=fm freq=147060000 toast=Copied_to_VFO", 2,
 	  false },
-	{ "18 Copy to VFO: a temporary color code goes along", "quick 3 7 ok back", "quick 4", "vfo=1 cc=7 temporary=0",
+	{ "18 Copy to VFO: a temporary color code goes along", "quick:color 7 ok back", "copykey", "vfo=1 cc=7 temporary=0",
 	  2, false },
-	{ "18 Copy to VFO: the talk target goes along", "tt down ok", "quick 4", "vfo=1 talk=91 temporary=0", 2,
+	{ "18 Copy to VFO: the talk target goes along", "tt down ok", "copykey", "vfo=1 talk=91 temporary=0", 2,
 	  false },
-	{ "18 Copy to VFO: the channel is unchanged", "quick 3 7 ok back quick 4", "ok 4 ok", "vfo=0 cc=1 temporary=0",
+	{ "18 Copy to VFO: the channel is unchanged", "quick:color 7 ok back copykey", "ok 4 ok", "vfo=0 cc=1 temporary=0",
 	  3, false },
-	{ "18 Copy to VFO writes no codeplug", "quick 3 7 ok back", "quick 4", "writes=0", 2, false },
-	{ "19 hear all latched", "", "quick 5", "hearall=1", 2, false },
-	{ "19 hear all off on BACK", "quick 5 back", "back", "hearall=0", 1, false },
-	{ "19 hear all ends with the channel", "quick 5 back", "up", "hearall=0", 1, false },
-	{ "21 VOX on (FM)", "down", "quick 6", "vox=1", 2, false },
-	{ "21 VOX off again", "down quick 6", "6", "vox=0", 1, false },
-	{ "21 monitor latch (FM)", "down", "quick 5", "monitor=1", 2, false },
+	{ "18 Copy to VFO writes no codeplug", "quick:color 7 ok back", "copykey", "writes=0", 2, false },
+	{ "19 hear all latched", "", "quick:digital-monitor", "hearall=1", 2, false },
+	{ "19 hear all off on BACK", "quick:digital-monitor back", "back", "hearall=0", 1, false },
+	{ "19 hear all ends with the channel", "quick:digital-monitor back", "up", "hearall=0", 1, false },
+	{ "21 monitor latch (FM)", "down", "quick:monitor", "monitor=1", 2, false },
 	{ "3 focus follows the row", "", "tt down", "focusid=91", 2, false },
 	{ "3 focus cleared on Home", "tt down", "long:back", "focusid=0", 1, false },
-	{ "20 timeslot", "", "quick 2 back", "ts=2 screen=home", 3, false },
-	{ "20 color code 7", "", "quick 3 7 ok", "cc=7", 4, false },
-	{ "20 save to channel", "quick 2", "long:ok", "writes=1", 1, true },
+	{ "20 timeslot", "", "quick:timeslot back", "ts=2 screen=home", 3, false },
+	{ "20 color code 7", "", "quick:color 7 ok", "cc=7", 4, false },
+	{ "20 save to channel", "quick:timeslot", "long:ok", "writes=1", 1, true },
 	{ "20 VFO Quick save explains itself", "ok 4 up ok", "quick 1 long:ok",
 	  "vfo=1 toast=VFO_settings_save_automatically writes=0", 3, false },
 	// Settings the radio core acts on reach it (ui_svc_apply), key presses ask for a key beep
@@ -462,7 +477,7 @@ static const flow_t flows[] = {
 	{ "R site survey per site", "", "ok 6 6 4", "set33=2", 4, false },
 	{ "R beacon interval", "", "ok 6 6 5", "set34=120 toast=Must_match", 4, false },
 	{ "R wake probe on", "", "ok 6 6 7", "set36=1 toast=Wake_probe_on", 4, false },
-	{ "T22 Home and undo", "quick 2 back ok 6", "long:back back", "screen=home temporary=0", 2, false },
+	{ "T22 Home and undo", "quick:timeslot back ok 6", "long:back back", "screen=home temporary=0", 2, false },
 	// Settings that act now (uifix). set<N> = ui_setting_t N: 7 theme, 31 privacy key type, 32 privacy key
 	{ "S PTT on when locked (default)", "long:quick", "ptt", "tx=1 pttblock=0", 1, false },
 	{ "S PTT off when locked", "ok 7 4 down down down ok long:back long:quick", "ptt",
@@ -540,8 +555,8 @@ static const flow_t flows[] = {
 	// Quick settings in the FM VFO: tile 8 is Width, as on a channel
 	{ "Q FM VFO: Width on 8", "vfokey", "quick 8", "toast=Bandwidth", 2, false },
 	{ "S VFO mode back to FM", "ok 4 up ok quick 4 back", "quick 4", "toast=VFO:_FM mode=fm temporary=0", 2, false },
-	{ "S VFO DMR: color code 7", "ok 4 up ok quick 4 back", "quick 3 7 ok", "cc=7 temporary=0", 4, false },
-	{ "S VFO DMR: timeslot 2", "ok 4 up ok quick 4 back", "quick 2 back", "ts=2 temporary=0", 3, false },
+	{ "S VFO DMR: color code 7", "ok 4 up ok quick 4 back", "quick:color 7 ok", "cc=7 temporary=0", 4, false },
+	{ "S VFO DMR: timeslot 2", "ok 4 up ok quick 4 back", "quick:timeslot back", "ts=2 temporary=0", 3, false },
 	{ "S VFO DMR: talk to a typed TG", "ok 4 up ok quick 4 back", "quick 8 down ok 3 1 0 0 ok", "talk=3100 temporary=0",
 	  9, false },
 	{ "S VFO DMR: the mode stays across a channel", "ok 4 up ok quick 4 back ok 4 ok", "ok 4 up ok", "mode=dmr vfo=1", 4,
@@ -704,9 +719,9 @@ static const flow_t flows[] = {
 	  "screen=zones toast=That_zone_was_deleted", 0, true },
 	{ "26 another task deletes a zone ahead: the open one stays", "ok 4 down down ctx", "zonejob:0",
 	  "screen=zone toast=none shows=Hotspots", 0, true },
-	{ "26 delete a zone ahead of dual watch's B: B follows its zone", "quick 7 ctx 1 zone+ zone+",
+	{ "26 delete a zone ahead of dual watch's B: B follows its zone", "quick:dual ctx 1 zone+ zone+",
 	  "ok 4 up ctx up ok " ZO_DELETE_KEY " down ok back wait:500", "dual=1 azone=0 bzone=1 writes=1", 11, true },
-	{ "26 delete dual watch's B zone: B's channel is in no other zone, the watch ends", "quick 7 ctx 1 zone+",
+	{ "26 delete dual watch's B zone: B's channel is in no other zone, the watch ends", "quick:dual ctx 1 zone+",
 	  "ok 4 ctx up up ok " ZO_DELETE_KEY " down ok back wait:500", "dual=0 zone=1 writes=1 toast=Dual_watch_off", 11, true },
 #endif
 #if CONFIG_VFO_FM || CONFIG_VFO_DMR
@@ -963,6 +978,75 @@ static void run_flow(const flow_t *f, const sim_geom_t *g, sim_map_t map, const 
 		printf("FAIL %s [%s]: wrote the codeplug while only operating (P7)\n", f->name, mapname);
 		fails++;
 	}
+}
+
+// Pin the key order independently of named-control behavior flows.
+static void quick_order_checks(void)
+{
+	static const uint8_t memory_fm[UI_QUICK_TILES] = {
+		QT_POWER, QT_SQUELCH, QT_TONE, QT_TO_VFO, QT_MONITOR, QT_VOX, QT_SCAN, QT_BANDWIDTH, QT_BRIGHTNESS,
+	};
+	static const uint8_t memory_dmr[UI_QUICK_TILES] = {
+		QT_POWER, QT_TIMESLOT, QT_CC, QT_TO_VFO, QT_HEAR_ALL, QT_PRIVACY, QT_SCAN, QT_TALK_TO, QT_BRIGHTNESS,
+	};
+	static const uint8_t wide_fm[UI_QUICK_TILES] = {
+		QT_POWER, QT_ZONE_SCAN, QT_SCAN, QT_SQUELCH, QT_TONE, QT_SPLIT, QT_MONITOR, QT_BANDWIDTH, QT_GPS,
+	};
+	static const uint8_t wide_dmr[UI_QUICK_TILES] = {
+		QT_POWER, QT_ZONE_SCAN, QT_SCAN, QT_TALK_TO, QT_TIMESLOT, QT_CC, QT_HEAR_ALL, QT_PRIVACY, QT_GPS,
+	};
+	static const uint8_t vfo_fm[UI_QUICK_TILES] = {
+		QT_POWER, QT_SQUELCH, QT_TONE, QT_MODE, QT_SPLIT, QT_VOX, QT_SCAN, QT_BANDWIDTH, QT_BRIGHTNESS,
+	};
+	static const uint8_t vfo_dmr[UI_QUICK_TILES] = {
+		QT_POWER, QT_TIMESLOT, QT_CC, QT_MODE, QT_HEAR_ALL, QT_SPLIT, QT_SCAN, QT_TALK_TO, QT_BRIGHTNESS,
+	};
+	static const char *const setups[] = { "down", "", "vfokey", "vfokey quick 4 back" };
+	int checked = 0;
+	char err[300];
+	for (int g = 0; g < sim_geom_count; g++)
+	for (int branded = 0; branded < 2; branded++)
+	for (int mode = 0; mode < 4; mode++) {
+		sim_reset(&sim_geoms[g], SIM_MAP_K);
+		if ((branded && !sim_run("branded-home", err, sizeof err)) ||
+		    !sim_run(setups[mode], err, sizeof err)) {
+			printf("FAIL Quick order setup [%s]: %s\n", sim_geoms[g].name, err);
+			fails++;
+			continue;
+		}
+		bool wide = (branded || CONFIG_DMR_TALKGROUP_ENTRIES) &&
+			(sim_geoms[g].w - 2 * sim_geoms[g].inset >= 220);
+		const uint8_t *expected = mode == 2 ? vfo_fm : mode == 3 ? vfo_dmr :
+			mode == 0 ? (wide ? wide_fm : memory_fm) : (wide ? wide_dmr : memory_dmr);
+		for (int tile = 0; tile < UI_QUICK_TILES; tile++) {
+			uint8_t actual = ui_quick_kind(tile, sim_view());
+			if (actual != expected[tile]) {
+				printf("FAIL Quick order [%s, brand %d, mode %d] key %d: expected %u, got %u\n",
+					sim_geoms[g].name, branded, mode, tile + 1, expected[tile], actual);
+				fails++;
+			}
+			checked++;
+		}
+	}
+	printf("# Quick order: %d numbered controls checked\n", checked);
+}
+
+static void vox_flows(const sim_geom_t *g, sim_map_t map, const char *mapname)
+{
+	static const flow_t vfo[] = {
+		{ "21 VOX on in FM VFO", "vfokey", "quick 6", "vox=1", 2, false },
+		{ "21 VOX off again in FM VFO", "vfokey quick 6", "6", "vox=0", 1, false },
+	};
+	static const flow_t memory[] = {
+		{ "21 VOX on in the standard FM memory grid", "down", "quick 6", "vox=1", 2, false },
+		{ "21 VOX off again in the standard FM memory grid", "down quick 6", "6", "vox=0", 1, false },
+	};
+	for (size_t i = 0; i < sizeof vfo / sizeof vfo[0]; i++)
+		run_flow(&vfo[i], g, map, mapname);
+	// Wide memory grids use tile 6 for Offset. VOX remains in the VFO grid and channel editor.
+	if (!CONFIG_DMR_TALKGROUP_ENTRIES || g->w - 2 * g->inset < 220)
+		for (size_t i = 0; i < sizeof memory / sizeof memory[0]; i++)
+			run_flow(&memory[i], g, map, mapname);
 }
 
 // ---- crawler ----
@@ -1330,6 +1414,7 @@ int main(void)
 		const sim_geom_t *g = sim_geom_find(runs[r].geom);
 		for (size_t i = 0; i < sizeof flows / sizeof flows[0]; i++)
 			run_flow(&flows[i], g, runs[r].map, runs[r].name);
+		vox_flows(g, runs[r].map, runs[r].name);
 	}
 	for (size_t i = 0; i < sizeof flows_mono / sizeof flows_mono[0]; i++)
 		run_flow(&flows_mono[i], sim_geom_find("128x64"), SIM_MAP_M, "M GD-77");
@@ -1339,6 +1424,7 @@ int main(void)
 	for (size_t i = 0; i < sizeof flows_f / sizeof flows_f[0]; i++)
 		run_flow(&flows_f[i], gf, SIM_MAP_F, "F few keys");
 	printf("# %d flows run\n", flows_run);
+	quick_order_checks();
 	about_checks();
 	call_screen_checks();
 	vfo_split_dmr_checks();
@@ -1357,6 +1443,15 @@ int main(void)
 	static const flow_t card_quick[] = {
 		{ "Tall color DMR Quick Controls", "", "branded-home quick", "screen=quick shows=Quick_Controls shows=GPS", 1, false },
 		{ "Tall color FM Quick Controls", "", "branded-home down quick 4 up", "screen=quick sq=6 shows=Quick_Controls", 4, false },
+		{ "DMR memory key 2 starts zone scan", "branded-home", "quick 2", "scanning=1 dual=0", 2, false },
+		{ "DMR memory key 3 starts dual watch", "branded-home", "quick 3", "dual=1", 2, false },
+		{ "DMR memory key 5 changes timeslot", "branded-home", "quick 5", "ts=2", 2, false },
+		{ "DMR memory key 6 edits color code", "branded-home", "quick 6 7 ok", "cc=7", 4, false },
+		{ "DMR memory key 7 toggles digital monitor", "branded-home", "quick 7", "hearall=1", 2, false },
+		{ "DMR memory key 8 toggles privacy", "branded-home", "quick 8", "privacy=1", 2, false },
+		{ "FM memory key 6 shows the stored offset without toggling VOX", "branded-home down", "quick 6",
+			"screen=quick vox=0 txfreq=147660000 shows=Offset shows=+600k", 2, false },
+		{ "FM memory key 7 toggles Monitor", "branded-home down", "quick 7", "monitor=1", 2, false },
 		{ "Talk to keeps all seven digits beside a long name", "",
 			"branded-home worst call:3109999,9100091,g quick 4", "screen=picker shows=TG_9100091", 2, false },
 		{ "Talk to tile fits a seven-digit group", "",
@@ -1366,11 +1461,169 @@ int main(void)
 		run_flow(&card_quick[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
 #if CONFIG_UI_CARD_MENU
 	static const flow_t card_menu[] = {
-		{ "Main Menu opens from Home", "branded-home", "ok", "screen=hub shows=Main_Menu shows=Activity_/_Logs", 1, false },
+		{ "Dual Watch filtered picker retains both the pane title and query", "branded-home quick 3 ctx 3", "6",
+			"screen=dual_pick shows=Watch_on_B shows=Find:_6 dual=1", 1, false },
+		{ "Dual Watch picker title identifies pane A", "branded-home quick 3 ctx", "2",
+			"screen=dual_pick shows=Watch_on_A dual=1", 1, false },
+		{ "Card Delete Zone defaults to keeping the zone", "branded-home ok 4 ok up up up up ok", "4 ok",
+			"screen=zoneedit writes=0", 2, false },
+		{ "Card Factory Reset defaults to keeping settings", "branded-home ok 9 0 down down down ok", "ok",
+			"screen=group writes=0", 1, false },
+		{ "Card sharing preserves a full unsaved private ID", "branded-home ok 4 ok ctx 5", "3 1 0 9 8 7 6",
+			"screen=zone_share_to shows=3109876 shows=Not_saved writes=0", 7, false },
+		{ "Card offer preview returns without importing", "branded-home zoneoffer:3101234 ctx 2", "back",
+			"screen=zone_offer writes=0", 1, false },
+		{ "Channel actions uses the shared card frame", "branded-home", "ok 4 ok ctx",
+			"screen=zchannel shows=20:12", 4, false },
+		{ "Zone options uses the shared card frame", "branded-home", "ok 4 ok up up up up ok",
+			"screen=zoneedit shows=20:12", 8, false },
+		{ "Add channel uses the shared card frame", "branded-home", "ok 4 ok 2 ok",
+			"screen=zpick shows=20:12", 5, false },
+		{ "Zone membership uses the shared card frame", "branded-home", "ok 1 2 ok up up up up ok",
+			"screen=chzones shows=20:12", 9, false },
+		{ "Sharing recipient uses the shared card frame", "branded-home", "ok 4 ok ctx 5",
+			"screen=zone_share_to shows=20:12", 5, false },
+		{ "Received offer uses the shared card frame", "branded-home", "zoneoffer:3101234 ctx",
+			"screen=zone_offer shows=20:12", 1, false },
+		{ "Offer preview uses the shared card frame", "branded-home", "zoneoffer:3101234 ctx 2",
+			"screen=zone_offer_preview shows=20:12", 2, false },
+		{ "Import destination uses the shared card frame", "branded-home", "zoneoffer:3101234,c ctx 1",
+			"screen=zone_offer_zone shows=20:12", 2, false },
+		{ "Delete zone uses the shared card frame", "branded-home", "ok 4 ok up up up up ok 4",
+			"screen=zonedel shows=20:12", 9, false },
+		{ "Factory reset uses the shared card frame", "branded-home", "ok 9 0 down down down ok",
+			"screen=confirm shows=20:12", 7, false },
+		{ "Hotspot information uses the shared card frame", "branded-home", "ok 8 3",
+			"screen=info shows=20:12", 3, false },
+		{ "USB information uses the shared card frame", "branded-home", "ok 8 4",
+			"screen=info shows=20:12", 3, false },
+		{ "Repeater information uses the shared card frame", "branded-home", "ok 8 5",
+			"screen=info shows=20:12", 3, false },
+		{ "Battery information uses the shared card frame", "branded-home", "ok 8 9",
+			"screen=info shows=20:12", 3, false },
+		{ "Roaming uses the shared card frame", "branded-home", "ok 8 6",
+			"screen=roaming shows=20:12", 3, false },
+		{ "Last position uses the shared card frame", "branded-home", "call:3101234,91,g wait:11000 positionreply:3101234,423601000,-710189000 wait:15000 ctx 9",
+			"screen=contact-position shows=20:12", 2, false },
+		{ "Missing position uses the shared card frame", "branded-home", "call:3101234,91,g wait:11000 ctx 9",
+			"screen=contact-position shows=20:12", 2, false },
+		{ "APRS position uses the shared card frame", "branded-home", "ok 7 2 9",
+			"screen=aprs-pos shows=20:12", 4, false },
+		{ "APRS heard uses the shared card frame", "branded-home", "ok 7 2 up ok",
+			"screen=aprs-heard shows=20:12", 5, false },
+		{ "Crash prompt uses the shared card frame", "branded-home", "crash:ask wait:2500",
+			"screen=crash shows=20:12", 0, false },
+		{ "Crash destination uses the shared card frame", "branded-home", "crash:on ok 9 0 down down down down ok 2",
+			"screen=crash_to shows=20:12", 9, false },
+
+		{ "Display settings use a consistent card frame", "branded-home", "ok 9 2",
+			"screen=group shows=Display shows=Backlight shows=Language shows=20:12", 3, false },
+		{ "Numeric setting cards show the actual allowed range", "branded-home ok 9 2", "ok down",
+			"screen=group shows=90% shows=10-100% set5=100", 2, false },
+		{ "Numeric setting Back cancels without applying", "branded-home ok 9 2 ok down", "back",
+			"screen=group set5=100", 1, false },
+		{ "Numeric setting OK applies the selected value", "branded-home ok 9 2 ok down", "ok",
+			"screen=group set5=90", 1, false },
+		{ "My Radio uses identity field cards", "branded-home", "ok 9 9 ok",
+			"screen=dmr-id shows=20:12 shows=Saved_in_the_codeplug shows=DMR_ID", 4, false },
+		{ "My Radio ID entry shows its allowed range", "branded-home ok 9 9 ok", "3 1 0 1",
+			"screen=dmr-id shows=1-16776415 writes=0", 4, false },
+		{ "Language cards identify the active catalog", "branded-home", "ok 9 2 up ok",
+			"screen=language shows=In_use shows=20:12", 5, false },
+		{ "Dual Watch action cards retain pane choices", "branded-home quick 3", "ctx",
+			"screen=dual shows=20:12 shows=Talk_on_B shows=Change_A shows=Stop,_stay_on_A", 1, false },
+		{ "Dual Watch cards keep B in the picker title", "branded-home quick 3 ctx", "3",
+			"screen=dual_pick shows=Watch_on_B shows=In_use shows=FM", 1, false },
+		{ "Dual Watch cards keep B in the zone title", "branded-home quick 3 ctx 3", "up up up up ok",
+			"screen=dual_zone shows=Zone_for_B shows=Local_repeaters", 5, false },
+		{ "Dual Watch picker cards change only B", "branded-home quick 3 ctx 3", "5 ok",
+			"screen=home apos=3 bpos=5 dual=1", 2, false },
+		{ "Find cards retain IDs and result kinds", "branded-home", "5 6 3",
+			"screen=find shows=Find shows=K1ABC_Joe shows=3101234 shows=Contact", 3, false },
+		{ "Find card PTT keeps private targeting", "branded-home 5 6 3", "ptt",
+			"txid=3101234 txpriv=1", 1, false },
+		{ "Talk to cards show the default group and ID", "branded-home", "quick 4",
+			"screen=picker shows=20:12 shows=Default shows=TG_3100", 2, false },
+		{ "Talk to card PTT uses the focused group once", "branded-home quick 4", "down ptt",
+			"txid=91 txpriv=0", 2, false },
+		{ "TX contact picker uses field cards", "branded-home ok 1 2 ok down down down down down down down down down", "ok",
+			"screen=chpick shows=TX_Contact shows=20:12 shows=TG_3100", 1, false },
+		{ "RX group picker uses field cards", "branded-home ok 1 2 ok down down down down down down down down down down", "ok",
+			"screen=chpick shows=RX_Group_List shows=20:12", 1, false },
+		{ "Radio submenu uses numbered navigation cards", "branded-home", "ok 1",
+			"screen=menu-section shows=Radio shows=Quick_Controls shows=Channels shows=20:12", 2, false },
+		{ "All Channels cards show mode and channel details", "branded-home", "ok 1 2",
+			"screen=channels shows=Channels shows=DMR shows=FM shows=TG3100", 3, false },
+		{ "All Channels cards preserve T9 filtering", "branded-home ok 1 2", "2 6",
+			"screen=channels shows=Find:_26 shows=COUNTY", 2, false },
+		{ "All Channels cards preserve the tune shortcut", "branded-home ok 1 2", "ctx",
+			"screen=home pos=3", 1, false },
+		{ "Activity cards keep the Main Menu title and empty state", "branded-home", "ok 6",
+			"screen=recent shows=Activity_/_Logs shows=No_calls_heard_yet shows=20:12", 2, false },
+		{ "Activity cards separate caller, target, direction, and age", "branded-home " CALLER, "ok 6",
+			"screen=recent shows=K1ABC_Joe shows=RX_TG_91 shows=ago", 2, false },
+		{ "Activity card PTT talks to the heard group", "branded-home " CALLER, "ok 6 ptt",
+			"txid=91 txpriv=0", 3, false },
+		{ "Activity card context opens caller Actions", "branded-home " CALLER, "ok 6 ctx",
+			"screen=actions", 3, false },
+		{ "Activity cards return to Main Menu", "branded-home " CALLER, "ok 6 back",
+			"screen=hub", 3, false },
+		{ "Home caller actions use the numbered cards", "branded-home " CALLER, "ctx",
+			"screen=actions shows=20:12 shows=OK_Select shows=Talk_to_TG_91 shows=Private_call centered=K1ABC_Joe", 1, false },
+		{ "Caller cards keep talkgroup PTT", "branded-home " CALLER, "ctx ptt",
+			"txid=91 txpriv=0", 2, false },
+		{ "Caller cards keep the private shortcut", "branded-home " CALLER, "ctx 2",
+			"screen=home talk=3101234", 2, false },
+		{ "Caller cards keep the message shortcut", "branded-home " CALLER, "ctx 3",
+			"screen=compose", 2, false },
+		{ "Caller cards return Home with Back", "branded-home " CALLER, "ctx back",
+			"screen=home", 2, false },
+#if CONFIG_CONTACT_POSITION
+		{ "Caller cards show the last position row", "branded-home " CALLER, "ctx up",
+			"screen=actions focus=Last_position shows=Last_position shows=OK_Select", 2, false },
+#endif
+		{ "Main Menu opens from Home", "branded-home", "ok", "screen=hub shows=Main_Menu shows=20:12 shows=Activity_/_Logs", 1, false },
 		{ "Radio opens Quick Controls", "branded-home", "ok 1 1", "screen=quick", 3, false },
 		{ "Radio keeps the all-channels list", "branded-home", "ok 1 2", "screen=channels", 3, false },
-		{ "Main Menu direct Messages", "branded-home", "ok 2", "screen=messages", 2, false },
+		{ "Main Menu direct Messages", "branded-home", "ok 2",
+			"screen=messages shows=Messages shows=No_messages_yet", 2, false },
+		{ "Messages cards preview an inbox message", "branded-home msg:3101234,Meet_at_the_north_lot wait:9000",
+			"ok 2", "screen=messages shows=Meet_at_the_north_lot shows=12:35", 2, false },
+		{ "Messages display the saved offset and wrap to the next day",
+			"branded-home ok 9 5 up ok 8 4 0 ok back back back msg:3101234,Late_message wait:9000",
+			"ok 2", "screen=messages shows=02:35 shows=10:12", 2, false },
+		{ "Inbox initially selects the newest message", "branded-home msg:3101234,Older msg:3105678,Newer wait:9000",
+			"ok 2", "screen=messages focus=W1XYZ_Jodi shows=Older shows=Newer", 2, false },
+		{ "Live conversation titles use the peer ID", "branded-home msg:1001,My_message wait:9000",
+			"ok 2", "screen=messages shows=1001 hides=You", 2, false },
+		{ "Live inbox groups repeated messages from the same party", "branded-home msg:3101234,First msg:3101234,Second wait:9000",
+			"ok 2 expect:hides=First ok", "screen=live-thread shows=First shows=Second", 3, false },
+		{ "Messages cards open full text", "branded-home msg:3101234,Meet_at_the_north_lot wait:9000",
+			"ok 2 ok", "screen=live-thread shows=20:12 shows=12:35 shows=Meet_at_the_north_lot", 3, false },
+		{ "Message banner opens the thread instead of the old reader", "branded-home msg:3101234,From_the_banner",
+			"ctx", "screen=live-thread shows=From_the_banner", 1, false },
 		{ "Main Menu direct Contacts", "branded-home", "ok 3", "screen=contacts", 2, false },
+#if CONFIG_CONTACT_EDIT
+		{ "Saved talkgroup More lists Edit, Message, and Make Channel Default", "branded-home ok 3", "ctx",
+		  "screen=actions count=3 focus=Edit shows=Message shows=Make_CH_Default", 1, false },
+		{ "Edit a saved talkgroup with a fixed type", "branded-home ok 3 ctx", "ok",
+		  "screen=contactedit count=4 shows=TS hides=Type", 1, false },
+		{ "Add a talkgroup directly from its tab", "branded-home ok 3", "up ok",
+		  "screen=contactedit count=4 shows=New_Talkgroup", 2, false },
+		{ "Saving a talkgroup edit returns to its actions", "branded-home ok 3 ctx ok", "down down ok long:ok",
+		  "screen=actions count=3 writes=1", 4, true },
+		{ "Save a new group from the directory", "branded-home ok 3 up ok", "ok 2 ok down ok 9 1 1 1 ok long:ok",
+		  "screen=contacts writes=1", 11, true },
+#if CONFIG_TALKGROUP_EDIT
+		{ "A talkgroup added through the Radio menu returns to its assignment list",
+		  "branded-home talkgroup-pool ok 1 2 ok up ok", "ok ok",
+		  "screen=operatingtalkgroups count=2 writes=1", 2, true },
+		{ "A saved talkgroup edit follows its channel assignment",
+		  "branded-home talkgroup-pool ok 1 2 ok up ok ok ok long:back ok 3 ctx ok",
+		  "down ok 9 1 1 1 ok long:ok long:back ok 1 2 ok up ok",
+		  "screen=operatingtalkgroups shows=TG_9111 writes=2", 15, true },
+#endif
+#endif
 		{ "Main Menu direct Zones", "branded-home", "ok 4", "screen=zones", 2, false },
 		{ "Zone cards show counts and open the current zone", "branded-home",
 			"ok 4 expect:shows=Select_zone expect:shows=(16) ok", "screen=zone shows=Select_channel", 3, false },
@@ -1382,15 +1635,133 @@ int main(void)
 			"ok 4 7", "screen=zones shows=Find", 3, false },
 		{ "Main Menu Scan opens before starting", "branded-home", "ok 5", "screen=scan shows=Start_scan", 2, false },
 		{ "Main Menu Scan can start", "branded-home", "ok 5 1", "screen=home scanning=1", 3, false },
+		{ "Scan status is visible while scanning", "branded-home", "ok 5 1 ok 5",
+			"screen=scan scanning=1 shows=Scanning shows=Stop_scan", 5, false },
+		{ "Scan keeps its stop shortcut", "branded-home", "ok 5 1 ok 5 1",
+			"screen=home scanning=0", 6, false },
 		{ "Main Menu Activity opens Recent", "branded-home", "ok 6", "screen=recent", 2, false },
-		{ "Main Menu GPS / APRS opens APRS", "branded-home", "ok 7 2", "screen=aprs", 3, false },
-		{ "Main Menu direct Tools", "branded-home", "ok 8", "screen=tools", 2, false },
+		{ "APRS cards show the active position and the configured RF route", "branded-home", "ok 7 2",
+			"screen=aprs shows=N0SIM-7 shows=AFSK shows=144.390 shows=Fixed shows=Beacons_off focus=Send_position_now", 3, false },
+		{ "APRS cards show the configured DMR route without an RF frequency", "branded-home", "ok 7 2 8",
+			"screen=aprs shows=N0SIM-7__DMR hides=144.390 aprs_via=1", 4, false },
+		{ "APRS cards show the next timed beacon", "branded-home", "ok 7 2 6 2",
+			"screen=aprs shows=Next_in_1:00 aprs_auto=1", 5, false },
+		{ "APRS cards distinguish automatic mode without a time interval", "branded-home", "ok 7 2 2",
+			"screen=aprs shows=No_timed_beacon aprs_auto=1 hides=Next_in", 4, false },
+		{ "APRS cards distinguish a missing position and countdown", "branded-home aprs:nopos", "ok 7 2 6 2",
+			"screen=aprs shows=No_position shows=No_timed_beacon hides=Next_in", 5, false },
+		{ "APRS cards retain the manual shortcut and return to the scrolled list", "branded-home", "ok 7 2 1 9 back",
+			"screen=aprs focus=Position aprs_sent=1 shows=N0SIM-7", 6, false },
+		{ "GPS and Data overview shows the satellite fix", "branded-home", "ok 7",
+			"screen=menu-section shows=GPS,_APRS,_and_Data shows=3D_/_9 shows=ARS", 2, false },
+		{ "GPS and Data overview distinguishes a missing fix", "branded-home localnofix", "ok 7",
+			"screen=menu-section shows=No_GPS_fix", 2, false },
+		{ "Position opens the three tabs and status on a tall card display", "branded-home", "ok 7 1",
+			"screen=gps shows=Position shows=Status shows=Sky shows=Signal shows=3D_Fix shows=HDOP shows=UTC", 3, false },
+		{ "Position changes tabs with digits", "branded-home", "ok 7 1 2",
+			"screen=gps shows=Position shows=Sky shows=GPS", 4, false },
+		{ "Position Signal shows the signal-strength scale", "branded-home", "ok 7 1 3",
+			"screen=gps shows=Signal shows=dB-Hz shows=50 shows=25", 4, false },
+		{ "ARS dashboard shows both timers, the server, and both LRRP subscriptions", "branded-home datastatus", "ok 7 3",
+			"screen=menu-section shows=Registered shows=Register_Now shows=Next_refresh shows=17:18 shows=12:42 shows=30_min shows=Server_ID shows=3101001 shows=3102003", 3, false },
+		{ "One LRRP subscription leaves no second card", "branded-home datastatus:one", "ok 7 3",
+			"screen=menu-section shows=3101001 hides=3102003", 3, false },
+		{ "GPS privacy switch empties both cards and reenabling keeps them empty", "branded-home datastatus", "ok 7 3 ok ok",
+			"screen=menu-section shows=No_active_subscriptions hides=3101001 hides=3102003", 5, false },
+		{ "Manual ARS registration updates the retry timer", "branded-home datastatus", "ok 7 3 down ok",
+			"screen=menu-section shows=Next_retry toast=Registration_queued", 5, false },
+		{ "ARS saves a gateway server ID and shows it when reopened", "branded-home", "ok 7 3 down down ok 1 6 7 7 7 2 1 3 ok back 3",
+			"screen=menu-section shows=16777213", 17, false },
+		{ "ARS Back cancels an edited server", "branded-home", "ok 7 3 down down ok 1 2 3 back",
+			"screen=menu-section shows=0_(Off) hides=123", 10, false },
+		{ "ARS rejects an out-of-range server", "branded-home", "ok 7 3 down down ok 9 9 9 9 9 9 9 9 ok",
+			"screen=menu-section shows=0_(Off) shows=Not_changed", 15, false },
+		{ "ARS can be turned off again", "branded-home", "ok 7 3 down down ok 1 ok ok 0 ok",
+			"screen=menu-section shows=0_(Off)", 11, false },
+		{ "GPS and Data routes all LRRP controls through ARS", "branded-home datastatus", "ok 7 4",
+			"screen=menu-section shows=GPS,_APRS,_and_Data hides=LRRP_Subscriptions", 3, false },
+		{ "Main Menu direct Tools", "branded-home", "ok 8",
+			"screen=tools shows=Tools_&_Utilities shows=Diagnostics shows=Battery", 2, false },
+		{ "Tools card preserves the diagnostics shortcut", "branded-home nobattery", "ok 8 7",
+			"screen=diag", 3, false },
+		{ "Tools card preserves Scan and Back", "branded-home", "ok 8 back 8 1",
+			"screen=home scanning=1", 5, false },
 		{ "Main Menu direct Settings and Back", "branded-home", "ok 9 back", "screen=hub", 3, false },
+		{ "Settings shows the actual groups", "branded-home", "ok 9",
+			"screen=settings shows=Sound shows=Display shows=Talk_&_listen shows=Privacy shows=Location "
+			"shows=Connections shows=Power shows=Keys shows=My_radio shows=Advanced", 2, false },
+		{ "Settings Display opens the brightness editor", "branded-home", "ok 9 2 ok",
+			"screen=group shows=Brightness", 4, false },
+		{ "Settings Keys keeps its shortcut", "branded-home", "ok 9 8",
+			"screen=group shows=Long_press_time shows=Up/Down_on_Home", 3, false },
+		{ "Settings Advanced keeps its zero shortcut", "branded-home", "ok 9 0",
+			"screen=group shows=About shows=Codeplug shows=Diagnostics", 3, false },
+#if CONFIG_MESSAGE_JOURNAL
+		{ "History activation opens a confirmation", "branded-home", "ok 9 0 up ok",
+			"screen=confirm shows=Message_history shows=Cancel", 5, false },
+		{ "History activation defaults to cancel", "branded-home", "ok 9 0 up ok ok",
+			"screen=group toast=none", 6, false },
+		{ "History activation reports success", "branded-home", "ok 9 0 up ok down ok wait:100",
+			"screen=group toast=Message_history_enabled", 7, false },
+		{ "Messages opens the conversation directory", "branded-home history", "ok 2",
+			"screen=messages focus=K1ABC_Joe shows=TG_3100 shows=Private_text shows=Group_reply hides=You", 2, false },
+		{ "A private conversation opens focused on its newest bubble", "branded-home history", "ok 2 ok",
+			"screen=thread focus=You shows=Older_private_text shows=Private_text", 3, false },
+		{ "Thread shows the full newest message", "branded-home history", "ok 2 ok",
+			"screen=thread shows=12:35 shows=You shows=full_message.", 3, false },
+		{ "UTC offset wraps the clock and stored message time across midnight", "branded-home history",
+			"ok 9 5 down down down down ok 7 2 0 ok long:back ok 2 ok",
+			"screen=thread shows=08:12 shows=00:35", 16, false },
+		{ "OK replies to the private thread even when an older message is selected", "branded-home history",
+			"ok 2 ok up ok", "screen=sms-write shows=K1ABC_Joe shows=20:12", 5, false },
+		{ "Crossing into older history retains the boundary bubble", "branded-home history", "ok 2 ok up up",
+			"screen=thread shows=Earlier_page shows=Older_private_text", 5, false },
+		{ "One Down press returns to the boundary bubble", "branded-home history", "ok 2 ok up up down",
+			"screen=thread shows=Earlier_page shows=Older_private_text focus=K1ABC_Joe", 6, false },
+		{ "A second Down press reaches the newest bubble", "branded-home history", "ok 2 ok up up down down",
+			"screen=thread shows=Private_text focus=You", 7, false },
+		{ "Holding Up crosses into older history", "branded-home history", "ok 2 ok up long:up",
+			"screen=thread shows=Earlier_page shows=Older_private_text", 5, false },
+		{ "Holding Down crosses into newer history", "branded-home history", "ok 2 ok up up down long:down",
+			"screen=thread shows=Private_text focus=You", 7, false },
+		{ "Holding Down stops at the newest message", "branded-home history", "ok 2 ok long:down",
+			"screen=thread focus=You", 4, false },
+		{ "Talkgroup conversation replies to the talkgroup", "branded-home history", "ok 2 down ok ok",
+			"screen=sms-write shows=TG_3100", 5, false },
+		{ "Send a reply to the private peer", "branded-home history", "ok 2 ok ok 4 ok",
+			"sent=1 txid=3101234 screen=thread", 6, false },
+		{ "A successful reply updates the bubble without a banner", "branded-home history ok 2 ok ok 4 ok",
+			"smsresult:ok", "screen=thread shows=Delivered banner=none", 0, false },
+		{ "A failed reply updates the bubble without a banner", "branded-home history ok 2 ok ok 4 ok",
+			"smsresult:fail", "screen=thread shows=Send_failed banner=none", 0, false },
+		{ "Send a reply to the talkgroup", "branded-home history", "ok 2 down ok ok 4 ok",
+			"sent=1 txid=3100 screen=thread", 7, false },
+		{ "A received message appears in its open thread", "branded-home history ok 2 ok",
+			"msg:3101234,Fresh_forecast", "screen=thread shows=Fresh_forecast banner=none", 0, false },
+		{ "A message from another contact keeps its normal notification", "branded-home history ok 2 ok",
+			"msg:3105678,Other_peer", "screen=thread banner=Message_from_W1XYZ_Jodi", 0, false },
+#endif
 	};
 	for (size_t i = 0; i < sizeof card_menu / sizeof card_menu[0]; i++)
 		run_flow(&card_menu[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+	static const flow_t scan_tabs[] = {
+		{ "Scan Lists reports the live zone source", "branded-home", "ok 5 right",
+			"screen=scan shows=Scan_source shows=Zone_channels", 3, false },
+		{ "Scan Options shows the current timing values", "branded-home", "ok 5 right right",
+			"screen=scan shows=Scan_resume shows=Carrier shows=2000_ms", 4, false },
+	};
+	for (size_t i = 0; i < sizeof scan_tabs / sizeof scan_tabs[0]; i++)
+		run_flow(&scan_tabs[i], sim_geom_find("240x320i10x5"), SIM_MAP_M, "Tall color");
 #if CONFIG_DMR
 	static const flow_t card_directory[] = {
+#if CONFIG_CONTACT_EDIT
+		{ "Saved private More lists the contact actions", "branded-home ok 3 right", "ctx",
+		  "screen=actions count=5 focus=Edit shows=Message shows=Radio_check shows=Call_alert shows=Position", 1, false },
+		{ "Edit a private contact with a fixed type", "branded-home ok 3 right ctx", "ok",
+		  "screen=contactedit count=3 hides=TS hides=Type", 1, false },
+		{ "Add a private contact directly from its tab", "branded-home ok 3 right", "up ok",
+		  "screen=contactedit count=3 shows=New_Contact", 2, false },
+#endif
 		{ "Talkgroups show the full saved ID", "branded-home worst", "ok 3",
 			"screen=contacts shows=TG_9100091 hides=PC_3109999", 2, false },
 		{ "The Contacts tab shows private calls only", "branded-home", "ok 3 right",

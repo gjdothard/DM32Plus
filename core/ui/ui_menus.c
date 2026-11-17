@@ -10,7 +10,7 @@
 #include "ui_nav.h"
 #include "ui_svc.h"
 #include "fmt.h"
-#if CONFIG_CONTACT_POSITION
+#if CONFIG_CONTACT_POSITION || CONFIG_DMR_ARS
 #include "dmr/call/dmr_lc.h"
 #endif
 #include "codeplug/codeplug.h"
@@ -20,6 +20,9 @@
 #endif
 #include "hal_time.h"
 #include "radio/tones.h"
+#include "radio/scan.h"
+#include "dmr/dmrDataService.h"
+#include "storage/message_journal.h"
 #include "radio/mic_gain.h"
 #include "radio/ref_trim.h"
 #include "radio/radio_am.h"
@@ -65,6 +68,11 @@ enum { HUB_LAST_CALLER, HUB_CONTACTS, HUB_MESSAGES, HUB_RECENT, HUB_ZONES, HUB_C
        HUB_RADIO, HUB_SCAN, HUB_GPS };
 
 #if CONFIG_UI_CARD_MENU
+static bool gps_data_available(void)
+{
+	return (ui_svc_features() & UI_FEAT_GPS) || CONFIG_APRS || CONFIG_DMR_DATA_CORE;
+}
+
 static const uint8_t main_entries[] = {
 	HUB_RADIO, HUB_MESSAGES, HUB_CONTACTS, HUB_ZONES, HUB_SCAN, HUB_RECENT, HUB_GPS, HUB_TOOLS, HUB_SETTINGS,
 };
@@ -98,7 +106,7 @@ static void hub_item(uint16_t i, ui_item_t *it)
 	static const char *const names[] = { TRN("Last caller"), TRN("Contacts"), TRN("Messages"), TRN("Recent"),
 					     TRN("Zones"), TRN("Channels"), TRN("Tools"), TRN("Settings"),
 #if CONFIG_UI_CARD_MENU
-					     TRN("Radio"), TRN("Scan"), TRN("GPS / APRS"),
+					     TRN("Radio"), TRN("Scan"), TRN("GPS, APRS, and Data"),
 #endif
 	};
 	bool main = CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st);
@@ -121,9 +129,12 @@ static void hub_item(uint16_t i, ui_item_t *it)
 	} else if ((e == HUB_SCAN || (e == HUB_TOOLS && !main)) && ui_st.scanning) {
 		sb_str(&b, TR("Scanning"));
 	}
-	if ((e == HUB_SCAN && !(ui_svc_features() & UI_FEAT_SCAN)) ||
-	    (e == HUB_GPS && !(ui_svc_features() & UI_FEAT_GPS) && !CONFIG_APRS))
+	if (e == HUB_SCAN && !(ui_svc_features() & UI_FEAT_SCAN))
 		it->flags |= UI_ITEM_DIM;
+#if CONFIG_UI_CARD_MENU
+	if (e == HUB_GPS && !gps_data_available())
+		it->flags |= UI_ITEM_DIM;
+#endif
 }
 
 static void hub_select(uint16_t i, bool hold)
@@ -134,10 +145,10 @@ static void hub_select(uint16_t i, bool hold)
 	uint8_t e = hub_entry(i);
 #if CONFIG_UI_CARD_MENU
 	if (e == HUB_RADIO || e == HUB_GPS) {
-		if (e == HUB_GPS && !(ui_svc_features() & UI_FEAT_GPS) && !CONFIG_APRS)
+		if (e == HUB_GPS && !gps_data_available())
 			ui_toast(TR("Not in this build"));
 		else
-			ui_push(SCR_MENU_SECTION, e);
+			ui_push(SCR_MENU_SECTION, e == HUB_GPS ? MENU_SECTION_GPS : MENU_SECTION_RADIO);
 		return;
 	}
 	if (e == HUB_SCAN) {
@@ -174,7 +185,7 @@ static void hub_draw(void)
 		.count = hub_count(), .focus = f->focus, .top = &f->top,
 		.item = hub_item, .hint = TR("1-7 open  Back"),
 	};
-	ui_draw_main_menu(ui_view(), &ui_st, &list);
+	ui_draw_numbered_menu(ui_view(), &ui_st, &list, false);
 }
 #endif
 
@@ -188,41 +199,131 @@ static const ui_scr_def_t hub_screen = {
 
 #if CONFIG_UI_CARD_MENU
 static void open_gps_position(void);
+#if CONFIG_UI_SETTINGS && (CONFIG_DMR_ARS || CONFIG_DMR_LRRP)
+static void group_item(uint16_t i, ui_item_t *it);
+static void group_select(uint16_t i, bool hold);
+static bool group_key(const input_event_t *ev);
+static void group_enter(void);
+
+static bool menu_section_key(const input_event_t *ev)
+{
+	return ui_frame()->arg == MENU_SECTION_ARS && group_key(ev);
+}
+#endif
 
 static const char *menu_section_title(void)
 {
-	return ui_frame()->arg == HUB_GPS ? TR("GPS / APRS") : TR("Radio");
+	static const char *const titles[] = { TRN("Radio"), TRN("GPS, APRS, and Data"),
+		TRN("ARS & LRRP") };
+	return tr(titles[ui_frame()->arg]);
 }
 
-static bool section_available(uint16_t i)
+static bool section_available(uint16_t arg, uint16_t i)
 {
-	if (ui_frame()->arg == HUB_GPS)
-		return i == 0 ? (ui_svc_features() & UI_FEAT_GPS) != 0 : CONFIG_APRS;
+	if (arg == MENU_SECTION_GPS) {
+		switch (i) {
+		case 0: return (ui_svc_features() & UI_FEAT_GPS) != 0;
+		case 1: return CONFIG_APRS;
+		case 2: return CONFIG_DMR_ARS || (ui_svc_features() & UI_FEAT_LRRP);
+		}
+	}
 	return i == 0 || CONFIG_CHANNEL_LIST;
 }
 
-static uint16_t menu_section_count(void) { return 2; }
+static uint16_t menu_section_count(void)
+{
+	switch (ui_frame()->arg) {
+	case MENU_SECTION_GPS: return 3;
+	case MENU_SECTION_ARS: return DATA_ROWS;
+	default: return 2;
+	}
+}
+
+static void gps_summary(sbuf_t *b)
+{
+	ui_position_t position;
+	if (!ui_svc_position(&position))
+		sb_str(b, TR("Off"));
+	else if (!position.fix)
+		sb_str(b, TR("No GPS fix"));
+	else {
+		sb_str(b, position.mode == 3 ? "3D" : position.mode == 2 ? "2D" : TR("Fix"));
+		sb_str(b, " / ");
+		sb_u32(b, position.sats, 1);
+	}
+}
 
 static void menu_section_item(uint16_t i, ui_item_t *it)
 {
-	const char *label = ui_frame()->arg == HUB_GPS ? (i == 0 ? TR("Position") : "APRS") :
-		(i == 0 ? TR("Quick Controls") : TR("Channels"));
+	uint16_t arg = ui_frame()->arg;
+	const char *label;
+	sbuf_t b;
+	sb_init(&b, it->value, sizeof it->value);
+	switch (arg) {
+	case MENU_SECTION_GPS: {
+		static const char *const links[] = { TRN("Position"), "APRS", TRN("ARS & LRRP") };
+		label = tr(links[i]);
+		if (section_available(arg, i)) {
+			if (i == 0)
+				gps_summary(&b);
+			else if (i == 2 && CONFIG_DMR_ARS)
+				sb_str(&b, ui_ars_status(ui_svc_ars_state()));
+		}
+		break;
+	}
+	case MENU_SECTION_ARS:
+		if (i == DATA_REGISTER) {
+			str_copy(it->label, sizeof it->label, TR("Register Now"));
+			if (!CONFIG_DMR_ARS)
+				it->flags |= UI_ITEM_DIM;
+			return;
+		}
+#if CONFIG_UI_SETTINGS && (CONFIG_DMR_ARS || CONFIG_DMR_LRRP)
+		if ((i == DATA_ANSWER && CONFIG_DMR_LRRP) || (i == DATA_SERVER && CONFIG_DMR_ARS)) {
+			group_item(i, it);
+			return;
+		}
+#endif
+		label = i == DATA_ANSWER ? TR("Answer GPS requests") : TR("Server ID");
+		it->flags |= UI_ITEM_INFO;
+		break;
+	default:
+		label = i == 0 ? TR("Quick Controls") : TR("Channels");
+		break;
+	}
 	str_copy(it->label, sizeof it->label, label);
+	if (arg == MENU_SECTION_ARS)
+		return;
 	item_num(it, i + 1);
-	if (!section_available(i))
+	if (!section_available(arg, i))
 		it->flags |= UI_ITEM_DIM;
 }
 
 static void menu_section_select(uint16_t i, bool hold)
 {
 	(void)hold;
-	if (!section_available(i)) {
-		ui_toast(TR("Not in this build"));
-	} else if (ui_frame()->arg == HUB_GPS) {
-		if (i == 0)
-			open_gps_position();
+	uint16_t arg = ui_frame()->arg;
+	if (arg == MENU_SECTION_ARS) {
+		if (i == DATA_REGISTER) {
+			if (ui_svc_ars_register_now())
+				ui_toast(TR("Registration queued"));
+			else
+				ui_toast(TR("Cannot register now"));
+		}
+#if CONFIG_UI_SETTINGS && (CONFIG_DMR_ARS || CONFIG_DMR_LRRP)
 		else
-			ui_push(SCR_APRS, 0);
+			group_select(i, hold);
+#endif
+		return;
+	}
+	if (!section_available(arg, i)) {
+		ui_toast(TR("Not in this build"));
+	} else if (arg == MENU_SECTION_GPS) {
+		switch (i) {
+		case 0: open_gps_position(); break;
+		case 1: ui_push(SCR_APRS, 0); break;
+		case 2: ui_push(SCR_MENU_SECTION, MENU_SECTION_ARS); break;
+		}
 	} else {
 		ui_push(i == 0 ? SCR_QUICK : SCR_CHANNELS, 0);
 	}
@@ -231,13 +332,21 @@ static void menu_section_select(uint16_t i, bool hold)
 static const ui_scr_def_t menu_section_screen = {
 	.name = "menu-section", .flags = SF_LIST | SF_NUMBERED | SF_FIELD, .title = menu_section_title,
 	.count = menu_section_count, .item = menu_section_item, .select = menu_section_select,
+#if CONFIG_UI_SETTINGS && (CONFIG_DMR_ARS || CONFIG_DMR_LRRP)
+	.key = menu_section_key, .enter = group_enter,
+#endif
 };
 #endif
 
 // ======================= Actions on a station or talkgroup =======================
 
 enum { A_TALK, A_PRIVATE, A_MESSAGE, A_CHECK, A_ALERT, A_POSITION, A_SAVE_CONTACT, A_SPEAK, A_SAVE_CHANNEL,
-       A_MAKE_DEFAULT, A_LAST_POSITION };
+       A_MAKE_DEFAULT, A_LAST_POSITION, A_EDIT_CONTACT };
+
+#if CONFIG_CONTACT_EDIT
+static void ct_open_saved(uint16_t slot);
+static void ct_open_new(bool group, bool fixed_type);
+#endif
 
 #if CONFIG_CONTACT_POSITION
 static ui_target_t position_target;
@@ -252,6 +361,20 @@ bool ui_contact_position_shown(void)
 static uint8_t act_list(uint8_t *out)
 {
 	uint8_t n = 0;
+#if CONFIG_CONTACT_EDIT
+	if (ui_frame()->arg) {
+		out[n++] = A_EDIT_CONTACT;
+		out[n++] = A_MESSAGE;
+		if (ui_target.group) {
+			out[n++] = A_MAKE_DEFAULT;
+		} else {
+			out[n++] = A_CHECK;
+			out[n++] = A_ALERT;
+			out[n++] = A_POSITION;
+		}
+		return n;
+	}
+#endif
 	if (ui_target.group) {
 		out[n++] = A_TALK;
 		out[n++] = A_MAKE_DEFAULT;
@@ -353,6 +476,9 @@ static void act_item(uint16_t i, ui_item_t *it)
 		if (ui_target.saved || !CONFIG_CONTACT_EDIT)
 			it->flags |= UI_ITEM_DIM;
 		break;
+	case A_EDIT_CONTACT:
+		sb_str(&b, TR("Edit"));
+		break;
 	case A_SPEAK:
 		sb_str(&b, TR("Speak status"));
 		it->flags |= UI_ITEM_DIM;
@@ -363,8 +489,8 @@ static void act_item(uint16_t i, ui_item_t *it)
 			it->flags |= UI_ITEM_DIM;
 		break;
 	case A_MAKE_DEFAULT:
-		sb_str(&b, TR("Make channel default"));
-		if (!(feats() & UI_FEAT_TALK_TARGET))
+		sb_str(&b, ui_frame()->arg ? TR("Make CH Default") : TR("Make channel default"));
+		if (!(feats() & UI_FEAT_TALK_TARGET) || (ui_frame()->arg && (ui_view()->vfo || ui_view()->ch.mode != RADIO_MODE_DMR)))
 			it->flags |= UI_ITEM_DIM;
 		break;
 	default:
@@ -372,9 +498,10 @@ static void act_item(uint16_t i, ui_item_t *it)
 	}
 }
 
+static char outgoing_toast[40];	// The toast keeps the pointer until it expires.
+
 static void act_select(uint16_t i, bool hold)
 {
-	static char msg[40];
 	uint8_t l[12];
 	uint8_t n = act_list(l);
 	if (i >= n)
@@ -383,7 +510,6 @@ static void act_select(uint16_t i, bool hold)
 	char name[24];
 	ui_sb_target(name, sizeof name, &ui_target);
 	sbuf_t b;
-	sb_init(&b, msg, sizeof msg);
 	switch (l[i]) {
 	case A_TALK:
 		act_target(i, &t);
@@ -395,6 +521,17 @@ static void act_select(uint16_t i, bool hold)
 		ui_talk(&t, false);
 		break;
 	case A_MAKE_DEFAULT:
+#if CONFIG_CONTACT_EDIT
+		if (ui_frame()->arg) {
+			if (ui_svc_set_channel_contact(ui_frame()->arg)) {
+				ui_go_home();
+				ui_toast(TR("Saving..."));
+			} else {
+				ui_toast(TR("Couldn't save: try again"));
+			}
+			break;
+		}
+#endif
 		ui_talk(&ui_target, true);
 		break;
 	case A_MESSAGE:
@@ -405,21 +542,23 @@ static void act_select(uint16_t i, bool hold)
 		break;
 	case A_CHECK:
 		if (ui_svc_radio_check(ui_target.id)) {
+			sb_init(&b, outgoing_toast, sizeof outgoing_toast);
 			sb_str(&b, TR("Checking "));
 			sb_str(&b, name);
 			sb_str(&b, "...");
 			ui_go_home();
-			ui_toast(msg);
+			ui_toast(outgoing_toast);
 		} else {
 			ui_toast(TR("Radio check: not in this build"));
 		}
 		break;
 	case A_ALERT:
 		if (ui_svc_call_alert(ui_target.id)) {
+			sb_init(&b, outgoing_toast, sizeof outgoing_toast);
 			sb_str(&b, TR("Call alert to "));
 			sb_str(&b, name);
 			ui_go_home();
-			ui_toast(msg);
+			ui_toast(outgoing_toast);
 		} else {
 			ui_toast(TR("Call alert: not in this build"));
 		}
@@ -448,6 +587,11 @@ static void act_select(uint16_t i, bool hold)
 		}
 #endif
 		ui_toast(ui_target.saved ? TR("Already in your contacts") : TR("Add contacts in qdmr"));
+		break;
+	case A_EDIT_CONTACT:
+#if CONFIG_CONTACT_EDIT
+		ct_open_saved(ui_frame()->arg);
+#endif
 		break;
 	case A_SPEAK:
 		ui_toast(TR("Voice prompts: not in this build"));
@@ -481,7 +625,7 @@ static const ui_scr_def_t actions_screen = {
 // ======================= Message composer =======================
 
 #if CONFIG_DMR_SMS
-static void sms_text_open(void);
+static void sms_text_open(bool reply);
 #endif
 
 // Sent in the language in use (the text goes out as UTF-16, Latin-1 included)
@@ -506,9 +650,25 @@ static void compose_item(uint16_t i, ui_item_t *it)
 	}
 }
 
-static void send_text(const ui_target_t *target, const char *text)
+#if CONFIG_MESSAGE_JOURNAL
+static uint32_t inline_reply_id;
+#endif
+
+bool ui_thread_send_result(uint32_t id)
 {
-	static char msg[40];
+#if CONFIG_MESSAGE_JOURNAL
+	if (inline_reply_id && inline_reply_id == id) {
+		inline_reply_id = 0;
+		return true;
+	}
+#else
+	(void)id;
+#endif
+	return false;
+}
+
+static void send_text(const ui_target_t *target, const char *text, bool reply)
+{
 	char name[24];
 	ui_sb_target(name, sizeof name, target);
 	if (!ui_svc_msg_send(target->id, target->group, text)) {
@@ -516,21 +676,27 @@ static void send_text(const ui_target_t *target, const char *text)
 		return;
 	}
 	sbuf_t b;
-	sb_init(&b, msg, sizeof msg);
+	sb_init(&b, outgoing_toast, sizeof outgoing_toast);
 	sb_str(&b, TR("Sending to "));
 	sb_str(&b, name);
-	ui_go_home();
-	ui_toast(msg);
+#if CONFIG_MESSAGE_JOURNAL
+	inline_reply_id = reply && ui_svc_history_active() ? target->id : 0;
+#endif
+	if (reply)
+		ui_pop();
+	else
+		ui_go_home();
+	ui_toast(outgoing_toast);
 }
 
 static void compose_select(uint16_t i, bool hold)
 {
 	(void)hold;
 	if (i < CANNED_N) {
-		send_text(&ui_target, tr(canned[i]));
+		send_text(&ui_target, tr(canned[i]), false);
 	} else if (i == CANNED_N) {
 #if CONFIG_DMR_SMS
-		sms_text_open();
+		sms_text_open(false);
 #else
 		ui_toast(TR("Typing: not in this build"));
 #endif
@@ -559,10 +725,38 @@ static bool contacts_card_active(void)
 	return CONFIG_UI_CARD_MENU && ui_frame()->scr == SCR_CONTACTS && ui_contact_tabs_available();
 }
 
+#if CONFIG_CONTACT_EDIT
+// The virtual first row belongs only to Contacts, not the other screens that share its contact lookup.
+static bool contacts_add_row(uint16_t raw) { return ui_frame()->scr == SCR_CONTACTS && raw == 0; }
+
+static uint16_t contacts_slot(uint16_t raw)
+{
+	return ui_frame()->scr == SCR_CONTACTS ? raw : (uint16_t)(raw + 1u);
+}
+
+static uint16_t contacts_screen_raw_count(void) { return (uint16_t)(contacts_raw_count() + 1u); }
+
+static const char *contacts_add_label(void)
+{
+	return contacts_card_active() && ui_frame()->arg == 0 ? TR("Add talkgroup") : TR("Add contact");
+}
+#else
+static uint16_t contacts_slot(uint16_t raw) { return (uint16_t)(raw + 1u); }
+#define contacts_screen_raw_count contacts_raw_count
+#endif
+
 static bool contacts_raw_label(uint16_t raw, char *buf, uint8_t len)
 {
+#if CONFIG_CONTACT_EDIT
+	if (contacts_add_row(raw)) {
+		if (ui_filter_text()[0])
+			return false;
+		str_copy(buf, len, contacts_add_label());
+		return true;
+	}
+#endif
 	contact_t c;
-	if (!codeplug_contact((uint16_t)(raw + 1u), &c))
+	if (!codeplug_contact(contacts_slot(raw), &c))
 		return false;
 	if (contacts_card_active() && ((c.type == CONTACT_PRIVATE) != (ui_frame()->arg != 0)))
 		return false;
@@ -577,7 +771,7 @@ static bool contacts_raw_label(uint16_t raw, char *buf, uint8_t len)
 static bool contacts_target(uint16_t i, ui_target_t *t)
 {
 	contact_t c;
-	if (i >= ui_filter_count() || !codeplug_contact((uint16_t)(ui_filter_raw(i) + 1u), &c))
+	if (i >= ui_filter_count() || !codeplug_contact(contacts_slot(ui_filter_raw(i)), &c))
 		return false;
 	memset(t, 0, sizeof *t);
 	t->id = c.id;
@@ -589,6 +783,12 @@ static bool contacts_target(uint16_t i, ui_target_t *t)
 
 static void contacts_item(uint16_t i, ui_item_t *it)
 {
+#if CONFIG_CONTACT_EDIT
+	if (contacts_add_row(ui_filter_raw(i))) {
+		str_copy(it->label, sizeof it->label, contacts_add_label());
+		return;
+	}
+#endif
 	ui_target_t t;
 	if (!contacts_target(i, &t))
 		return;
@@ -623,6 +823,13 @@ static void contacts_item(uint16_t i, ui_item_t *it)
 
 static void contacts_select(uint16_t i, bool hold)
 {
+#if CONFIG_CONTACT_EDIT
+	if (contacts_add_row(ui_filter_raw(i))) {
+		bool tabs = contacts_card_active();
+		ct_open_new(tabs && ui_frame()->arg == 0, tabs);
+		return;
+	}
+#endif
 	ui_target_t t;
 	if (contacts_target(i, &t))
 		ui_talk(&t, hold);
@@ -631,9 +838,26 @@ static void contacts_select(uint16_t i, bool hold)
 static void contacts_context(uint16_t i)
 {
 	ui_target_t t;
-	if (contacts_target(i, &t))
-		ui_open_actions(&t);
+	if (!contacts_target(i, &t))
+		return;
+#if CONFIG_CONTACT_EDIT
+	if (t.id != 0xFFFFFFu) {
+		ui_target = t;
+		ui_push(SCR_ACTIONS, contacts_slot(ui_filter_raw(i)));
+		return;
+	}
+#endif
+	ui_open_actions(&t);
 }
+
+#if CONFIG_CONTACT_EDIT
+static void contacts_enter(void)
+{
+	// Keep the normal talk shortcut on the first saved entry. Up from there reaches Add.
+	if (ui_filter_count() > 1)
+		ui_frame()->focus = 1;
+}
+#endif
 
 #if CONFIG_UI_CARD_MENU
 static bool contacts_key(const input_event_t *ev)
@@ -647,6 +871,9 @@ static bool contacts_key(const input_event_t *ev)
 		f->arg = tab;
 		f->top = f->focus = 0;
 		ui_filter_rebuild();
+#if CONFIG_CONTACT_EDIT
+		contacts_enter();
+#endif
 		ui_focus_changed();
 		ui_dirty();
 	}
@@ -659,7 +886,10 @@ static const ui_scr_def_t contacts_screen = {
 	.hint = TRN(TEXT_ALT_OPEN "0-9 find  OK talk  # more" TEXT_ALT_NEXT "0-9  OK talk  # more" TEXT_ALT_CLOSE),
 	.empty = TRN("No contacts: add them in qdmr"),
 	.count = ui_filter_count, .item = contacts_item, .select = contacts_select, .context = contacts_context,
-	.target = contacts_target, .raw_count = contacts_raw_count, .raw_label = contacts_raw_label,
+	.target = contacts_target, .raw_count = contacts_screen_raw_count, .raw_label = contacts_raw_label,
+#if CONFIG_CONTACT_EDIT
+	.enter = contacts_enter,
+#endif
 #if CONFIG_UI_CARD_MENU
 	.key = contacts_key,
 #endif
@@ -675,57 +905,164 @@ static const ui_scr_def_t contacts_screen = {
 
 // ======================= Messages =======================
 
-static uint16_t msgs_count(void) { return ui_svc_msg_count(); }
+static void message_time(sbuf_t *b, uint32_t minute)
+{
+	char time[6];
+	ui_local_time(time, minute);
+	sb_str(b, time);
+}
+
+#if CONFIG_MESSAGE_JOURNAL
+static uint16_t history_count(void);
+static void history_item(uint16_t i, ui_item_t *it);
+static void history_select(uint16_t i, bool hold);
+static void history_context(uint16_t i);
+static const char *history_body(void);
+#endif
+
+static uint32_t message_peer(const ui_msg_t *m)
+{
+	uint32_t id = m->group || m->sent || (m->own && m->dst) ? m->dst : m->src;
+	return id | (m->group ? MESSAGE_HISTORY_GROUP_KEY : 0);
+}
+
+static ui_target_t peer_target(uint32_t key)
+{
+	ui_target_t t = { .id = key & ~MESSAGE_HISTORY_GROUP_KEY, .group = (key & MESSAGE_HISTORY_GROUP_KEY) != 0 };
+	t.saved = ui_contact_name(t.id, t.group, t.name);
+	return t;
+}
+
+// Return one live row per peer, or all rows for a selected peer. The service's order is newest first.
+static unsigned live_rows(uint8_t rows[DMR_DATA_INBOX_SIZE], uint32_t only, ui_msg_t *m)
+{
+	uint32_t peers[DMR_DATA_INBOX_SIZE];
+	unsigned n = 0;
+	for (unsigned i = 0; i < DMR_DATA_INBOX_SIZE && ui_svc_msg_get(i, m); i++) {
+		uint32_t key = message_peer(m);
+		if (only && only != key)
+			continue;
+		unsigned j = 0;
+		while (!only && j < n && peers[j] != key)
+			j++;
+		if (only || j == n) {
+			peers[n] = key;
+			rows[n++] = (uint8_t)i;
+		}
+	}
+	return n;
+}
+
+static bool live_row(unsigned row, uint32_t peer, ui_msg_t *m)
+{
+	uint8_t rows[DMR_DATA_INBOX_SIZE];
+	unsigned n = live_rows(rows, peer, m);
+	if (row >= n)
+		return false;
+	if (peer && CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st))
+		row = n - 1u - row;
+	return ui_svc_msg_get(rows[row], m);
+}
+
+static uint16_t msgs_count(void)
+{
+#if CONFIG_MESSAGE_JOURNAL
+	if (ui_svc_history_active())
+		return history_count();
+#endif
+	uint8_t rows[DMR_DATA_INBOX_SIZE];
+	ui_msg_t m;
+	return (uint16_t)live_rows(rows, 0, &m);
+}
+
+static void newest_focus(uint16_t count)
+{
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) && count)
+		ui_frame()->focus = count - 1u;
+}
+
+static void msgs_enter(void)
+{
+#if CONFIG_MESSAGE_JOURNAL
+	if (ui_svc_history_active())
+		ui_svc_history_browse(0, 0);
+#endif
+}
+
+static void msg_preview(ui_item_t *it, const ui_msg_t *m)
+{
+	ui_local_time(it->value, m->utc_minute);
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st)) {
+		it->value[5] = '\n';
+		str_copy(it->value + 6, sizeof it->value - 6, m->text);
+	}
+	it->flags |= UI_ITEM_PREVIEW;
+	if (m->unread)
+		it->flags |= UI_ITEM_WARN;
+}
 
 static void msgs_item(uint16_t i, ui_item_t *it)
 {
-	ui_msg_t m;
-	if (!ui_svc_msg_get(i, &m))
+#if CONFIG_MESSAGE_JOURNAL
+	if (ui_svc_history_active()) {
+		history_item(i, it);
 		return;
-	sbuf_t b;
-	sb_init(&b, it->label, sizeof it->label);
-	if (m.sent)
-		sb_str(&b, GLYPH_ARROW);
-	if (m.name[0])
-		sb_str(&b, m.name);
-	else
-		sb_u32(&b, m.src, 1);
-	sb_str(&b, ": ");
-	sb_str(&b, m.text);
-	ui_sb_age(it->value, sizeof it->value, m.age_ms);
-	it->flags |= UI_ITEM_PREVIEW;	// the start of the message: cut at its end
-	if (m.unread)
-		it->flags |= UI_ITEM_WARN;
+	}
+#endif
+	ui_msg_t m;
+	if (live_row(i, 0, &m)) {
+		ui_target_t peer = peer_target(message_peer(&m));
+		ui_sb_target(it->label, sizeof it->label, &peer);
+		msg_preview(it, &m);
+	}
 }
 
 static void msgs_select(uint16_t i, bool hold)
 {
+#if CONFIG_MESSAGE_JOURNAL
+	if (ui_svc_history_active()) {
+		history_select(i, hold);
+		return;
+	}
+#endif
 	(void)hold;
-	ui_push(SCR_MESSAGE, i);
+	ui_msg_t m;
+	if (live_row(i, 0, &m)) {
+		uint16_t token = m.token;
+		uint32_t peer = message_peer(&m);
+		uint8_t rows[DMR_DATA_INBOX_SIZE];
+		bool thread = CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st);
+		ui_push(thread || live_rows(rows, peer, &m) > 1 ? SCR_LIVE_THREAD : SCR_MESSAGE, token);
+	}
 }
 
-static void msg_target_of(uint16_t i, ui_target_t *t)
+static void msg_target_from(const ui_msg_t *m, ui_target_t *t)
 {
-	ui_msg_t m;
-	memset(t, 0, sizeof *t);
-	if (ui_svc_msg_get(i, &m)) {
-		t->id = m.src;
-		strcpy(t->name, m.name);
-		t->saved = m.name[0] != 0;
-	}
+	*t = peer_target(message_peer(m));
 }
 
 static void msgs_context(uint16_t i)
 {
-	ui_target_t t;
-	msg_target_of(i, &t);
-	ui_open_actions(&t);
+#if CONFIG_MESSAGE_JOURNAL
+	if (ui_svc_history_active()) {
+		history_context(i);
+		return;
+	}
+#endif
+	ui_msg_t m;
+	if (live_row(i, 0, &m)) {
+		ui_target_t t = peer_target(message_peer(&m));
+		ui_open_actions(&t);
+	}
 }
 
 static const ui_scr_def_t messages_screen = {
 	.name = "messages", .flags = SF_LIST | SF_FIELD, .prefix = TRN("Messages"), .hint = TRN("OK open  # reply  Back"),
 	.empty = TRN("No messages yet"),
-	.count = msgs_count, .item = msgs_item, .select = msgs_select, .context = msgs_context,
+	.count = msgs_count, .item = msgs_item, .select = msgs_select, .context = msgs_context, .enter = msgs_enter,
+#if CONFIG_MESSAGE_JOURNAL
+	.body = history_body,
+#endif
 };
 
 // One message: the text, then canned replies first, call, delete
@@ -748,14 +1085,36 @@ static void msg_item(uint16_t i, ui_item_t *it)
 		it->flags |= UI_ITEM_DIM;
 }
 
+static bool msg_target(uint16_t i, ui_target_t *t)
+{
+	(void)i;
+	ui_msg_t m;
+	if (ui_svc_msg_by_token(ui_frame()->arg, &m) < 0)
+		return false;
+	msg_target_from(&m, t);
+	return t->id != 0;
+}
+
+static void msg_context(uint16_t i)
+{
+	ui_target_t t;
+	if (msg_target(i, &t))
+		ui_open_actions(&t);
+	else
+		ui_toast(TR("Message deleted"));
+}
+
 static void msg_select(uint16_t i, bool hold)
 {
 	(void)hold;
-	msg_target_of(ui_frame()->arg, &ui_target);
+	if (i != MV_DELETE && !msg_target(i, &ui_target)) {
+		ui_toast(TR("Message deleted"));
+		return;
+	}
 	switch (i) {
 	case MV_REPLY_OK:
 	case MV_REPLY_WAY:
-	send_text(&ui_target, tr(i == MV_REPLY_OK ? canned[0] : canned[1]));
+	send_text(&ui_target, tr(i == MV_REPLY_OK ? canned[0] : canned[1]), false);
 		break;
 	case MV_CALL:
 		ui_talk(&ui_target, false);
@@ -773,50 +1132,483 @@ static void msg_select(uint16_t i, bool hold)
 	}
 }
 
-static bool msg_target(uint16_t i, ui_target_t *t)
-{
-	(void)i;
-	msg_target_of(ui_frame()->arg, t);
-	return t->id != 0;
-}
+static char msg_title_text[24];
 
 static const char *msg_title(void)
 {
-	static char t[24];
+	int i = ui_svc_msg_by_token(ui_frame()->arg, NULL);
+	if (i < 0)
+		return NULL;
 	sbuf_t b;
-	sb_init(&b, t, sizeof t);
-	sb_u32(&b, ui_frame()->arg + 1u, 1);
+	sb_init(&b, msg_title_text, sizeof msg_title_text);
+	sb_u32(&b, (uint32_t)i + 1u, 1);
 	sb_str(&b, TR(" of "));
 	sb_u32(&b, ui_svc_msg_count(), 1);
-	return t;
+	return msg_title_text;
 }
+
+static char msg_text[UI_MSG_TEXT_MAX + 48];
 
 static const char *msg_body(void)
 {
-	static char t[UI_MSG_TEXT_MAX + 48];
 	ui_msg_t m;
-	if (!ui_svc_msg_get(ui_frame()->arg, &m))
+	if (ui_svc_msg_by_token(ui_frame()->arg, &m) < 0)
 		return TR("Message deleted");
-	// "From Joe Smith, 2m ago" (the ID where there is no name; # gives the station's actions), then the text
+
 	sbuf_t b;
-	sb_init(&b, t, sizeof t);
+	sb_init(&b, msg_text, sizeof msg_text);
 	sb_str(&b, m.sent ? TR("To ") : TR("From "));
-	if (m.name[0])
+	if (m.own)
+		sb_str(&b, TR("You"));
+	else if (m.name[0])
 		sb_str(&b, m.name);
 	else
 		sb_u32(&b, m.src, 1);
 	sb_str(&b, ", ");
-	sb_age_long(&b, m.age_ms);
+	message_time(&b, m.utc_minute);
 	sb_chr(&b, '\n');
 	sb_str(&b, m.text);
-	return t;
+	return msg_text;
 }
 
 static const ui_scr_def_t message_screen = {
 	.name = "message", .flags = SF_LIST | SF_FIELD, .prefix = TRN("Message"), .hint = TRN("OK choose  # more  Back"),
-	.count = msg_count, .item = msg_item, .select = msg_select, .context = msgs_context, .target = msg_target,
+	.count = msg_count, .item = msg_item, .select = msg_select, .context = msg_context, .target = msg_target,
 	.title = msg_title, .body = msg_body, .enter = msg_enter,
 };
+
+static uint32_t live_thread_peer(ui_msg_t *m)
+{
+	return ui_svc_msg_by_token(ui_frame()->arg, m) >= 0 ? message_peer(m) : 0;
+}
+
+bool ui_open_message_thread(uint16_t token)
+{
+#if CONFIG_MESSAGE_JOURNAL && CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st) && ui_svc_history_active()) {
+		ui_msg_t m;
+		if (ui_svc_msg_by_token(token, &m) < 0)
+			return false;
+		ui_svc_msg_read(token);
+		ui_svc_history_thread(message_peer(&m), 0, false);
+		ui_push(SCR_THREAD, 0);
+		return true;
+	}
+#endif
+	if (ui_svc_msg_by_token(token, NULL) < 0)
+		return false;
+	ui_push(CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) ? SCR_LIVE_THREAD : SCR_MESSAGE, token);
+	return true;
+}
+
+bool ui_thread_receive(uint16_t token)
+{
+	ui_frame_t *frame = ui_frame();
+	uint32_t active;
+	ui_msg_t m;
+	if (frame->scr == SCR_LIVE_THREAD) {
+		active = live_thread_peer(&m);
+#if CONFIG_MESSAGE_JOURNAL
+	} else if (frame->scr == SCR_THREAD) {
+		message_history_view_t view;
+		ui_svc_history_view(&view, NULL, 0);
+		active = view.key;
+#endif
+	} else {
+		return false;
+	}
+	if (!active || ui_svc_msg_by_token(token, &m) < 0 || message_peer(&m) != active)
+		return false;
+	ui_svc_msg_read(token);
+	if (frame->scr == SCR_LIVE_THREAD) {
+		uint8_t rows[DMR_DATA_INBOX_SIZE];
+		frame->arg = token;
+		newest_focus((uint16_t)live_rows(rows, active, &m));
+	}
+	return true;
+}
+
+static uint16_t live_thread_count(void)
+{
+	ui_msg_t m;
+	uint32_t peer = live_thread_peer(&m);
+	uint8_t rows[DMR_DATA_INBOX_SIZE];
+	return peer ? (uint16_t)live_rows(rows, peer, &m) : 0;
+}
+
+static void live_thread_item(uint16_t i, ui_item_t *it)
+{
+	ui_msg_t m;
+	uint32_t peer = live_thread_peer(&m);
+	if (!peer || !live_row(i, peer, &m))
+		return;
+	if (m.own || m.sent)
+		str_copy(it->label, sizeof it->label, TR("You"));
+	else if (m.name[0])
+		str_copy(it->label, sizeof it->label, m.name);
+	else {
+		sbuf_t b;
+		sb_init(&b, it->label, sizeof it->label);
+		sb_u32(&b, m.src, 1);
+	}
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st))
+		ui_local_time(it->value, m.utc_minute);
+	else
+		msg_preview(it, &m);
+	if (m.sent)
+		it->flags |= UI_ITEM_TEMP;
+}
+
+static void thread_reply(uint32_t peer)
+{
+#if CONFIG_DMR_SMS
+	if (peer && (feats() & UI_FEAT_SMS)) {
+		ui_target = peer_target(peer);
+		sms_text_open(true);
+		return;
+	}
+#else
+	(void)peer;
+#endif
+	ui_toast(TR("Messages: not in this build"));
+}
+
+static void live_thread_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	ui_msg_t m;
+	uint32_t peer = live_thread_peer(&m);
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st)) {
+		if (peer)
+			thread_reply(peer);
+	} else if (peer && live_row(i, peer, &m)) {
+		ui_push(SCR_MESSAGE, m.token);
+	}
+}
+
+static const char *live_thread_title(void)
+{
+	ui_msg_t m;
+	uint32_t peer = live_thread_peer(&m);
+	ui_target_t t = peer_target(peer);
+	ui_sb_target(msg_title_text, sizeof msg_title_text, &t);
+	return msg_title_text;
+}
+
+static void mark_live_peer_read(uint32_t peer, ui_msg_t *m)
+{
+	uint8_t rows[DMR_DATA_INBOX_SIZE];
+	unsigned n = live_rows(rows, peer, m);
+	for (unsigned i = 0; i < n; i++)
+		if (ui_svc_msg_get(rows[i], m) && m->unread)
+			ui_svc_msg_read(m->token);
+}
+
+static void live_thread_enter(void)
+{
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st)) {
+		ui_msg_t m;
+		uint32_t peer = live_thread_peer(&m);
+		if (peer)
+			mark_live_peer_read(peer, &m);
+	}
+	newest_focus(live_thread_count());
+}
+
+static const ui_scr_def_t live_thread_screen = {
+	.name = "live-thread", .flags = SF_LIST | SF_FIELD, .hint = TRN("OK open  Back"),
+	.count = live_thread_count, .item = live_thread_item, .select = live_thread_select,
+	.title = live_thread_title, .enter = live_thread_enter, .empty = TRN("No messages yet"),
+};
+
+#if CONFIG_MESSAGE_JOURNAL
+
+static uint16_t history_count(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	return v.key == 0 ? v.count : 0;
+}
+
+static void history_label(uint32_t key, char *buf, size_t size)
+{
+	ui_target_t t = peer_target(key);
+	ui_sb_target(buf, size, &t);
+}
+
+static uint32_t history_peer(uint16_t i)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (v.key || i >= v.count)
+		return 0;
+	return v.peers[i];
+}
+
+static void history_item(uint16_t i, ui_item_t *it)
+{
+	message_history_view_t view;
+	ui_svc_history_view(&view, msg_text, sizeof msg_text);
+	if (view.key || i >= view.count)
+		return;
+	history_label(view.peers[i], it->label, sizeof it->label);
+	if (view.status == HISTORY_READY && CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st)) {
+		const uint8_t *preview = (const uint8_t *)msg_text + i * MESSAGE_DIRECTORY_PREVIEW;
+		ui_local_time(it->value, preview[0] | ((uint16_t)preview[1] << 8));
+		it->value[5] = '\n';
+		str_copy(it->value + 6, sizeof it->value - 6, (const char *)preview + 2);
+		it->flags |= UI_ITEM_PREVIEW;
+	}
+}
+
+static void history_context(uint16_t i)
+{
+	uint32_t peer = history_peer(i);
+	if (peer) {
+		ui_target_t t = peer_target(peer);
+		ui_open_actions(&t);
+	}
+}
+
+static void history_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	uint32_t peer = history_peer(i);
+	if (peer) {
+		ui_msg_t m;
+		mark_live_peer_read(peer, &m);
+#if CONFIG_UI_CARD_MENU
+		if (ui_card_layout(&ui_st)) {
+			ui_svc_history_thread(peer, 0, false);
+			ui_push(SCR_THREAD, 0);
+			return;
+		}
+#endif
+		ui_svc_history_browse(peer, 0);
+		ui_push(SCR_CONVERSATION, 0);
+	}
+}
+
+static const char *history_status(const message_history_view_t *v)
+{
+	switch (v->status) {
+	case HISTORY_LOADING: return TR("Reading history...");
+	case HISTORY_ERROR: return TR("Couldn't read history");
+	case HISTORY_EMPTY: return TR("No messages yet");
+	default: return NULL;
+	}
+}
+
+static const char *history_body(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (!ui_svc_history_active())
+		return NULL;
+	if (v.key)
+		return TR("Reading history...");
+	return v.status == HISTORY_EMPTY ? NULL : history_status(&v);
+}
+
+static uint16_t conversation_count(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	return v.status == HISTORY_READY && v.before ? 2 : 1;
+}
+
+static void conversation_item(uint16_t i, ui_item_t *it)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	bool older = i == 0 && v.status == HISTORY_READY && v.before;
+	str_copy(it->label, sizeof it->label, older ? TR("Older message") : TR("Newest message"));
+}
+
+static void conversation_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	bool older = i == 0 && v.status == HISTORY_READY && v.before;
+	if (v.key)
+		ui_svc_history_browse(v.key, older ? v.before : 0);
+}
+
+static const char *conversation_body(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (v.status == HISTORY_EMPTY)
+		return TR("No more messages");
+	if (v.status != HISTORY_READY)
+		return history_status(&v);
+	const char *state = !(v.flags & MESSAGE_RECORD_OUTGOING) ? TR("Received message") :
+		v.flags & MESSAGE_RECORD_FAILED ? TR("Send failed") :
+		v.flags & MESSAGE_RECORD_DELIVERED ? TR("Delivered") : TR("Sent");
+	sbuf_t b;
+	sb_init(&b, msg_text, sizeof msg_text);
+	bool outgoing = (v.flags & MESSAGE_RECORD_OUTGOING) != 0;
+	if (outgoing) {
+		message_time(&b, v.time);
+		sb_str(&b, "  ");
+		sb_str(&b, TR("To "));
+	}
+	// The view stores the peer key, even when the author's ID has since changed.
+	char peer[24];
+	history_label(v.key, peer, sizeof peer);
+	sb_str(&b, v.flags & MESSAGE_RECORD_LOCAL_AUTHOR ? TR("You") : peer);
+	if (!outgoing) {
+		sb_str(&b, "  ");
+		message_time(&b, v.time);
+	}
+	sb_chr(&b, '\n');
+	sb_str(&b, outgoing ? TR("You") : state);
+	if (outgoing) {
+		sb_str(&b, "  ");
+		sb_str(&b, state);
+	}
+	sb_chr(&b, '\n');
+	size_t n = strlen(msg_text);
+	ui_svc_history_view(&v, msg_text + n, sizeof msg_text - n);
+	return msg_text;
+}
+
+static const char *conversation_title(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	history_label(v.key, msg_title_text, sizeof msg_title_text);
+	return msg_title_text;
+}
+
+#if CONFIG_UI_CARD_MENU
+static unsigned thread_index(const message_history_view_t *v, unsigned row)
+{
+	return v->forward ? row : v->count - 1u - row;
+}
+
+static uint16_t thread_count(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	return v.timeline && v.status == HISTORY_READY ? v.count : 0;
+}
+
+static void thread_item(uint16_t i, ui_item_t *it)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (!v.timeline || v.status != HISTORY_READY || i >= v.count)
+		return;
+	unsigned index = thread_index(&v, i);
+	const message_thread_entry_t *entry = &v.thread[index];
+	bool outgoing = (entry->flags & MESSAGE_RECORD_OUTGOING) != 0;
+	if (outgoing) {
+		sbuf_t label;
+		sb_init(&label, it->label, sizeof it->label);
+		sb_str(&label, TR("You"));
+		sb_str(&label, "  ");
+		sb_str(&label, entry->flags & MESSAGE_RECORD_FAILED ? TR("Send failed") :
+			   entry->flags & MESSAGE_RECORD_DELIVERED ? TR("Delivered") : TR("Sent"));
+	} else if (entry->flags & MESSAGE_RECORD_LOCAL_AUTHOR) {
+		str_copy(it->label, sizeof it->label, TR("You"));
+	} else {
+		history_label(v.key, it->label, sizeof it->label);
+	}
+	ui_local_time(it->value, entry->time);
+	if (outgoing)
+		it->flags |= UI_ITEM_TEMP;
+}
+
+static void thread_select(uint16_t i, bool hold)
+{
+	(void)i;
+	(void)hold;
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (v.key)
+		thread_reply(v.key);
+}
+
+static const char *thread_body(void)
+{
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	return v.timeline ? history_status(&v) : TR("Reading history...");
+}
+
+static bool thread_key(const input_event_t *ev)
+{
+	bool rotary = ev->action == ACT_ENC_STEP && ev->value;
+	bool up = ev->action == ACT_NAV_UP || (rotary && ev->value < 0);
+	bool down = ev->action == ACT_NAV_DOWN || (rotary && ev->value > 0);
+	// The first event from a held arrow must use the same page boundaries as its repeats.
+	if (!rotary && ev->gesture != GESTURE_PRESS && ev->gesture != GESTURE_REPEAT &&
+	    !(ev->gesture == GESTURE_LONG && (up || down)))
+		return false;
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (ev->action == ACT_CONTEXT) {
+		ui_frame()->top = 0;
+		if (v.key)
+			ui_svc_history_thread(v.key, 0, false);
+		return true;
+	}
+	if (!v.timeline || v.status != HISTORY_READY || !v.count || (!up && !down))
+		return false;
+	uint16_t row = ui_frame()->focus;
+	if ((up && row == 0) || (down && row == v.count - 1u)) {
+		if (v.flags & (up ? MESSAGE_THREAD_OLDER : MESSAGE_THREAD_NEWER)) {
+			uint32_t current = v.thread[thread_index(&v, row)].id;
+			// The next window includes the focused message. Step to its immediate neighbor.
+			ui_frame()->top = 1;
+			ui_svc_history_thread(v.key, down ? current - 1u : current + 1u, down);
+		}
+		return true;
+	}
+	return false;
+}
+
+static const ui_scr_def_t thread_screen = {
+	.name = "thread", .flags = SF_LIST, .hint = TRN("OK reply  # newest  Back"),
+	.count = thread_count, .item = thread_item, .select = thread_select,
+	.title = conversation_title, .body = thread_body, .key = thread_key,
+};
+#endif
+
+void ui_history_tick(void)
+{
+	ui_frame_t *f = ui_frame();
+	if (f->scr != SCR_MESSAGES && f->scr != SCR_CONVERSATION && f->scr != SCR_THREAD)
+		return;
+	message_history_view_t v;
+	ui_svc_history_view(&v, NULL, 0);
+	if (f->scr == SCR_MESSAGES && ui_svc_history_active() && v.key)
+		ui_svc_history_browse(0, 0);
+	if (f->scr == SCR_THREAD && !v.timeline && v.key)
+		ui_svc_history_thread(v.key, 0, false);
+	if (f->arg != v.revision) {
+		f->arg = v.revision;
+
+		if (f->scr == SCR_THREAD && v.timeline && v.status != HISTORY_LOADING) {
+			if (v.status == HISTORY_READY && v.count) {
+				uint16_t step = f->top && (v.before || v.forward) && v.count > 1u ? 1u : 0u;
+				f->focus = v.forward ? step : v.count - 1u - step;
+			}
+			f->top = 0;
+		}
+		ui_dirty();
+	}
+}
+
+
+static const ui_scr_def_t conversation_screen = {
+	.name = "conversation", .flags = SF_LIST, .prefix = TRN("Conversation"), .hint = TRN("OK choose  Back cancel"),
+	.count = conversation_count, .item = conversation_item, .select = conversation_select,
+	.title = conversation_title, .body = conversation_body,
+};
+#endif
 
 // ======================= Recent =======================
 
@@ -846,6 +1638,28 @@ static void recent_item(uint16_t i, ui_item_t *it)
 	sb_init(&b, it->label, sizeof it->label);
 	sbuf_t vb;
 	sb_init(&vb, it->value, sizeof it->value);
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		if (r->name[0])
+			sb_str(&b, r->name);
+		else
+			sb_u32(&b, r->out ? r->dst : r->src, 1);
+		sb_age_long(&vb, ui_st.now_ms - r->ms);
+		sb_chr(&vb, '\n');
+		sb_str(&vb, r->out ? "TX " : "RX ");
+		sb_str(&vb, r->group ? "TG " : TR("Private"));
+		if (r->group)
+			sb_u32(&vb, r->dst, 1);
+		if (r->gps_range) {
+			sb_chr(&vb, ' ');
+			sb_u32(&vb, (r->gps_dist_m + 500u) / 1000u, 1);
+			sb_str(&vb, "km");
+		}
+		if (r->to_us)
+			it->flags |= UI_ITEM_WARN;
+		return;
+	}
+#endif
 	if (r->out) {
 		sb_str(&b, GLYPH_ARROW);
 		sb_str(&b, r->group ? "TG " : "");
@@ -1437,6 +2251,14 @@ static void share_to_item(uint16_t i, ui_item_t *it)
 	sb_str(&b, t.group ? "TG " : TR("Private ID "));
 	sb_u32(&b, t.id, 1);
 	str_copy(it->value, sizeof it->value, TR(TEXT_ALT_OPEN "Not saved" TEXT_ALT_NEXT TEXT_ALT_CLOSE));
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		sbuf_t value;
+		sb_init(&value, it->value, sizeof it->value);
+		sb_chr(&value, '\n');
+		sb_str(&value, TR(TEXT_ALT_OPEN "Not saved" TEXT_ALT_NEXT TEXT_ALT_CLOSE));
+	}
+#endif
 }
 
 static void share_to_select(uint16_t i, bool hold)
@@ -1625,6 +2447,19 @@ static void preview_item(uint16_t i, ui_item_t *it)
 	sb_init(&b, it->label, sizeof it->label);
 	sb_str(&b, ch.name[0] ? ch.name : TR("(no name)"));
 	sb_init(&b, it->value, sizeof it->value);
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		sb_str(&b, ch.dmr ? "DMR" : "FM");
+		sb_chr(&b, '\n');
+		if (ch.in_band)
+			sb_freq(&b, ch.rx_hz);
+		else {
+			sb_str(&b, TR(TEXT_ALT_OPEN "Not in band" TEXT_ALT_NEXT "Out" TEXT_ALT_CLOSE));
+			it->flags |= UI_ITEM_DIM;
+		}
+		return;
+	}
+#endif
 	if (!ch.in_band) {
 		sb_str(&b, TR(TEXT_ALT_OPEN "Not in band" TEXT_ALT_NEXT "Out" TEXT_ALT_CLOSE));
 		it->flags |= UI_ITEM_DIM;
@@ -1813,6 +2648,12 @@ static void chlist_item(uint16_t i, ui_item_t *it)
 	sb_chr(&b, ' ');
 	sb_str(&b, ch.name);
 	sb_init(&b, it->value, sizeof it->value);
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		sb_str(&b, ch.mode == RADIO_MODE_DMR ? "DMR" : radio_am_channel(&ch) ? "AM" : "FM");
+		sb_chr(&b, '\n');
+	}
+#endif
 	sb_channel_row(&b, &ch);
 	if (num == chlist_current())
 		it->flags |= UI_ITEM_TEMP;	// the channel we are on
@@ -1883,7 +2724,11 @@ static const ui_scr_def_t chlist_screen = {
 
 enum { CE_NAME, CE_NUMBER, CE_MODE, CE_RX, CE_TX, CE_POWER, CE_RX_ONLY, CE_BW, CE_RX_TONE, CE_TX_TONE, CE_VOX,
        CE_CC, CE_TS, CE_CONTACT, CE_LIST, CE_ID, CE_DMO, CE_BEEP, CE_ALIAS1, CE_ALIAS2, CE_TOT, CE_SCAN, CE_ECO,
-       CE_ZONES, CE_GO, CE_SHARE, CE_SAVE, CE_SAVE_NEW, CE_COUNT, CE_NONE = 0xFF };
+       CE_ZONES, CE_GO, CE_SHARE, CE_SAVE, CE_SAVE_NEW,
+#if CONFIG_TALKGROUP_EDIT
+       CE_TALKGROUPS,
+#endif
+       CE_COUNT, CE_NONE = 0xFF };
 
 static channel_t ced_ch;		// what the screen shows (the working copy when editing)
 static uint16_t ced_num;		// its number, 0 = no such channel
@@ -2001,6 +2846,12 @@ static void ced_build(void)
 			continue;
 		if ((r == CE_SAVE && !(changed || fresh)) || ((r == CE_SAVE || r == CE_SAVE_NEW) && !edit))
 			continue;
+#if CONFIG_TALKGROUP_EDIT
+		uint8_t count;
+		if (r == CE_TALKGROUPS && (!dmr || fresh || ced_orig.mode != RADIO_MODE_DMR ||
+		    !codeplug_talkgroup_refs(ced_num, NULL, &count)))
+			continue;
+#endif
 		ced_rows[ced_n++] = r;
 	}
 }
@@ -2136,7 +2987,11 @@ static void chinfo_item(uint16_t i, ui_item_t *it)
 		TRN("Timeslot"), TRN("TX contact"), TRN("RX group list"), TRN("Own ID"), TRN("Direct mode"),
 		TRN("Talk permit beeps"), TRN("Talker alias TS1"), TRN("Talker alias TS2"), TRN("TX time-out"), TRN("Scan"),
 		TRN("Battery saver"), TRN("Zones"), TRN("Tune to this ch"), TRN(GLYPH_SHARE " Share channel to..."),
-		TRN("Save"), TRN("Save as new channel") };
+		TRN("Save"), TRN("Save as new channel"),
+#if CONFIG_TALKGROUP_EDIT
+		TRN("Operating talkgroups"),
+#endif
+	};
 	const channel_t *ch = &ced_ch;
 	if (i >= ced_n)
 		return;
@@ -2638,6 +3493,9 @@ static void chinfo_select(uint16_t i, bool hold)
 		break;
 	case CE_SAVE: ced_save(false); break;
 	case CE_SAVE_NEW: ced_save(true); break;
+#if CONFIG_TALKGROUP_EDIT
+	case CE_TALKGROUPS: ui_push(SCR_TALKGROUPS, ced_num); break;
+#endif
 	default: break;
 	}
 	ui_dirty();
@@ -2682,7 +3540,9 @@ static void discard_select(uint16_t i, bool hold)
 
 static const char *discard_body(void)
 {
-	return discard_contact ? TR("Discard this new contact?") : TR("Discard the changes to this channel?");
+	if (discard_contact)
+		return ui_frame()->arg ? TR("Discard contact changes?") : TR("Discard this new contact?");
+	return TR("Discard the changes to this channel?");
 }
 
 static const ui_scr_def_t discard_screen = {
@@ -2744,17 +3604,18 @@ static void text_enter(void)
 }
 
 #if CONFIG_DMR_SMS
-static void sms_text_open(void)
+static void sms_text_open(bool reply)
 {
 	sms_target = ui_target;
 	text_target = NULL;
 	text_max = DMR_ETSI_TEXT_MAX;
-	ui_push(SCR_SMS_TEXT, 0);
+	ui_push(SCR_SMS_TEXT, reply);
 }
 
 static uint8_t sms_text_cols(void)
 {
-	int cols = (gfx_width() - 1) / ui_layout.small->w;
+	int inset = CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) ? 17 : 1;
+	int cols = (gfx_width() - inset) / ui_layout.small->w;
 	size_t max = sizeof(((ui_item_t *)0)->label) - 1u;
 	return cols < 1 ? 1 : (size_t)cols > max ? (uint8_t)max : (uint8_t)cols;
 }
@@ -2902,7 +3763,7 @@ static bool text_key_fn(const input_event_t *ev)
 			if (text_buf[strspn(text_buf, " ")] == '\0')
 				ui_toast(TR("Enter a message"));
 			else
-				send_text(&sms_target, text_buf);
+				send_text(&sms_target, text_buf, ui_frame()->arg != 0);
 		}
 #endif
 #if CONFIG_CHANNEL_EDIT
@@ -2949,7 +3810,8 @@ static const ui_scr_def_t sms_text_screen = {
 // A new contact: from Find's "Create contact" on a typed number, or a station's actions (Save as contact). Name (text
 // entry), ID (typed), type (talkgroup / private, flips on OK), timeslot (the channel's, 1, 2), Save. Long OK saves too
 
-enum { CT_NAME, CT_ID, CT_TYPE, CT_TS, CT_SAVE, CT_COUNT, CT_NONE = 0xFF };
+enum { CT_NAME, CT_ID, CT_TYPE, CT_TS, CT_SAVE, CT_COUNT, CT_PENDING, CT_NONE = 0xFF };
+enum { CT_NEW_FIXED = CODEPLUG_CONTACTS_MAX + 1, CT_NEW_ANY };
 #define CT_ID_DIGITS	8
 #define CT_GROUP_MAX	0xFFFFFEu	// 0xFFFFFF is all call
 #define CT_PRIVATE_MAX	((uint32_t)CODEPLUG_DMR_ID_MAX)
@@ -2978,14 +3840,58 @@ void ui_new_contact(const ui_target_t *t)
 	ui_push(SCR_CONTACT_EDIT, 0);
 }
 
-static uint16_t ct_count(void) { return CT_COUNT; }
+static void ct_open_saved(uint16_t slot)
+{
+	if (!codeplug_contact(slot, &ct) || ct.type == CONTACT_ALL_CALL) {
+		ui_toast(TR("Not set"));
+		return;
+	}
+	ct_edit = CT_NONE;
+	ui_push(SCR_CONTACT_EDIT, slot);
+}
+
+static void ct_open_new(bool group, bool fixed_type)
+{
+	ct = (contact_t){ .type = group ? CONTACT_GROUP : CONTACT_PRIVATE };
+	ct_edit = CT_NONE;
+	ui_push(SCR_CONTACT_EDIT, fixed_type ? CT_NEW_FIXED : CT_NEW_ANY);
+}
+
+static bool ct_fixed_type(void)
+{
+	uint16_t arg = ui_frame()->arg;
+	return arg != 0 && arg != CT_NEW_ANY;
+}
+
+static uint16_t ct_count(void)
+{
+	return ct_fixed_type() ? (ct.type == CONTACT_GROUP ? 4 : 3) : CT_COUNT;
+}
+
+static uint8_t ct_row(uint16_t i)
+{
+	if (ct_fixed_type() && i >= CT_TYPE)
+		i += ct.type == CONTACT_GROUP ? 1u : 2u;
+	return (uint8_t)i;
+}
+
+static const char *ct_title(void)
+{
+	uint16_t arg = ui_frame()->arg;
+	if (arg && arg <= CODEPLUG_CONTACTS_MAX)
+		return ct.type == CONTACT_GROUP ? TR("Edit talkgroup") : TR("Edit contact");
+	return ct.type == CONTACT_GROUP && arg == CT_NEW_FIXED ? TR("New Talkgroup") : TR("New Contact");
+}
 
 static void ct_item(uint16_t i, ui_item_t *it)
 {
 	static const char *const labels[CT_COUNT] = { TRN("Name"), "ID", TRN("Type"), TRN("Timeslot"), TRN("Save") };
-	if (i >= CT_COUNT)
+	if (i >= ct_count())
 		return;
+	i = ct_row(i);
 	str_copy(it->label, sizeof it->label, tr(labels[i]));
+	if (i == CT_TS && ct_fixed_type())
+		str_copy(it->label, sizeof it->label, "TS");
 	sbuf_t b;
 	sb_init(&b, it->value, sizeof it->value);
 	switch (i) {
@@ -2997,7 +3903,7 @@ static void ct_item(uint16_t i, ui_item_t *it)
 			it->flags |= UI_ITEM_EDIT;
 			sb_str(&b, ced_digits);
 			sb_chr(&b, '_');
-		} else {
+		} else if (ct.id) {
 			sb_u32(&b, ct.id, 1);
 		}
 		break;
@@ -3006,7 +3912,7 @@ static void ct_item(uint16_t i, ui_item_t *it)
 		break;
 	case CT_TS:
 		if (ct.timeslot == 0) {
-			sb_str(&b, TR("Channel's"));
+			sb_str(&b, ct_fixed_type() ? TR("Channel default") : TR("Channel's"));
 		} else {
 			sb_str(&b, "TS ");
 			sb_u32(&b, ct.timeslot, 1);
@@ -3031,14 +3937,18 @@ static const char *ct_problem(uint16_t *slot)
 		return TR("Private IDs go up to 16776415");
 	if (group && ct.id > CT_GROUP_MAX)
 		return TR("Talkgroups go up to 16777214");
-	*slot = 0;
+	uint16_t arg = ui_frame()->arg;
+	uint16_t current = arg <= CODEPLUG_CONTACTS_MAX ? arg : 0;
+	*slot = current;
 	for (uint16_t i = 1; i <= CODEPLUG_CONTACTS_MAX; i++) {
+		if (i == current)
+			continue;
 		if (!codeplug_contact(i, &c)) {
 			if (*slot == 0)
 				*slot = i;
 			continue;
 		}
-		if (c.id == ct.id && (c.type != CONTACT_PRIVATE) == group) {
+		if (c.id == ct.id && c.type == ct.type && (!group || c.timeslot == ct.timeslot)) {
 			sbuf_t b;
 			sb_init(&b, toast_msg, sizeof toast_msg);
 			sb_str(&b, TR("Already a contact: "));
@@ -3061,6 +3971,11 @@ static void ct_save(void)
 		ui_toast(TR("Couldn't save now: try again"));
 		return;
 	}
+	if (ui_frame()->arg) {
+		ct_edit = CT_PENDING;
+		ui_toast(TR("Saving..."));
+		return;
+	}
 	sbuf_t b;
 	sb_init(&b, toast_msg, sizeof toast_msg);
 	sb_str(&b, TR("Saved contact "));
@@ -3075,13 +3990,27 @@ static void ct_save(void)
 	ui_toast(toast_msg);
 }
 
+void ui_menus_contact_saved(void)
+{
+	if (ui_frame()->scr != SCR_CONTACT_EDIT || ct_edit != CT_PENDING)
+		return;
+	ct_edit = CT_NONE;
+	ui_pop();
+	if (ui_frame()->scr == SCR_ACTIONS && ui_frame()->arg) {
+		ui_target.id = ct.id;
+		str_copy(ui_target.name, sizeof ui_target.name, ct.name);
+		ui_focus_changed();
+	}
+	ui_toast(TR("Contact saved"));
+}
+
 static void ct_select(uint16_t i, bool hold)
 {
 	if (hold) {
 		ct_save();
 		return;
 	}
-	switch (i) {
+	switch (ct_row(i)) {
 	case CT_NAME:
 		ui_text_open(ct.name, CODEPLUG_NAME_LEN);
 		break;
@@ -3108,11 +4037,14 @@ static void ct_select(uint16_t i, bool hold)
 
 static bool ct_key(const input_event_t *ev)
 {
+	if (ct_edit == CT_PENDING)
+		return true;
 	bool press = ev->gesture == GESTURE_PRESS || ev->gesture == GESTURE_LONG;
 	if (ct_edit == CT_NONE) {
 		if (ev->action == ACT_BACK && ev->gesture == GESTURE_PRESS) {
 			discard_contact = true;
-			ui_push(SCR_DISCARD, 0);
+			uint16_t arg = ui_frame()->arg;
+			ui_push(SCR_DISCARD, arg > 0 && arg <= CODEPLUG_CONTACTS_MAX);
 			return true;
 		}
 		return false;
@@ -3154,7 +4086,7 @@ static bool ct_key(const input_event_t *ev)
 }
 
 static const ui_scr_def_t contact_edit_screen = {
-	.name = "contactedit", .flags = SF_LIST | SF_FIELD, .prefix = TRN("New Contact"),
+	.name = "contactedit", .flags = SF_LIST, .title = ct_title,
 	.hint = TRN(TEXT_ALT_OPEN "OK change  hold OK save  Back" TEXT_ALT_NEXT "OK change  hold OK save" TEXT_ALT_CLOSE),
 	.count = ct_count, .item = ct_item, .select = ct_select, .key = ct_key,
 };
@@ -3210,6 +4142,8 @@ static void zchan_item(uint16_t i, ui_item_t *it)
 	if (i == ZC_REMOVE)
 		it->flags |= UI_ITEM_WARN;
 #if CONFIG_ZONE_SHARE
+	if (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) && i == ZC_SEND)
+		str_copy(it->label, sizeof it->label, TR("Share channel to"));
 	if (i == ZC_SEND && !(feats() & UI_FEAT_ZONE_SHARE))
 		it->flags |= UI_ITEM_DIM;
 #endif
@@ -3306,6 +4240,12 @@ static void zpick_item(uint16_t i, ui_item_t *it)
 		return;
 	sbuf_t b;
 	sb_init(&b, it->value, sizeof it->value);
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		sb_str(&b, zpick_ch.mode == RADIO_MODE_DMR ? "DMR" : radio_am_channel(&zpick_ch) ? "AM" : "FM");
+		sb_chr(&b, '\n');
+	}
+#endif
 	sb_channel_row(&b, &zpick_ch);
 }
 
@@ -3909,6 +4849,10 @@ static uint16_t dmr_id_count(void) { return MY_COUNT; }
 
 void ui_menus_save_failed(void)
 {
+#if CONFIG_CONTACT_EDIT
+	if (ui_frame()->scr == SCR_CONTACT_EDIT && ct_edit == CT_PENDING)
+		ct_edit = CT_NONE;
+#endif
 #if CONFIG_ZONE_EDIT
 	zones_new_pending = false;	// nothing to focus
 #endif
@@ -3932,6 +4876,10 @@ static void dmr_id_item(uint16_t i, ui_item_t *it)
 				sb_u32(&b, v, 1);
 			sb_chr(&b, '_');		// what is typed so far, as the channel editor: "3101_"
 			it->flags |= UI_ITEM_EDIT;
+#if CONFIG_UI_CARD_MENU
+			if (ui_card_layout(&ui_st))
+				sb_str(&b, "\n1-16776415");
+#endif
 		} else if (v != 0) {
 			sb_u32(&b, v, 1);
 		} else {
@@ -5041,7 +5989,7 @@ static const ui_scr_def_t tools_screen = {
 #if CONFIG_UI_SETTINGS
 
 typedef enum { ST_TOGGLE, ST_LIST, ST_NUMBER, ST_ACTION } set_type_t;
-enum { SA_DIAG, SA_FIRMWARE, SA_CODEPLUG, SA_RESET, SA_MY_RADIO, SA_CRASH, SA_LANGUAGE };
+enum { SA_DIAG, SA_FIRMWARE, SA_CODEPLUG, SA_RESET, SA_MY_RADIO, SA_CRASH, SA_LANGUAGE, SA_MESSAGE_HISTORY };
 
 typedef struct {
 	const char *name;
@@ -5255,6 +6203,9 @@ static const set_item_t s_location[] = {
 	LIST(TRN("Position format"), NULL, UI_SET_POS_FORMAT, v_posfmt, n_posfmt),
 	LIST(TRN("Send position"), "APRS", UI_SET_POS_SEND_S, v_possend, n_possend),
 	TOGGLE(TRN("Answer GPS requests"), "LRRP position location", UI_SET_POS_REPLY),
+#if CONFIG_GPS || CONFIG_DMR_SMS || CONFIG_RTC
+	NUMBER(TRN("UTC offset"), "time zone local message time", UI_SET_UTC_OFFSET_MIN, -720, 840, 15, " min"),
+#endif
 };
 static const set_item_t s_connections[] = {
 	TOGGLE(TRN("Hotspot allowed"), "MMDVM", UI_SET_HOTSPOT_AUTO),
@@ -5335,6 +6286,9 @@ static const set_item_t s_advanced[] = {
 #if CONFIG_CRASH_SCREEN
 	ACTION(TRN("Crash log"), "crash report fault debug", SA_CRASH),
 #endif
+#if CONFIG_MESSAGE_JOURNAL
+	ACTION(TRN("Message history"), "sms storage", SA_MESSAGE_HISTORY),
+#endif
 #if CONFIG_REF_TRIM
 	NUMBER(TRN("Freq trim"), "frequency offset reference oscillator calibration ppm", UI_SET_REF_TRIM, -REF_TRIM_MAX_PPB,
 	       REF_TRIM_MAX_PPB, REF_TRIM_STEP_PPB, NULL),	// its own page (trim_screen); last: Up from the top
@@ -5359,6 +6313,10 @@ const char *ui_set_group_name(uint8_t g) { return g < GROUPS ? groups[g].name : 
 // shown disabled
 static bool set_hidden(const set_item_t *s)
 {
+#if CONFIG_MESSAGE_JOURNAL
+	if (s->type == ST_ACTION && s->id == SA_MESSAGE_HISTORY)
+		return !ui_svc_message_history_available();
+#endif
 #if CONFIG_KEY_ASSIGN
 	if (s->type != ST_ACTION && s->id >= UI_SET_KEY_FIRST && s->id <= UI_SET_KEY_LAST) {
 		key_labels();
@@ -5440,6 +6398,19 @@ static int32_t set_value;
 
 static const set_item_t *set_item_at(uint16_t i)
 {
+#if CONFIG_UI_CARD_MENU && (CONFIG_DMR_ARS || CONFIG_DMR_LRRP)
+	static const set_item_t reply = {
+		.name = TRN("Answer GPS requests"), .id = UI_SET_POS_REPLY, .type = ST_TOGGLE,
+	};
+	static const set_item_t ars_server = {
+		.name = TRN("Server ID"), .id = UI_SET_ARS_SERVER, .type = ST_NUMBER, .step = 1,
+	};
+	if (ui_frame()->scr == SCR_MENU_SECTION && ui_frame()->arg == MENU_SECTION_ARS) {
+		if (i == DATA_ANSWER && CONFIG_DMR_LRRP)
+			return &reply;
+		return i == DATA_SERVER && CONFIG_DMR_ARS ? &ars_server : NULL;
+	}
+#endif
 	uint16_t g = ui_frame()->arg;
 	return g < GROUPS ? set_nth((uint8_t)g, i) : NULL;
 }
@@ -5468,6 +6439,10 @@ static void set_value_text(const set_item_t *s, int32_t v, char *out, size_t len
 			break;
 		}
 #endif
+		if (s->id == UI_SET_ARS_SERVER && v == 0) {
+			sb_str(&b, TR("0 (Off)"));
+			break;
+		}
 		sb_i32(&b, v);
 		if (s->unit != NULL)
 			sb_str(&b, s->unit);
@@ -5546,6 +6521,10 @@ static void set_range(const set_item_t *s, int32_t *lo, int32_t *hi)
 {
 	*lo = s->min;
 	*hi = s->max;
+#if CONFIG_DMR_ARS
+	if (s->id == UI_SET_ARS_SERVER)
+		*hi = (int32_t)DMR_ID_MAX - 1;
+#endif
 	if (s->id == UI_SET_PRIVACY_KEY && ui_svc_setting_get(UI_SET_PRIVACY_TYPE) == 2) {
 		*lo = 0;
 		*hi = 65535;
@@ -5559,6 +6538,10 @@ static void group_item(uint16_t i, ui_item_t *it)
 	if (s == NULL)
 		return;
 	str_copy(it->label, sizeof it->label, tr(s->name));
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st) && s->type != ST_ACTION && s->id == UI_SET_BACKLIGHT_S)
+		str_copy(it->label, sizeof it->label, TR("Backlight"));
+#endif
 	bool edit = set_editing && i == ui_frame()->focus;
 	if (s->type != ST_ACTION)
 		set_value_text(s, edit ? set_value : ui_svc_setting_get(s->id), it->value, sizeof it->value);
@@ -5568,8 +6551,22 @@ static void group_item(uint16_t i, ui_item_t *it)
 		strcpy(it->value, "-");
 	if (s->id == UI_SET_MIC_GAIN && !edit && mic_agc_on())
 		strcpy(it->value, "AGC");
-	if (edit)
+	if (edit) {
 		it->flags |= UI_ITEM_EDIT;
+#if CONFIG_UI_CARD_MENU
+		if (ui_card_layout(&ui_st) && ui_frame()->scr == SCR_GROUP && s->type == ST_NUMBER) {
+			int32_t lo, hi;
+			set_range(s, &lo, &hi);
+			sbuf_t value = { it->value + strlen(it->value), it->value + sizeof it->value - 1 };
+			sb_chr(&value, '\n');
+			sb_i32(&value, lo);
+			sb_chr(&value, '-');
+			sb_i32(&value, hi);
+			if (s->unit)
+				sb_str(&value, s->unit);
+		}
+#endif
+	}
 	if (set_why_not(s) != NULL)
 		it->flags |= UI_ITEM_DIM;
 }
@@ -5635,6 +6632,9 @@ static void group_select(uint16_t i, bool hold)
 		case SA_CODEPLUG: ui_push(SCR_INFO, INFO_CODEPLUG); break;
 		case SA_MY_RADIO: ui_push(SCR_DMR_ID, 0); break;
 		case SA_RESET: ui_push(SCR_CONFIRM, 0); break;
+#if CONFIG_MESSAGE_JOURNAL
+		case SA_MESSAGE_HISTORY: ui_push(SCR_CONFIRM, 1); break;
+#endif
 		case SA_LANGUAGE: ui_push(SCR_LANGUAGE, 0); break;
 #if CONFIG_CRASH_SCREEN
 		case SA_CRASH: ui_push(SCR_CRASH, 0); break;
@@ -5673,7 +6673,10 @@ static bool group_key(const input_event_t *ev)
 			(ev->gesture == GESTURE_PRESS || ev->gesture == GESTURE_LONG)) {
 		int32_t d = ev->action - ACT_DIGIT_0;
 		int32_t v = set_typed ? set_value * 10 + d : d;
-		set_value = v > hi ? d : v;
+		if (s->id == UI_SET_ARS_SERVER)
+			set_value = v <= 99999999 ? v : 99999999;	// keep invalid IDs visible for validation on OK
+		else
+			set_value = v > hi ? d : v;
 		set_typed = true;
 		if (set_value < lo && set_value * 10 > hi)
 			set_value = lo;	// can't grow into the range any more
@@ -5730,6 +6733,12 @@ static uint16_t confirm_count(void) { return 2; }
 
 static void confirm_item(uint16_t i, ui_item_t *it)
 {
+#if CONFIG_MESSAGE_JOURNAL
+	if (ui_frame()->arg == 1) {
+		str_copy(it->label, sizeof it->label, i == 0 ? TR("Cancel") : TR("Enable"));
+		return;
+	}
+#endif
 	str_copy(it->label, sizeof it->label, i == 0 ? TR("No, keep settings") : TR("Yes, reset"));
 	if (i == 1)
 		it->flags |= UI_ITEM_WARN;
@@ -5740,6 +6749,13 @@ static void confirm_select(uint16_t i, bool hold)
 	(void)hold;
 	if (i == 0) {
 		ui_pop();
+#if CONFIG_MESSAGE_JOURNAL
+	} else if (ui_frame()->arg == 1) {
+		if (ui_svc_message_history_activate())
+			ui_pop();
+		else
+			ui_toast(TR("Storage busy"));
+#endif
 	} else if (ui_svc_factory_reset()) {
 		ui_go_home();
 		ui_toast(TR("Factory settings restored"));
@@ -5750,11 +6766,27 @@ static void confirm_select(uint16_t i, bool hold)
 
 static const char *confirm_body(void)
 {
+#if CONFIG_MESSAGE_JOURNAL
+	if (ui_frame()->arg == 1)
+		return TR("Enable message history on this radio?");
+#endif
 	return TR("Reset all settings to factory defaults? Channels stay. This can't be undone.");
 }
 
+#if CONFIG_MESSAGE_JOURNAL
+static const char *confirm_title(void)
+{
+	return ui_frame()->arg == 1 ? TR("Message history") : TR("Factory Reset");
+}
+#endif
+
 static const ui_scr_def_t confirm_screen = {
-	.name = "confirm", .flags = SF_LIST, .prefix = TRN("Factory Reset"), .hint = TRN("OK choose  Back cancel"),
+	.name = "confirm", .flags = SF_LIST, .hint = TRN("OK choose  Back cancel"),
+#if CONFIG_MESSAGE_JOURNAL
+	.title = confirm_title,
+#else
+	.prefix = TRN("Factory Reset"),
+#endif
 	.count = confirm_count, .item = confirm_item, .select = confirm_select, .body = confirm_body,
 };
 #else
@@ -5787,15 +6819,7 @@ typedef struct {
 	ui_target_t t;
 	const char *tag;
 } pick_t;
-#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
-static union {
-	pick_t normal[PICK_MAX];
-	codeplug_talkgroup_t operating[CODEPLUG_TALKGROUP_MAX];
-} picker_entries;
-#define picks picker_entries.normal
-#else
 static pick_t picks[PICK_MAX];
-#endif
 static uint8_t n_picks;
 
 #if CONFIG_DMR
@@ -5821,7 +6845,8 @@ static void picker_enter(void)
 	contact_t c;
 #if CONFIG_DMR_TALKGROUP_ENTRIES
 	if (ui_frame()->arg == 1) {
-		n_picks = codeplug_talkgroups(v->channel_number, picker_entries.operating);
+		codeplug_talkgroup_t entry;
+		n_picks = codeplug_talkgroup_at(v->channel_number, 0, &entry);
 		ui_frame()->focus = v->talkgroup_index < n_picks ? v->talkgroup_index : 0;
 		return;
 	}
@@ -5893,14 +6918,21 @@ static void picker_item(uint16_t i, ui_item_t *it)
 {
 #if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
 	if (ui_frame()->arg == 1 && i < n_picks) {
-		const codeplug_talkgroup_t *entry = &picker_entries.operating[i];
-		ui_target_t target = { .id = entry->id, .group = true };
+		codeplug_talkgroup_t entry;
+		codeplug_talkgroup_at(ui_view()->channel_number, (uint8_t)i, &entry);
+		if (!entry.id) {
+			str_copy(it->label, sizeof it->label, TR("Not set"));
+			it->flags |= UI_ITEM_DIM;
+			return;
+		}
+		ui_target_t target = { .id = entry.id, .group = true };
 		contact_t contact;
-		if (codeplug_contact_find(entry->id, true, &contact))
+		if (entry.contact_number ? codeplug_contact(entry.contact_number, &contact) :
+		    codeplug_contact_find(entry.id, true, &contact))
 			str_copy(target.name, sizeof target.name, contact.name);
 		ui_sb_target(it->label, sizeof it->label, &target);
 		it->flags |= UI_ITEM_PREVIEW;	// keep the leading TG ID when a long contact name needs ellipsis
-		str_copy(it->value, sizeof it->value, entry->timeslot == 2 ? "TS2" : "TS1");
+		str_copy(it->value, sizeof it->value, entry.timeslot == 2 ? "TS2" : entry.timeslot == 1 ? "TS1" : TR("Channel's"));
 		return;
 	}
 #endif
@@ -5908,6 +6940,24 @@ static void picker_item(uint16_t i, ui_item_t *it)
 		str_copy(it->label, sizeof it->label, TR("Type a number..."));
 		return;
 	}
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		if (picks[i].t.name[0])
+			str_copy(it->label, sizeof it->label, picks[i].t.name);
+		else
+			ui_sb_target(it->label, sizeof it->label, &picks[i].t);
+		sbuf_t value;
+		sb_init(&value, it->value, sizeof it->value);
+		if (picks[i].t.name[0]) {
+			if (picks[i].t.group)
+				sb_str(&value, "TG ");
+			sb_u32(&value, picks[i].t.id, 1);
+		}
+		sb_chr(&value, '\n');
+		sb_str(&value, tr(picks[i].tag));
+		return;
+	}
+#endif
 	ui_sb_target(it->label, sizeof it->label, &picks[i].t);
 	if (picks[i].t.group)
 		it->flags |= UI_ITEM_PREVIEW;
@@ -5967,10 +7017,102 @@ static const ui_scr_def_t picker_screen = {
 
 static bool scan_start_row(void) { return CONFIG_UI_CARD_MENU && ui_frame()->arg == 1 && !ui_st.scanning; }
 
-static uint16_t scan_count(void) { return scan_start_row() ? 1 : 3; }
+#if CONFIG_UI_CARD_MENU
+bool ui_scan_card_active(void) { return ui_frame()->arg != 0 && ui_card_layout(&ui_st); }
+
+const char *ui_scan_card_status(void)
+{
+	const radio_view_t *v = ui_view();
+	if (!ui_st.scanning)
+		return TR("Scan stopped");
+	if (v->scan_phase == SCAN_PH_PAUSED)
+		return TR("Scan paused");
+	if (v->scan_phase == SCAN_PH_RESUME)
+		return TR("Resume delay");
+	if (v->scan_phase == SCAN_PH_HOLD)
+		return TR("Holding on signal");
+	return TR("Scanning");
+}
+
+static bool scan_card_key(const input_event_t *ev)
+{
+	if (!ui_scan_card_active() || ev->gesture != GESTURE_PRESS ||
+	    (ev->action != ACT_NAV_LEFT && ev->action != ACT_NAV_RIGHT))
+		return false;
+	ui_frame_t *f = ui_frame();
+	if (ev->action == ACT_NAV_LEFT && f->arg > 1)
+		f->arg--;
+	else if (ev->action == ACT_NAV_RIGHT && f->arg < 3)
+		f->arg++;
+	f->top = f->focus = 0;
+	ui_dirty();
+	return true;
+}
+
+static void scan_card_item(uint16_t i, ui_item_t *it)
+{
+	const radio_view_t *v = ui_view();
+	if (ui_frame()->arg == 1) {
+		const char *label = i ? TR("Skip channel for now") : ui_st.scanning ? TR("Stop scan") : TR("Start scan");
+		str_copy(it->label, sizeof it->label, label);
+		item_num(it, (uint16_t)(i + 1u));
+		return;
+	}
+	sbuf_t b;
+	sb_init(&b, it->value, sizeof it->value);
+	it->flags |= UI_ITEM_INFO;
+	if (ui_frame()->arg == 2) {
+		if (i == 0) {
+			str_copy(it->label, sizeof it->label, TR("Scan source"));
+			sb_str(&b, v->vfo ? TR("VFO band") : v->zone_name);
+		} else if (i == 1) {
+			str_copy(it->label, sizeof it->label, TR("Zone channels"));
+			sb_u32(&b, v->zone_size, 1);
+		} else {
+			str_copy(it->label, sizeof it->label, TR("Edit scan skips in CPS"));
+		}
+		return;
+	}
+	ui_scan_prefs_t p;
+	ui_svc_scan_prefs(&p);
+	static const char *const options[] = {
+		TRN("Scan resume"), TRN("Scan dwell"), TRN("Resume delay"), TRN("Priority channel"),
+	};
+	str_copy(it->label, sizeof it->label, tr(options[i]));
+	if (i == 0) {
+		sb_str(&b, p.resume == SCAN_RESUME_TIME ? TR("Timed") :
+			    p.resume == SCAN_RESUME_STOP ? TR("Stop on signal") : TR("Carrier"));
+	} else if (i == 3) {
+		sb_str(&b, p.priority ? TR("On") : TR("Off"));
+	} else {
+		sb_u32(&b, i == 1 ? p.dwell_ms : p.delay_ms, 1);
+		sb_str(&b, " ms");
+	}
+}
+#endif
+
+static uint16_t scan_count(void)
+{
+#if CONFIG_UI_CARD_MENU
+	if (ui_scan_card_active()) {
+		if (ui_frame()->arg == 2)
+			return ui_view()->vfo ? 1 : 3;
+		if (ui_frame()->arg == 3)
+			return 4;
+		return ui_st.scanning ? 2 : 1;
+	}
+#endif
+	return scan_start_row() ? 1 : 3;
+}
 
 static void scan_item(uint16_t i, ui_item_t *it)
 {
+#if CONFIG_UI_CARD_MENU
+	if (ui_scan_card_active()) {
+		scan_card_item(i, it);
+		return;
+	}
+#endif
 	static const char *const names[] = { TRN("Skip channel for now"), TRN("Stay here"), TRN("Always skip") };
 	str_copy(it->label, sizeof it->label, scan_start_row() ? TR("Start scan") : tr(names[i]));
 	item_num(it, (uint16_t)(i + 1u));
@@ -5981,6 +7123,18 @@ static void scan_item(uint16_t i, ui_item_t *it)
 static void scan_select(uint16_t i, bool hold)
 {
 	(void)hold;
+#if CONFIG_UI_CARD_MENU
+	if (ui_scan_card_active()) {
+		if (ui_frame()->arg != 1)
+			return;
+		if (i == 0) {
+			ui_go_home();
+			ui_scan_toggle();
+			return;
+		}
+		i--;
+	}
+#endif
 	if (scan_start_row()) {
 		ui_go_home();
 		ui_scan_toggle();
@@ -5993,13 +7147,16 @@ static void scan_select(uint16_t i, bool hold)
 		ui_go_home();
 		ui_toast(TR("Scan stopped here"));
 	} else {
-		ui_toast(TR("Edit scan lists in qdmr"));
+		ui_toast(TR("Edit scan skips in CPS"));
 	}
 }
 
 static const ui_scr_def_t scan_screen = {
 	.name = "scan", .flags = SF_LIST | SF_NUMBERED | SF_FIELD, .prefix = TRN("Scan"), .hint = TRN("OK pick  Back"),
 	.count = scan_count, .item = scan_item, .select = scan_select,
+#if CONFIG_UI_CARD_MENU
+	.key = scan_card_key,
+#endif
 };
 
 // ======================= Screens with their own drawing =======================
@@ -6031,8 +7188,13 @@ static void lang_list_item(uint16_t i, ui_item_t *it)
 	str_copy(it->label, sizeof it->label, lang_name((uint8_t)i));
 	if (i == lang_current())
 		str_copy(it->value, sizeof it->value, TR("In use"));
-	if (!lang_built((uint8_t)i))
+	if (!lang_built((uint8_t)i)) {
 		it->flags |= UI_ITEM_DIM;
+#if CONFIG_UI_CARD_MENU
+		if (ui_card_layout(&ui_st))
+			str_copy(it->value, sizeof it->value, TR("Not in this build"));
+#endif
+	}
 }
 
 static void lang_list_select(uint16_t i, bool hold)
@@ -6060,19 +7222,187 @@ static const ui_scr_def_t lang_screen = {
 	.count = lang_list_count, .item = lang_list_item, .select = lang_list_select, .enter = lang_list_enter,
 };
 
+#if CONFIG_UI_CARD_MENU
+static const char *thread_display_text(void)
+{
+	unsigned breaks = 0;
+	for (const char *p = msg_text; *p; p++)
+		breaks += *p == '\n';
+	// Very short hard-wrapped lines can exceed the panel. Reflow densely
+	// wrapped messages so every word still fits in the full-size bubble.
+	for (char *p = msg_text; *p; p++)
+		if (*p == '\r' || (breaks > 6 && *p == '\n'))
+			*p = ' ';
+	return msg_text;
+}
+
+const char *ui_thread_text(uint16_t row)
+{
+	msg_text[0] = 0;
+#if CONFIG_MESSAGE_JOURNAL
+	if (ui_frame()->scr == SCR_THREAD) {
+		message_history_view_t view;
+		ui_svc_history_view(&view, NULL, 0);
+		if (view.timeline && view.status == HISTORY_READY && row < view.count)
+			ui_svc_history_thread_text(view.revision, thread_index(&view, row), msg_text, sizeof msg_text);
+		return thread_display_text();
+	}
+#endif
+	ui_msg_t m;
+	uint32_t peer = live_thread_peer(&m);
+	if (peer && live_row(row, peer, &m))
+		str_copy(msg_text, sizeof msg_text, m.text);
+	return thread_display_text();
+}
+
+const char *ui_compose_peer(void) { return compose_title(); }
+#endif
+
+#if CONFIG_TALKGROUP_EDIT
+bool ui_talkgroup_edit_focused(void)
+{
+	const ui_frame_t *f = ui_frame();
+	return f->scr == SCR_CHANNEL && f->focus < ced_n && ced_rows[f->focus] == CE_TALKGROUPS;
+}
+
+static uint16_t operating_tg_count(void)
+{
+	uint8_t count;
+	return codeplug_talkgroup_refs(ui_frame()->arg, NULL, &count) ? (uint16_t)(count + 1u) : 0;
+}
+
+static void operating_tg_label(uint16_t ref, char *label, uint8_t len, char *value, uint8_t value_len)
+{
+	contact_t contact;
+	if (!codeplug_contact(ref, &contact) || contact.type != CONTACT_GROUP) {
+		str_copy(label, len, TR("Not set"));
+		return;
+	}
+	ui_target_t target = { .id = contact.id, .group = true };
+	str_copy(target.name, sizeof target.name, contact.name);
+	ui_sb_target(label, len, &target);
+	if (value)
+		str_copy(value, value_len, contact.timeslot == 2 ? "TS2" : contact.timeslot == 1 ? "TS1" : TR("Channel's"));
+}
+
+static void operating_tg_item(uint16_t i, ui_item_t *it)
+{
+	if (!i) {
+		str_copy(it->label, sizeof it->label, TR("Add talkgroup"));
+		return;
+	}
+	codeplug_talkgroup_t tg;
+	codeplug_talkgroup_at(ui_frame()->arg, (uint8_t)(i - 1u), &tg);
+	operating_tg_label(tg.contact_number, it->label, sizeof it->label, it->value, sizeof it->value);
+	it->flags |= UI_ITEM_PREVIEW;
+}
+
+static void operating_tg_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	uint16_t channel = ui_frame()->arg;
+	if (!i) {
+		if (operating_tg_count() > CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL)
+			ui_toast(TR("Channel talkgroup list is full"));
+		else
+			ui_push(SCR_TALKGROUP_ADD, channel);
+		return;
+	}
+	codeplug_talkgroup_t tg;
+	codeplug_talkgroup_at(channel, (uint8_t)(i - 1u), &tg);
+	if (tg.contact_number)
+		ui_push(SCR_TALKGROUP_MOVE, tg.contact_number);
+}
+
+static bool operating_tg_add_label(uint16_t raw, char *buf, uint8_t len)
+{
+	contact_t contact;
+	if (!codeplug_contact((uint16_t)(raw + 1u), &contact) || contact.type != CONTACT_GROUP)
+		return false;
+	operating_tg_label((uint16_t)(raw + 1u), buf, len, NULL, 0);
+	return true;
+}
+
+static void operating_tg_add_item(uint16_t i, ui_item_t *it)
+{
+	operating_tg_label((uint16_t)(ui_filter_raw(i) + 1u), it->label, sizeof it->label, it->value, sizeof it->value);
+	it->flags |= UI_ITEM_PREVIEW;
+}
+
+static void operating_tg_add_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	if (ui_svc_edit_talkgroups(ui_frame()->arg, (uint16_t)(ui_filter_raw(i) + 1u), UI_TG_ADD))
+		ui_pop();
+	else
+		ui_toast(TR("Couldn't save: try again"));
+}
+
+static uint16_t operating_tg_move_count(void) { return 3; }
+
+static void operating_tg_move_item(uint16_t i, ui_item_t *it)
+{
+	static const char *const labels[] = { TRN("Move up"), TRN("Move down"), TRN("Remove talkgroup") };
+	str_copy(it->label, sizeof it->label, tr(labels[i]));
+}
+
+static void operating_tg_move_select(uint16_t i, bool hold)
+{
+	(void)hold;
+	static const ui_tg_edit_t ops[] = { UI_TG_UP, UI_TG_DOWN, UI_TG_REMOVE };
+	if (ui_svc_edit_talkgroups(ced_num, ui_frame()->arg, ops[i])) {
+		ui_pop();
+		ui_frame_t *f = ui_frame();
+		if (i == 0 && f->focus > 1)
+			f->focus--;
+		else if (i == 1 && f->focus + 1u < operating_tg_count())
+			f->focus++;
+	} else {
+		ui_toast(TR("Couldn't save: try again"));
+	}
+}
+
+static const ui_scr_def_t operating_tg_screen = {
+	.name = "operatingtalkgroups", .flags = SF_LIST, .prefix = TRN("Operating talkgroups"),
+	.count = operating_tg_count, .item = operating_tg_item, .select = operating_tg_select,
+};
+
+static const ui_scr_def_t operating_tg_add_screen = {
+	.name = "addtalkgroup", .flags = SF_LIST | SF_FILTER, .prefix = TRN("Add talkgroup"),
+	.count = ui_filter_count, .item = operating_tg_add_item, .select = operating_tg_add_select,
+	.raw_count = contacts_raw_count, .raw_label = operating_tg_add_label,
+};
+
+static const ui_scr_def_t operating_tg_move_screen = {
+	.name = "talkgroupactions", .flags = SF_LIST, .prefix = TRN("Talkgroup"),
+	.count = operating_tg_move_count, .item = operating_tg_move_item, .select = operating_tg_move_select,
+};
+#endif
+
 const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
 	[SCR_HOME] = &home_screen, [SCR_QUICK] = &quick_screen, [SCR_HUB] = &hub_screen,
 #if CONFIG_UI_CARD_MENU
 	[SCR_MENU_SECTION] = &menu_section_screen,
 #endif
 	[SCR_FIND] = &ui_find_screen, [SCR_ACTIONS] = &actions_screen, [SCR_CONTACTS] = &contacts_screen,
+	[SCR_LIVE_THREAD] = &live_thread_screen,
 	[SCR_MESSAGES] = &messages_screen, [SCR_MESSAGE] = &message_screen, [SCR_COMPOSE] = &compose_screen,
+#if CONFIG_MESSAGE_JOURNAL
+	[SCR_CONVERSATION] = &conversation_screen,
+#if CONFIG_UI_CARD_MENU
+	[SCR_THREAD] = &thread_screen,
+#endif
+#endif
 #if CONFIG_DMR_SMS
 	[SCR_SMS_TEXT] = &sms_text_screen,
 #endif
 	[SCR_RECENT] = &recent_screen, [SCR_ZONES] = &channels_screen, [SCR_ZONE] = &zone_screen,
 	[SCR_TOOLS] = &tools_screen, [SCR_SETTINGS] = &settings_screen, [SCR_GROUP] = &group_screen,
 	[SCR_PICKER] = &picker_screen, [SCR_INFO] = &info_screen, [SCR_CONFIRM] = &confirm_screen,
+#if CONFIG_TALKGROUP_EDIT
+	[SCR_TALKGROUPS] = &operating_tg_screen, [SCR_TALKGROUP_ADD] = &operating_tg_add_screen,
+	[SCR_TALKGROUP_MOVE] = &operating_tg_move_screen,
+#endif
 #if CONFIG_CONTACT_POSITION
 	[SCR_CONTACT_POSITION] = &contact_position_screen,
 #endif

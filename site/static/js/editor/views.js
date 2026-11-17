@@ -6,10 +6,13 @@
 // nothing when the value was taken.
 
 import { h, button } from "../flasher/dom.js";
+import { guardDialog } from "./unsaved.js";
+import { keyboardTabs } from "./navigation.js";
 import { parseFreq, parseTone, mhz } from "../codeplug/fields.js";
 import { LIMITS, POWER_NAMES } from "../codeplug/records.js";
-import { refNumber, listenBand } from "../codeplug/model.js";
+import { refNumber, listenBand, newContact } from "../codeplug/model.js";
 import { TALK_GROUP_MAX, validTalkGroups } from "../codeplug/talkgroups.js";
+import { MAX_ASSIGNMENTS, POOL_CAPACITY } from "../codeplug/talkgroup-pool.js";
 
 // --- Parsers shared by the columns and the forms ---
 
@@ -109,6 +112,28 @@ const refLabel = (v, t) => (v == null ? "" : typeof v === "number" ? t("editor.m
 // table whose members are edited in its own dialog (zones, RX lists): Bulk Edit isn't offered there
 export const bulkColumns = (table, m, t) => columns(table, m, t).filter((c) => c.readOnly !== true && c.key !== "name" && c.key !== "number");
 
+export const DEFAULT_CHANNEL_COLUMNS = ["name", "number", "mode", "rxHz", "txHz", "colorCode", "timeslot", "contact"];
+
+export function visibleChannelColumns(all, selected = DEFAULT_CHANNEL_COLUMNS) {
+	const keys = new Set(Array.isArray(selected) ? selected : DEFAULT_CHANNEL_COLUMNS);
+	const name = all.find(column => column.key === "name");
+	return [{ ...name, pinned: true }, ...all.filter(column => column.key !== "name" && keys.has(column.key))];
+}
+
+// Reuse the table parsers for compact contact, DTMF, and APRS record editors.
+export function recordForm(table, model, t) {
+	return columns(table, model, t).filter(column => column.set).map(column => ({
+		key: column.key, label: column.label, type: column.type === "bool" ? "bool" : column.type === "select" ? "select" : "text",
+		options: column.options,
+		disabled: table === "contacts" && column.key === "id" ? record => record.type === "all" : undefined,
+		parse: (record, key, value) => {
+			if (table === "contacts" && key === "id" && record.type === "all") return;
+			return column.set(record, value);
+		},
+		format: column.editValue || column.format,
+	}));
+}
+
 export function columns(table, m, t) {
 	const col = (key, label, type, parse, extra = {}) => ({
 		key, label: t(label), type,
@@ -198,7 +223,7 @@ export function columns(table, m, t) {
 					return;
 				}
 				return freq(t)(r, k, v);
-			}, { format: (v) => (v ? mhz(v) : t("editor.aprs.channel_freq")), numeric: true }),
+			}, { format: (v) => (v ? mhz(v) : t("editor.aprs.channel_freq")), editValue: v => v ? mhz(v) : "", numeric: true }),
 		];
 	}
 	return [];
@@ -222,7 +247,7 @@ const sfrField = (key, shift, mask, byte = "sfrA") => ({
 	key,
 });
 
-export function channelForm(m, t) {
+export function channelForm(m, t, draftContacts = []) {
 	const sel = (key, label, options, extra = {}) => ({ key, label: t(label), type: "select", options, ...extra });
 	const chk = (key, label) => ({ key, label: t(label), type: "bool" });
 	const txt = (key, label, parse, format) => ({ key, label: t(label), type: "text", parse, format });
@@ -231,24 +256,24 @@ export function channelForm(m, t) {
 	const dmr = (f) => ({ ...f, show: (r) => r.mode === "dmr" && (!f.show || f.show(r)) });
 	const sfr = (f, label, options) => dmr({ ...sfrField(...f), label: t(label), type: "select", options, show: (r) => r.sfr });
 	return [
-		{ group: t("editor.form.basic") },
+		{ tab: "basics", label: t("editor.form.basics") },
 		txt("name", "editor.col.name", name(LIMITS.name)(t)),
 		sel("mode", "editor.col.mode", () => [["fm", "FM"], ["dmr", "DMR"]]),
 		sel("power", "editor.col.power", () => powerOptions(t)),
 		// in a receive-only band TX follows RX, locked (rxFreq)
 		{ type: "pair", key: "freqs", disabled: (w, value) => listening(value),
 			fields: [txt("rxHz", "editor.col.rx", rxFreq(t), mhz), { ...txt("txHz", "editor.col.tx", freq(t), mhz), disabled: (w, value) => listening(value), follows: "rxHz" }], buttons: [
-			["→", t("editor.freq.rx_to_tx"), ([rx]) => [rx, rx]],
-			["⇄", t("editor.freq.swap"), ([rx, tx]) => [tx, rx]],
-			["←", t("editor.freq.tx_to_rx"), ([, tx]) => [tx, tx]],
+			[t("editor.freq.rx_to_tx"), ([rx]) => [rx, rx]],
+			[t("editor.freq.swap"), ([rx, tx]) => [tx, rx]],
+			[t("editor.freq.tx_to_rx"), ([, tx]) => [tx, tx]],
 		] },
 		{ type: "note", key: "band", text: (value) => {
 			const band = listenBand(parseFreq(value("rxHz")));
 			return band ? t(`editor.band.${band}`) : "";
 		} },
-		txt("tot", "editor.col.tot", tot(t), (v) => (v ? String(v) : t("editor.tot.default"))),
 		// a receive-only band makes the channel RX only on save (rxFreq): the box shows it as the RX frequency is typed
 		{ ...chk("rxOnly", "editor.col.rx_only"), implied: listening },
+		{ tab: "signal", label: t("editor.form.signal") },
 		fm({ group: t("editor.form.analog") }),
 		fm(sel("bw", "editor.col.bw", () => [[12.5, "12.5 kHz"], [25, "25 kHz"]])),
 		fm(txt("rxTone", "editor.col.rx_tone", tone(t), (v) => v)),
@@ -258,10 +283,14 @@ export function channelForm(m, t) {
 		dmr({ group: t("editor.form.digital") }),
 		dmr(sel("colorCode", "editor.col.cc", () => [...Array(16).keys()].map((n) => [n, String(n)]))),
 		dmr(sel("timeslot", "editor.col.ts", () => [[1, "1"], [2, "2"]])),
-		dmr(operatingTalkgroups(m.contacts, t)),
-		dmr(sel("privacySlot", "editor.col.encryption", (r) => encryptionOptions(t, r?.privacySlot))),
 		dmr(sel("contact", "editor.col.contact", () => refOptions(m.contacts, t))),
 		dmr(sel("rxList", "editor.col.rx_list", () => refOptions(m.rxLists, t))),
+		dmr({ tab: "talkgroups", label: t("editor.col.talkgroups") }),
+		dmr(channelTalkgroups(m, t, draftContacts)),
+		{ tab: "advanced", label: t("editor.form.advanced") },
+		{ group: t("editor.form.basic") },
+		txt("tot", "editor.col.tot", tot(t), (v) => (v ? String(v) : t("editor.tot.default"))),
+		dmr(sel("privacySlot", "editor.col.encryption", (r) => encryptionOptions(t, r?.privacySlot))),
 		dmr(txt("dmrId", "editor.col.channel_id", dmrId(t), (v) => (v ? String(v) : ""))),
 		dmr(chk("dmo", "editor.col.dmo")),
 		dmr(sel("aliasTs1", "editor.col.alias_ts1", () => aliasOptions(t))),
@@ -296,64 +325,176 @@ const coord = (t, max) => (r, k, v) => {
 	r[k] = n;
 };
 
-function operatingTalkgroups(contacts, t) {
-	const options = new Map();
-	for (const { id, name, type, timeslot } of contacts) {
-		if (type === "group" && Number.isInteger(id) && id > 0 && id < 0xFFFFFF && !options.has(id))
-			options.set(id, { label: name ? `${name} · TG ${id}` : `TG ${id}`, timeslot });
-	}
-	const resolve = (ids, choices, channel) => [...ids].map((tg) => {
-		const slot = choices.get(tg).timeslot;
-		return { id: tg, timeslot: slot === 1 || slot === 2 ? slot : channel.timeslot === 2 ? 2 : 1 };
-	});
+function channelTalkgroups(model, t, draftContacts) {
+	const shared = model.sharedTalkgroups;
+	const contacts = model.contacts.filter(contact =>
+		contact.type === "group" && Number.isInteger(contact.id) && contact.id > 0 && contact.id < 0xFFFFFF);
+	const resolve = (selected, channel) => shared ? [...selected] : selected.map(contact => ({
+		id: contact.id, timeslot: contact.timeslot || channel.timeslot,
+	}));
+	const keyOf = contact => shared ? contact : contact.id;
+	const max = shared ? MAX_ASSIGNMENTS : TALK_GROUP_MAX;
 	return {
-		key: "talkGroups",
-		label: t("editor.col.talkgroups"),
-		choices: options,
+		key: shared ? "talkgroupRefs" : "talkGroups",
+		contacts,
 		resolve,
+		label: t("editor.col.talkgroups"),
 		render(id, entries = []) {
-			const menu = h("details", { id, class: "operating-talkgroups", "aria-labelledby": id + "-label" });
-			const summary = h("summary");
-			const choices = new Map(options);
-			const selected = new Set(entries.map((entry) => entry.id));
-			for (const entry of entries) {
-				if (!choices.has(entry.id)) choices.set(entry.id, { label: `TG ${entry.id}`, timeslot: entry.timeslot });
-			}
+			const selected = shared ? [...entries] : entries.map(entry => ({
+				...entry, name: contacts.find(contact => contact.id === entry.id)?.name || "",
+			}));
+			const other = model.channels.reduce((total, channel) =>
+				total + (channel.mode === "dmr" && channel.talkgroupRefs !== entries ? (channel.talkgroupRefs?.length ?? 0) : 0), 0);
+			const limit = shared ? Math.min(max, Math.max(0, POOL_CAPACITY - other)) : max;
+			const label = contact => typeof contact === "number" ? t("editor.missing", { n: contact }) :
+				[contact.name, `TG ${contact.id}`, contact.timeslot ? `TS${contact.timeslot}` : t("editor.tg.channel_slot")]
+					.filter(Boolean).join(" · ");
+			const panel = h("div", { id, class: "ed-tg-editor", role: "group", "aria-labelledby": id + "-label" });
+			const heading = h("p", { class: "small muted", "aria-live": "polite" });
+			const assigned = h("ol", { class: "ed-tg-assigned" });
+			const empty = h("p", { class: "muted" }, t("editor.tg.empty"));
+			const filter = h("input", { type: "search", placeholder: t("editor.tg.search"), "aria-label": t("editor.tg.search") });
 			const list = h("div", { class: "operating-talkgroup-list" });
-			const checks = new Map();
-			const update = () => {
-				summary.textContent = selected.size ? `${t("editor.col.talkgroups")} · ${selected.size}/${TALK_GROUP_MAX}`
-					: t("editor.col.talkgroups");
-				for (const [tg, check] of checks) check.disabled = !selected.has(tg) && selected.size >= TALK_GROUP_MAX;
+			const checked = new Set();
+			const picker = h("div", { class: "ed-tg-picker", hidden: true });
+			const add = button(t("editor.tg.add"), () => {
+				picker.hidden = !picker.hidden;
+				add.setAttribute("aria-expanded", String(!picker.hidden));
+				if (!picker.hidden) filter.focus();
+			});
+			add.setAttribute("aria-expanded", "false");
+			const apply = button(t("editor.tg.add_selected"), () => {
+				selected.push(...checked);
+				checked.clear();
+				picker.hidden = true;
+				add.setAttribute("aria-expanded", "false");
+				update();
+				if (add.disabled) assigned.lastElementChild?.querySelector("button:not(:disabled)")?.focus();
+				else add.focus();
+			}, { primary: true });
+			const create = h("div", { class: "ed-tg-picker", hidden: true });
+			const createButton = button(t("editor.tg.create"), () => {
+				create.hidden = !create.hidden;
+				createButton.setAttribute("aria-expanded", String(!create.hidden));
+				if (!create.hidden) contactName.focus();
+			});
+			createButton.setAttribute("aria-expanded", "false");
+			const contactName = h("input", { type: "text", maxlength: LIMITS.name });
+			const contactId = h("input", { type: "text", inputmode: "numeric" });
+			const slot = h("select", {}, ...[t("editor.tg.channel_slot"), "TS1", "TS2"].map((text, index) =>
+				h("option", { value: index }, text)));
+			const error = h("p", { class: "notice bad", role: "alert", hidden: true });
+			const createContact = () => {
+				if (selected.length >= limit || model.contacts.length + draftContacts.length >= LIMITS.contacts) return;
+				const contact = newContact({ timeslot: Number(slot.value) });
+				const invalid = name(LIMITS.name)(t)(contact, "name", contactName.value) ||
+					int(1, 0xFFFFFE)(t)(contact, "id", contactId.value);
+				const duplicate = [...contacts, ...draftContacts].some(item => item.id === contact.id &&
+					(!shared || (item.timeslot || 0) === contact.timeslot));
+				error.hidden = !invalid && !duplicate;
+				if (!error.hidden) {
+					error.textContent = invalid || t("editor.tg.duplicate");
+					return;
+				}
+				draftContacts.push(contact);
+				selected.push(contact);
+				checked.clear();
+				contactName.value = contactId.value = "";
+				slot.selectedIndex = 0;
+				create.hidden = true;
+				createButton.setAttribute("aria-expanded", "false");
+				update();
+				if (createButton.disabled) assigned.lastElementChild?.querySelector("button:not(:disabled)")?.focus();
+				else createButton.focus();
 			};
-			for (const [tg, { label, timeslot }] of choices) {
-				const check = h("input", { type: "checkbox", checked: selected.has(tg), onchange: () => {
-					if (check.checked) selected.add(tg);
-					else selected.delete(tg);
-					update();
-				} });
-				checks.set(tg, check);
-				list.append(h("label", {}, check, label, timeslot === 1 || timeslot === 2 ? ` · TS${timeslot}` : ""));
-			}
-			menu.readTalkGroups = (channel) => resolve(selected, choices, channel);
+			const refreshChoices = () => {
+				const query = filter.value.trim().toLowerCase();
+				const used = new Set(selected.map(keyOf));
+				const choices = [...contacts, ...draftContacts].filter(contact => {
+					const key = keyOf(contact);
+					if (used.has(key) || !label(contact).toLowerCase().includes(query)) return false;
+					used.add(key);
+					return true;
+				});
+				const refreshChecks = () => {
+					for (const input of list.querySelectorAll("input"))
+						input.disabled = !input.checked && selected.length + checked.size >= limit;
+					apply.disabled = checked.size === 0;
+				};
+				list.replaceChildren(...choices.map(contact => {
+					const input = h("input", { type: "checkbox", checked: checked.has(contact), onchange: () => {
+						if (input.checked) checked.add(contact);
+						else checked.delete(contact);
+						refreshChecks();
+					} });
+					return h("label", {}, input, label(contact));
+				}));
+				if (!choices.length) list.append(h("p", { class: "muted" }, t("editor.tg.no_matches")));
+				refreshChecks();
+			};
+			const update = () => {
+				heading.textContent = `${selected.length}/${limit}`;
+				empty.hidden = selected.length !== 0;
+				add.disabled = selected.length >= limit;
+				createButton.disabled = add.disabled || model.contacts.length + draftContacts.length >= LIMITS.contacts;
+				assigned.replaceChildren(...selected.map((contact, i) => {
+					const move = offset => () => {
+						const next = i + offset;
+						[selected[i], selected[next]] = [selected[next], selected[i]];
+						update();
+						assigned.children[next]?.querySelector("button:not(:disabled)")?.focus();
+					};
+					return h("li", {}, h("div", { class: "ed-tg-row" }, h("span", {}, label(contact)),
+						h("div", { class: "ed-tg-actions" },
+							button(t("editor.tg.up"), move(-1), { disabled: i === 0 }),
+							button(t("editor.tg.down"), move(1), { disabled: i === selected.length - 1 }),
+							button(t("editor.tg.remove"), () => {
+								selected.splice(i, 1);
+								update();
+								const next = assigned.children[Math.min(i, selected.length - 1)];
+								(next?.querySelector("button:not(:disabled)") || add).focus();
+							}))));
+				}));
+				refreshChoices();
+			};
+			filter.addEventListener("input", refreshChoices);
+			picker.append(filter, list, apply);
+			create.append(h("div", { class: "form-grid" },
+				h("label", { class: "form-row" }, t("editor.col.name"), contactName),
+				h("label", { class: "form-row" }, t("editor.col.id"), contactId),
+				h("label", { class: "form-row" }, t("editor.col.ts"), slot)), error,
+				button(t("editor.tg.create_assign"), createContact, { primary: true }));
+			panel.append(h("div", { class: "ed-tg-actions" }, add, createButton, heading), empty, assigned, picker, create);
+			panel.readTalkGroups = channel => resolve(selected, channel);
 			update();
-			menu.append(summary, list);
-			return menu;
+			return panel;
 		},
 		read(input, channel) { return input.readTalkGroups(channel); },
-		parse(record, key, entries) {
-			if (!validTalkGroups(entries)) return t("editor.err.talkgroups", { max: TALK_GROUP_MAX });
-			record[key] = entries;
+		parse(record, field, entries) {
+			const valid = shared ? entries.length <= max && new Set(entries).size === entries.length &&
+				entries.every(contact => contacts.includes(contact) || draftContacts.includes(contact)) : validTalkGroups(entries);
+			if (!valid) return t("editor.err.talkgroups", { max });
+			record[field] = entries;
 		},
 	};
 }
 
 // A form in a dialog over a working copy of the record; Save hands the copy back
-export function formDialog(title, fields, record, t, onSave) {
+export function formDialog(title, fields, record, t, onSave, options = {}) {
 	const work = { ...record };
 	const errs = h("p", { class: "notice bad", hidden: true });
 	const rows = [];
-	const body = h("div", { class: "form-grid" });
+	const body = h("div", { class: "ed-channel-body" + (fields.some(field => field.tab) ? "" : " form-grid") });
+	const nav = h("div", { class: "ed-channel-tabs", role: "tablist", "aria-label": t("editor.form.sections"), hidden: !fields.some(field => field.tab) });
+	const sections = [];
+	let section;
+	const select = (active) => {
+		for (const tab of sections) {
+			tab.content.hidden = tab !== active;
+			tab.control.setAttribute("aria-selected", String(tab === active));
+			tab.control.tabIndex = tab === active ? 0 : -1;
+		}
+	};
 	// One field: its label and input, kept in rows for sync() and save()
 	const field = (f) => {
 		const id = "f-" + f.key;
@@ -375,36 +516,59 @@ export function formDialog(title, fields, record, t, onSave) {
 		}
 		const label = h(f.render ? "span" : "label", f.render ? { id: id + "-label" } : { for: id },
 			typeof f.label === "function" ? f.label(work) : f.label);
-		const row = h("div", { class: "form-row" + (f.type === "bool" ? " form-check" : "") }, label, input);
-		rows.push({ f, input, row, label });
+		const error = h("span", { id: id + "-error", class: "ed-field-error small", hidden: true });
+		input.setAttribute("aria-describedby", error.id);
+		input.addEventListener("input", () => { error.hidden = true; input.removeAttribute("aria-invalid"); });
+		input.addEventListener("change", () => { error.hidden = true; input.removeAttribute("aria-invalid"); });
+		const row = h("div", { class: "form-row" + (f.type === "bool" ? " form-check" : "") }, label, input, error);
+		rows.push({ f, input, row, label, error, section });
 		return row;
 	};
 	for (const f of fields) {
+		if (f.tab) {
+			const tab = {
+				content: h("div", { class: "form-grid", id: "channel-" + f.tab, role: "tabpanel",
+					"aria-labelledby": "channel-tab-" + f.tab, hidden: sections.length !== 0 }),
+				show: f.show,
+			};
+			tab.control = button(f.label, () => select(tab));
+			tab.control.id = "channel-tab-" + f.tab;
+			tab.control.setAttribute("role", "tab");
+			tab.control.setAttribute("aria-controls", tab.content.id);
+			tab.control.setAttribute("aria-selected", String(sections.length === 0));
+			tab.control.tabIndex = sections.length === 0 ? 0 : -1;
+			sections.push(tab);
+			nav.append(tab.control);
+			body.append(tab.content);
+			section = tab;
+			continue;
+		}
+		const content = section?.content ?? body;
 		if (f.group) {
 			const row = h("h3", { class: "form-group" }, f.group);
 			rows.push({ f: { key: null, type: "group", show: f.show }, input: null, row });
-			body.append(row);
+			content.append(row);
 		} else if (f.type === "note") {
 			// a line of text from the inputs as they are typed
 			const row = h("p", { class: "form-note small muted", hidden: true });
 			rows.push({ f, input: null, row });
-			body.append(row);
+			content.append(row);
 		} else if (f.type === "pair") {
 			// two fields side by side with small buttons between them that act on both inputs
 			const a = field(f.fields[0]), b = field(f.fields[1]);
 			const [ia, ib] = rows.slice(-2).map((r) => r.input);
-			const tools = f.buttons.map(([icon, name, fn]) => {
+			const tools = f.buttons.map(([name, fn]) => {
 				const btn = h("button", { type: "button", class: "btn pair-btn", title: name, "aria-label": name, onclick: () => {
 					const v = fn([ia.value, ib.value]);
 					[ia.value, ib.value] = v;
 					sync();
-				} }, icon);
+				} }, name);
 				return btn;
 			});
 			const mid = h("div", { class: "pair-tools" }, ...tools);
 			rows.push({ f: { key: f.key, type: "pair", disabled: f.disabled }, input: null, row: null, tools });
-			body.append(h("div", { class: "form-pair" }, a, mid, b));
-		} else body.append(field(f));
+			content.append(h("div", { class: "form-pair" }, a, b, mid));
+		} else content.append(field(f));
 	}
 	const byKey = (k) => rows.find((r) => r.f.key === k);
 	const value = (k) => byKey(k).input.value;
@@ -433,21 +597,35 @@ export function formDialog(title, fields, record, t, onSave) {
 				input.disabled = on;
 			}
 			if (f.type === "bool") (f.set ? f.set(work, input.checked) : (work[f.key] = input.checked));
-			if (f.show) row.hidden = !f.show(work);
+			if (f.show) row.hidden = !f.show(work) && f.key !== options.field;
 			if (typeof f.label === "function") label.textContent = f.label(work);
 			if (f.disabled) {
 				input.disabled = f.disabled(work, value);
 				if (input.disabled && f.follows) input.value = byKey(f.follows).input.value;
 			}
 		}
+		for (const tab of sections) {
+			const hasProblem = rows.some(row => row.section === tab && row.f.key === options.field);
+			tab.control.hidden = tab.show ? !tab.show(work) && !hasProblem : false;
+			if (tab.control.hidden && !tab.content.hidden) select(sections[0]);
+		}
 	};
 	body.addEventListener("change", sync);
 	body.addEventListener("input", sync);
+	keyboardTabs(nav, control => select(sections.find(tab => tab.control === control)));
 	sync();
-	const dlg = h("dialog", { class: "confirm editor-dialog" });
+	const dlg = h("dialog", { class: "confirm editor-dialog ed-channel-dialog", "aria-labelledby": "channel-edit-title" });
+	const signature = () => JSON.stringify(rows.filter(row => row.input).map(({ f, input }) =>
+		f.read ? f.read(input, work) : input.type === "checkbox" ? input.checked : input.value));
+	const original = signature();
+	const cancel = guardDialog(dlg, () => signature() !== original, t("editor.dialog.discard"));
 	const save = () => {
 		const bad = [];
-		for (const { f, input } of rows) {
+		let first;
+		for (const row of rows) {
+			const { f, input } = row;
+			if (row.error) { row.error.hidden = true; input.removeAttribute("aria-invalid"); }
+			if (f.show && !f.show(work) && f.key !== options.field) continue;
 			if (f.type === "bool" || f.type === "pair" || f.type === "group" || f.type === "note") continue;
 			if (f.type === "select") {
 				const v = input._opts[input.selectedIndex]?.[0];
@@ -455,26 +633,44 @@ export function formDialog(title, fields, record, t, onSave) {
 				continue;
 			}
 			const err = f.parse ? f.parse(work, f.key, f.read ? f.read(input, work) : input.value) : ((work[f.key] = input.value), null);
-			if (err) bad.push(`${typeof f.label === "function" ? f.label(work) : f.label}: ${err}`);
+			if (err) {
+				row.error.textContent = err;
+				row.error.hidden = false;
+				input.setAttribute("aria-invalid", "true");
+				bad.push(`${typeof f.label === "function" ? f.label(work) : f.label}: ${err}`);
+				first ??= row;
+			}
 		}
 		if (bad.length) {
 			errs.hidden = false;
 			errs.textContent = bad.join(" · ");
+			if (first.section && !first.section.control.hidden) select(first.section);
+			(first.input.matches("input, select") ? first.input : first.input.querySelector("input, button"))?.focus();
 			return;
 		}
-		onSave(work);
+		if (onSave(work) === false) return;
 		dlg.close();
 	};
-	dlg.append(h("h2", {}, title), body, errs, h("div", { class: "confirm-actions" },
-		button(t("editor.cancel"), () => dlg.close()), button(t("editor.save_record"), save, { primary: true })));
-	dlg.addEventListener("close", () => dlg.remove());
+	errs.setAttribute("role", "alert");
+	dlg.append(h("header", { class: "ed-channel-header" }, h("h2", { id: "channel-edit-title" }, title), nav),
+		body, h("footer", { class: "ed-channel-footer" }, errs, h("div", { class: "confirm-actions" },
+			button(t("editor.cancel"), cancel), button(options.saveLabel || t("editor.form.save_channel"), save, { primary: true }))));
+	dlg.addEventListener("close", () => { dlg.remove(); options.onClose?.(); });
 	document.body.append(dlg);
 	dlg.showModal();
+	const problem = byKey(options.field);
+	if (problem?.input) {
+		if (problem.section) select(problem.section);
+		problem.error.textContent = options.error || "";
+		problem.error.hidden = !options.error;
+		if (options.error) problem.input.setAttribute("aria-invalid", "true");
+		(problem.input.matches("input, select") ? problem.input : problem.input.querySelector("input, button"))?.focus();
+	}
 }
 
 // --- Members of a zone or an RX group list ---
 
-export function membersDialog(title, members, pool, max, t, label, onSave) {
+export function membersDialog(title, members, pool, max, t, label, onSave, options = {}) {
 	let list = members.slice();
 	const filter = h("input", { type: "search", placeholder: t("editor.filter"), "aria-label": t("editor.filter") });
 	const avail = h("select", { multiple: true, size: 14, class: "members-list", "aria-label": t("editor.members.available") });
@@ -511,20 +707,44 @@ export function membersDialog(title, members, pool, max, t, label, onSave) {
 	chosen.addEventListener("dblclick", del);
 	fill();
 	const dlg = h("dialog", { class: "confirm editor-dialog" });
+	const nameInput = h("input", { type: "text", value: options.name ?? "", maxlength: LIMITS.name });
+	const error = h("p", { id: "members-error", class: "ed-field-error small", role: "alert", hidden: true });
+	nameInput.setAttribute("aria-describedby", error.id);
+	chosen.setAttribute("aria-describedby", error.id);
+	const cancel = guardDialog(dlg,
+		() => nameInput.value !== (options.name ?? "") || list.length !== members.length || list.some((item, index) => item !== members[index]),
+		t("editor.dialog.discard"));
 	dlg.append(h("h2", {}, title),
+		options.name !== undefined ? h("label", { class: "form-row" }, t("editor.col.name"), nameInput) : null,
+		error,
 		h("div", { class: "members" },
 			h("div", {}, h("h3", {}, t("editor.members.available")), filter, avail),
 			h("div", { class: "members-actions" }, button(t("editor.members.add"), add), button(t("editor.members.remove"), del),
 				button(t("editor.move_up"), () => move(-1)), button(t("editor.move_down"), () => move(1))),
 			h("div", {}, h("h3", {}, t("editor.members.chosen")), chosen, count)),
-		h("div", { class: "confirm-actions" }, button(t("editor.cancel"), () => dlg.close()),
+		h("div", { class: "confirm-actions" }, button(t("editor.cancel"), cancel),
 			button(t("editor.save_record"), () => {
-				onSave(list);
+				const record = {};
+				const invalid = options.name !== undefined ? name(LIMITS.name)(t)(record, "name", nameInput.value) : null;
+				if (invalid || list.length > max) {
+					error.textContent = invalid || t("editor.members.count", { n: list.length, max });
+					error.hidden = false;
+					(invalid ? nameInput : chosen).focus();
+					return;
+				}
+				if (onSave(list, record.name) === false) return;
 				dlg.close();
 			}, { primary: true })));
-	dlg.addEventListener("close", () => dlg.remove());
+	dlg.addEventListener("close", () => { dlg.remove(); options.onClose?.(); });
 	document.body.append(dlg);
 	dlg.showModal();
+	if (options.error) {
+		error.textContent = options.error;
+		error.hidden = false;
+		const input = options.field === "name" ? nameInput : chosen;
+		input.setAttribute("aria-invalid", "true");
+		input.focus();
+	}
 }
 
 export { refNumber, refLabel };

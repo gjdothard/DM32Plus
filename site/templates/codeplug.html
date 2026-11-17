@@ -1,11 +1,16 @@
+<!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 Garrett Dothard -->
-<section class="wrap section page-head compact">
-	<h1>{{t editor.title}}</h1>
-	<p class="lead">{{t editor.lead}}</p>
-	<p><a class="btn" href="{{home}}flash/index.html#radio=dm32">{{t flash.dm32plus.install}}</a>
-		<a class="btn" href="{{home}}flash/index.html#update">{{t flash.dm32plus.upgrade}}</a></p>
-</section>
-<section class="wrap section">
+<section class="wrap section cps-page">
+	<div class="cps-heading">
+		<h1>{{t editor.title}}</h1>
+		<details class="cps-firmware">
+			<summary>{{t editor.firmware}}</summary>
+			<nav aria-label="{{t editor.firmware}}">
+				<a href="{{home}}flash/index.html#radio={{product_board}}">{{t flash.product.install}}</a>
+				<a href="{{home}}flash/index.html#update">{{t flash.product.upgrade}}</a>
+			</nav>
+		</details>
+	</div>
 	<div id="editor" class="editor"><p class="muted">{{t editor.loading}}</p></div>
 	<noscript><p class="notice">{{t editor.noscript}}</p></noscript>
 </section>

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT Copyright (c) 2026 The RadioFoundry Authors Safe writes to the board's data flash
+// Copyright (c) 2026 Garrett Dothard
 // (docs/spec/settings-store.md 4): a sector rewrite goes through a journal (a copy of the new sector and a header
 // saying where it goes), so a power cut in the middle of the erase or the program is finished at the next boot instead
 // of leaving a half-erased codeplug sector. Shared by the codeplug editor and the open-firmware CPS shim. No RTOS here:
@@ -22,7 +23,7 @@ void storage_quick_unlock(void);
 
 // After the board's flash works, before the settings and the codeplug are read: check that the settings ring and the
 // journal are ours (else the region is foreign, below), then finish a journaled rewrite that a power cut
-// interrupted. False if there is no usable flash or the region is foreign (then every write is refused)
+// interrupted. False if there is no usable flash, the region is foreign, or a replay could not finish.
 bool storage_init(void);
 // Flash usable and the region ours: writes allowed
 bool storage_ready(void);

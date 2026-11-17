@@ -32,6 +32,11 @@ TESTS   := dmrFecTest sfrTest dmrDataTest dmrDataServiceTest hotspotDataTest hot
 
 all: run
 
+TESTS += wallClockTest
+wallClockTest: wallClockTest.c $(CORE)/app/wall_clock.c
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -DCONFIG_RTC=1 -o $@ $^
+
+
 TESTS += dmrAesTest
 dmrAesTest: dmrAesTest.c $(CORE)/dmr/dmrAes.c $(CORE)/dmr/dmrPrivacy.c $(CORE)/dmr/ambe/ambeFec.c $(CORE)/dmr/call/dmr_lc.c $(CORE)/dmr/fec/dmrFec.c
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ $^
@@ -99,6 +104,10 @@ TESTS   += dmrDataServiceTestNoTms
 dmrDataServiceTestNoTms: $(SVC) $(CORE)/dmr/dmrDataService.c $(CORE)/dmr/dmrDataService.h $(CORE)/dmr/dmr_data_api.h
 	$(CC) $(CFLAGS) -DCONFIG_DMR_TMS=0 -o $@ $(SVC) -lm
 
+TESTS += dmrDataServiceTestHistory
+dmrDataServiceTestHistory: $(SVC) $(CORE)/dmr/dmrDataService.c $(CORE)/dmr/dmrDataService.h $(CORE)/dmr/dmr_data_api.h $(CORE)/storage/message_journal.h
+	$(CC) $(CFLAGS) $(FLASH_HAL) -DCONFIG_MESSAGE_JOURNAL=1 -o $@ $(SVC) -lm
+
 TESTS += dmrDataServiceTestNoUdpCompress
 dmrDataServiceTestNoUdpCompress: $(SVC) $(CORE)/dmr/dmrDataService.c $(CORE)/dmr/dmrDataService.h $(CORE)/dmr/dmr_data_api.h
 	$(CC) $(CFLAGS) -DCONFIG_DMR_UDP_COMPRESS=0 -o $@ $(SVC) -lm
@@ -146,6 +155,7 @@ run: $(TESTS)
 	./dmrDataTest > dmrDataTest.out; status=$$?; grep -E "^(FAIL|# (PASSED|FAILED))" dmrDataTest.out; exit $$status
 	./dmrDataServiceTest
 	./dmrDataServiceTestNoTms
+	./dmrDataServiceTestHistory
 	./dmrDataServiceTestNoUdpCompress
 	./hotspotDataTest
 	./hotspotUplinkTest
@@ -161,6 +171,7 @@ run: $(TESTS)
 	./ipGatewayTestAir440
 	./sfrTest
 	./aprsTest
+	./wallClockTest
 ifneq ($(TSHARK),)
 	@# Independent check of the frames the gateway sent: no malformed packets or bad checksums
 	@for f in ipGatewayTest.pcap ipGatewayTest16.pcap ipGatewayTest31.pcap ipGatewayTestShared.pcap ipGatewayTestAir440.pcap; do "$(TSHARK)" -r $$f -o ip.check_checksum:TRUE -o udp.check_checksum:TRUE -z expert,note -q; done > ipGatewayTest.expert
@@ -304,6 +315,8 @@ TESTS   += boardBandTest
 boardBandTest: boardBandTest.c $(ROOT)/hal/board.h
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ boardBandTest.c
 
+radioCoreTest radioCoreTestNoVfoDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest aprsRadioTest: sim/radio_task.h
+
 run: run-core
 run-core: radioCoreTest radioCoreTestNoVfoDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest inputTest aprsRadioTest quadratureTest serialmicTest miclevelTest \
           rx2LinkTest keyassignTest powerSwitchTest boardBandTest batteryTest
@@ -327,6 +340,11 @@ run-core: radioCoreTest radioCoreTestNoVfoDmr radioFeaturesTest radioFeaturesTes
 
 # The read-only codeplug (open-firmware layout and built-in channels), on fake flash images
 FLASH_HAL := -I$(ROOT)/hal -Wshadow
+TESTS   += messageJournalTest
+
+messageJournalTest: messageJournalTest.c $(CORE)/storage/message_journal.c $(CORE)/storage/message_journal.h $(CORE)/storage/storage.c
+	$(CC) $(CFLAGS) $(FLASH_HAL) -DCONFIG_MESSAGE_JOURNAL=1 -o $@ messageJournalTest.c $(CORE)/storage/message_journal.c $(CORE)/storage/storage.c
+
 TESTS   += codeplugTest
 
 codeplugTest: codeplugTest.c $(CORE)/codeplug/codeplug.c $(CORE)/codeplug/codeplug.h $(CORE)/codeplug/dmr_iddb.c $(CORE)/codeplug/dmr_iddb.h $(CORE)/storage/storage.c
@@ -351,7 +369,8 @@ calCurveTest: calCurveTest.c $(CORE)/radio/cal_curve.h
 	$(CC) $(CFLAGS) -Wshadow -o $@ calCurveTest.c
 
 run: run-flash
-run-flash: codeplugTest codeplugNoCompactTest calCurveTest codeplugPower2Test codeplugPower3Test codeplugPower9Test
+run-flash: codeplugTest codeplugNoCompactTest calCurveTest codeplugPower2Test codeplugPower3Test codeplugPower9Test messageJournalTest
+	./messageJournalTest
 	./codeplugPower2Test
 	./codeplugPower3Test
 	./codeplugPower9Test
@@ -479,9 +498,9 @@ UIAPP   := $(UI) $(CORE)/ui/ui_app.c $(CORE)/ui/ui_menus.c $(CORE)/ui/ui_find.c 
 ABOUT_H := out/gen/rfoundry_about.h
 $(shell python3 $(ROOT)/tools/gen_about.py $(ROOT)/AUTHORS $(ROOT)/platform/stm32f4/THIRD_PARTY $(ABOUT_H) >/dev/null)
 UIFLAGS := -std=gnu99 -Wall -Wextra -Wno-unused-parameter -Wshadow -g $(COVFLAGS) $(SANFLAGS) -I$(CORE) -I$(ROOT)/hal -I. -Iout/gen \
-           '-DGFX_FB_BYTES=(320u*320u*2u)' -DGFX_MAX_ROWS=320 -DCONFIG_FONT_XL=1 -DCONFIG_UI_CARD_MENU=1 -DFONT_BOTH -DGFX_INDEXED=1 -DGFX_FIT_TRACE
+           '-DGFX_FB_BYTES=(320u*320u*2u)' -DGFX_MAX_ROWS=320 -DCONFIG_FONT_XL=1 -DCONFIG_UI_CARD_MENU=1 -DCONFIG_DMR_TALKGROUP_ENTRIES=1 -DFONT_BOTH -DGFX_INDEXED=1 -DGFX_FIT_TRACE
 UIDEPS  := $(UIAPP) $(ABOUT_H) $(LANG_H) $(wildcard $(CORE)/ui/*.h $(CORE)/ui/fonts/*.inc sim/ui_sim.h)
-TESTS   += uiFlowTest uiFlowTestNoColor uiSim
+TESTS   += uiFlowTest uiFlowTestNoColor uiFlowTestHistory uiSim
 
 uiFlowTest: uiFlowTest.c $(UIDEPS)
 	$(CC) $(UIFLAGS) -o $@ uiFlowTest.c $(UIAPP) -lz
@@ -490,6 +509,9 @@ uiFlowTest: uiFlowTest.c $(UIDEPS)
 # without a translation (CONFIG_LANG_ES=n): the Language screen dims Spanish
 uiFlowTestNoColor: uiFlowTest.c $(UIDEPS)
 	$(CC) $(UIFLAGS) -DCONFIG_UI_COLOR=0 -DCONFIG_LANG_ES=0 -o $@ uiFlowTest.c $(UIAPP) -lz
+
+uiFlowTestHistory: uiFlowTest.c $(UIDEPS)
+	$(CC) $(UIFLAGS) -DCONFIG_MESSAGE_JOURNAL=1 -o $@ uiFlowTest.c $(UIAPP) -lz
 
 uiSim: uiSim.c $(UIDEPS)
 	$(CC) $(UIFLAGS) -o $@ uiSim.c $(UIAPP) -lz
@@ -507,13 +529,14 @@ ui-sheets: uiSim
 	UI_GALLERY_COLORS="$(UI_GALLERY_COLORS)" ./uiSim --sheets out/sheets $(GEOM)
 
 run: run-ui
-run-ui: gfxTest i18nTest i18nTestNoLang i18nTestDefault uiFlowTest uiFlowTestNoColor uiSim
+run-ui: gfxTest i18nTest i18nTestNoLang i18nTestDefault uiFlowTest uiFlowTestNoColor uiFlowTestHistory uiSim
 	./gfxTest
 	./i18nTest
 	./i18nTestNoLang
 	./i18nTestDefault
 	./uiFlowTest
 	./uiFlowTestNoColor
+	./uiFlowTestHistory
 	./uiSim --layout
 .PHONY: run-ui ui-gallery ui-sheets
 
@@ -1074,7 +1097,7 @@ CPEDIT  := $(CORE)/codeplug/codeplug.c $(CORE)/storage/storage.c sim/sim_flash.c
 TESTS   += codeplugEditTest
 
 codeplugEditTest: codeplugEditTest.c $(CPEDIT) $(wildcard $(CORE)/codeplug/*.h $(CORE)/storage/*.h sim/sim_flash.h)
-	$(CC) $(CFLAGS) -I$(ROOT)/hal -I. -Wshadow -o $@ codeplugEditTest.c $(CPEDIT)
+	$(CC) $(CFLAGS) -DCONFIG_DMR_TALKGROUP_ENTRIES=1 -I$(ROOT)/hal -I. -Wshadow -o $@ codeplugEditTest.c $(CPEDIT)
 
 run: run-cpedit
 run-cpedit: codeplugEditTest

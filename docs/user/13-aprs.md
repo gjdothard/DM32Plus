@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # APRS
 
@@ -20,10 +21,25 @@ room. The [Radio reference](23-radios.md) lists them and says where APRS is veri
   valid callsign nothing is sent, and the APRS page says why.
 - Sending is off until you turn it on. "Send position now" works at any time.
 
+## GPS, APRS, and Data
+
+On the dark card layout, press **OK**, **7** on Home. **1** opens Position and shows the fix and satellites used
+beside the card. **2** opens APRS. **3** opens the **ARS & LRRP** dashboard.
+
+- **Answer GPS requests** toggles LRRP replies. Switching it off clears active subscriptions and cancels reports still
+  waiting to transmit. Turning it back on allows new requests. The same setting is under **Settings > Location**.
+- **Register Now** schedules a registration on the current eligible DMR channel. It waits for a clear channel.
+  The dashboard shows the next retry or refresh, time registered, attempts, refresh interval, and transmit context.
+- Select **Server ID**, press **OK**, enter the ID, and press **OK** to save or **Back** to cancel. Enter **0** to turn ARS off.
+- Each active LRRP card shows the requester ID, interval, optional distance threshold, and the next check or GPS status.
+  A check time is an estimate. Opening the dashboard sends no packet.
+
 ## The APRS page
 
-Press **OK**, **6** (Tools), **8** (APRS). The top of the page shows your callsign, the APRS
-frequency, your position and its source, and when the next beacon goes out. If the radio can't send, it says why.
+From **GPS, APRS, and Data**, choose **APRS**. On the dark card layout, the summary shows your callsign,
+the configured send route, the APRS frequency for AFSK, and the current position and source. It shows the
+next timed beacon, or says when automatic beacons are off or have no timed schedule. The existing numbered
+shortcuts still work, including **1** for **Send position now**. Other layouts also offer **Tools > APRS**.
 
 | Row | What it does |
 |---|---|
@@ -112,13 +128,13 @@ Four decimal places put you within about 11 m. You can also type "latitude" or "
 
 **Tools > Position** shows what the radio's GPS is doing, on four pages. Press Up or Down (or turn the knob) for the
 next page, or press 1 to 4. On a radio with a tall screen, Status also shows the grid locator and degrees, minutes and
-seconds, so there are three pages.
+seconds, so there are three pages. The dark card layout shows Status, Sky, and Signal as tabs.
 
 | Page | What it shows |
 |---|---|
 | 1 Status | 3D Fix, 2D Fix (Fix when the receiver doesn't say which) or Searching; satellites used and seen; position, altitude, speed, HDOP (accuracy: good, fair, poor) and the UTC time of the fix |
 | 2 Sky | where each satellite is: the outer ring is the horizon, the middle ring 45 degrees up, north at the top. A filled dot is used in the fix. The colors and the legend show the system: GPS, GLONASS, Galileo, BeiDou, QZSS |
-| 3 Signal | each satellite's signal strength as a bar; filled bars are used in the fix |
+| 3 Signal | each satellite's signal strength as a bar. Filled bars are used in the fix. The dark card layout marks 25 and 50 dB-Hz |
 | 4 Grid | your Maidenhead grid locator (FN42li), and the position in degrees, minutes and seconds |
 
 "No GPS, or it is off" means the radio has no GPS or **Settings > Location > GPS** is off. A first fix outdoors takes

@@ -20,6 +20,9 @@
 #include "settings/settings.h"
 #include "radio/ref_trim.h"
 #include "storage/storage.h"
+#if CONFIG_MESSAGE_JOURNAL
+#include "storage/message_journal.h"
+#endif
 #include "codeplug/codeplug.h"
 #include "hal_time.h"
 #include "config.h"
@@ -31,6 +34,9 @@
 #endif
 #if CONFIG_DMR_DATA_CORE
 #include "dmr/dmr_data_api.h"
+#if CONFIG_DMR_ARS
+#include "dmr/call/dmr_lc.h"
+#endif
 #endif
 #if CONFIG_TFTP
 #include "net/tftp_codeplug.h"
@@ -212,6 +218,10 @@ int32_t ui_svc_setting_get(uint8_t id)
 	case UI_SET_POS_SEND_S:
 		settings_read(&st);
 		return st.pos_send_s;
+	case UI_SET_UTC_OFFSET_MIN:
+		settings_read(&st);
+		return st.utc_offset_quarters >= -48 && st.utc_offset_quarters <= 56 ?
+			st.utc_offset_quarters * 15 : 0;
 	case UI_SET_LANGUAGE:
 		settings_read(&st);
 		return (int32_t)((uint8_t)st.lang[0] << 8 | (uint8_t)st.lang[1]);
@@ -289,9 +299,16 @@ int32_t ui_svc_setting_get(uint8_t id)
 	case UI_SET_CHECK_REPLY:
 	case UI_SET_ALERT_ANSWER:
 	case UI_SET_POS_REPLY:
+#if CONFIG_DMR_ARS
+	case UI_SET_ARS_SERVER:
+#endif
 	case UI_SET_MSG_FORMAT: {
 		dmrDataSettings_t ds;
 		dmr_data_get_settings(&ds);
+#if CONFIG_DMR_ARS
+		if (id == UI_SET_ARS_SERVER)
+			return (int32_t)ds.arsServer;
+#endif
 		if (id == UI_SET_MSG_FORMAT)
 			return ds.smsFormat;
 		return id == UI_SET_CHECK_REPLY ? ds.radioCheckReply : id == UI_SET_ALERT_ANSWER ? ds.callAlertAck :
@@ -424,6 +441,13 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 		st->ref_trim_ppb = ref_trim_clamp(value);
 		settings_end(hal_millis());
 		return true;
+	case UI_SET_UTC_OFFSET_MIN:
+		if (value < -720 || value > 840 || value % 15 != 0)
+			return false;
+		st = settings_begin();
+		st->utc_offset_quarters = (int8_t)(value / 15);
+		settings_end(hal_millis());
+		return true;
 	case UI_SET_MIC_GAIN:
 	case UI_SET_AUTO_LOCK_S:
 	case UI_SET_LONG_PRESS_MS:
@@ -530,6 +554,17 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 		dmr_data_set_settings(&ds);	// the radio core saves the data service's settings when they change
 		return true;
 	}
+#if CONFIG_DMR_ARS
+	case UI_SET_ARS_SERVER: {
+		if (value < 0 || (uint32_t)value >= DMR_ID_MAX)
+			return false;
+		dmrDataSettings_t ds;
+		dmr_data_get_settings(&ds);
+		ds.arsServer = (uint32_t)value;
+		dmr_data_set_settings(&ds);
+		return true;
+	}
+#endif
 	case UI_SET_MSG_FORMAT: {
 		dmrDataSettings_t ds;
 		if ((value != DMR_SMS_FORMAT_ETSI_IP) && (value != DMR_SMS_FORMAT_ETSI) &&
@@ -630,6 +665,60 @@ static struct {
 } job;
 static channel_t job_ch;	// the job's working copy of the stored channel
 
+#if CONFIG_TALKGROUP_EDIT
+static void edit_talkgroups_job(void *ctx)
+{
+	(void)ctx;
+	uint16_t refs[CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL];
+	uint8_t count;
+	uint16_t ref = (uint16_t)job.id;
+	storage_lock();
+	if (!codeplug_channel(job.channel, &job_ch) || job_ch.mode != RADIO_MODE_DMR ||
+	    !codeplug_talkgroup_refs(job.channel, refs, &count))
+		goto failed;
+	uint8_t i = 0;
+	while (i < count && refs[i] != ref)
+		i++;
+	if (job.temp == UI_TG_ADD) {
+		if (i < count)
+			goto saved;
+		if (count == CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL)
+			goto failed;
+		refs[count++] = ref;
+	} else if (i == count) {
+		goto failed;
+	} else if (job.temp == UI_TG_REMOVE) {
+		count--;
+		memmove(refs + i, refs + i + 1, (count - i) * sizeof refs[0]);
+	} else {
+		int next = i + (job.temp == UI_TG_UP ? -1 : 1);
+		if (next < 0 || next >= count)
+			goto saved;
+		refs[i] = refs[next];
+		refs[next] = ref;
+	}
+	if (!codeplug_set_talkgroup_refs(job.channel, refs, count))
+		goto failed;
+saved:
+	storage_unlock();
+	ui_notify(&(ui_event_t){ .kind = UI_EV_TALKGROUPS_SAVED });
+	return;
+failed:
+	storage_unlock();
+	save_failed(TRN("Couldn't write the codeplug: not saved"));
+}
+
+bool ui_svc_edit_talkgroups(uint16_t channel, uint16_t contact, ui_tg_edit_t op)
+{
+	if (!channel || !contact || op > UI_TG_REMOVE || storage_job_busy())
+		return false;
+	job.channel = channel;
+	job.id = contact;
+	job.temp = (uint8_t)op;
+	return storage_job_post(edit_talkgroups_job, NULL);
+}
+#endif
+
 // Power, bandwidth, tones, mode, color code and timeslot go into the channel; the squelch is radio-wide (the default
 // squelch preference). The radio core re-reads the channel (codeplug_serial), and the clear makes the remaining
 // flags follow the new values
@@ -724,6 +813,8 @@ static void write_contact_job(void *ctx)
 	(void)ctx;
 	if (!codeplug_set_contact(job.channel, &job.contact)) {
 		save_failed(TRN("Couldn't write the codeplug: not saved"));
+	} else {
+		ui_notify(&(ui_event_t){ .kind = UI_EV_CONTACT_SAVED });
 	}
 }
 
@@ -735,6 +826,30 @@ bool ui_svc_write_contact(uint16_t index, const contact_t *c)
 	job.channel = index;
 	job.contact = *c;
 	return storage_job_post(write_contact_job, NULL);
+}
+
+static void set_channel_contact_job(void *ctx)
+{
+	(void)ctx;
+	contact_t contact;
+	uint16_t index = (uint16_t)job.id;
+	if (codeplug_channel(job.channel, &job_ch) && job_ch.mode == RADIO_MODE_DMR &&
+	    codeplug_contact(index, &contact) && contact.type == CONTACT_GROUP) {
+		job_ch.contact = index;
+		if (codeplug_set_channel(job.channel, &job_ch)) {
+			radio_req_dmr_target_clear();
+			return;
+		}
+	}
+	save_failed(TRN("Couldn't write the codeplug: not saved"));
+}
+
+bool ui_svc_set_channel_contact(uint16_t index)
+{
+	if (!index || index > CODEPLUG_CONTACTS_MAX || !take_channel() || v.ch.mode != RADIO_MODE_DMR)
+		return false;
+	job.id = index;
+	return storage_job_post(set_channel_contact_job, NULL);
 }
 #endif
 
@@ -891,6 +1006,46 @@ bool ui_svc_factory_reset(void)
 {
 	return storage_job_post(factory_reset_job, NULL);
 }
+
+#if CONFIG_MESSAGE_JOURNAL
+bool ui_svc_message_history_available(void)
+{
+	return message_journal_available();
+}
+
+static void history_activation_result(message_journal_result_t result, uint32_t id)
+{
+	(void)id;
+	const char *message = TRN("History activation failed");
+	switch (result) {
+	case MESSAGE_JOB_OK: message = TRN("Message history enabled"); break;
+	case MESSAGE_JOB_BUSY: message = TRN("Storage busy"); break;
+	case MESSAGE_JOB_FOREIGN: message = TRN("History needs blank storage"); break;
+	default: break;
+	}
+	ui_event_t ev = { .kind = UI_EV_HISTORY_RESULT };
+	strncpy(ev.text, message, sizeof ev.text - 1u);
+	ui_notify(&ev);
+}
+
+bool ui_svc_message_history_activate(void)
+{
+	static const message_journal_job_t request = { .complete = history_activation_result };
+	return message_journal_available() && message_journal_activate(&request);
+}
+bool ui_svc_history_active(void) { return message_history_active(); }
+void ui_svc_history_browse(uint32_t key, uint32_t before) { message_history_browse(key, before); }
+void ui_svc_history_thread(uint32_t key, uint32_t anchor, bool forward) { message_history_thread(key, anchor, forward); }
+void ui_svc_history_thread_text(uint16_t revision, unsigned index, char *text, size_t size)
+{
+	message_history_thread_text(revision, index, text, size);
+}
+
+void ui_svc_history_view(message_history_view_t *out, char *text, size_t size)
+{
+	message_history_view(out, text, size);
+}
+#endif
 
 void ui_svc_boot_text(char line1[17], char line2[17])
 {

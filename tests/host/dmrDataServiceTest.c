@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 /*
  * Host unit test for the DMR data service (core/dmr/dmrDataService.c): the reply queue and retried message handling,
@@ -24,6 +25,27 @@ static int failures = 0;
 #define OUR_ID		1000
 #define RADIO_A		2001
 #define RADIO_B		2002
+
+#if CONFIG_MESSAGE_JOURNAL
+static message_journal_record_t archived;
+static unsigned archived_count;
+
+void message_history_capture(uint32_t src, uint32_t dst, uint8_t flags, uint16_t utc_minute, const char *text)
+{
+	archived.src = src;
+	archived.dst = dst;
+	archived.flags = flags;
+	archived.time = utc_minute;
+	snprintf(archived.text, sizeof(archived.text), "%s", text);
+	archived_count++;
+}
+#endif
+
+uint16_t dmrDataServiceUtcMinute(uint32_t nowMs)
+{
+	(void)nowMs;
+	return 756;
+}
 
 static uint32_t millis = 100000;
 static dmrDataChannel_t ch = { .ownId = OUR_ID, .talkGroup = 9, .rmo = false, .canTransmit = true, .channelKey = 1 };
@@ -372,6 +394,23 @@ static void testARS(void)
 	CHECK(countSent('A', DMR_ARS_DEVICE_REGISTRATION) == 0);
 	CHECK(dmrDataServiceArsState() == DMR_ARS_STATE_REGISTERED);
 
+	// A manual refresh waits for a clear channel and an in-flight request is not duplicated.
+	channelClear = false;
+	CHECK(dmrDataServiceArsRegisterNow());
+	CHECK(!dmrDataServiceArsRegisterNow());
+	runMainTask(100);
+	CHECK(countSent('A', DMR_ARS_DEVICE_REGISTRATION) == 0);
+	channelClear = true;
+	runMainTask(1000);
+	CHECK(countSent('A', DMR_ARS_DEVICE_REGISTRATION) == 1);
+	CHECK(!dmrDataServiceArsRegisterNow());
+	receiveARS(ACK_PLAIN, sizeof(ACK_PLAIN));
+	runMainTask(1000);
+	dmrDataDashboard_t dashboard;
+	dmrDataServiceDashboard(&dashboard);
+	CHECK(dashboard.arsState == DMR_ARS_STATE_REGISTERED && dashboard.attempts == 1);
+	CHECK(dashboard.refreshMs == ARS_REFRESH_DEFAULT_MS && dashboard.nextMs != 0);
+
 	// The server asks: registers again straight away
 	sentCount = 0;
 	receiveARS(QUERY, sizeof(QUERY));
@@ -601,6 +640,10 @@ static void testLrrp(void)
 	runMainTask(3000);
 	CHECK(countLrrp(0x0B) == 1);
 	CHECK(dmrDataServiceLrrpTriggerCount() == 1);// the distance one
+	dmrDataDashboard_t dashboard;
+	dmrDataServiceDashboard(&dashboard);
+	CHECK(dashboard.count == 1 && dashboard.subscription[0].requester == LRRP_SERVER);
+	CHECK(dashboard.subscription[0].intervalMs == 30000 && dashboard.subscription[0].distanceMeters == 500);
 
 	receiveLrrp("0f06220155");
 	runMainTask(3000);
@@ -629,6 +672,29 @@ static void testLrrp(void)
 	runMainTask(3000);
 	CHECK(sentCount == 0);
 	settings.lrrpReply = true;
+
+	// Turning replies off clears both subscriptions, even if an On update replaces it in the mailbox.
+	settings.hasGps = true;
+	haveLocation = true;
+	receiveLrrp("090922041122334434313c");
+	receiveLrrp("090922015534311e788374");
+	runMainTask(3000);
+	CHECK(dmrDataServiceLrrpTriggerCount() == 2);
+	channelClear = false;
+	runMainTask(5000);
+	CHECK(txPending && txKind == TXK_LRRP);
+	dmrDataSettings_t updated = settings;
+	updated.lrrpReply = false;
+	dmr_data_set_settings(&updated);
+	dmrDataServiceDashboard(&dashboard);
+	CHECK(dashboard.count == 0);
+	updated.lrrpReply = true;
+	dmr_data_set_settings(&updated);
+	channelClear = true;
+	sentCount = 0;
+	runMainTask(65000);
+	CHECK(dmrDataServiceLrrpTriggerCount() == 0 && countLrrp(0x0D) == 0);
+	haveLocation = false;
 }
 
 
@@ -886,14 +952,19 @@ static void testOurSms(void)
 	// goes in front of the rest
 	reset();
 	static const char *const texts[] = { "m0", "m1", "m2", "m3", "m4" };
+	uint16_t opened = 0;
 	for (int i = 0; i < 5; i++)
 	{
 		receiveTMS(RADIO_A, texts[i], (uint8_t)(40 + i));
 		runMainTask(500);
+		if (i == 3)
+			opened = dmr_data_last_event().message_token;
 	}
 	CHECK(sms_inbox_count() == DMR_DATA_INBOX_SIZE);	// m4 m3 m2 m1 (m0 dropped)
+	CHECK(opened != 0 && sms_inbox_get_token(opened, &m) == 1 && strcmp(m.text, "m3") == 0);
 	serial = dmr_data_serial();
-	CHECK(sms_inbox_delete(1));				// m3
+	CHECK(sms_inbox_delete_token(opened));			// m3, which moved after the next arrival
+	CHECK(sms_inbox_get_token(opened, NULL) < 0 && !sms_inbox_delete_token(opened));
 	CHECK(dmr_data_serial() != serial);
 	CHECK(sms_inbox_count() == 3);
 	const char *const after[] = { "m4", "m2", "m1" };
@@ -2105,6 +2176,34 @@ static void testTmsOff(void)
 }
 #endif
 
+#if CONFIG_MESSAGE_JOURNAL && CONFIG_DMR_TMS
+static void testHistoryCapture(void)
+{
+	reset();
+	archived_count = 0;
+	receiveTMS(RADIO_A, "Archive incoming", 99);
+	CHECK(archived_count == 1 && archived.src == RADIO_A && archived.dst == OUR_ID &&
+	      archived.flags == 0 && archived.time == 756 && strcmp(archived.text, "Archive incoming") == 0);
+	receiveTMS(RADIO_A, "Archive incoming", 99);
+	CHECK(archived_count == 1);
+	sms.src = OUR_ID;
+	sms.dst = RADIO_B;
+	sms.group = false;
+	sms.ack = true;
+	strcpy(sms.text, "Archive outgoing");
+	smsFinish(DMR_REQ_OK);
+	CHECK(archived_count == 2 && archived.dst == RADIO_B && archived.src == OUR_ID &&
+	      archived.flags == (MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_DELIVERED) &&
+	      strcmp(archived.text, "Archive outgoing") == 0);
+	sms.ack = false;
+	sms.group = true;
+	smsFinish(DMR_REQ_OK);
+	CHECK(archived_count == 3 && archived.flags == (MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_GROUP));
+	smsFinish(DMR_REQ_FAILED);
+	CHECK(archived_count == 4 && archived.flags == (MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_GROUP | MESSAGE_RECORD_FAILED));
+}
+#endif
+
 int main(void)
 {
 	dmrDataServiceInit(&fakeEnv);
@@ -2144,6 +2243,9 @@ int main(void)
 #endif
 #if !CONFIG_DMR_TMS
 	testTmsOff();
+#endif
+#if CONFIG_MESSAGE_JOURNAL && CONFIG_DMR_TMS
+	testHistoryCapture();
 #endif
 
 	printf(failures ? "# FAILED (%d failures)\n" : "# PASSED (%d failures)\n", failures);

@@ -8,6 +8,7 @@
 #include "codeplug/codeplug.h"
 #include "codeplug/dmr_iddb.h"
 #include "board.h"
+#include "storage/storage.h"
 
 static int failures;
 
@@ -438,6 +439,16 @@ static void test_iddb(void)
 	codeplug_reload();
 	CHECK(dmr_iddb_count() == 1);
 
+	// The chip can still read past the codeplug limit, but the database must fit inside it.
+	const hal_flash_map_t limit = { .openfw_end = FL + 0xB8000u + 24u };
+	flash.map = &limit;
+	uint32_t count = (0x40000u - 12u) / 24u + 1u;
+	put_iddb_header('-', 24, count);
+	CHECK(dmr_iddb_init() && dmr_iddb_count() == count);
+	put_iddb_header('-', 24, count + 1u);
+	CHECK(!dmr_iddb_init() && dmr_iddb_count() == 0);
+	flash.map = NULL;
+
 	// The old "ID" tag is rejected
 	image[FL + 0x30001] = 'D';
 	CHECK(!dmr_iddb_init());
@@ -580,6 +591,13 @@ static void test_iddb_compact(void)
 	char small[10];
 	CHECK(dmr_iddb_lookup(3101234, small, sizeof(small)) && strcmp(small, "N0CALL Sp") == 0);
 
+	hal_flash_map_t limit = { .openfw_end = FL + 0xB8000u + 0x1000u };
+	flash.map = &limit;
+	CHECK(dmr_iddb_init());
+	limit.openfw_end--;
+	CHECK(!dmr_iddb_init() && dmr_iddb_count() == 0);
+	flash.map = NULL;
+
 	// A header that doesn't hold together is no database
 	h[4] = 2;
 	CHECK(!dmr_iddb_init());
@@ -669,6 +687,12 @@ static void test_aprs_records(void)
 #endif
 
 #if CONFIG_DMR_TALKGROUP_ENTRIES
+static void put_pool_u32(uint8_t *p, uint32_t value)
+{
+	put16(p, (uint16_t)value);
+	put16(p + 2, (uint16_t)(value >> 16));
+}
+
 static void test_talkgroup_records(void)
 {
 	build_openfw();
@@ -702,6 +726,33 @@ static void test_talkgroup_records(void)
 	CHECK(entries[4].id == 13 && entries[4].timeslot == 2);
 	put16(&image[EE + 0xF00A], (1u << 9) | 511u);
 	CHECK(codeplug_talkgroups(2, entries) == 4);
+
+	codeplug_talkgroup_t item;
+	CHECK(codeplug_talkgroup_at(2, 1, &item) == 4 && item.id == 3100000);
+
+	// A 63-entry list is indexed directly. A torn newer bank cannot shadow the committed bank.
+	uint8_t *older = &image[FL + 0x14000], *newer = older + 0x4000;
+	const uint8_t pool_magic[] = { 'R', 'F', 'T', 'P', 1, 0, 0, 0 };
+	const unsigned entries_start = 16 + 2 * (CODEPLUG_CHANNELS_MAX + 1);
+	memcpy(older, pool_magic, sizeof pool_magic);
+	put_pool_u32(older + 8, 1);
+	for (uint16_t i = 0; i <= CODEPLUG_CHANNELS_MAX; i++)
+		put16(older + 16 + i * 2, i < 2 ? 0 : 63);
+	for (unsigned i = 0; i < 62; i++)
+		put16(older + entries_start + i * 2, (uint16_t)(i + 1));
+	put_contact(100, "TG 3100 TS1", 3100, CONTACT_GROUP, 0x00);
+	put_contact(101, "TG 3100000 TS2", 3100000, CONTACT_GROUP, 0x02);
+	put16(older + entries_start + 62 * 2, 100);
+	put_pool_u32(older + 12, storage_crc32(storage_crc32(0, older + 8, 4), older + 16, 0x4000 - 16));
+	memcpy(newer, older, 0x4000);
+	put_pool_u32(newer + 8, 2);	// until the new checksum is present this bank must be ignored
+	CHECK(codeplug_reload() == CODEPLUG_OPENFW);
+	CHECK(codeplug_talkgroup_at(2, 62, &item) == 63 && item.id == 3100 && item.timeslot == 1);
+
+	put16(newer + entries_start + 62 * 2, 101);
+	put_pool_u32(newer + 12, storage_crc32(storage_crc32(0, newer + 8, 4), newer + 16, 0x4000 - 16));
+	CHECK(codeplug_reload() == CODEPLUG_OPENFW);
+	CHECK(codeplug_talkgroup_at(2, 62, &item) == 63 && item.id == 3100000 && item.timeslot == 2);
 }
 #endif
 

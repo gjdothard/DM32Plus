@@ -30,7 +30,8 @@
 #include "hotspot/hotspot.h"
 #endif
 
-#define UI_STACK_MAX		6
+// Zone channel actions can open the channel editor, its assignment list, and then a picker.
+#define UI_STACK_MAX		(6 + 2 * CONFIG_TALKGROUP_EDIT)
 #define TOAST_MS		1800
 #define VOLUME_MS		3000	// the volume screen closes this long after the last key
 #define ENTRY_TIMEOUT_MS	10000
@@ -135,6 +136,9 @@ static void update_focus_target(void)
 #if CONFIG_KEY_ASSIGN
 	bool lateral_keys = gfx_width() >= 220 && stack[sp].scr == SCR_QUICK;
 	lateral_keys |= stack[sp].scr == SCR_CONTACTS && ui_contact_tabs_available();
+#if CONFIG_UI_CARD_MENU
+	lateral_keys |= stack[sp].scr == SCR_SCAN && ui_scan_card_active();
+#endif
 	ui_svc_quick_keys(lateral_keys);
 #endif
 	const ui_scr_def_t *d = ui_scr[stack[sp].scr];
@@ -143,6 +147,14 @@ static void update_focus_target(void)
 		ui_svc_focus_target(t.id, !t.group);
 	else
 		ui_svc_focus_target(0, false);
+}
+
+static void list_item(const ui_scr_def_t *d, uint16_t i, ui_item_t *it)
+{
+	it->label[0] = it->value[0] = 0;
+	it->num = 0;
+	it->flags = 0;
+	d->item(i, it);
 }
 
 void ui_push(uint8_t scr, uint16_t arg)
@@ -166,10 +178,7 @@ void ui_push(uint8_t scr, uint16_t arg)
 		uint16_t n = d->count();
 		while (stack[sp].focus < n) {
 			ui_item_t it;
-			it.flags = 0;
-			it.label[0] = it.value[0] = 0;
-			it.num = 0;
-			d->item(stack[sp].focus, &it);
+			list_item(d, stack[sp].focus, &it);
 			if (!(it.flags & UI_ITEM_INFO))
 				break;
 			stack[sp].focus++;
@@ -595,20 +604,30 @@ static void handle_event(const ui_event_t *ev)
 	name_mark = NULL;	// a mark from an earlier event would point into this same buffer
 	switch (ev->kind) {
 	case UI_EV_MESSAGE:
+		if (ui_thread_receive(ev->index)) {
+			if (ui_st.message_tone)
+				ui_svc_beep(UI_BEEP_MESSAGE);
+			vibrate(UI_VIBE_MESSAGE);
+			break;
+		}
 		sb_str(&b, TR("Message from "));
 		station(&b, ev);
 		{
 			// The banner shows two lines of the message: more than the event carries, from the inbox
 			ui_msg_t m;
-			bool got = ui_svc_msg_get(ev->index, &m);
+			bool got = ui_svc_msg_by_token(ev->index, &m) >= 0;
 			banner(UI_BANNER_MESSAGE, false, ev->id, title, got ? m.text : ev->text);
 		}
 		ui_st.banner.msg = ev->index;
+		if (stack[sp].scr == SCR_MESSAGE)
+			update_focus_target();
 		if (ui_st.message_tone)
 			ui_svc_beep(UI_BEEP_MESSAGE);
 		vibrate(UI_VIBE_MESSAGE);
 		break;
 	case UI_EV_MESSAGE_SENT:
+		if (ui_thread_send_result(ev->id))
+			break;
 		if (ev->ok) {
 			sb_str(&b, ev->index == 1 ? TR("Sent to ") : TR("Delivered to "));
 			station(&b, ev);
@@ -669,14 +688,28 @@ static void handle_event(const ui_event_t *ev)
 	case UI_EV_HOTSPOT_STARTED:
 		banner(UI_BANNER_INFO, false, 0, TR("Hotspot started by host"), TR("OK stops it"));
 		break;
+#if CONFIG_MESSAGE_JOURNAL
+	case UI_EV_HISTORY_RESULT:
+#endif
 	case UI_EV_SAVE_FAILED: {
 		static char msg[sizeof ev->text];
 		memcpy(msg, ev->text, sizeof msg);
 		msg[sizeof msg - 1] = 0;
 		ui_toast(msg[0] ? tr(msg) : TR("Couldn't save: try again"));	// msg: a TRN text of ui_svc_storage.c
-		ui_menus_save_failed();
+		if (ev->kind == UI_EV_SAVE_FAILED)
+			ui_menus_save_failed();
 		break;
 	}
+#if CONFIG_CONTACT_EDIT
+	case UI_EV_CONTACT_SAVED:
+		ui_menus_contact_saved();
+		break;
+#endif
+#if CONFIG_TALKGROUP_EDIT
+	case UI_EV_TALKGROUPS_SAVED:
+		ui_dirty();
+		break;
+#endif
 	case UI_EV_CALL_ALERT_RESULT:
 		if (ev->ok) {
 			station(&b, ev);
@@ -742,8 +775,10 @@ static void banner_open(void)
 	uint8_t kind = b->kind;
 	uint16_t msg = b->msg;
 	b->kind = UI_BANNER_NONE;
-	if (kind == UI_BANNER_MESSAGE)
-		ui_push(SCR_MESSAGE, msg);
+	if (kind == UI_BANNER_MESSAGE) {
+		if (!ui_open_message_thread(msg))
+			ui_toast(TR("Message deleted"));
+	}
 #if CONFIG_ZONE_SHARE
 	else if (kind == UI_BANNER_ZONE_OFFER)
 		ui_push(SCR_OFFER, 0);
@@ -1676,14 +1711,6 @@ static void hotspot_key(const input_event_t *ev)
 
 // --- the generic list screen ---
 
-static void list_item(const ui_scr_def_t *d, uint16_t i, ui_item_t *it)
-{
-	it->label[0] = it->value[0] = 0;
-	it->num = 0;
-	it->flags = 0;
-	d->item(i, it);
-}
-
 static void list_move(const ui_scr_def_t *d, int8_t dir)
 {
 	ui_frame_t *f = &stack[sp];
@@ -1729,10 +1756,7 @@ static inline __attribute__((always_inline)) bool list_key(const ui_scr_def_t *d
 				if (it.num == '0' + dg) {
 					f->focus = i;
 					update_focus_target();
-					if (it.flags & UI_ITEM_DIM)
-						d->select(i, false);	// explains why it isn't available
-					else
-						d->select(i, false);
+					d->select(i, false);	// also lets the screen explain a dim item
 					return true;
 				}
 			}
@@ -1792,7 +1816,10 @@ static void list_draw(const ui_scr_def_t *d)
 	l.empty = tr(d->empty);
 	l.hint = tr(d->hint);
 	l.body = d->body != NULL ? d->body() : NULL;
-	if ((d->flags & SF_FILTER) && filter_keys[0]) {
+	if ((d->flags & SF_FILTER) && (filter_keys[0] ||
+	    (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) &&
+	     (f->scr == SCR_CHANNELS || f->scr == SCR_CHPICK || f->scr == SCR_ZPICK ||
+	      f->scr == SCR_SHARE_TO || f->scr == SCR_CRASH_TO)))) {
 		sbuf_t b;
 		sb_init(&b, header, sizeof header);
 		sb_str(&b, TR("Find: "));
@@ -1811,13 +1838,169 @@ static void list_draw(const ui_scr_def_t *d)
 		l.header = header;
 	}
 #if CONFIG_UI_CARD_MENU
+	if (CONFIG_UI_SETTINGS && CONFIG_DMR_ARS && f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_ARS)
+		l.hint = TR("OK change  Back");
 	if (ui_card_layout(&ui_st)) {
+		if (f->scr == SCR_ZCHANNEL || f->scr == SCR_ZONEEDIT || f->scr == SCR_SHARE ||
+		    f->scr == SCR_ROAM || f->scr == SCR_OFFER) {
+			if (f->scr == SCR_ZONEEDIT)
+				l.prefix = TR("Zone Options");
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_ACTIONS);
+			return;
+		}
+		if (f->scr == SCR_ZPICK || f->scr == SCR_OFFER_PREVIEW || f->scr == SCR_APRS_HEARD) {
+			if (f->scr == SCR_APRS_HEARD)
+				l.prefix = TR("APRS Heard");
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_DETAILS);
+			return;
+		}
+		if (f->scr == SCR_ZONEDEL || f->scr == SCR_CONFIRM) {
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_CONFIRM);
+			return;
+		}
+		if (f->scr == SCR_CHZONES || f->scr == SCR_SHARE_TO || f->scr == SCR_OFFER_ZONE ||
+		    f->scr == SCR_APRS_POS || f->scr == SCR_CRASH_TO || f->scr == SCR_INFO ||
+		    f->scr == SCR_CONTACT_POSITION || f->scr == SCR_CRASH
+#if CONFIG_MESSAGE_JOURNAL
+		    || f->scr == SCR_CONVERSATION
+#endif
+		   ) {
+			if (f->scr == SCR_APRS_POS)
+				l.prefix = TR("APRS Position");
+			if (f->scr == SCR_CONTACT_POSITION)
+				l.prefix = TR("Last Position");
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_FIELDS);
+			return;
+		}
+		if (f->scr == SCR_GROUP || f->scr == SCR_DMR_ID || f->scr == SCR_LANGUAGE) {
+			ui_item_t focused = { 0 };
+			if (l.count)
+				l.item(l.focus, &focused);
+			if (f->scr == SCR_GROUP && (focused.flags & UI_ITEM_EDIT))
+				l.hint = TR(TEXT_ALT_OPEN "Up/Dn change  OK keep  Back cancel" TEXT_ALT_NEXT
+					"Up/Dn  OK keep  Back cancel" TEXT_ALT_CLOSE);
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_FIELDS);
+			return;
+		}
+		if (f->scr == SCR_DUAL || f->scr == SCR_DUAL_PICK || f->scr == SCR_DUAL_ZONE) {
+			l.name_in_title = f->scr != SCR_DUAL;
+			ui_draw_card_page(&ui_st, &l, f->scr == SCR_DUAL ? UI_CARD_PAGE_ACTIONS :
+				f->scr == SCR_DUAL_PICK ? UI_CARD_PAGE_DETAILS : UI_CARD_PAGE_FIELDS);
+			return;
+		}
+		if (f->scr == SCR_FIND || f->scr == SCR_PICKER || f->scr == SCR_CHPICK) {
+			if (f->scr == SCR_FIND)
+				l.prefix = TR("Find");
+			ui_draw_card_page(&ui_st, &l, f->scr == SCR_CHPICK ? UI_CARD_PAGE_FIELDS : UI_CARD_PAGE_DETAILS);
+			return;
+		}
+		if (f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_RADIO) {
+			l.prefix = l.name;
+			l.name = NULL;
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_ACTIONS);
+			return;
+		}
+		if (f->scr == SCR_CHANNELS) {
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_DETAILS);
+			return;
+		}
+		if (f->scr == SCR_RECENT) {
+			l.prefix = TR("Activity / Logs");
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_DETAILS);
+			return;
+		}
+		if (f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_GPS) {
+			l.prefix = l.name;
+			ui_draw_numbered_menu(view, &ui_st, &l, false);
+			return;
+		}
+		if (f->scr == SCR_APRS) {
+			l.name = l.prefix;
+			ui_draw_card_list(&ui_st, &l, UI_CARD_APRS);
+			return;
+		}
+		if (f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_ARS) {
+			if (l.hint == NULL)
+				l.hint = TR("Back");
+			ui_draw_data_dashboard(view, &ui_st, &l);
+			return;
+		}
+		if (f->scr == SCR_TOOLS || (f->scr == SCR_SETTINGS && CONFIG_UI_SETTINGS)) {
+			if (f->scr == SCR_TOOLS)
+				l.prefix = TR("Tools & Utilities");
+			ui_draw_numbered_menu(view, &ui_st, &l, false);
+			return;
+		}
+		if (f->scr == SCR_ACTIONS) {
+			l.prefix = l.name;
+			ui_draw_numbered_menu(view, &ui_st, &l, f->arg != 0);
+			return;
+		}
+#if CONFIG_CONTACT_EDIT
+		if (f->scr == SCR_CONTACT_EDIT || f->scr == SCR_CHANNEL || f->scr == SCR_TEXT || f->scr == SCR_DISCARD) {
+			l.hint = TR("OK change  Back");
+			if (f->scr == SCR_TEXT) {
+				l.header = l.name;
+				l.hint = TR("Back del  # mode  OK keep");
+			} else if (f->scr == SCR_DISCARD) {
+				l.hint = TR("OK pick  Back");
+			}
+			ui_draw_card_list(&ui_st, &l, f->scr == SCR_CONTACT_EDIT ? UI_CARD_CONTACT_EDITOR : UI_CARD_FIELDS);
+			return;
+		}
+#endif
+#if CONFIG_TALKGROUP_EDIT
+		if (f->scr == SCR_TALKGROUPS || f->scr == SCR_TALKGROUP_ADD || f->scr == SCR_TALKGROUP_MOVE) {
+			l.hint = f->scr == SCR_TALKGROUP_ADD ? TR("0-9 find  OK pick  Back") : TR("OK pick  Back");
+			ui_draw_card_list(&ui_st, &l, UI_CARD_FIELDS);
+			return;
+		}
+#endif
 		if (f->scr == SCR_ZONES || f->scr == SCR_ZONE) {
 			ui_draw_card_list(&ui_st, &l, f->scr == SCR_ZONE ? UI_CARD_ZONE_CHANNELS : UI_CARD_ZONES);
 			return;
 		}
 		if (f->scr == SCR_CONTACTS && ui_contact_tabs_available()) {
+			l.hint = NULL;
+#if CONFIG_CONTACT_EDIT
+			if (l.count && ui_filter_raw(l.focus) == 0)
+				l.hint = TR("OK Add  Back");
+#endif
 			ui_draw_card_list(&ui_st, &l, f->arg ? UI_CARD_CONTACTS : UI_CARD_TALKGROUPS);
+			return;
+		}
+		if (f->scr == SCR_COMPOSE || f->scr == SCR_SMS_TEXT) {
+			l.header = f->scr == SCR_SMS_TEXT ? l.name : NULL;
+			l.name = ui_compose_peer();
+			ui_draw_card_list(&ui_st, &l, UI_CARD_COMPOSER);
+			return;
+		}
+		if (f->scr == SCR_MESSAGES) {
+			ui_draw_card_list(&ui_st, &l, UI_CARD_MESSAGES);
+			return;
+		}
+		if (f->scr == SCR_LIVE_THREAD
+#if CONFIG_MESSAGE_JOURNAL
+		    || f->scr == SCR_THREAD
+#endif
+		   ) {
+			if (f->scr == SCR_LIVE_THREAD)
+				l.hint = TR("OK reply  Back");
+			ui_draw_card_thread(&ui_st, &l, ui_thread_text);
+			return;
+		}
+		if (f->scr == SCR_SCAN && ui_scan_card_active()) {
+			sbuf_t b;
+			sb_init(&b, header, sizeof header);
+			if (view->vfo)
+				sb_freq(&b, view->ch.rx_hz);
+			else
+				sb_str(&b, view->ch.name);
+			sb_str(&b, view->ch.mode == RADIO_MODE_DMR ? " DMR" : view->am ? " AM" : " FM");
+			l.name = ui_scan_card_status();
+			l.header = view->vfo ? TR("VFO band") : view->zone_name;
+			l.body = header;
+			ui_draw_card_list(&ui_st, &l, (ui_card_list_kind_t)(UI_CARD_SCAN + f->arg - 1));
 			return;
 		}
 	}
@@ -2246,6 +2429,9 @@ bool ui_app_tick(const radio_view_t *v, uint32_t now_ms)
 #endif
 	now = now_ms;
 	ui_st.now_ms = now_ms;
+#if CONFIG_MESSAGE_JOURNAL
+	ui_history_tick();
+#endif
 	ui_svc_poll();
 	ui_svc_keys_poll();
 #if CONFIG_ZONE_EDIT
@@ -2459,6 +2645,17 @@ static void draw_screen(void);
 
 void ui_app_draw(void)
 {
+#if CONFIG_MESSAGE_JOURNAL && CONFIG_UI_CARD_MENU
+	if (ui_frame()->scr == SCR_THREAD && ui_frame()->top) {
+		message_history_view_t history;
+		ui_svc_history_view(&history, NULL, 0);
+		// Leave the previous frame on the panel until the overlapping window is ready.
+		if (history.status == HISTORY_LOADING) {
+			dirty = false;
+			return;
+		}
+	}
+#endif
 	uint32_t before = ui_strip_draws;
 	dirty = false;
 	draws++;
@@ -2526,6 +2723,9 @@ void ui_app_status(ui_app_status_t *s)
 	s->query = stack[sp].scr == SCR_FIND ? ui_find_query() : (d->flags & SF_FILTER) ? filter_keys : "";
 	s->draws = draws;
 	s->strip_drawn = strip_ok;
+#if CONFIG_TALKGROUP_EDIT
+	s->talkgroup_edit_focused = ui_talkgroup_edit_focused();
+#endif
 #if CONFIG_CONTACT_POSITION
 	s->contact_position_valid = stack[sp].scr == SCR_CONTACT_POSITION && ui_contact_position_shown();
 #endif

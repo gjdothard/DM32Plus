@@ -9,6 +9,12 @@ the code is laid out, who owns the data behind each screen, and how the UI is te
 
 A board can supply a Home brand to opt into the tall color card layout. It uses a status row, a zone or VFO
 heading, channel cards, recent activity, and a key legend. A and B keep their positions in dual watch.
+Home, Quick Controls, Main Menu, and the card lists share the status row and header band drawing.
+Main Menu and the card lists share row backgrounds and the footer's banner, toast, and hint handling.
+Zone actions and roaming use numbered action cards. Sharing, import destinations, APRS child pages,
+contact positions, crash reporting, and tool information use the same card frame. Confirmation pages
+put the consequence in an amber summary card and retain the existing safe initial choice.
+These drawing changes preserve action order, shortcuts, save behavior, and transmission rules.
 The status row shows a satellite in green with a fix, yellow while acquiring a fix, and gray when fix status is unavailable.
 The selected card keeps its cyan outline during calls. Each card has a separate state badge and power label.
 Recent activity starts each row with the pane letter, using the same colors as the cards.
@@ -22,11 +28,24 @@ The Talk to tile fits the `TG` prefix and seven digits. The picker shortens a lo
 the end to keep the leading ID visible.
 
 With `CONFIG_UI_CARD_MENU`, the tall dark display replaces the seven-entry Hub with a nine-entry Main Menu.
-Radio opens Quick Controls and the all-channels list. GPS / APRS opens the existing Position and APRS pages.
+Radio opens Quick Controls and the all-channels list. GPS, APRS, and Data opens Position, APRS, and the combined ARS & LRRP dashboard.
 Scan opens its own control before starting a scan. Activity / Logs opens the Recent activity list.
 Zones / Channels uses a two-step zone and channel list. The zone row shows its channel count and marks
 the active zone. OK and CONTEXT open its channels, and held OK tunes the zone directly on boards with CONTEXT.
 Filtering and channel and zone edits use the same list and editor handlers as the standard layout.
+Actions for the current or last caller use the numbered cards, shared status row, centered target title,
+and footer. Number shortcuts, PTT, and Back keep the standard actions behavior.
+Activity / Logs uses the same frame with caller cards. Each row separates the caller, age, and RX/TX target.
+Its PTT, context actions, and empty state keep their existing behavior.
+The Radio submenu uses numbered navigation cards. All Channels uses two-line cards with mode and channel
+details, plus a dedicated Find region. Its numbering, filtering, edit action, and tune shortcut are unchanged.
+Find and Talk to use the same card frame, with contact IDs separated from names and type or source shown
+on a second line. Channel TX-contact and RX-group pickers use field cards with a Find region.
+Dual Watch uses numbered action cards and channel/zone picker cards. Picker titles include the pane letter;
+the other pane's channel stays dimmed and marked in use. Existing A/B selection and stop behavior are unchanged.
+Settings groups, My Radio, and Language share the field-card frame. Numeric edits use amber borders and text
+and show the setting's actual range. Long field values move below their labels instead of shrinking the label.
+Language identifies the active catalog and explains catalogs not included in the image.
 Contacts & Talkgroups uses separate group and private-call tabs on the same filtered contacts list.
 The horizontal actions change tabs and keep the filter text. The first two assignable side keys supply
 those actions while the directory is open. The ID has a dedicated column, and a long name can shorten.
@@ -270,7 +289,7 @@ they show the change within a fraction of a second.
 ### 2.3 GPS screen
 
 With `CONFIG_GPS_SKY`, Tools > Position (`gps`, `ui_gps.c`) has four pages, three on a panel at least `UI_TALL_PX` tall
-(Status takes in Grid there). Up and Down (the knob) turn them and wrap; the digits go to one. It opens on Status. Every draw reads `ui_svc_position` and the satellites one at a time
+(Status takes in Grid there). The tall dark card layout shows the active tab and a 25/50 dB-Hz scale on Signal. Up and Down (the knob) turn them and wrap; the digits go to one. It opens on Status. Every draw reads `ui_svc_position` and the satellites one at a time
 (`ui_svc_gps_sat`), so the screen keeps one byte, its page.
 
 | Page | Shows |
@@ -287,13 +306,16 @@ screen says so and points to Settings > Location. Without `CONFIG_GPS_SKY` the s
 
 ### 2.4 Contact editor
 
-With `CONFIG_CONTACT_EDIT` (DMR and the channel editor), New Contact (`contactedit`) makes a contact on the radio. It
-opens from:
+With `CONFIG_CONTACT_EDIT` (DMR and the channel editor), `contactedit` makes and edits saved group and private
+contacts. It opens from:
 
 - Find: "Create contact 3100", the last row for a typed number no contact has as its ID. Up to 6 digits start it as a
   talkgroup, 7 and more (a DMR ID) as a person.
 - Actions: Save as contact (item 7 for a person, item 4 for a talkgroup), for a target that isn't a contact. Its ID,
   type and name come with it.
+- Contacts: select Add talkgroup or Add contact. On a tabbed directory the tab sets the entry's type.
+- Contacts: open More for a saved entry and select Edit. Talkgroup actions are Edit, Message, and Make CH Default.
+  Private contact actions are Edit, Message, Radio check, Call alert, and Position.
 
 The name starts as the target's name, else "TG 3100" for a talkgroup or the ID for a person.
 
@@ -301,20 +323,18 @@ The name starts as the target's name, else "TG 3100" for a talkgroup or the ID f
 |---|---|
 | Name | opens Text entry (2.1) |
 | ID | opens an editor that takes digits, as the channel editor's Own ID: the first digit starts a new ID, a digit past 16777214 is refused, BACK takes back a digit and with none typed closes it, OK keeps (nothing typed: unchanged) |
-| Type | Talkgroup / Private, flips |
-| Timeslot | Channel's / TS 1 / TS 2: the contact's timeslot override |
+| Type | Talkgroup / Private, flips when creating an entry without a preset type |
+| TS | Channel default / TS 1 / TS 2 for a saved talkgroup or a new talkgroup from the directory |
 | Save | saves |
 
 - Long SELECT anywhere saves. BACK opens Unsaved Changes ("Discard this new contact?"), "No, keep editing" first.
 - Save checks first and names the first problem in a toast: an empty name, a private ID past 16776415
-  (`CODEPLUG_DMR_ID_MAX`), a contact with the same ID and type ("Already a contact: K1ABC Joe"), no free contact
+  (`CODEPLUG_DMR_ID_MAX`), a duplicate private ID or a duplicate group ID and override, no free contact
   ("No room for more contacts", 1024).
-- Save writes the lowest free contact with `codeplug_set_contact` as a storage job (`ui_svc_write_contact`). A failed
-  write raises `UI_EV_SAVE_FAILED`. The radio core's name cache follows `codeplug_serial()`.
-- After a save the editor closes. From actions they show again, "In contacts" and under the new name; from Find the
-  radio goes Home, since Find's rows are the number's.
-- Editing or deleting a stored contact is not built yet (#74). A CPS write afterwards replaces contacts made on the
-  radio.
+- Save updates the existing record or writes the lowest free slot as a storage job (`ui_svc_write_contact`). Assigned
+  operating talkgroups continue to reference the edited record. A failed write raises `UI_EV_SAVE_FAILED`.
+- After a directory save the editor returns to the directory or the saved entry's More menu. A save from Find returns
+  Home. Read the radio in the CPS before making changes there to pick up edits made on the radio.
 
 ### 2.5 Languages
 
@@ -553,6 +573,7 @@ draw the anti-aliased fonts (`CONFIG_FONT_AA`), and `240x320i10x5` the larger te
 | Token | Meaning |
 |---|---|
 | `up down left right ok back quick ctx 0..9 tt mon user1..user4 emerg enc+ enc-` | a short press (counted) |
+| `quick:<control>` | select a named control in the current Quick grid: `power`, `squelch`, `timeslot`, `color`, `privacy`, `digital-monitor`, `monitor`, `vox`, or `dual`. Sends QUICK when needed, then the number key; both presses count. Fails if the control is absent. |
 | `long:<key>` | a long press (counted) |
 | `ptt`, `ptt:<ms>`, `pttdown`, `pttup` | PTT (counted) |
 | `mondown`, `monup` | the monitor key held, then released (FM: the squelch held open) |
@@ -567,7 +588,14 @@ draw the anti-aliased fonts (`CONFIG_FONT_AA`), and `240x320i10x5` the larger te
 | `expect:<key>=<value>` | check: `screen focus depth count zone pos vfo freq mode tx txid txpriv talk locked query banner toast power sq ts cc temporary writes checks sent text scanning privacy hearall monitor hotspot beeps radio_tot radio_backlight beep pttblock poweroff wake usbnet set<id>` (`wake` 1 when a banner or the emergency screen asked for the backlight since the last check, `beep` the last beep kind, `set<id>` a setting's stored value; `_` = space, `*` = anything) |
 
 `uiFlowTest` runs every task flow of `task-flows.md` with the press budgets of `usability-tests.md` on four display
-and key map pairs (K at 160x120i5, M at 128x64, V at 160x128, K at 240x320) plus the few-key fallbacks: 160 flow runs.
+and key map pairs (K at 160x120i5, M at 128x64, V at 160x128, K at 240x320) plus the few-key fallbacks.
+Shared behavior flows select Quick controls by name because the grids differ by mode and display layout.
+Independent order checks pin all nine numbered positions in the standard and wide FM and DMR memory grids
+and both VFO grids, with and without a Home brand. Card flows also press specific number keys.
+Screen expectations compare literal debug screen identifiers, including underscores. Text expectations
+continue to use an underscore for a space.
+Copy to VFO flows use its assignable key. VOX flows cover the standard FM memory grid and the FM VFO;
+the wide FM memory grid has Offset on key 6.
 A crawler then visits every reachable screen and checks the rules that hold everywhere: BACK leaves every screen, long
 BACK reaches Home, long QUICK locks on Home and nowhere else, long CONTEXT opens the talk target picker on a DMR channel, the status strip is drawn (except About while idle),
 PTT shows TX, and every field-use screen is at most 3 presses deep. The About check scrolls the page to its end at
@@ -630,7 +658,9 @@ HIL: `tests/hil/test_ui.py` (`tests/hil/README.md`) replays the main sequences o
 - Switching USB to network has no confirmation (P7: reversible); the info page says what stops and how to get back.
 - A failed message isn't kept for a retry: the banner says "Not delivered: send it again".
 - Compose offers canned texts ("OK", "On my way", "Call me", "Can't talk now"), sent in the language in use (2.5). Write... opens the keypad editor for a custom message.
-- Deleting a message has no undo (`sms_inbox_delete` removes it from the RAM inbox).
+- The open message follows its inbox token across new arrivals. If the record is evicted, the
+  view reports that it is gone. Deleting a message removes that token from the RAM inbox.
+- Reply and call target the sender of a private message or the destination talkgroup of a group message.
 - Save to channel and the permanent talk target write the codeplug as a storage job on the housekeeping task, so the
   UI no longer stalls for the flash write. A permanent target must be a stored contact: a typed ID is set for now at
   once and the job then says "Not a stored contact: for now only".

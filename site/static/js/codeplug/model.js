@@ -19,16 +19,18 @@ import { parseTone } from "./fields.js";
 import { readHeader } from "./iddb.js";
 import { channelKeySlot, encodeChannelKeys } from "./channelkeys.js";
 import { decodeTalkGroups, encodeTalkGroups, validTalkGroups } from "./talkgroups.js";
+import { MAX_ASSIGNMENTS, POOL_CAPACITY, readPool, writePool } from "./talkgroup-pool.js";
 
 const REFS = ["contact", "rxList", "aprs"];
 
 export function decode(image) {
 	const b = image.bytes;
+	const pool = readPool(b);
 	const m = {
 		general: decodeGeneral(b),
 		channels: [], vfo: [], zones: [], contacts: [], rxLists: [], dtmfContacts: [], aprs: [],
 		iddb: readHeader(b),
-		base: image,
+		base: image, sharedTalkgroups: !!pool,
 	};
 	for (let n = 1; n <= LIMITS.contacts; n++) {
 		const c = decodeContact(b.subarray(CONTACTS + (n - 1) * CONTACT_SIZE, CONTACTS + n * CONTACT_SIZE));
@@ -52,7 +54,9 @@ export function decode(image) {
 		if (!channelUsed(b, n)) continue;
 		const c = decodeChannel(b.subarray(channelAddr(n), channelAddr(n) + CH_SIZE));
 		if (c) m.channels.push(linkRefs(m, { number: n, ...c, privacySlot: channelKeySlot(b, n),
-			talkGroups: c.mode === "dmr" ? decodeTalkGroups(b, n) : [] }));
+			talkGroups: c.mode === "dmr" && !pool ? decodeTalkGroups(b, n) : [],
+			talkgroupRefs: c.mode === "dmr" && pool ?
+				(pool.lists.get(n) ?? []).map(ref => find(m.contacts, ref)) : [] }));
 	}
 	for (const a of VFO) {
 		const c = decodeChannel(b.subarray(a, a + CH_SIZE));
@@ -156,7 +160,20 @@ export function encode(m) {
 	}
 	for (let bank = 0; bank < 8; bank++) b.set(bits.subarray(bank * 16, bank * 16 + 16), bankBitmap(bank));
 	encodeChannelKeys(b, m.channels);
-	encodeTalkGroups(b, m.channels);
+	if (m.sharedTalkgroups) {
+		const saved = new Set(m.contacts);
+		const lists = new Map();
+		for (const channel of m.channels) {
+			const refs = channel.talkgroupRefs ?? [];
+			if (channel.mode !== "dmr" || !refs.length) continue;
+			if (refs.some(record => !saved.has(record) || record.type !== "group" || !record.number))
+				throw new Error("Operating talkgroup assignment is missing a saved group record");
+			lists.set(channel.number, refs.map(record => record.number));
+		}
+		writePool(b, lists);
+	} else {
+		encodeTalkGroups(b, m.channels);
+	}
 	m.vfo.forEach((c, i) => c && putChannel(b.subarray(VFO[i], VFO[i] + CH_SIZE), c));
 
 	// Zones: packed into slots 0..n-1 in model order, the 80-channel layout. A 16-channel table is rewritten whole
@@ -244,7 +261,7 @@ export function newChannel(fields = {}) {
 		number: null, name: "", rxHz: 446006250, txHz: 446006250, mode: "fm", power: 0, tot: 0, rxTone: "",
 		txTone: "", bw: 12.5, rxOnly: false, allSkip: false, zoneSkip: false, vox: false, squelch: 0, colorCode: 1,
 		timeslot: 1, contact: null, rxList: null, aprs: null, dmrId: 0, noBeep: false, noEco: false, dmo: false,
-		talkGroups: [],
+		talkGroups: [], talkgroupRefs: [],
 		roam: false, aliasTs1: 0, aliasTs2: 0, useLocation: false, lat: 0, lon: 0, sfr: false, sfrA: 0, sfrB: 0, privacySlot: 0,
 		...fields,
 	};
@@ -254,8 +271,15 @@ export function newContact(fields = {}) {
 	return { number: null, name: "", id: 0, type: "group", timeslot: 0, ...fields };
 }
 
+export function channelsUsingTalkgroups(m, contacts) {
+	const gone = new Set(contacts);
+	return m.channels.filter(channel => (channel.talkgroupRefs ?? []).some(record => gone.has(record)));
+}
+
 // Remove records and every reference to them
 export function remove(m, table, items) {
+	if (table === "contacts" && channelsUsingTalkgroups(m, items).length)
+		throw new Error("Remove or replace operating talkgroup assignments before deleting the saved records");
 	const gone = new Set(items);
 	m[table] = m[table].filter((x) => !gone.has(x));
 	if (table === "channels") {
@@ -298,6 +322,8 @@ export function validate(m, { bands = null } = {}) {
 		["zones", LIMITS.zones], ["dtmfContacts", LIMITS.dtmfContacts], ["aprs", LIMITS.aprs]];
 	for (const [t, max] of counts) if (m[t].length > max) err(t, null, null, "too_many", { max, count: m[t].length });
 
+	const savedGroups = new Set(m.contacts.filter(contact => contact.type === "group"));
+	let usedTalkgroups = 0;
 	for (const c of m.channels) {
 		if (!c.name) err("channels", c, "name", "no_name");
 		if (c.name.length > LIMITS.name) err("channels", c, "name", "too_long", { max: LIMITS.name });
@@ -308,7 +334,15 @@ export function validate(m, { bands = null } = {}) {
 		for (const f of ["rxTone", "txTone"]) if (parseTone(c[f]) === null) err("channels", c, f, "bad_tone");
 		if (c.colorCode < 0 || c.colorCode > 15) err("channels", c, "colorCode", "range", { min: 0, max: 15 });
 		if (![0, 1, 2, 3, 4, 255].includes(c.privacySlot ?? 0)) err("channels", c, "privacySlot", "range", { min: 0, max: 4 });
-		if (!validTalkGroups(c.talkGroups ?? [])) err("channels", c, "talkGroups", "talkgroups");
+		if (m.sharedTalkgroups && c.mode === "dmr") {
+			const refs = c.talkgroupRefs ?? [];
+			usedTalkgroups += refs.length;
+			if (refs.length > MAX_ASSIGNMENTS || refs.some(ref => !savedGroups.has(ref)) ||
+			    new Set(refs).size !== refs.length)
+				err("channels", c, "talkgroupRefs", "talkgroups");
+		} else if (!m.sharedTalkgroups && !validTalkGroups(c.talkGroups ?? [])) {
+			err("channels", c, "talkGroups", "talkgroups");
+		}
 		if (c.mode === "dmr" && !c.contact && !c.rxOnly) warn("channels", c, "contact", "no_contact");
 		const band = listenBand(c.rxHz);
 		if (band && c.mode === "dmr") warn("channels", c, "mode", `listen_dmr_${band}`);
@@ -317,6 +351,8 @@ export function validate(m, { bands = null } = {}) {
 		for (const k of REFS) if (typeof c[k] === "number") warn("channels", c, k, "dangling", { number: c[k] });
 		if (c.dmrId > 0xFFFFFF) err("channels", c, "dmrId", "id_range");
 	}
+	if (usedTalkgroups > POOL_CAPACITY) err("channels", null, "talkgroupRefs", "talkgroups");
+
 	const names = new Map();
 	for (const c of m.channels) names.set(c.name, (names.get(c.name) || 0) + 1);
 	for (const c of m.channels) if (c.name && names.get(c.name) > 1) warn("channels", c, "name", "duplicate");

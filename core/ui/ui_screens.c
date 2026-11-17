@@ -9,6 +9,10 @@
 #include "fmt.h"
 #include "i18n.h"
 #include "ui_svc.h"
+#if CONFIG_UI_CARD_MENU
+#include "ui_nav.h"
+#include "dmr/dmrDataService.h"
+#endif
 #include "config.h"
 
 ui_layout_t ui_layout;
@@ -28,6 +32,35 @@ static bool ui_strip_fill;
 // The red is lighter and pinker than TX's (the TX pill also says TX); there is no green, which would hide the RX
 // pill. Default keeps the theme's blue focus; its filled strip is light gray (white in high contrast). Built without CONFIG_UI_COLOR (radios
 // with only a monochrome screen) the theme's own colors stay
+void ui_local_time(char out[6], uint32_t utc_minute)
+{
+	if (!utc_minute || utc_minute > 1440u) {
+		str_copy(out, 6, "--:--");
+		return;
+	}
+	int32_t offset = ui_svc_setting_get(UI_SET_UTC_OFFSET_MIN);
+	uint32_t local = (uint32_t)((int32_t)(utc_minute - 1u) + offset + 1440) % 1440u;
+	sbuf_t b;
+	sb_init(&b, out, 6);
+	sb_u32(&b, local / 60u, 2);
+	sb_chr(&b, ':');
+	sb_u32(&b, local % 60u, 2);
+}
+
+static bool status_clock_available(void)
+{
+	return board.home_brand != NULL && gfx_width() >= 220;
+}
+
+static int draw_status_clock(const font_t *f, int right, int y, color_t fg)
+{
+	char time[6];
+	ui_local_time(time, ui_svc_utc_minute());
+	right -= gfx_text_width(f, time);
+	gfx_text(f, right, y, time, fg);
+	return right - f->w;
+}
+
 static void accent_apply(void)
 {
 	ui_col.focus_fg = ui_col.fg;
@@ -345,10 +378,12 @@ static int draw_top_as(const radio_view_t *v, radio_state_t st, const ui_state_t
 	}
 	int ty = (ph - f->h + 1) / 2;
 
-	// Right side, right to left: battery %, battery icon, signal bars, unread messages, lock
+	// Right side, right to left: clock, battery %, battery icon, signal bars, unread messages, lock
 	sbuf_t b;
 	int rx = w;
 	if (!merged) {
+		if (status_clock_available())
+			rx = draw_status_clock(&font_6x12, rx, ty + (f->h - font_6x12.h) / 2, sfg);
 		color_t bc = sfg;
 		if (!s->no_battery) {
 			char pct[6];
@@ -2234,6 +2269,7 @@ static void card_status(const ui_state_t *s)
 	int y = 3;
 	int brand = gfx_text(f, 0, y, board.home_brand, ui_col.fg);
 	gfx_text(f, brand, y, "+", ui_col.focus);
+	right = draw_status_clock(f, right, y, ui_col.fg);
 	if (!s->no_battery) {
 		char text[6];
 		sbuf_t b;
@@ -2276,6 +2312,21 @@ static void card_status(const ui_state_t *s)
 #endif
 	gfx_hline(0, 22, gfx_width(), CARD_EDGE);
 	ui_strip_draws++;
+}
+
+static void card_header(const ui_state_t *s, int band_height)
+{
+	gfx_clear(CARD_INK);
+	card_status(s);
+	gfx_fill(0, 27, gfx_width(), band_height, CARD_SURFACE);
+}
+
+static void card_center_title(const char *title, int padding, char *fit, size_t len)
+{
+	const font_t *font = ui_layout.small;
+	int width = gfx_width();
+	gfx_text_fit(font, title, width - 2 * padding, fit, len);
+	gfx_text(font, (width - gfx_text_width(font, fit)) / 2, 29, fit, ui_col.focus);
 }
 
 static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool tx, bool denied, bool dual)
@@ -2411,12 +2462,8 @@ static void draw_card_home(const radio_view_t *v, const ui_state_t *s)
 	const font_t *sm = ui_layout.small;
 	int width = gfx_width(), footer = gfx_height() - sm->h - 2;
 	char fit[48];
-	gfx_clear(CARD_INK);
-	card_status(s);
-	gfx_fill(0, 27, width, 23, CARD_SURFACE);
-	const char *zone = v->vfo ? TR("VFO MODE") : v->zone_name;
-	gfx_text_fit(sm, zone, width - 12, fit, sizeof fit);
-	gfx_text(sm, (width - gfx_text_width(sm, fit)) / 2, 29, fit, ui_col.focus);
+	card_header(s, 23);
+	card_center_title(v->vfo ? TR("VFO MODE") : v->zone_name, 6, fit, sizeof fit);
 	int recent = 155;
 	if (s->dual.on) {
 		bool a = s->dual.sel == 0;
@@ -2694,9 +2741,9 @@ int ui_draw_text_page(const radio_view_t *v, const ui_state_t *s, const char *ti
 	int w = gfx_width();
 	char line[64];
 	gfx_clear(ui_col.bg);
-	// No status strip while idle: the page gets the whole height. A call or a transmission brings it back (P2: the
+	// Without the clock, the idle page gets the whole height. A call or a transmission brings the strip back (P2: the
 	// TX / RX pill is never hidden)
-	int y = v->state != RS_IDLE ? ui_draw_top(v, s, NULL, title) : 0;
+	int y = v->state != RS_IDLE || status_clock_available() ? ui_draw_top(v, s, NULL, title) : 0;
 	int y_end = list_bottom(s);
 	int rows = (y_end - y) / f->h;
 	if (rows < 1)
@@ -3262,8 +3309,9 @@ static void __attribute__((noinline)) draw_quick_list(const radio_view_t *v, con
 	quick_v = v;
 	quick_s = s;
 	quick_list_focus = s->quick_focus;
-	ui_list_t l = { TR("Quick"), v->vfo ? "VFO" : v->ch.name, NULL, NULL, UI_QUICK_TILES, quick_list_focus, &top,
-			quick_list_item, NULL, split_hint != NULL ? split_hint : TR("1-9 change  Hold OK save") };
+	ui_list_t l = { .prefix = TR("Quick"), .name = v->vfo ? "VFO" : v->ch.name,
+		.count = UI_QUICK_TILES, .focus = quick_list_focus, .top = &top, .item = quick_list_item,
+		.hint = split_hint != NULL ? split_hint : TR("1-9 change  Hold OK save") };
 	ui_draw_list(v, s, &l);
 }
 
@@ -3346,9 +3394,7 @@ static void __attribute__((noinline)) draw_quick_cards(const radio_view_t *v, co
 	const font_t *value_font = ui_layout.small;
 	int width = gfx_width(), top = 57, bottom = ui_layout.hint_y - 4;
 	char label[40], value[16], fit[32];
-	gfx_clear(CARD_INK);
-	card_status(s);
-	gfx_fill(0, 27, width, 24, CARD_SURFACE);
+	card_header(s, 24);
 	const char *title = TR("Quick Controls");
 	gfx_text(value_font, 5, 29, title, ui_col.focus);
 	const char *mode = mode_word(v);
@@ -3410,21 +3456,446 @@ void ui_draw_quick(const radio_view_t *v, const ui_state_t *s)
 }
 
 #if CONFIG_UI_CARD_MENU
+static void card_list_row(int y, int width, int height, color_t edge, color_t interior)
+{
+	gfx_round_fill(0, y, width, height, edge);
+	if (interior != edge)
+		gfx_round_fill(1, y + 1, width - 2, height - 2, interior);
+}
+
+static void card_list_footer(const ui_state_t *s, int y, const char *keys, const char *back,
+	char *fit, size_t len)
+{
+	ui_draw_banner(s);
+	if (s->toast) {
+		ui_draw_hint(s->toast, true);
+	} else if (s->hints) {
+		const font_t *font = &font_6x12;
+		int width = gfx_width();
+		gfx_hline(0, y, width, CARD_EDGE);
+		if (back) {
+			gfx_text(font, 0, y + 3, keys, ui_col.dim);
+			gfx_text(font, width - gfx_text_width(font, back), y + 3, back, ui_col.dim);
+		} else {
+			gfx_text_fit(font, keys, width - 4, fit, len);
+			gfx_text(font, 2, y + 3, fit, ui_col.dim);
+		}
+	}
+}
+
+static void card_page_footer(const ui_state_t *s, int y, const char *hint)
+{
+	char text[80], left[80], back[32], fit[40];
+	bool more = true;
+	const font_t *font = &font_6x12;
+	for (int level = 0; more; level++) {
+		gfx_text_alt(hint ? hint : TR("Back"), level, text, sizeof text, &more);
+		hint_split(text, left, sizeof left, back, sizeof back);
+		if (!back[0])
+			str_copy(back, sizeof back, TR("Back"));
+		if (gfx_text_width(font, left) + gfx_text_width(font, back) + 8 <= gfx_width())
+			break;
+	}
+	while (gfx_text_width(font, left) + gfx_text_width(font, back) + 8 > gfx_width()) {
+		char *last = NULL;
+		for (char *p = strstr(left, "  "); p; p = strstr(p + 2, "  "))
+			last = p;
+		if (!last) {
+			left[0] = 0;
+			break;
+		}
+		*last = 0;
+	}
+	card_list_footer(s, y, left, back, fit, sizeof fit);
+}
+
+static int card_page_text(const font_t *font, const char *text, int y, int end, bool draw, color_t color)
+{
+	char line[64];
+	while (*text && y + font->h <= end) {
+		const char *next = wrap_line(font, text, gfx_width() - 14, line, sizeof line);
+		if (*next && y + 2 * font->h > end)
+			fit_end(font, text, gfx_width() - 14, line, sizeof line);
+		if (draw)
+			gfx_text(font, 6, y, line, color);
+		text = next;
+		y += font->h;
+	}
+	return y;
+}
+
+static int card_page_value(const ui_item_t *item, int room, char *value, size_t len)
+{
+	bool more = true;
+	int width = 0;
+	for (int level = 0; more; level++) {
+		gfx_text_alt(item->value, level, value, len, &more);
+		width = gfx_text_width(&font_6x12, value);
+		if (width <= room)
+			break;
+	}
+	return width;
+}
+
+static void card_page_field(int x, int y, int right, const ui_item_t *item, color_t fg, color_t value_color)
+{
+	const font_t *font = ui_layout.small, *meta = &font_6x12;
+	char value[44], label[40];
+	int vw = card_page_value(item, right - x - gfx_text_width(font, item->label) - 8, value, sizeof value);
+	fit_end(font, item->label, right - x - (vw ? vw + 8 : 0), label, sizeof label);
+	gfx_text(font, x, y, label, fg);
+	if (vw)
+		gfx_text(meta, right - vw, y + (font->h - meta->h) / 2, value, value_color);
+}
+
+void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kind_t kind)
+{
+	const font_t *font = ui_layout.small, *meta = &font_6x12;
+	const int width = gfx_width(), footer = gfx_height() - 19;
+	bool actions = kind == UI_CARD_PAGE_ACTIONS;
+	bool fields = kind == UI_CARD_PAGE_FIELDS || kind == UI_CARD_PAGE_CONFIRM;
+	int step = kind == UI_CARD_PAGE_DETAILS ? 44 : actions ? 34 : 28;
+	char fit[64];
+	card_header(s, 24);
+	if (l->name_in_title && l->prefix && l->name) {
+		// Keep the pane letter even when a translated prefix needs shortening, without a permanent title buffer.
+		int tail = gfx_text_width(font, l->name);
+		gfx_text_fit(font, l->prefix, width - 14 - tail - font->w, fit, sizeof fit);
+		sbuf_t title = { fit + strlen(fit), fit + sizeof fit - 1 };
+		sb_chr(&title, ' ');
+		sb_str(&title, l->name);
+		gfx_text(font, (width - gfx_text_width(font, fit)) / 2, 29, fit, ui_col.focus);
+	} else
+		card_center_title(l->prefix ? l->prefix : l->name, 7, fit, sizeof fit);
+	int y = 55;
+	if (!l->name_in_title && l->prefix && l->name && strcmp(l->prefix, l->name) != 0) {
+		fit_end(meta, l->name, width - 12, fit, sizeof fit);
+		gfx_text(meta, 6, y, fit, ui_col.dim);
+		y += meta->h + 5;
+	}
+	if (l->body && l->body[0]) {
+		int limit = footer - (l->count ? step + 10 : 4);
+		int height = card_page_text(meta, l->body, 0, limit - y - 12, false, 0) + 12;
+		card_list_row(y, width - 2, height, kind == UI_CARD_PAGE_CONFIRM ? ui_col.warn : CARD_EDGE, CARD_SURFACE);
+		card_page_text(meta, l->body, y + 6, y + height - 6, true, ui_col.fg);
+		y += height + 5;
+	}
+	if (l->header && l->header[0]) {
+		card_list_row(y, width - 2, meta->h + 9, ui_col.focus, CARD_SURFACE);
+		fit_end(meta, l->header, width - 14, fit, sizeof fit);
+		gfx_text(meta, 6, y + 4, fit, ui_col.fg);
+		y += meta->h + 14;
+	}
+	// Values can move below labels; a translation never makes one row use a smaller label font.
+	if (fields || actions) {
+		for (uint16_t i = 0; i < l->count; i++) {
+			ui_item_t item = { 0 };
+			l->item(i, &item);
+			if (actions && item.value[0] && step < 44)
+				step = 44;
+			char value[44];
+			int label_width = gfx_text_width(font, item.label);
+			if (fields && step < 44 && (strchr(item.value, '\n') ||
+			    card_page_value(&item, width - 16 - label_width - 8, value, sizeof value) > width - 16 - label_width - 8))
+				step = 44;
+			if (label_width > width - (actions ? 42 : 16)) {
+				int needed = 2 * font->h + meta->h + 12;
+				if (fields && strchr(item.value, '\n'))
+					needed += meta->h;
+				if (step < needed)
+					step = needed;
+			}
+		}
+	}
+	int rows = (footer - y - 4) / step;
+	if (rows < 1)
+		rows = 1;
+	uint16_t top = list_window(l, rows);
+	for (int row = 0; row < rows && top + row < l->count; row++) {
+		uint16_t i = (uint16_t)(top + row);
+		ui_item_t item = { 0 };
+		l->item(i, &item);
+		char *detail = strchr(item.value, '\n');
+		if (detail)
+			*detail++ = 0;
+		int yy = y + row * step, x = 7;
+		bool focus = i == l->focus && !(item.flags & UI_ITEM_INFO);
+		bool editing = focus && (item.flags & UI_ITEM_EDIT);
+		color_t highlight = item.flags & UI_ITEM_EDIT ? ui_col.warn : ui_col.focus;
+		color_t fg = focus && !actions ? CARD_INK : item.flags & UI_ITEM_DIM ? ui_col.dim : ui_col.fg;
+		color_t secondary = focus && !actions ? fg : ui_col.dim;
+		if (editing)
+			fg = secondary = ui_col.warn;
+		if (!focus && (item.flags & UI_ITEM_WARN))
+			fg = ui_col.warn;
+		card_list_row(yy, width - 2, step - 4, focus ? highlight : CARD_EDGE,
+			editing ? CARD_SURFACE : focus ? actions ? CARD_SELECTED : highlight : CARD_SURFACE);
+		if (actions && item.num) {
+			char key[] = { item.num, 0 };
+			gfx_round_fill(5, yy + 8, 15, meta->h + 2, focus ? highlight : CARD_EDGE);
+			gfx_text(meta, 9, yy + 9, key, focus ? CARD_INK : fg);
+			x = 25;
+		}
+		int right = width - (actions ? 17 : 9);
+		if (actions)
+			gfx_text(meta, width - 12, yy + 9, ">", focus ? highlight : CARD_EDGE);
+		if (actions && step > 44) {
+			const char *tail = wrap_line(font, item.label, right - x, fit, sizeof fit);
+			gfx_text(font, x, yy + 3, fit, fg);
+			if (*tail) {
+				fit_end(font, tail, right - x, fit, sizeof fit);
+				gfx_text(font, x, yy + 3 + font->h, fit, fg);
+			}
+			row_text(meta, x, yy + step - meta->h - 7, right, "", detail ? detail : item.value, fg, secondary, false);
+		} else if (kind == UI_CARD_PAGE_DETAILS || (actions && step == 44)) {
+			char value[44];
+			bool more;
+			if (actions) {
+				detail = detail ? detail : item.value;
+				value[0] = 0;
+			} else
+				gfx_text_alt(item.value, 0, value, sizeof value, &more);
+			int vw = gfx_text_width(meta, value);
+			fit_end(font, item.label, right - x - (vw ? vw + 6 : 0), fit, sizeof fit);
+			gfx_text(font, x, yy + 4, fit, fg);
+			if (vw)
+				gfx_text(meta, right - vw, yy + 6, value, secondary);
+			if (detail) {
+				gfx_text_alt(detail, 0, value, sizeof value, &more);
+				fit_end(meta, value, right - x, fit, sizeof fit);
+				gfx_text(meta, x, yy + 25, fit, secondary);
+			}
+		} else if (fields && step > 28) {
+			if (detail && gfx_text_width(font, item.label) <= right - x) {
+				card_page_field(x, yy + 3, right, &item, fg, secondary);
+				fit_end(meta, detail, right - x, fit, sizeof fit);
+				gfx_text(meta, x, yy + step - meta->h - 7, fit, secondary);
+				continue;
+			}
+			const char *tail = wrap_line(font, item.label, right - x, fit, sizeof fit);
+			gfx_text(font, x, yy + 3, fit, fg);
+			if (*tail) {
+				fit_end(font, tail, right - x, fit, sizeof fit);
+				gfx_text(font, x, yy + 3 + font->h, fit, fg);
+			}
+			row_text(meta, x, yy + step - meta->h - 7 - (detail ? meta->h + 2 : 0), right,
+				"", item.value, fg, secondary, false);
+			if (detail) {
+				fit_end(meta, detail, right - x, fit, sizeof fit);
+				gfx_text(meta, x, yy + step - meta->h - 7, fit, secondary);
+			}
+		} else if (fields) {
+			card_page_field(x, yy + (step - 4 - font->h) / 2, right, &item, fg, secondary);
+		} else {
+			row_text(font, x, yy + (step - 4 - font->h) / 2, right,
+				item.label, item.value, fg, secondary, (item.flags & UI_ITEM_PREVIEW) != 0);
+		}
+	}
+	if (!l->count && l->empty)
+		wrap_text(font, l->empty, y + 8, footer, true, ui_col.dim);
+	if (top)
+		gfx_fill(width - 3, y, 3, 2, ui_col.focus);
+	if (top + rows < l->count)
+		gfx_fill(width - 3, y + rows * step - 5, 3, 2, ui_col.focus);
+	card_page_footer(s, footer, l->hint);
+}
+
+#if CONFIG_GPS_SKY
+int ui_draw_position_tabs(const ui_state_t *s, const char *const *names, uint8_t count, uint8_t active)
+{
+	char fit[32];
+	int width = gfx_width();
+	const font_t *font = &font_6x12;
+	card_header(s, 24);
+	card_center_title(TR("Position"), 6, fit, sizeof fit);
+	for (uint8_t i = 0; i < count; i++) {
+		int x = width * i / count + 2;
+		int w = width * (i + 1) / count - x - 2;
+		bool selected = i == active;
+		gfx_round_fill(x, 55, w, 19, selected ? ui_col.focus : CARD_SURFACE);
+		gfx_text_fit(font, tr(names[i]), w - 6, fit, sizeof fit);
+		gfx_text(font, x + (w - gfx_text_width(font, fit)) / 2, 58, fit, selected ? CARD_INK : ui_col.fg);
+	}
+	return 82;
+}
+
+void ui_draw_position_footer(const ui_state_t *s)
+{
+	char fit[32];
+	card_list_footer(s, gfx_height() - 19, TR("Up Down page  Back"), NULL, fit, sizeof fit);
+}
+#endif
+
+const char *ui_ars_status(uint8_t state)
+{
+	if (!CONFIG_DMR_ARS)
+		return TR("Not in this build");
+	switch (state) {
+	case DMR_ARS_STATE_REGISTERING: return TR("Registering");
+	case DMR_ARS_STATE_REGISTERED: return TR("Registered");
+	case DMR_ARS_STATE_REFUSED: return TR("Refused");
+	case DMR_ARS_STATE_NO_ANSWER: return TR("No answer");
+	default: return TR("Off");
+	}
+}
+
+static void dashboard_control(const ui_list_t *l, unsigned i, int x, int y, int w, bool enabled)
+{
+	ui_item_t item = {0};
+	l->item(i, &item);
+	bool focus = l->focus == i;
+	color_t bg = focus ? (item.flags & UI_ITEM_EDIT ? ui_col.warn : ui_col.focus) : CARD_SURFACE;
+	color_t fg = focus ? CARD_INK : enabled ? ui_col.fg : ui_col.dim;
+	gfx_round_fill(x, y, w, 19, bg);
+	row_text(&font_6x12, x + 5, y + 3, x + w - 5, item.label, item.value, fg,
+		 focus ? fg : ui_col.focus, false);
+}
+
+static void dashboard_timer(int x, int w, const char *label, uint32_t seconds, const char *empty)
+{
+	char value[24];
+	gfx_round_fill(x, 105, w, 34, CARD_SURFACE);
+	gfx_text_fit(&font_6x12, label, w - 10, value, sizeof value);
+	gfx_text(&font_6x12, x + 5, 108, value, ui_col.dim);
+	sbuf_t b;
+	sb_init(&b, value, sizeof value);
+	if (empty)
+		sb_str(&b, empty);
+	else
+		sb_mmss(&b, seconds);
+	gfx_text(ui_layout.small, x + 5, 121, value, ui_col.fg);
+}
+
+static void dashboard_subscriptions(const ui_state_t *s, const dmrDataDashboard_t *data, int width, int footer)
+{
+	const font_t *font = &font_6x12;
+	gfx_text(font, 5, 211, TR("Active subscriptions"), ui_col.focus);
+	if (!data->count) {
+		gfx_text(font, 5, 231, TR("No active subscriptions"), ui_col.dim);
+		return;
+	}
+	ui_position_t position;
+	bool fixed = ui_svc_position(&position) && position.fix;
+	for (unsigned i = 0; i < data->count; i++) {
+		const dmrLrrpSubscription_t *sub = &data->subscription[i];
+		int y = 225 + (int)i * 28;
+		if (y + 27 >= footer)
+			break;
+		char id[20], rule[24];
+		sbuf_t b;
+		sb_init(&b, id, sizeof id);
+		sb_str(&b, "DMR ");
+		sb_u32(&b, sub->requester, 1);
+		sb_init(&b, rule, sizeof rule);
+		sb_u32(&b, sub->intervalMs / 1000u, 1);
+		sb_str(&b, " s");
+		if (sub->distanceMeters) {
+			sb_str(&b, " / ");
+			sb_u32(&b, sub->distanceMeters, 1);
+			sb_str(&b, " m");
+		}
+		card_list_row(y, width, 26, CARD_EDGE, CARD_SURFACE);
+		row_text(font, 5, y + 1, width - 10, id, rule, ui_col.fg, ui_col.dim, false);
+		int32_t ms = (int32_t)(sub->due - s->now_ms);
+		sb_init(&b, rule, sizeof rule);
+		if (!fixed)
+			sb_str(&b, TR("Waiting for GPS"));
+		else if (ms <= 0)
+			sb_str(&b, TR("Check due"));
+		else {
+			sb_str(&b, TR("Next check "));
+			sb_mmss(&b, ((uint32_t)ms + 999u) / 1000u);
+		}
+		gfx_text(font, 5, y + 13, rule, fixed ? ui_col.fg : ui_col.warn);
+	}
+}
+
+void ui_draw_data_dashboard(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l)
+{
+	dmrDataDashboard_t data;
+	ui_svc_data_dashboard(&data);
+	bool registered = data.arsState == DMR_ARS_STATE_REGISTERED;
+	int width = gfx_width(), footer = gfx_height() - 19;
+	char fit[32];
+	const font_t *font = &font_6x12;
+	card_header(s, 24);
+	card_center_title(l->name, 5, fit, sizeof fit);
+	dashboard_control(l, DATA_ANSWER, 1, 55, width - 2, CONFIG_DMR_LRRP);
+	int actionWidth = width / 2;
+	gfx_text_fit(font, ui_ars_status(data.arsState), width - actionWidth - 10, fit, sizeof fit);
+	gfx_text(font, 5, 84, fit, registered ? ui_col.rx : ui_col.dim);
+	dashboard_control(l, DATA_REGISTER, width - actionWidth, 81, actionWidth - 1, data.canRegister);
+	int32_t ms = (int32_t)(data.nextMs - s->now_ms);
+	dashboard_timer(1, actionWidth - 3, registered ? TR("Next refresh") : TR("Next retry"),
+			ms > 0 ? ((uint32_t)ms + 999u) / 1000u : 0,
+			!data.nextMs ? "--" : ms <= 0 ? TR("Due") : NULL);
+	dashboard_timer(actionWidth + 1, width - actionWidth - 2, TR("Registered for"),
+			(s->now_ms - data.registeredAt) / 1000u, registered ? NULL : "--");
+
+	char value[24];
+	sbuf_t b;
+	sb_init(&b, value, sizeof value);
+	sb_u32(&b, data.attempts, 1);
+	sb_str(&b, " / ");
+	sb_u32(&b, data.maxAttempts, 1);
+	card_list_row(143, width, 64, CARD_EDGE, CARD_SURFACE);
+	row_text(font, 5, 146, width - 10, TR("Attempts"), value, ui_col.dim, ui_col.fg, false);
+	sb_init(&b, value, sizeof value);
+	if (registered && data.refreshMs) {
+		sb_u32(&b, data.refreshMs / 60000u, 1);
+		sb_str(&b, TR(" min"));
+	} else {
+		sb_str(&b, registered ? TR("Off") : "--");
+	}
+	row_text(font, 5, 159, width - 10, TR("Refresh interval"), value, ui_col.dim, ui_col.fg, false);
+	dashboard_control(l, DATA_SERVER, 1, 171, width - 2, CONFIG_DMR_ARS);
+	if (v->dmr.active) {
+		char id[16];
+		sb_init(&b, id, sizeof id);
+		sb_str(&b, "ID ");
+		sb_u32(&b, v->dmr.own_id, 1);
+		sb_init(&b, value, sizeof value);
+		sb_str(&b, "TX ");
+		sb_freq(&b, v->ch.tx_hz);
+		sb_str(&b, " TS");
+		sb_u32(&b, v->dmr.ts, 1);
+		sb_str(&b, " CC");
+		sb_u32(&b, v->dmr.cc, 1);
+		row_text(font, 5, 191, width - 10, value, id, ui_col.fg, ui_col.dim, false);
+	}
+	dashboard_subscriptions(s, &data, width, footer);
+	card_list_footer(s, footer, TR("OK Select"), TR("Back"), fit, sizeof fit);
+}
+
 void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kind_t kind)
 {
 	const font_t *sm = ui_layout.small, *meta = &font_6x12;
 	const int width = gfx_width(), footer = gfx_height() - 19;
-	const int step = 28;
+	bool composer = kind == UI_CARD_COMPOSER;
+	bool messages = kind == UI_CARD_MESSAGES || composer;
+	const int step = kind == UI_CARD_MESSAGES ? 44 : 28;
 	bool directory = kind == UI_CARD_TALKGROUPS || kind == UI_CARD_CONTACTS;
 	bool channels = kind == UI_CARD_ZONE_CHANNELS;
+	bool scan = kind >= UI_CARD_SCAN && kind <= UI_CARD_SCAN_OPTIONS;
+	bool aprs = kind == UI_CARD_APRS;
+	bool data = aprs;
+	bool fields = kind == UI_CARD_FIELDS || kind == UI_CARD_CONTACT_EDITOR;
 	char fit[40];
-	gfx_clear(CARD_INK);
-	card_status(s);
-	gfx_fill(0, 27, width, 24, CARD_SURFACE);
-	const char *title = directory ? TR("Contacts & Talkgroups") : channels ? l->name : TR("Channels & Zones");
-	gfx_text_fit(sm, title, width - 14, fit, sizeof fit);
-	gfx_text(sm, (width - gfx_text_width(sm, fit)) / 2, 29, fit, ui_col.focus);
-	if (directory) {
+	card_header(s, 24);
+	const char *title = fields ? (l->prefix ? l->prefix : l->name) : composer || data ? l->name : messages ? l->prefix : scan ? TR("Scan") :
+		directory ? TR("Contacts & Talkgroups") : channels ? l->name : TR("Channels & Zones");
+	card_center_title(title, 7, fit, sizeof fit);
+	if (scan) {
+		const char *tabs[] = { TR("Scan"), TR("Scan Lists"), TR("Options") };
+		for (unsigned i = 0; i < 3; i++) {
+			bool active = (unsigned)(kind - UI_CARD_SCAN) == i;
+			int w = width / 3 - 4, x = (int)i * (width / 3) + 2;
+			gfx_round_fill(x, 55, w, 19, active ? ui_col.focus : CARD_SURFACE);
+			gfx_text_fit(meta, tabs[i], w - 4, fit, sizeof fit);
+			gfx_text(meta, x + (w - gfx_text_width(meta, fit)) / 2, 58, fit,
+				 active ? CARD_INK : ui_col.fg);
+		}
+	} else if (directory) {
 		const char *tabs[] = { TR("Talkgroups"), TR("Contacts") };
 		for (int i = 0; i < 2; i++) {
 			bool active = (kind == UI_CARD_CONTACTS) == (i == 1);
@@ -3433,7 +3904,7 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 			gfx_text(meta, x + (w - gfx_text_width(meta, tabs[i])) / 2, 58, tabs[i],
 				 active ? CARD_INK : ui_col.fg);
 		}
-	} else {
+	} else if (!messages && !data && !fields) {
 		const char *stage = channels ? TR("2  Select channel") : TR("1  Select zone");
 		int stage_w = gfx_text_width(meta, stage) + 16;
 		int stage_x = (width - stage_w) / 2;
@@ -3441,26 +3912,60 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		gfx_round_fill(stage_x + 1, 58, stage_w - 2, 14, CARD_INK);
 		gfx_text(meta, stage_x + 8, 59, stage, ui_col.focus);
 	}
-	int y = 79;
-	if (l->header) {
+	int y = messages || data || fields ? 55 : 79;
+	if (aprs && l->body) {
+		int height = 2 * 6;
+		const char *text = l->body;
+		while (*text && height < 6 * meta->h + 12) {
+			text = wrap_line(meta, text, width - 16, fit, sizeof fit);
+			height += meta->h;
+		}
+		card_list_row(y, width - 5, height, CARD_EDGE, CARD_SURFACE);
+		text = l->body;
+		for (int line = y + 6; *text && line + meta->h <= y + height - 6; line += meta->h) {
+			const char *next = wrap_line(meta, text, width - 16, fit, sizeof fit);
+			if (*next && line + 2 * meta->h > y + height - 6)
+				fit_end(meta, text, width - 16, fit, sizeof fit);
+			gfx_text(meta, 7, line, fit, ui_col.fg);
+			text = next;
+		}
+		y += height + 4;
+	} else if ((messages || fields) && l->body)
+		y = wrap_text(meta, l->body, y, footer, true, ui_col.dim) + 4;
+	if (kind == UI_CARD_SCAN) {
+		card_list_row(y, width - 5, 49, CARD_EDGE, CARD_SURFACE);
+		gfx_text_fit(sm, l->name, width - 17, fit, sizeof fit);
+		gfx_text(sm, 8, y + 4, fit, s->scanning ? ui_col.rx : ui_col.dim);
+		row_text(meta, 8, y + 30, width - 18, l->body, l->header, ui_col.fg, ui_col.dim, false);
+		y += 53;
+	} else if (!scan && l->header) {
 		gfx_text_fit(sm, l->header, width - 12, fit, sizeof fit);
 		gfx_text(sm, 6, y, fit, ui_col.fg);
 		y += sm->h + 4;
 	}
 	int rows = (footer - y - 4) / step;
+
 	uint16_t top = list_window(l, rows);
 	for (int row = 0; row < rows && top + row < l->count; row++) {
 		uint16_t i = (uint16_t)(top + row);
 		ui_item_t item = { 0 };
 		l->item(i, &item);
 		int yy = y + row * step;
-		bool focus = i == l->focus;
-		color_t fg = focus ? CARD_INK : ui_col.fg;
+		bool focus = i == l->focus && (!(scan || data) || !(item.flags & UI_ITEM_INFO));
+		color_t highlight = item.flags & UI_ITEM_EDIT ? ui_col.warn : ui_col.focus;
+		color_t fg = focus ? CARD_INK : item.flags & UI_ITEM_DIM ? ui_col.dim : ui_col.fg;
 		color_t value = focus ? fg : item.flags & UI_ITEM_TEMP ? ui_col.warn : ui_col.dim;
-		gfx_round_fill(0, yy, width - 5, step - 3, focus ? ui_col.focus : CARD_EDGE);
-		if (!focus)
-			gfx_round_fill(1, yy + 1, width - 7, step - 5, CARD_SURFACE);
+		int end = width - 5;
+		card_list_row(yy, end, step - 3, focus ? highlight : CARD_EDGE,
+			      focus ? highlight : CARD_SURFACE);
 		int x = 7;
+		if (aprs && item.num) {
+			char key[] = { item.num, 0 };
+			int ky = yy + (step - 3 - meta->h) / 2;
+			gfx_round_fill(x - 2, ky - 1, 13, meta->h + 2, focus ? CARD_INK : CARD_EDGE);
+			gfx_text(meta, x + 1, ky, key, focus ? ui_col.focus : fg);
+			x = 23;
+		}
 		if (item.flags & UI_ITEM_FOLDER) {
 			color_t icon = focus ? fg : ui_col.focus;
 			gfx_rect(7, yy + 9, 13, 9, icon);
@@ -3470,7 +3975,21 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 				gfx_fill(12, yy + 12, 3, 3, focus ? fg : ui_col.warn);
 			x = 26;
 		}
-		if (directory) {
+		if (kind == UI_CARD_MESSAGES && (item.flags & UI_ITEM_PREVIEW)) {
+			char *preview = strchr(item.value, '\n');
+			if (preview)
+				*preview++ = 0;
+			if (item.flags & UI_ITEM_WARN) {
+				gfx_round_fill(x, yy + 9, 5, 5, focus ? fg : ui_col.focus);
+				x += 10;
+			}
+			row_text(meta, x, yy + 5, end - 6, item.label, item.value, fg, value, false);
+			if (preview) {
+				preview[strcspn(preview, "\r\n")] = 0;
+				fit_end(meta, preview, end - 14, fit, sizeof fit);
+				gfx_text(meta, 7, yy + 22, fit, focus ? fg : ui_col.dim);
+			}
+		} else if (directory) {
 			const int name_x = 79;
 			gfx_text(meta, x, yy + (step - 3 - meta->h) / 2, item.label, focus ? fg : ui_col.focus);
 			int room = width - 11 - name_x;
@@ -3478,7 +3997,10 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 			fit_end(font, item.value, room, fit, sizeof fit);
 			gfx_text(font, name_x, yy + (step - 3 - font->h) / 2, fit, fg);
 		} else {
-			row_text(sm, x, yy + (step - 3 - sm->h) / 2, width - 11, item.label, item.value, fg, value,
+			const font_t *font = aprs || kind == UI_CARD_SCAN_LISTS ? meta : sm;
+			if (kind == UI_CARD_FIELDS && gfx_text_width(sm, item.label) + gfx_text_width(sm, item.value) + 5 > width - 18)
+				font = meta;
+			row_text(font, x, yy + (step - 3 - font->h) / 2, width - 11, item.label, item.value, fg, value,
 				 (item.flags & UI_ITEM_PREVIEW) != 0);
 		}
 	}
@@ -3488,33 +4010,96 @@ void ui_draw_card_list(const ui_state_t *s, const ui_list_t *l, ui_card_list_kin
 		gfx_fill(width - 3, y, 3, 2, ui_col.focus);
 	if (top + rows < l->count)
 		gfx_fill(width - 3, y + rows * step - 4, 3, 2, ui_col.focus);
-	ui_draw_banner(s);
-	if (s->toast) {
-		ui_draw_hint(s->toast, true);
-	} else if (s->hints) {
-		const char *keys = directory ? TR("P1/P2 tabs  OK talk  # more  Back") :
-			channels ? (CONFIG_ZONE_EDIT ? TR("OK go  # actions  Back") : TR("OK go  Back")) :
-			TR("OK/# open  Hold OK go  Back");
-		gfx_hline(0, footer, width, CARD_EDGE);
-		gfx_text_fit(meta, keys, width - 4, fit, sizeof fit);
-		gfx_text(meta, 2, footer + 3, fit, ui_col.dim);
-	}
+	const char *keys = messages || data || fields ? l->hint : kind == UI_CARD_SCAN ? TR("P1/P2 tabs  OK pick  Back") :
+		scan ? TR("P1/P2 tabs  Back") :
+		directory ? (l->hint ? l->hint : TR("P1/P2 tabs  OK talk  # more  Back")) :
+		channels ? (CONFIG_ZONE_EDIT ? TR("OK go  # actions  Back") : TR("OK go  Back")) :
+		TR("OK/# open  Hold OK go  Back");
+	card_list_footer(s, footer, keys, NULL, fit, sizeof fit);
 }
 
-void ui_draw_main_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l)
+static int thread_lines(const char *text, int x, int y, int width, bool draw, color_t color)
+{
+	const font_t *font = &font_6x12;
+	char line[48];
+	while (*text) {
+		text = wrap_line(font, text, width, line, sizeof line);
+		if (draw)
+			gfx_text(font, x, y, line, color);
+		y += font->h;
+	}
+	return y;
+}
+
+static int bubble_height(const char *text, int width)
+{
+	return 24 + thread_lines(text, 0, 0, width, false, 0);
+}
+
+void ui_draw_card_thread(const ui_state_t *s, const ui_list_t *l, const char *(*text)(uint16_t))
+{
+	const font_t *font = &font_6x12;
+	int width = gfx_width(), bottom = gfx_height() - 23, top = 55;
+	int text_width = width - 40;
+	char fit[40];
+	card_header(s, 24);
+	card_center_title(l->name, 7, fit, sizeof fit);
+	if (l->body)
+		top = wrap_text(font, l->body, top, bottom, true, ui_col.dim) + 4;
+	if (l->count) {
+		uint16_t focus = l->focus < l->count ? l->focus : l->count - 1u;
+		uint16_t first = focus, end = focus + 1u;
+		int height = bubble_height(text(focus), text_width);
+		int room = bottom - top;
+		while (first && height < room) {
+			height += bubble_height(text(first - 1u), text_width);
+			first--;
+		}
+		int y = bottom - height;
+		// Keep the selected bubble at the bottom. Near the start, use the
+		// following messages to fill any space left by the short history.
+		if (height < room && end < l->count) {
+			while (end < l->count && height < room) {
+				height += bubble_height(text(end), text_width);
+				end++;
+			}
+			y = height > room ? top : bottom - height;
+		}
+		gfx_clip(0, top, width, room);
+		for (uint16_t i = first; i < end; i++) {
+			ui_item_t item = { 0 };
+			l->item(i, &item);
+			const char *body = text(i);
+			int h = bubble_height(body, text_width);
+			bool outgoing = item.flags & UI_ITEM_TEMP;
+			bool chosen = i == focus;
+			int left = outgoing ? 24 : 0, right = left + width - 26;
+			color_t fg = chosen ? CARD_INK : ui_col.fg;
+			gfx_round_fill(left, y, right - left, h - 4,
+				       chosen ? ui_col.focus : outgoing ? CARD_SELECTED : CARD_SURFACE);
+			row_text(font, left + 7, y + 4, right - 6, outgoing ? item.value : item.label,
+				 outgoing ? item.label : item.value, fg, chosen ? fg : ui_col.dim, false);
+			thread_lines(body, left + 7, y + 18, text_width, true, fg);
+			y += h;
+		}
+		gfx_clip_off();
+	} else if (!l->body && l->empty) {
+		wrap_text(font, l->empty, top, bottom, true, ui_col.dim);
+	}
+	card_list_footer(s, bottom + 4, l->hint, NULL, fit, sizeof fit);
+}
+
+void ui_draw_numbered_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l, bool uniform)
 {
 #if CONFIG_DUAL_WATCH
-	if (ui_card_layout(s)) {
+	if (ui_card_layout(s) && l->count) {
 		const font_t *sm = ui_layout.small;
 		const font_t *meta = &font_6x12;
 		const int width = gfx_width(), top = 55, footer = gfx_height() - 19;
 		const int step = (footer - top - 3) / l->count;
 		char fit[40];
-		gfx_clear(CARD_INK);
-		card_status(s);
-		gfx_fill(0, 27, width, 24, CARD_SURFACE);
-		gfx_text_fit(sm, l->prefix, width - 10, fit, sizeof fit);
-		gfx_text(sm, (width - gfx_text_width(sm, fit)) / 2, 29, fit, ui_col.focus);
+		card_header(s, 24);
+		card_center_title(l->prefix, 5, fit, sizeof fit);
 		for (uint16_t i = 0; i < l->count; i++) {
 			ui_item_t item = { 0 };
 			l->item(i, &item);
@@ -3523,8 +4108,7 @@ void ui_draw_main_menu(const radio_view_t *v, const ui_state_t *s, const ui_list
 			bool focus = l->focus == i;
 			color_t edge = focus ? ui_col.focus : CARD_EDGE;
 			color_t fg = item.flags & UI_ITEM_DIM ? ui_col.dim : ui_col.fg;
-			gfx_round_fill(0, y, width, step - 2, edge);
-			gfx_round_fill(1, y + 1, width - 2, step - 4, focus ? CARD_SELECTED : CARD_SURFACE);
+			card_list_row(y, width, step - 2, edge, focus ? CARD_SELECTED : CARD_SURFACE);
 			char key[] = { item.num, 0 };
 			int ky = y + (step - meta->h) / 2;
 			gfx_round_fill(5, ky - 1, 15, meta->h + 2, edge);
@@ -3536,21 +4120,15 @@ void ui_draw_main_menu(const radio_view_t *v, const ui_state_t *s, const ui_list
 				right -= vw + 6;
 				gfx_text(meta, right, ky, item.value, ui_col.warn);
 			}
-			const font_t *label = gfx_text_width(sm, item.label) <= right - 28 ? sm : meta;
+			const font_t *label = uniform || gfx_text_width(sm, item.label) <= right - 28 ? sm : meta;
 			gfx_text_fit(label, item.label, right - 28, fit, sizeof fit);
 			gfx_text(label, 25, text_y + (sm->h - label->h) / 2, fit, fg);
 		}
-		ui_draw_banner(s);
-		if (s->toast)
-			ui_draw_hint(s->toast, true);
-		else if (s->hints) {
-			gfx_hline(0, footer, width, CARD_EDGE);
-			gfx_text(meta, 0, footer + 3, TR("OK Select"), ui_col.dim);
-			const char *back = TR("Back");
-			gfx_text(meta, width - gfx_text_width(meta, back), footer + 3, back, ui_col.dim);
-		}
+		card_list_footer(s, footer, TR("OK Select"), TR("Back"), fit, sizeof fit);
 		return;
 	}
+#else
+	(void)uniform;
 #endif
 	ui_draw_list(v, s, l);
 }

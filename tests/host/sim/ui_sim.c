@@ -7,12 +7,14 @@
 //
 // Script tokens (separated by spaces):
 //   up down left right ok back quick ctx 0..9 tt mon user1..user4 emerg enc+ enc-   a short press (counted);
+//   quick:<control>     open Quick if needed and press the named control's number (both presses count)
 //   powerkey zone+ zone- scankey lockkey cbkey homekey dualkey abkey: what a reassigned side key sends
 //   long:<key>          a long press (counted)
 //   ptt / ptt:<ms>      PTT pressed for 1 s / ms (counted); pttdown ... pttup holds it
 //   mondown ... monup   the monitor key held (FM: the squelch held open)
 //   datatx / dataend    DMR data goes out without PTT (ARS, SMS, IP): the view says TX; it ends
 //   dtmf:<digits>       during TX: the radio core has sent these DTMF digits (the TX screen's DTMF line)
+//   datastatus        simulated ARS registration and two active LRRP reports
 //   wait:<ms>           time passes
 //   reboot              power off and on: the screens start over, the settings stay
 //   receivers:2         a receiver per dual watch channel; rxa:/rxb:<src>,<dst>,g|p a call on A's / B's own,
@@ -65,6 +67,9 @@
 #include "hotspot/hotspot.h"
 #include "stubentry/stub_entry.h"
 #include "ui/ui_svc_aprs.h"
+#if CONFIG_UI_CARD_MENU
+#include "dmr/dmrDataService.h"
+#endif
 
 #define TICK_MS		50
 #define PRESS_MS	150
@@ -395,6 +400,7 @@ static bool usb_up;	// the computer has brought the network adapter up (hal_neti
 static struct {
 	bool off;		// "aprs:off": not in this build
 	bool no_call;		// "aprs:nocall": no callsign anywhere
+	bool no_pos;		// "aprs:nopos": no position available
 	aprs_cfg_t cfg;
 	uint32_t sent;
 } aprs_sim;
@@ -416,11 +422,11 @@ bool ui_svc_aprs_view(aprs_view_t *v)
 		strcpy(v->call, "N0SIM-7");
 	v->block = aprs_sim.no_call ? APRS_NO_CALL : APRS_OK;
 	v->freq_hz = aprs_sim.cfg.region == APRS_REGION_CUSTOM ? aprs_sim.cfg.freq_hz : hz[aprs_sim.cfg.region % APRS_REGION_COUNT];
-	v->pos_valid = !aprs_sim.no_call;
+	v->pos_valid = !aprs_sim.no_call && !aprs_sim.no_pos;
 	v->pos_src = APRS_SRC_FIXED;
 	v->lat = 337000000;
 	v->lon = -841000000;
-	v->next_s = aprs_sim.cfg.tx_on ? 245 : 0xFFFFu;
+	v->next_s = aprs_sim.cfg.tx_on && v->pos_valid && aprs_sim.cfg.interval_s ? aprs_sim.cfg.interval_s : 0xFFFFu;
 	v->rf_sent = aprs_sim.sent;
 	v->stations = 2;
 	return true;
@@ -772,16 +778,103 @@ uint32_t codeplug_dmr_id(void) { return 3101276; }
 static struct { uint16_t index; contact_t c; } sim_ct_edits[SIM_CONTACT_EDITS];
 static uint8_t n_ct_edits;
 
+#if CONFIG_TALKGROUP_EDIT
+static bool sim_tg_pool;
+static uint16_t sim_tg_refs[CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL];
+static uint8_t sim_tg_count;
+
+bool codeplug_talkgroup_refs(uint16_t channel, uint16_t *refs, uint8_t *count)
+{
+	*count = 0;
+	if (!sim_tg_pool || channel != 3)
+		return false;
+	*count = sim_tg_count;
+	if (refs)
+		memcpy(refs, sim_tg_refs, *count * sizeof *refs);
+	return true;
+}
+
+bool ui_svc_edit_talkgroups(uint16_t channel, uint16_t ref, ui_tg_edit_t op)
+{
+	if (!sim_tg_pool || channel != 3)
+		return false;
+	uint8_t i = 0;
+	while (i < sim_tg_count && sim_tg_refs[i] != ref)
+		i++;
+	if (op == UI_TG_ADD && i == sim_tg_count && i < CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL)
+		sim_tg_refs[sim_tg_count++] = ref;
+	else if (op == UI_TG_REMOVE && i < sim_tg_count) {
+		sim_tg_count--;
+		memmove(sim_tg_refs + i, sim_tg_refs + i + 1, (sim_tg_count - i) * sizeof sim_tg_refs[0]);
+	} else if ((op == UI_TG_UP && i > 0 && i < sim_tg_count) || (op == UI_TG_DOWN && i + 1 < sim_tg_count)) {
+		uint8_t next = (uint8_t)(i + (op == UI_TG_UP ? -1 : 1));
+		sim_tg_refs[i] = sim_tg_refs[next];
+		sim_tg_refs[next] = ref;
+	} else {
+		return false;
+	}
+	sim_rec.codeplug_writes++;
+	return true;
+}
+#endif
+
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+void radio_req_dmr_talkgroup_step(int16_t step) { (void)step; }
+void radio_req_dmr_talkgroup_select(uint8_t index) { (void)index; }
+
+bool codeplug_contact_find(uint32_t id, bool group, contact_t *out)
+{
+	for (uint16_t ref = 1; ref <= CODEPLUG_CONTACTS_MAX; ref++) {
+		if (codeplug_contact(ref, out) && out->id == id && (out->type != CONTACT_PRIVATE) == group)
+			return true;
+	}
+	return false;
+}
+
+uint8_t codeplug_talkgroup_at(uint16_t channel, uint8_t index, codeplug_talkgroup_t *out)
+{
+	*out = (codeplug_talkgroup_t){0};
+#if CONFIG_TALKGROUP_EDIT
+	if (sim_tg_pool && channel == 3) {
+		contact_t contact;
+		if (index < sim_tg_count && codeplug_contact(sim_tg_refs[index], &contact))
+			*out = (codeplug_talkgroup_t){ .id = contact.id, .timeslot = contact.timeslot,
+						      .contact_number = sim_tg_refs[index] };
+		return sim_tg_count;
+	}
+#endif
+	(void)channel;
+	(void)index;
+	return 0;
+}
+#endif
+
 #if CONFIG_CONTACT_EDIT
 bool ui_svc_write_contact(uint16_t index, const contact_t *c)
 {
-	if (n_ct_edits == SIM_CONTACT_EDITS)
-		return false;
-	sim_ct_edits[n_ct_edits].index = index;
-	sim_ct_edits[n_ct_edits].c = *c;
-	n_ct_edits++;
+	uint8_t i = 0;
+	while (i < n_ct_edits && sim_ct_edits[i].index != index)
+		i++;
+	if (i == n_ct_edits) {
+		if (n_ct_edits == SIM_CONTACT_EDITS)
+			return false;
+		n_ct_edits++;
+	}
+	sim_ct_edits[i].index = index;
+	sim_ct_edits[i].c = *c;
+	sim_cp_serial++;
 	sim_rec.codeplug_writes++;
+	ui_notify(&(ui_event_t){ .kind = UI_EV_CONTACT_SAVED });
 	return true;
+}
+
+bool ui_svc_set_channel_contact(uint16_t index)
+{
+	channel_t channel;
+	if (view.vfo || !codeplug_channel(view.channel_number, &channel) || channel.mode != RADIO_MODE_DMR)
+		return false;
+	channel.contact = index;
+	return ui_svc_write_channel(view.channel_number, &channel);
 }
 #endif
 
@@ -1250,7 +1343,7 @@ static void rx_end(void)
 
 // ---------------- services other packages own (ui_svc.h) ----------------
 
-typedef struct { ui_msg_t m; uint32_t at; } sim_msg_t;
+typedef struct { ui_msg_t m; } sim_msg_t;
 static sim_msg_t inbox[8];
 static uint16_t n_inbox;
 
@@ -1484,6 +1577,12 @@ bool ui_svc_scan(bool on)
 	changed();
 	return true;
 }
+#if CONFIG_UI_CARD_MENU
+void ui_svc_scan_prefs(ui_scan_prefs_t *out)
+{
+	*out = (ui_scan_prefs_t){ .dwell_ms = 150, .delay_ms = 2000, .resume = 1 };
+}
+#endif
 // Roaming as the radio core does it, without sites to search: roam now "moves" at once
 bool ui_svc_roam(uint8_t cmd)
 {
@@ -1674,13 +1773,30 @@ bool ui_svc_msg_get(uint16_t i, ui_msg_t *out)
 	if (i >= n_inbox)
 		return false;
 	*out = inbox[i].m;
-	out->age_ms = now_ms - inbox[i].at;
+
 	return true;
 }
-void ui_svc_msg_read(uint16_t i) { if (i < n_inbox) inbox[i].m.unread = false; }
-bool ui_svc_msg_delete(uint16_t i)
+int ui_svc_msg_by_token(uint16_t token, ui_msg_t *out)
 {
-	if (i >= n_inbox)
+	for (uint16_t i = 0; i < n_inbox; i++) {
+		if (inbox[i].m.token == token) {
+			if (out != NULL)
+				ui_svc_msg_get(i, out);
+			return i;
+		}
+	}
+	return -1;
+}
+void ui_svc_msg_read(uint16_t token)
+{
+	int i = ui_svc_msg_by_token(token, NULL);
+	if (i >= 0)
+		inbox[i].m.unread = false;
+}
+bool ui_svc_msg_delete(uint16_t token)
+{
+	int i = ui_svc_msg_by_token(token, NULL);
+	if (i < 0)
 		return false;
 	memmove(&inbox[i], &inbox[i + 1], (n_inbox - i - 1u) * sizeof inbox[0]);
 	n_inbox--;
@@ -1708,8 +1824,40 @@ static const ui_gps_sat_t sim_sats[] = {
 	{ UI_GNSS_GLONASS, 7, 22, 0, 100, false }, { UI_GNSS_GALILEO, 11, 15, 15, 280, false },
 };
 #define SIM_SATS	(sizeof(sim_sats) / sizeof(sim_sats[0]))
+#if CONFIG_UI_CARD_MENU
+static bool sim_data_status, sim_ars_queued;
+static uint8_t sim_subscriptions;
+uint8_t ui_svc_ars_state(void) {
+	return sim_ars_queued ? DMR_ARS_STATE_REGISTERING : sim_data_status ? DMR_ARS_STATE_REGISTERED : DMR_ARS_STATE_OFF;
+}
+bool ui_svc_ars_register_now(void)
+{
+	if (!ui_svc_setting_get(UI_SET_ARS_SERVER) || sim_ars_queued)
+		return false;
+	sim_ars_queued = true;
+	return true;
+}
+void ui_svc_data_dashboard(dmrDataDashboard_t *out)
+{
+	if (!ui_svc_setting_get(UI_SET_POS_REPLY))
+		sim_subscriptions = 0;
+	*out = (dmrDataDashboard_t){
+		.count = sim_subscriptions, .arsState = ui_svc_ars_state(),
+		.nextMs = sim_data_status ? now_ms + 1038000u : 0,
+		.registeredAt = now_ms - 762000u, .refreshMs = 1800000u,
+		.attempts = sim_data_status ? 1 : 0, .maxAttempts = 6,
+		.canRegister = ui_svc_setting_get(UI_SET_ARS_SERVER) && !sim_ars_queued,
+		.subscription = {
+			{ 3101001, 30000, 0, now_ms + 24000 },
+			{ 3102003, 30000, 100, now_ms + 14000 },
+		},
+	};
+}
+#endif
 static bool sim_no_fix;
 static int32_t sim_lat, sim_lon;
+
+uint16_t ui_svc_utc_minute(void) { return sim_no_fix ? 0 : 20u * 60u + 12u + 1u; }
 
 bool ui_svc_position(ui_position_t *out)
 {
@@ -1740,6 +1888,98 @@ static bool emergency_on;
 bool ui_svc_emergency(bool on) { emergency_on = on; return true; }
 bool ui_svc_emergency_active(void) { return emergency_on; }
 bool ui_svc_factory_reset(void) { return true; }
+#if CONFIG_MESSAGE_JOURNAL
+static bool sim_history_enabled;
+static message_history_view_t sim_history;
+static const char *sim_history_text;
+static char sim_realtime_text[UI_MSG_TEXT_MAX + 1];
+
+bool ui_svc_message_history_available(void) { return board.home_brand != NULL; }
+bool ui_svc_message_history_activate(void)
+{
+	ui_event_t ev = { .kind = UI_EV_HISTORY_RESULT, .text = "Message history enabled" };
+	ui_notify(&ev);
+	return true;
+}
+
+bool ui_svc_history_active(void) { return sim_history_enabled; }
+void ui_svc_history_browse(uint32_t key, uint32_t before)
+{
+	uint16_t revision = sim_history.revision + 1u;
+	sim_history = (message_history_view_t){ .key = key, .revision = revision, .status = HISTORY_READY };
+	if (!key) {
+		sim_history.peers[0] = 3101234;
+		sim_history.peers[1] = MESSAGE_HISTORY_GROUP_KEY | 3100;
+		sim_history.count = 2;
+	} else if (key & MESSAGE_HISTORY_GROUP_KEY) {
+		sim_history_text = "Group reply";
+		sim_history.flags = MESSAGE_RECORD_GROUP | MESSAGE_RECORD_OUTGOING;
+	} else if (before && before <= 8) {
+		sim_history_text = "Older private text";
+	} else {
+		sim_history_text = "Private text";
+		sim_history.time = 756;
+		sim_history.before = 8;
+		sim_history.flags = MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_DELIVERED;
+	}
+}
+void ui_svc_history_thread(uint32_t key, uint32_t anchor, bool forward)
+{
+	uint16_t revision = sim_history.revision + 1u;
+	sim_history = (message_history_view_t){ .key = key, .revision = revision, .status = HISTORY_READY,
+		.timeline = true, .forward = forward, .before = anchor, .count = 1 };
+	if (key & MESSAGE_HISTORY_GROUP_KEY) {
+		sim_history.thread[0] = (message_thread_entry_t){ .id = 10, .flags = MESSAGE_RECORD_OUTGOING };
+	} else if (anchor && !forward) {
+		sim_history.count = 2;
+		sim_history.thread[0] = (message_thread_entry_t){ .id = 5 };
+		sim_history.thread[1] = (message_thread_entry_t){ .id = 3 };
+		sim_history.flags = MESSAGE_THREAD_NEWER;
+	} else if (anchor && forward) {
+		sim_history.count = 2;
+		sim_history.thread[0] = (message_thread_entry_t){ .id = 5 };
+		sim_history.thread[1] = (message_thread_entry_t){ .id = 8, .time = 756,
+			.flags = MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_DELIVERED };
+	} else {
+		sim_history.count = 2;
+		sim_history.thread[forward ? 1 : 0] = (message_thread_entry_t){ .id = 8, .time = 756,
+			.flags = MESSAGE_RECORD_OUTGOING | MESSAGE_RECORD_DELIVERED };
+		sim_history.thread[forward ? 0 : 1] = (message_thread_entry_t){ .id = 5 };
+		sim_history.flags = MESSAGE_THREAD_OLDER;
+	}
+}
+
+void ui_svc_history_thread_text(uint16_t revision, unsigned index, char *text, size_t size)
+{
+	if (revision != sim_history.revision || index >= sim_history.count) {
+		if (size)
+			text[0] = 0;
+		return;
+	}
+	uint32_t id = sim_history.thread[index].id;
+	const char *body = id == UINT32_MAX ? sim_realtime_text : id == 10 ? "Group reply" : id == 8 ?
+		"Private text with several wrapped lines, far longer than a preview. Please bring the spare battery. End of the full message." :
+		id == 5 ? "Older private text" : "Earlier page";
+	snprintf(text, size, "%s", body);
+}
+
+void ui_svc_history_view(message_history_view_t *out, char *text, size_t size)
+{
+	*out = sim_history;
+	if (text && size) {
+		if (!sim_history.key && size >= MESSAGE_JOURNAL_TEXT) {
+			memset(text, 0, MESSAGE_JOURNAL_TEXT);
+			text[0] = (char)244u;
+			text[1] = 2;
+			snprintf(text + 2, MESSAGE_DIRECTORY_PREVIEW - 2u, "Private text");
+			snprintf(text + MESSAGE_DIRECTORY_PREVIEW + 2u, MESSAGE_DIRECTORY_PREVIEW - 2u, "Group reply");
+
+		} else {
+			snprintf(text, size, "%s", sim_history_text ? sim_history_text : "");
+		}
+	}
+}
+#endif
 
 // The crash log (ui_svc.h): "crash:on" a record from before this start nobody has seen, "crash:ask" / "crash:auto"
 // the same with the report's mode and the first contact (USA, TG 3100) as its target. A report goes at once;
@@ -1784,21 +2024,37 @@ uint8_t ui_svc_crash_tx_state(void)
 
 static void add_message(uint32_t src, const char *text)
 {
+	static uint16_t next_token;
 	if (n_inbox == 8)
 		n_inbox--;
 	memmove(&inbox[1], &inbox[0], n_inbox * sizeof inbox[0]);
 	n_inbox++;
 	memset(&inbox[0], 0, sizeof inbox[0]);
 	inbox[0].m.src = src;
+	inbox[0].m.own = src == 1001;
+	inbox[0].m.utc_minute = 12u * 60u + 35u + 1u;
+	if (++next_token == 0)
+		++next_token;
+	inbox[0].m.token = next_token;
 	inbox[0].m.unread = true;
-	inbox[0].at = now_ms;
+
 	strcpy(inbox[0].m.name, contact_name(src, false));
 	strncpy(inbox[0].m.text, text, UI_MSG_TEXT_MAX);
+#if CONFIG_MESSAGE_JOURNAL
+	if (sim_history_enabled && sim_history.timeline && sim_history.key == src) {
+		ui_svc_history_thread(src, 0, false);
+		snprintf(sim_realtime_text, sizeof sim_realtime_text, "%s", text);
+		memmove(&sim_history.thread[1], &sim_history.thread[0],
+			sim_history.count * sizeof sim_history.thread[0]);
+		sim_history.count++;
+		sim_history.thread[0] = (message_thread_entry_t){ .id = UINT32_MAX, .time = 757 };
+	}
+#endif
 	ui_event_t ev;
 	memset(&ev, 0, sizeof ev);
 	ev.kind = UI_EV_MESSAGE;
 	ev.id = src;
-	ev.index = 0;
+	ev.index = inbox[0].m.token;
 	strcpy(ev.name, inbox[0].m.name);
 	strncpy(ev.text, text, sizeof ev.text - 1);
 	ui_notify(&ev);
@@ -1862,7 +2118,20 @@ static void advance(uint32_t ms)
 
 void sim_reset(const sim_geom_t *g, sim_map_t map)
 {
+#if CONFIG_TALKGROUP_EDIT
+	sim_tg_pool = false;
+	sim_tg_count = 0;
+#endif
+#if CONFIG_MESSAGE_JOURNAL
+	sim_history_enabled = false;
+	sim_history = (message_history_view_t){0};
+	sim_history_text = NULL;
+#endif
 	board.home_brand = NULL;
+#if CONFIG_UI_CARD_MENU
+	sim_data_status = sim_ars_queued = false;
+	sim_subscriptions = 0;
+#endif
 	sim_no_fix = false;
 	sim_lat = 423601000;
 	sim_lon = -710589000;
@@ -1936,6 +2205,7 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	ui_svc_setting_set(UI_SET_TOT_S, 180);
 	ui_svc_setting_set(UI_SET_BACKLIGHT_S, 30);
 	ui_svc_setting_set(UI_SET_REF_TRIM, 0);
+	ui_svc_setting_set(UI_SET_UTC_OFFSET_MIN, 0);
 	ui_svc_setting_set(UI_SET_LONG_PRESS_MS, 600);	// settings a flow changes start from their defaults
 	ui_svc_setting_set(UI_SET_AUTO_LOCK_S, 0);
 	ui_svc_setting_set(UI_SET_PTT_LOCKED, 1);
@@ -1963,6 +2233,8 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	ui_svc_setting_set(UI_SET_ROAM_PROBE, 0);
 	ui_svc_setting_set(UI_SET_CRASH_MODE, UI_CRASH_SEND_OFF);
 	ui_svc_setting_set(UI_SET_CRASH_CONTACT, 0);
+	ui_svc_setting_set(UI_SET_ARS_SERVER, 0);
+	ui_svc_setting_set(UI_SET_POS_REPLY, 1);
 	// English, or the language UI_LANG names ("es": a gallery in that language, docs/dev/translating.md)
 	const char *lang = getenv("UI_LANG");
 	ui_svc_setting_set(UI_SET_LANGUAGE, lang != NULL && strlen(lang) == 2 ? (uint8_t)lang[0] << 8 | (uint8_t)lang[1] : 0);
@@ -2079,6 +2351,33 @@ static const char *screen(void)
 	return s.screen;
 }
 
+// Behavior flows name a control; separate order checks exercise its numbered position.
+// Still send real keys, so opening the menu and choosing a tile count against the press budget.
+static bool quick_control(const char *name, char *err, size_t len)
+{
+	static const struct { const char *name; uint8_t kind; } controls[] = {
+		{ "power", QT_POWER }, { "squelch", QT_SQUELCH }, { "timeslot", QT_TIMESLOT },
+		{ "color", QT_CC }, { "privacy", QT_PRIVACY }, { "digital-monitor", QT_HEAR_ALL },
+		{ "monitor", QT_MONITOR }, { "vox", QT_VOX }, { "dual", QT_SCAN },
+	};
+	for (size_t i = 0; i < sizeof controls / sizeof controls[0]; i++) {
+		if (strcmp(name, controls[i].name) != 0)
+			continue;
+		if (strcmp(screen(), "quick") != 0 && !press("quick", false, err, len))
+			return false;
+		for (int tile = 0; tile < UI_QUICK_TILES; tile++) {
+			if (ui_quick_kind(tile, ui_view()) == controls[i].kind) {
+				char key[] = { (char)('1' + tile), 0 };
+				return press(key, false, err, len);
+			}
+		}
+		snprintf(err, len, "no Quick control %s in this mode", name);
+		return false;
+	}
+	snprintf(err, len, "unknown Quick control %s", name);
+	return false;
+}
+
 static bool check(const char *kv, char *err, size_t len)
 {
 	char key[32], want[64], got[64];
@@ -2090,9 +2389,10 @@ static bool check(const char *kv, char *err, size_t len)
 	memcpy(key, kv, (size_t)(eq - kv));
 	key[eq - kv] = 0;
 	snprintf(want, sizeof want, "%s", eq + 1);
-	for (char *p = want; *p; p++)
-		if (*p == '_')
-			*p = ' ';
+	if (strcmp(key, "screen") != 0)
+		for (char *p = want; *p; p++)
+			if (*p == '_')
+				*p = ' ';
 	ui_app_status_t s;
 	ui_app_status(&s);
 	bool prefix = false;
@@ -2249,6 +2549,8 @@ static bool run_token(char *t, char *err, size_t len)
 	char *arg = strchr(t, ':');
 	if (arg != NULL)
 		*arg++ = 0;
+	if (strcmp(t, "quick") == 0 && arg != NULL)
+		return quick_control(arg, err, len);
 	if (strcmp(t, "long") == 0)
 		return press(arg, true, err, len);
 	if (strcmp(t, "ptt") == 0) {
@@ -2326,6 +2628,12 @@ static bool run_token(char *t, char *err, size_t len)
 		advance(arg != NULL ? (uint32_t)atoi(arg) : 1000u);
 		return true;
 	}
+#if CONFIG_TALKGROUP_EDIT
+	if (strcmp(t, "talkgroup-pool") == 0) {
+		sim_tg_pool = true;
+		return true;
+	}
+#endif
 	if (strcmp(t, "branded-home") == 0) {
 		static const char *const levels[] = { "L-", "L", "L+", "L++", "M", "M+", "M++", "H-", "H" };
 		board.home_brand = "DM32";
@@ -2333,6 +2641,12 @@ static bool run_token(char *t, char *err, size_t len)
 		advance(1000);
 		return true;
 	}
+#if CONFIG_MESSAGE_JOURNAL
+	if (strcmp(t, "history") == 0) {
+		sim_history_enabled = true;
+		return true;
+	}
+#endif
 	if (strcmp(t, "rx") == 0 || strcmp(t, "call") == 0) {
 		unsigned src = 0, dst = 0;
 		char kind = 'g', alias[32] = "";
@@ -2476,6 +2790,16 @@ static bool run_token(char *t, char *err, size_t len)
 		advance(200);
 		return true;
 	}
+#if CONFIG_UI_CARD_MENU
+	if (strcmp(t, "datastatus") == 0) {
+		sim_data_status = true;
+		sim_subscriptions = arg != NULL && strcmp(arg, "one") == 0 ? 1 : 2;
+		ui_svc_setting_set(UI_SET_ARS_SERVER, 16777213);
+		changed();
+		advance(200);
+		return true;
+	}
+#endif
 #if CONFIG_CONTACT_POSITION
 	if (strcmp(t, "localnofix") == 0) {
 		sim_no_fix = true;
@@ -2525,6 +2849,20 @@ static bool run_token(char *t, char *err, size_t len)
 		return true;
 	}
 #endif
+#endif
+#if CONFIG_MESSAGE_JOURNAL
+	if (strcmp(t, "smsresult") == 0 && arg != NULL && sim_history.timeline && sim_rec.messages_sent) {
+		bool ok = strcmp(arg, "ok") == 0;
+		if (!ok && strcmp(arg, "fail") != 0)
+			return false;
+		ui_svc_history_thread(sim_history.key, 0, false);
+		sim_history.thread[0].flags = MESSAGE_RECORD_OUTGOING |
+			(ok ? MESSAGE_RECORD_DELIVERED : MESSAGE_RECORD_FAILED);
+		ui_event_t result = { .kind = UI_EV_MESSAGE_SENT, .id = sim_rec.tx_id, .ok = ok };
+		ui_notify(&result);
+		advance(200);
+		return true;
+	}
 #endif
 	if (strcmp(t, "msg") == 0 && arg != NULL) {
 		char text[UI_MSG_TEXT_MAX + 1];
@@ -2578,6 +2916,7 @@ static bool run_token(char *t, char *err, size_t len)
 	if (strcmp(t, "aprs") == 0 && arg != NULL) {	// aprs:off (not built), aprs:nocall, aprs:custom (a custom frequency set)
 		aprs_sim.off = strcmp(arg, "off") == 0;
 		aprs_sim.no_call = strcmp(arg, "nocall") == 0;
+		aprs_sim.no_pos = strcmp(arg, "nopos") == 0;
 		if (strcmp(arg, "custom") == 0)
 			aprs_sim.cfg.freq_hz = 144930000;
 		return true;

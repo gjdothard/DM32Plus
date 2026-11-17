@@ -1,5 +1,6 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Native codeplug (draft)
 
@@ -15,6 +16,18 @@ plan for a native format. Nothing in section 4 is built yet.
 - The open-firmware layout keeps working for as long as qdmr and the open-firmware CPS are the tools people have.
 - The native format carries what the open-firmware one can't: per-channel privacy key slot, more zones, longer names, and
   per-channel features without overloading vendor flag bits.
+- The CPS can explicitly convert legacy operating talkgroup assignments to saved group-contact references.
+  Conversion reuses matching contacts, creates missing contacts, and preserves the legacy bytes in the output.
+- The channel editor stages new talkgroup contacts until Save channel. It saves the channel and any newly
+  assigned contacts together as one undoable edit.
+- Opening a file over unsaved edits requires confirmation. Channel and membership dialogs ask before discarding
+  modified fields or lists, including dismissal with Escape. Browser drafts are written in edit order and report
+  saving, saved, or unavailable; a restored draft preserves whether it had unexported or unwritten edits.
+- Record creation is staged until the editor is saved. A new channel and any talkgroup contacts created in its
+  editor are one undoable change. The Problems view opens the affected record section and labels its field.
+- A fresh CPS visit offers radio reading, file opening, or explicit codeplug creation. A working draft restores
+  directly; an untouched blank draft from an older CPS returns to the start screen. Explicitly created empty
+  codeplugs remain editing sessions. The workspace and its dialogs follow the selected site theme.
 - Radio-wide state, keys included, lives in the settings store, not in the codeplug. A codeplug file can be shared
   without leaking keys or the owner's last channel.
 

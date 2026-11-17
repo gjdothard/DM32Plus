@@ -7,7 +7,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { bulkColumns, channelForm, columns } from "../static/js/editor/views.js";
+import { bulkColumns, channelForm, columns, recordForm, visibleChannelColumns, DEFAULT_CHANNEL_COLUMNS } from "../static/js/editor/views.js";
+import { nextTab } from "../static/js/editor/navigation.js";
 import { empty } from "../static/js/codeplug/model.js";
 import { Grid } from "../static/js/editor/grid.js";
 
@@ -24,10 +25,9 @@ test("operating talkgroups use saved group contacts and preserve per-entry times
 		{ id: 0xFFFFFF, name: "All call", type: "all" },
 	);
 	const f = channelForm(model, t).find((item) => item.key === "talkGroups");
-	assert.deepEqual([...f.choices], [[3100, { label: "Nationwide · TG 3100", timeslot: 2 }],
-		[91, { label: "Worldwide · TG 91", timeslot: 0 }]]);
+	assert.deepEqual(f.contacts, model.contacts.slice(0, 3));
 	const channel = { timeslot: 1 };
-	const entries = f.resolve([3100, 91], f.choices, channel);
+	const entries = f.resolve(f.contacts.slice(0, 2), channel);
 	assert.equal(f.parse(channel, f.key, entries), undefined);
 	assert.deepEqual(channel.talkGroups, [{ id: 3100, timeslot: 2 }, { id: 91, timeslot: 1 }]);
 	assert.equal(f.parse(channel, f.key, [entries[0], entries[0]]), "editor.err.talkgroups");
@@ -99,4 +99,47 @@ test("the table filter and sort take every column's text, numbers too", () => {
 	g.filter = "";
 	g.sort = { key: "number", dir: 1 };
 	assert.deepEqual(g.shown().map((r) => r.number), [3, 12]);
+});
+
+test("channel column preferences retain the pinned name and ignore unknown fields", () => {
+	const all = columns("channels", empty(), t);
+	assert.deepEqual(visibleChannelColumns(all).map(column => column.key), DEFAULT_CHANNEL_COLUMNS);
+	const chosen = visibleChannelColumns(all, ["power", "unknown"]);
+	assert.deepEqual(chosen.map(column => column.key), ["name", "power"]);
+	assert.equal(chosen[0].pinned, true);
+	assert.deepEqual(visibleChannelColumns(all, null).map(column => column.key), DEFAULT_CHANNEL_COLUMNS);
+});
+
+test("channel filtering still finds values in hidden columns", () => {
+	const all = columns("channels", empty(), t);
+	const g = Object.assign(Object.create(Grid.prototype), {
+		columns: all.filter(column => column.key === "name"), searchColumns: all,
+		rows: [{ name: "Simplex", mode: "fm", txTone: "88.5" }], filter: "88.5", sort: null,
+	});
+	assert.equal(g.shown().length, 1);
+});
+
+test("record forms keep channel-default APRS frequencies and existing all-call IDs readable", () => {
+	const aprs = recordForm("aprs", empty(), t).find(field => field.key === "txHz");
+	assert.equal(aprs.format(0), "");
+	const profile = { txHz: 145000000 };
+	assert.equal(aprs.parse(profile, "txHz", ""), undefined);
+	assert.equal(profile.txHz, 0);
+	const id = recordForm("contacts", empty(), t).find(field => field.key === "id");
+	const all = { type: "all", id: 0 };
+	assert.equal(id.disabled(all), true);
+	assert.equal(id.parse(all, "id", "0"), undefined);
+	assert.equal(all.id, 0);
+	const group = { type: "group", id: 9 };
+	assert.ok(id.parse(group, "id", "bad"));
+	assert.equal(group.id, 9);
+});
+
+test("tab keyboard navigation wraps and supports Home and End", () => {
+	assert.equal(nextTab("ArrowRight", 3, 4), 0);
+	assert.equal(nextTab("ArrowLeft", 0, 4), 3);
+	assert.equal(nextTab("Home", 2, 4), 0);
+	assert.equal(nextTab("End", 0, 4), 3);
+	assert.equal(nextTab("Tab", 1, 4), null);
+	assert.equal(nextTab("ArrowRight", 0, 0), null);
 });

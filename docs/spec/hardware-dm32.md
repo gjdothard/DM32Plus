@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 # Baofeng DM-32UV hardware
 
 This page covers what is needed to bring up the DM-32UV: SoC, memory, peripherals, pins, RF chip, audio, flash,
@@ -200,11 +201,14 @@ DATA_CMD.
 | 0x03 / 0x04 | current day count, low / high byte (16 bits, days since an epoch the firmware chooses) |
 | 0x0C / 0x0D / 0x0E | load seconds / minutes / hours |
 | 0x0F / 0x10 | load day low / high |
-| 0x11 | RTC_CCR: bit 0 interrupt enable, bit 1 run, bit 2 load (self clearing); RadioFoundry writes 0x07 |
+| 0x11 | RTC_CCR: bit 0 interrupt enable, bit 1 run, bit 2 load (self clearing); the clock driver leaves alarms disabled |
 | 0x12 | RTC_LOAD_VSTAT bit 0: set to 0 before loading, 1 after (marks the time valid) |
 
 Datasheet first-power-up order: reset the RTC I2C interface, soft-reset the RTC (RTC_SOFT_RST_N = 0, wait 25 ms, = 1),
 optionally set the match (alarm) registers, load time, CCR.
+
+The clock driver preserves the RTC domain on boot and reads a retained value only when the validity bit and run
+bit are set and the day count is in its UTC epoch range. GPS initialization and power-off retention passed the bench check described in the [bring-up guide](../testing/dm32-bringup.md#rtc-retention).
 
 ### 3.4 Timers
 
@@ -974,6 +978,27 @@ For the USB audio design ([usb-audio.md](usb-audio.md) 2). Not measured.
 The vendor CPS protocol on UART0 (115200) is a raw 24-bit window on this flash: `52 addr3 len2` reads, `57 addr3 00 10
 <4096 bytes>` writes, entered with `PSEARCH` / `PASSSTA` / `SYSINFO` and `FF FF FF FF 0C "PROGRAM"`. The full command set of the radio's programming task is in [dm32-stock-cps.md](dm32-stock-cps.md).
 
+### Conversation storage candidate
+
+The board map leaves five 4 KiB sectors from `0x71B000` through `0x71FFFF` between the settings-sector journal
+and the open-firmware flash image. This 20 KiB gap lies outside the open-firmware CPS write windows. It is the
+first candidate for an opt-in message journal. Four data sectors and one spare sector would hold about 80
+192-byte records before allowing for deletion records or other journal overhead. Verify ownership and
+backup and restore behavior on the radio before any erase. The CPS installer and stock rollback
+write the application in internal flash. A full SPI backup can capture the gap, but the existing
+codeplug restore does not restore it. The original firmware may write there after rollback.
+
+The CPS flash-image window ends at `0xE80000` (exclusive). This leaves a 512 KiB reserve at
+`0xE80000–0xEFFFFF` for conversation storage. The ID database may use up to about 6.9 MiB across its two
+standard areas. The firmware ignores databases whose declared extent exceeds the new limit. Save a
+full SPI backup or export the database with the previous CPS before upgrading if the old database may
+cross this boundary. Build a smaller database by selecting fewer regions or shorter text, then write it
+from CPS. Channels, talkgroups, and saved contacts have separate records.
+
+The reserve may still contain bytes from an older ID database. Initialize it only as part of a journal
+migration. Older firmware and CPS versions can write through this region, so verify rollback behavior
+before storing conversations there. The native codeplug and AES journal remain above the reserve.
+
 ---
 
 ## 11. Factory calibration
@@ -1212,7 +1237,7 @@ Runs on a radio: `docs/testing/dm32-bringup.md` is the bring-up checklist and li
 | Host link | UART0 115200 (divisor 46): debug link, CPS, MMDVM hotspot, PPP. Receive by interrupt into a 1,024-byte ring, transmit by polling. No USB: the radio has no USB data port (the USB-C socket is on the battery pack and only charges it; 3.11), so `CONFIG_USB=n`, `CONFIG_HOSTLINK=y` | `platform/hrc7000/uart.c` |
 | Display | 240x320 in 16 colors (a 37.5 KB frame buffer of palette indexes); MADCTL 0xC0, inversion on | `boards/dm32/display_dm32.c`, `drivers/display/st7789` |
 | Keys | matrix 5x4 on LCD DB0-DB4 / GPIO 0x31-0x34 under the LCD bus lock; SK1 / SK2 as column-to-ground keys; encoder on the GPIO B interrupt (B edges, acked); every other input without interrupts | `input_dm32.c`, `drivers/input/keymatrix` |
-| Data flash | SPI0 + manual CS; any JEDEC ID with a known capacity (GD25Q128, Puya); writes and erases below 0x700000 refused. The core's areas (`hal_flash_map_t`): open-firmware EEPROM image 0x700000, settings ring 0x711000 (8 sectors), journal 0x719000 (2 sectors), open-firmware flash image 0x720000 to 0xF00000, native codeplug 0xF00000..0xFFEFFF (1 MB minus one sector); AES journal 0xFFD000..0xFFEFFF; final stock metadata sector 0xFFF000..0xFFFFFF preserved; no calibration window, no TFTP staging area | `flash_dm32.c` |
+| Data flash | SPI0 + manual CS; any JEDEC ID with a known capacity (GD25Q128, Puya); writes and erases below 0x700000 refused. Open-firmware EEPROM image at 0x700000, settings ring at 0x711000 (8 sectors), journal at 0x719000 (2 sectors), open-firmware flash image at 0x720000–0xE7FFFF, conversation reserve at 0xE80000–0xEFFFFF, native codeplug and AES journal at 0xF00000–0xFFEFFF, and preserved stock metadata at 0xFFF000–0xFFFFFF. No calibration window or TFTP staging area | `flash_dm32.c` |
 | Calibration | 11, read only; a decoded copy at 0x710000 as a fallback; UHF below 400 MHz clamps to the first point | `drivers/cal/baofeng/baofeng_cal.c` |
 | Radio | FD6818 bit-banged (each frame with interrupts off: the DMR interrupts switch it per burst); C7000 FM and TX sub-audio, FD6818 RX sub-audio; PA drive on DAC B from the calibration | `radio_dm32.c`, `drivers/rf/fd6818`, `drivers/modem/hrc7000` |
 | DMR | the HR_C7000 slot engine behind `hal_dmr_modem.h` (`modem-hrc7000.md` 3, 5, 6); FD6818 idle -> TX at the RF TX interrupt, PA keyed 28 ms after each burst is armed, off at the first tick 20 ms after the RF TX interrupt | `drivers/modem/hrc7000/hrc7000_dmr.c`, `platform/hrc7000/dmr_glue.c`, `boards/dm32/radio_dm32.c` (the RF and PA hooks) |
