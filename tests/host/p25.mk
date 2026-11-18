@@ -17,6 +17,19 @@ TESTS += fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest boardAirTest hrc7000AirTest \
 	modemGlueTest modemGlueTestNoAir modemGlueTestSplit modemGlueTestNoAirSplit
 TESTS += pcmGateTest pcmGateTestNoAir pcmGateTestVox pcmGateTestNoAirVox modemGluePcmTest
+TESTS += vocoderMemoryTest vocoderMemoryTestTrunk vocoderMemoryTestNoP25
+
+P25_MEMORY := vocoderMemoryTest.c $(CORE)/p25/p25_workspace.c
+P25_MEMORY_DEPS := $(ROOT)/platform/hrc7000/vocoder.c $(P25_HEADERS) $(ROOT)/hal/hal_vocoder.h \
+	$(wildcard $(ROOT)/platform/hrc7000/*.h stubs/modem_rtos/*.h)
+vocoderMemoryTest: $(P25_MEMORY) $(P25_MEMORY_DEPS)
+	$(CC) $(CFLAGS) $(P25_FLAGS) -I$(ROOT)/platform/hrc7000 -Istubs/modem_rtos -o $@ $(P25_MEMORY)
+vocoderMemoryTestTrunk: $(P25_MEMORY) $(P25_MEMORY_DEPS)
+	$(CC) $(CFLAGS) $(P25_FLAGS) -UCONFIG_P25_TRUNK -DCONFIG_P25_TRUNK=1 \
+		-I$(ROOT)/platform/hrc7000 -Istubs/modem_rtos -o $@ $(P25_MEMORY)
+vocoderMemoryTestNoP25: $(P25_MEMORY) $(P25_MEMORY_DEPS)
+	$(CC) $(CFLAGS) $(P25_FLAGS) -UCONFIG_P25 -DCONFIG_P25=0 -UCONFIG_IMBE -DCONFIG_IMBE=0 \
+		-I$(ROOT)/platform/hrc7000 -Istubs/modem_rtos -o $@ $(P25_MEMORY)
 
 P25_HRC7 := $(ROOT)/drivers/modem/hrc7000
 P25_GLUE := modemGlueTest.c $(P25_HRC7)/hrc7000_air.c $(P25_HRC7)/hrc7000_dmr.c \
@@ -131,7 +144,11 @@ run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 	./p25TrunkTest
 	./p25VoiceTest
 	./ambeVoiceTest
+	./vocoderMemoryTest
+	./vocoderMemoryTestTrunk
+	./vocoderMemoryTestNoP25
 	./fxpTest
 	./airSoftmodemTest
 
 run-p25: pcmGateTest pcmGateTestNoAir pcmGateTestVox pcmGateTestNoAirVox modemGluePcmTest ambeVoiceTest
+run-p25: vocoderMemoryTest vocoderMemoryTestTrunk vocoderMemoryTestNoP25

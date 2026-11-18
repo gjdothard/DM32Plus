@@ -141,8 +141,8 @@ static void v_encode(const int16_t *pcm, uint8_t *bits) { (void)pcm; memset(bits
 static void v_decode(const uint8_t *bits, int16_t *pcm) { (void)bits; memset(pcm, 0, VOCODER_FRAME_SAMPLES * 2); }
 static uint32_t v_options(void) { return VOCODER_OPT_NOISE_REDUCTION | VOCODER_OPT_TONE_FRAMES | VOCODER_OPT_AGC; }
 static void v_set_options(uint32_t opts) { (void)opts; }
-static const hal_vocoder_t fake_vocoder = { v_present, v_reset, v_encode, v_decode, NULL, v_options, v_set_options,
-					    NULL };
+static const hal_vocoder_t fake_vocoder = { .present = v_present, .reset = v_reset, .encode = v_encode, .decode = v_decode,
+	.options = v_options, .set_options = v_set_options };
 static const char *codec_profile;
 static const char *v_profile(void) { return codec_profile; }
 static uint8_t p_mic(void) { return 0; }
@@ -3817,7 +3817,7 @@ static void test_soft_volume(void)
 	CHECK(debuglink_is_feature_op(DL_OP_VOLUME));	// the dispatcher routes it here
 	// VERSION's codec=: a codec stopped for a stub upload (present() false) still reports its profile from flash
 	{
-		const hal_vocoder_t pv = { v_present, v_reset, v_encode, v_decode, v_profile, NULL, NULL, NULL };
+		const hal_vocoder_t pv = { .present = v_present, .reset = v_reset, .encode = v_encode, .decode = v_decode, .profile = v_profile };
 		bool was = codec_present;
 		CHECK(strcmp(debuglink_codec_id(NULL), "none") == 0);
 		codec_present = false;

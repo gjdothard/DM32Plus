@@ -101,10 +101,15 @@ UI/CPS schema design can proceed while provider work is being tested.
   resolve the interrupt-RAM overflow without shrinking the heap or codec slot.
 - [x] M2.5b: Check default, conventional-only, trunking-enabled and DMR-off
   target builds. Check static task stacks in default and P25-enabled firmware.
-- [ ] M2.5c: Define and test a safe home for caller-owned P25 state. A successful
-  link with no channel owner does not establish active-mode memory fit.
+- [x] M2.5c (host and target ABI): Add exclusive codec-state loans and a grouped
+  P25 workspace that fits the existing encoder-state pool. Reject busy/stale
+  ownership, preserve codec identity/options and reinitialize AMBE after return.
+- [ ] M4 handoff gate: Connect the workspace lease to the actual mode owner,
+  stop every old voice/air callback before return, and test real mode transitions.
 
-Next task: M2.4b/M2.5, target resource checks and exclusive state-memory ownership. Do not
+Next task: M3, versioned channel/system records and the RX-only permission matrix;
+then M4 will consume the workspace lease during mode changes. M2's physical FIFO
+and throughput qualification still needs an owner-authorized hardware session. Do not
 advertise P25 in VERSION, the UI or CPS until the matching integration gates pass.
 
 ## Target resource baseline (2026-11-18)
@@ -157,9 +162,9 @@ checked across all three settings to verify the probe is always recompiled.
 These are separate type sizes. They are not all incremental allocations:
 the provider already overlays the soft modem with idle DMR queue storage.
 The unconnected voice/engine/follower owner does not allocate its state yet.
-The current vocoder HAL has no memory-lending interface. M2 must establish
-exclusive ownership and restoration before using any idle codec memory;
-the private AMBE slot and reserved window remain intact.
+At this baseline the vocoder HAL had no memory-lending interface. The next
+milestone below adds exclusive state ownership and restoration. The private
+AMBE slot and reserved window remain intact.
 
 Within the build container, use distinct build directories and fixed version data:
 
@@ -185,6 +190,52 @@ This is a selected-entry-point diagnostic, not an all-code size bound.
 Linker headroom is static space, not free RTOS heap, and is not permission to
 put the voice state there. Hardware FIFO timing and sustained codec throughput
 remain unmeasured.
+
+## Workspace loan milestone
+
+`68f77717` plus the memory-loan changes adds the optional HAL loan pair and
+`p25_workspace.[ch]`. The provider lends the existing 7,168-byte encoder state;
+it rejects an active codec call, another loan, invalid size/alignment or permanent
+parking. Returns validate the exact pointer/capacity/generation. Reset is skipped
+and encode/decode return zero output while lent. Fresh AMBE initialization after
+return restores both encoder and decoder state. Codec identity and options stay
+available; executable code, flash and modem tables are never lent or rewritten.
+
+The target ABI probe reports a 5,800-byte trunked workspace or 5,336 bytes without
+trunking, and a 16-byte caller-owned lease handle. The engine already includes
+its air session. The target ELF confirms the existing encoder pool remains
+7,168 bytes and the decoder pool 6,144 bytes. This leaves 1,368 bytes within the
+encoder pool with trunking enabled; no second permanent workspace is allocated.
+
+`vocoderMemoryTest` runs the actual wrapper and workspace helpers with C codec
+stand-ins. Conventional/trunking/P25-off configurations pass 85/85/16 checks.
+They cover blocked calls without changing borrowed bytes, real reset-path
+reinitialization, options/identity, stale and malformed returns, unavailable
+providers, rollback failures, absent slots and parking during acquisition.
+The four existing radio suites pass 2,181/892/262/216 checks.
+
+| Workspace-era target configuration | Flash bytes | Main RAM bytes | Static RAM headroom |
+|---|---:|---:|---:|
+| Default, P25 off | 634,996 | 209,208 | 2,248 |
+| Conventional-only P25 | 645,704 | 210,992 | 464 |
+| P25 with trunking | 645,696 | 210,992 | 464 |
+| DMR off, P25 off | 336,352 | 129,152 | 82,304 |
+
+All four target builds pass with `-Os -Werror`. The loan provider adds 16 bytes
+of aligned main-RAM usage to the enabled image; the workspace itself reuses
+the existing pool. The 16-byte lease handle remains the future caller's cost.
+Use `BUILD=build/memory/<configuration>`, `GITVERSION=68f77717`, and the same
+fixed timestamp/options as the baseline commands above. Target evidence is in
+`build/p25-target`; the VM source tree is `/home/builder/p25-memory-68f77717`.
+The enabled target's static stack check passes all ten tasks: audio retains
+1,596 bytes beyond the context overhead/margin, the modem 688 bytes, the radio
+840 bytes and UI 40 bytes. This does not measure runtime high-water marks or
+the future channel owner's complete call chain.
+
+The workspace API is available for M4 but has no radio-core channel caller yet.
+The caller must stop AMBE before borrowing and stop P25 audio/air callbacks
+before return. This change does not prove that those mode transitions are wired,
+activate a P25 channel, or establish RF/voice interoperability.
 
 ## Required test cases to carry through later stages
 
@@ -220,6 +271,7 @@ remain unmeasured.
 | Existing audio/radio regressions | Radio core/features/receive bands/roaming/USRP: 2181/892/262/216/121 checks passed. Board/radio attachment compiles with P25 on/off and DMR off. Documentation: 155 files, zero broken links; generic-code check passed. | Host compiler with fake CPU services; not target resource or hardware evidence. |
 | M2.5 target build/resource milestone | Default, P25, conventional-only and DMR-off C-SKY images build with `-Werror`; default and P25 static task-stack checks pass. Retained-entry-point ELF and target ABI probe expose current code/state costs. Task-only placement fixes a 2,152-byte RAM overflow. | Caller-owned P25 state is not allocated yet; memory ownership and restoration remain open. |
 | Host checks after target placement | All 23 `run-p25` executables and 9 Python build/attribution/probe/feature-off checks pass. | Full CI and owner-authorized hardware qualification remain pending. |
+| M2.5c memory ownership | 26 `run-p25` executables and 10 Python checks pass; real codec-wrapper/workspace ownership tests pass with P25/trunking independently on/off. Target probe confirms the grouped workspace fits the existing encoder pool, and four firmware configurations build without warnings. | Codec stand-ins validate the wrapper, not proprietary codec behavior on hardware. The real channel owner has not acquired or released a workspace yet. |
 | Scope update | Owner requested retaining TX and honoring existing CPS RX-only; permission matrix above replaces the earlier passive-only product scope. | Hardware TX still requires its own authorized test session and --allow-rf. |
 
 Local ignored test output is in `build/p25-host`. Python works outside the

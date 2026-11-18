@@ -8,6 +8,7 @@ BaseType_t xTaskCreate(void (*fn)(void *), const char *name, uint32_t stack, voi
 uint32_t ulTaskNotifyTake(BaseType_t clear, TickType_t ticks);
 void vTaskNotifyGiveFromISR(TaskHandle_t task, BaseType_t *woken);
 void xTaskNotifyGive(TaskHandle_t task);
+void vTaskDelay(TickType_t ticks);
 void vTaskSuspendAll(void);
 BaseType_t xTaskResumeAll(void);
 #endif

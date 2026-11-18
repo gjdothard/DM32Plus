@@ -66,3 +66,9 @@ speech. Simulated timing and drain tests do not establish hardware behavior.
 Future refreshes must compare against this exact revision, preserve the ISC
 notices, and rerun the foundation tests. Imported test results are evidence of
 host behavior only; upstream's RF bench qualification does not qualify this fork.
+
+`p25_workspace.[ch]` is local integration code, not an upstream import. It groups
+the imported state types and borrows idle codec state through optional HAL loan
+hooks. The HR_C7000 adaptation lends its existing encoder-state buffer, excludes
+codec calls while lent and reinitializes both codec states after return. It never
+lends or changes the private codec's executable window or flash slot.

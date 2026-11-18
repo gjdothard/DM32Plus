@@ -82,6 +82,16 @@ class P25BuildTest(unittest.TestCase):
             cwd=ROOT, text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_vocoder_compiles_without_dmr(self):
+        data = self.probe("CONFIG_DMR=n")
+        result = subprocess.run(
+            shlex.split(OPTIONS.cc) + ["-std=gnu99", "-Wall", "-Wextra", "-Wshadow", "-Werror",
+                                      "-Icore", "-Ihal", "-Idrivers", "-Iplatform/hrc7000"]
+            + shlex.split(data["DEFS"])
+            + ["-c", "platform/hrc7000/vocoder.c", "-o", str(self.work / "vocoder.o")],
+            cwd=ROOT, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_resource_probe_markers(self):
         for settings, enabled, trunk in [
             ((), False, False),
@@ -99,7 +109,7 @@ class P25BuildTest(unittest.TestCase):
                     cwd=ROOT, text=True, capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 symbols = output.read_bytes()
-                for name in ("voice", "engine", "session", "softmodem"):
+                for name in ("voice", "engine", "session", "softmodem", "workspace", "workspace_lease"):
                     self.assertEqual(("p25_bytes_" + name).encode() in symbols, enabled)
                 self.assertEqual(b"p25_bytes_follower" in symbols, trunk)
 
