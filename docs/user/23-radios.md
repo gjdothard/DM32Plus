@@ -402,14 +402,16 @@ and the [DMR](09-dmr.md#timeslot-and-color-code) and [FM](08-fm.md#quick-setting
 grids. The [operating talkgroup instructions](09-dmr.md#choosing-a-talk-target) show how to assign and select
 talkgroups for a repeater.
 
-Pushing to `Development` or `Testing` runs the [product firmware workflow](../../.github/workflows/product-firmware.yml).
-It assigns the next calendar prerelease version, builds the DM-32UV application, and checks task-stack usage.
+Pushing to `Development` runs the [product firmware workflow](../../.github/workflows/product-firmware.yml).
+It assigns the next `v1.0.0-beta.N` prerelease from the base version in `boards/dm32/product.json`,
+builds the DM-32UV application, and checks task-stack usage.
 When those checks pass, it tags the built commit and publishes the image, manifest, and SHA-256 checksums used
-by the corresponding CPS channel. Testing prepends `RC-` to the GitHub tag, such as `RC-dm32plus-v26.11b1`.
+by the corresponding CPS channel.
 The release image excludes the proprietary voice codec.
 
 Pushing to `Testing` runs the same build and checks with a separate version sequence. Its GitHub prerelease
-names start with `RC ` and its tags start with `RC-dm32plus-`. Find these release candidates on GitHub Releases.
+names start with `RC ` and its tags use `v1.0.0-rc.N`. The counter is independent of Development.
+Stable releases use `v1.0.0`, without a suffix. Find these release candidates on GitHub Releases.
 
 Development prerelease **v26.11b4** was confirmed working on a physical DM-32UV by the radio owner.
 

@@ -5,7 +5,6 @@ name: Product firmware
 on:
   push:
     branches: [Development, Testing]
-    tags: ["*-v*b*"]
 
 env:
   PRODUCT_FILE: boards/dm32/product.json
@@ -35,50 +34,23 @@ jobs:
         id: version
         run: |
           set -euo pipefail
-          tag_prefix="$(jq -er .prefix "$PRODUCT_FILE")-"
-          if [[ "$GITHUB_REF" == refs/heads/Testing ]]; then
-            tag_prefix="RC-$tag_prefix"
-          fi
-          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
-            version=${GITHUB_REF_NAME#"$tag_prefix"}
-            git merge-base --is-ancestor HEAD refs/remotes/origin/Development
-          else
-            version=$(PYTHONPATH=tools TAG_PREFIX="$tag_prefix" python3 - <<'PY'
-          from datetime import datetime, timezone
-          import os
-          import subprocess
-          from release_version import is_prerelease, newest, parse
-
-          prefix = os.environ["TAG_PREFIX"]
-
-          def versions(*options):
-              tags = subprocess.check_output(["git", "tag", "--list", *options, f"{prefix}v*"], text=True)
-              return [tag.removeprefix(prefix) for tag in tags.splitlines()]
-
-          existing = newest(v for v in versions("--points-at", "HEAD") if is_prerelease(v))
-          if existing:
-              print(existing)
-          else:
-              timestamp = int(subprocess.check_output(["git", "show", "-s", "--format=%ct", "HEAD"], text=True))
-              date = datetime.fromtimestamp(timestamp, timezone.utc)
-              year, month = date.year % 100, date.month
-              series = f"v{year:02}.{month}"
-              latest = newest(v for v in versions() if (key := parse(v)) and key[:2] == (year, month))
-              patch, beta = 0, 1
-              if latest:
-                  _, _, patch, (_, previous_beta) = parse(latest)
-                  if 0 < previous_beta < 999:
-                      beta = previous_beta + 1
-                  else:
-                      patch += 1
-              print(series + (f".{patch}" if patch else "") + f"b{beta}")
+          channel=beta
+          if [[ "$GITHUB_REF" == refs/heads/Testing ]]; then channel=rc; fi
+          base="v$(jq -er .version "$PRODUCT_FILE")"
+          version=$(PYTHONPATH=tools BASE="$base" CHANNEL="$channel" python3 - <<'PY'
+          import os, subprocess
+          from release_version import next_prerelease, newest
+          base, channel = os.environ["BASE"], os.environ["CHANNEL"]
+          tags = subprocess.check_output(["git", "tag", "--list"], text=True).splitlines()
+          current = subprocess.check_output(["git", "tag", "--points-at", "HEAD"], text=True).splitlines()
+          existing = newest(t for t in current if t.startswith(base + "-" + channel + "."))
+          print(existing or next_prerelease(base, channel, tags))
           PY
-            )
-          fi
+          )
           python3 tools/release_version.py prerelease "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag_prefix$version" >> "$GITHUB_OUTPUT"
-          echo "Building $tag_prefix$version"
+          echo "tag=$version" >> "$GITHUB_OUTPUT"
+          echo "Building $version"
 
       - name: Check out the pinned FreeRTOS dependency
         run: git submodule update --init -- third_party/FreeRTOS-Kernel
@@ -146,7 +118,7 @@ jobs:
           notes="Development prerelease. Select Development in the product CPS to install or upgrade. The build and static task-stack checks passed."
           title="$product $VERSION"
           draft_options=()
-          if [[ "$tag" == RC-* ]]; then
+          if [[ "$tag" == *-rc.* ]]; then
             title="RC $title"
             notes="Testing release candidate. The build and static task-stack checks passed."
             draft_options=(--title "$title")

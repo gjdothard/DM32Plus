@@ -1,4 +1,5 @@
 #!/bin/sh
+# Copyright (c) 2026 Garrett Dothard
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
 # The web site's build on Cloudflare Pages (docs/dev/website.md, Hosting): the Pages project runs this from the
@@ -7,7 +8,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 python3 -m pip install -q -r site/requirements.txt
-# the newest release's images for the flasher, from the public API, and a newer pre-release's name (a bN tag), which
+# the newest release's images for the flasher, from the public API, and a newer pre-release's name (a beta or rc tag), which
 # the flasher offers as an opt-in version link. No release yet is fine: the flasher then builds main. Any other failure
 # stops the build, so a deployment never loses the images by accident
 mkdir -p build/dist
@@ -19,7 +20,8 @@ import importlib.util, json, os, sys, time, urllib.error, urllib.request
 spec = importlib.util.spec_from_file_location("release_version", "tools/release_version.py")
 rv = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(rv)
-api = "https://api.github.com/repos/RadioFoundry/RadioFoundry/releases?per_page=30"
+product = json.load(open("boards/dm32/product.json"))
+api = "https://api.github.com/repos/" + product["repository"] + "/releases?per_page=100"
 headers = {"Accept": "application/vnd.github+json"}
 if os.environ.get("GITHUB_TOKEN"):
 	headers["Authorization"] = "Bearer " + os.environ["GITHUB_TOKEN"]
@@ -35,7 +37,11 @@ for attempt in range(4):
 		print("GitHub API %d, retrying" % e.code)
 		time.sleep(10 * (attempt + 1))
 # by release name (tools/release_version.py), never drafts; a tag that isn't a release name is not offered
-named = {r["tag_name"]: r for r in rels if not r.get("draft") and rv.parse(r["tag_name"]) is not None}
+named = {}
+for r in rels:
+	version = rv.from_tag(r["tag_name"], product["prefix"])
+	if version and not r.get("draft") and bool(r.get("prerelease")) == rv.is_prerelease(version):
+		named[version] = r
 stable = rv.newest([t for t, r in named.items() if not r.get("prerelease")])
 beta = rv.newest([t for t, r in named.items() if r.get("prerelease")])
 if beta and stable and rv.parse(beta) < rv.parse(stable):
@@ -48,7 +54,7 @@ if not stable:
 	sys.exit(0)
 print("release", stable)
 for a in named[stable]["assets"]:
-	if a["name"].startswith("rfoundry-"):
+	if a["name"].startswith(product["prefix"] + "-" + product["board"] + "-"):
 		urllib.request.urlretrieve(a["browser_download_url"], os.path.join(sys.argv[1], a["name"]))
 		print("release asset", a["name"])
 EOF

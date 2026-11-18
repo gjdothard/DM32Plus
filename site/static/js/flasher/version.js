@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Which source a build is asked for: a release tag, a full commit hash, or a branch of the main repository. The branch
 // rule is the build backend's, so a name that passes here is not refused for its form there.
 
@@ -43,14 +44,19 @@ export function betaLink(beta, href, versionRef) {
 	return u.pathname + u.search + u.hash;
 }
 
-// A release name's sort key (newer is larger), or null when it isn't one: tools/release_version.py's parse(). vYY.M,
-// vYY.M.N, either with bN for a pre-release, which sorts before its final
-const RELEASE_RE = /^v(2[6-9]|[3-9][0-9])\.(1[0-2]|[1-9])(?:\.([1-9][0-9]{0,2}))?(?:b([1-9][0-9]{0,2}))?$/;
+// Mirrors tools/release_version.py. Calendar spellings are reserved historical
+// names; the semantic series follows them so v1.0.0 is an upgrade from v26.11.
+const LEGACY_RE = /^v(2[6-9]|[3-9][0-9])\.(1[0-2]|[1-9])(?:\.([1-9][0-9]{0,2}))?(?:b([1-9][0-9]{0,2}))?$/;
+const NUMBER = "(?:0|[1-9][0-9]{0,5})";
+const SEMANTIC_RE = new RegExp(`^v(${NUMBER})\\.(${NUMBER})\\.(${NUMBER})(?:-(beta|rc)\\.([1-9][0-9]{0,5}))?$`);
 
 export function releaseKey(name) {
-	const m = RELEASE_RE.exec(name || "");
+	if (typeof name !== "string") return null;
+	let m = LEGACY_RE.exec(name);
+	if (m) return [0, +m[1], +m[2], +(m[3] || 0), m[4] ? 0 : 2, +(m[4] || 0)];
+	m = SEMANTIC_RE.exec(name);
 	if (!m) return null;
-	return [+m[1], +m[2], +(m[3] || 0), m[4] ? 0 : 1, +(m[4] || 0)];
+	return [1, +m[1], +m[2], +m[3], m[4] === "beta" ? 0 : m[4] === "rc" ? 1 : 2, +(m[5] || 0)];
 }
 
 const newer = (a, b) => {
@@ -65,11 +71,11 @@ const newer = (a, b) => {
 export function updateFor(releases, board, running, gitTime = 0) {
 	const now = releaseKey(running);
 	if (!now && !(gitTime > 0)) return null;
-	const beta = now?.[3] === 0;
+	const beta = now && now[4] < 2;
 	let best = null, bestKey = null;
 	for (const r of releases || []) {
 		const k = releaseKey(r.version);
-		if (r.board !== board || (r.variant && r.variant !== "full") || !k || (k[3] === 0 && !beta)) continue;
+		if (r.board !== board || (r.variant && r.variant !== "full") || !k || (k[4] < 2 && !beta)) continue;
 		if (!bestKey || newer(k, bestKey)) [best, bestKey] = [r, k];
 	}
 	if (!best) return null;

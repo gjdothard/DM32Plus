@@ -6,5 +6,6 @@
   "repository": "gjdothard/DM32Plus",
   "board": "dm32",
   "brand": "DM32",
-  "accent": "+"
+  "accent": "+",
+  "version": "1.0.0"
 }
