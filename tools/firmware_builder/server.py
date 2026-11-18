@@ -318,6 +318,13 @@ def catalog_loader(base, product):
     return load
 
 
+def clean_workspaces(state):
+    state = Path(state).resolve()
+    for path in state.glob("firmware-*"):
+        if not path.is_symlink() and path.is_dir() and path.resolve().parent == state:
+            shutil.rmtree(path)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     catalog = parser.add_mutually_exclusive_group(required=True)
@@ -337,8 +344,15 @@ def main():
         radios = json.loads((args.site / "data/radios.json").read_text())["radios"]
         radio = next(r for r in radios if r["id"] == product["board"])
         features = json.loads((args.site / "data/features.json").read_text())["features"]
-    builder = Builder(args.state, product, radio, features, args.compiler, catalog_loader=loader)
-    ThreadingHTTPServer(("0.0.0.0", args.port), handler(builder)).serve_forever()
+    # A restarted container must not leave gigabytes of interrupted compiler work behind.
+    # The process lock also prevents two workers from sharing a cache/workspace directory.
+    import fcntl
+    args.state.mkdir(parents=True, exist_ok=True)
+    with (args.state / ".worker.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        clean_workspaces(args.state)
+        builder = Builder(args.state, product, radio, features, args.compiler, catalog_loader=loader)
+        ThreadingHTTPServer(("0.0.0.0", args.port), handler(builder)).serve_forever()
 
 
 if __name__ == "__main__":

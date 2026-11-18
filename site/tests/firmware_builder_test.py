@@ -33,6 +33,19 @@ def artifact(selection, output):
 
 
 class Requests(unittest.TestCase):
+    def test_restart_prunes_only_interrupted_workspaces(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            state = Path(temporary)
+            workspace = state / "firmware-interrupted"
+            workspace.mkdir()
+            (workspace / "partial.o").write_bytes(b"scratch")
+            cache = state / ("a" * 64)
+            cache.mkdir()
+            (cache / "firmware.bin").write_bytes(b"cached")
+            builder.clean_workspaces(state)
+            self.assertFalse(workspace.exists())
+            self.assertEqual((cache / "firmware.bin").read_bytes(), b"cached")
+
     def test_legacy_testing_and_stable_tags_are_separate(self):
         self.assertEqual(builder.source_tag(PRODUCT, {"ref": "v26.11", "testing": True}), "RC-sample-v26.11")
         self.assertEqual(builder.source_tag(PRODUCT, {"ref": "v26.11", "testing": False}), "sample-v26.11")

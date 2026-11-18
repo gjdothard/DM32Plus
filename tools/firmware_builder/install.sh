@@ -63,7 +63,8 @@ PY
 compose() { docker compose -f /etc/website-updater/compose.yaml "$@"; }
 verify() {
     compose config --quiet &&
-    compose up -d --force-recreate --wait --wait-timeout 90 firmware-builder cps &&
+    compose up -d --force-recreate --wait --wait-timeout 60 cps &&
+    compose up -d --force-recreate --wait --wait-timeout 90 firmware-builder &&
     compose exec -T cps python -B -c "import json;from urllib.request import urlopen;assert json.load(urlopen('http://127.0.0.1:8080/_firmware_build/v1/health',timeout=10))['status']=='ok'"
 }
 if ! verify; then
