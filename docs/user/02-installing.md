@@ -4,7 +4,7 @@
 # Installing
 
 The recommended way to install RadioFoundry, update it, back up a radio and restore it is the **web installer** on the
-project's web site, [radiofoundry.org](https://radiofoundry.org/flash/index.html). It runs in a Chromium-based browser
+project's site or [portable CPS](../../tools/offline_cps/README.md), under **Firmware**. It runs in a Chromium-based browser
 (Chrome, Edge) and needs nothing installed. The files you load into it never leave your computer. Nothing here changes
 the radio's calibration.
 
@@ -35,7 +35,7 @@ backup. The web installer's own backup (below) holds it too.
 
 ## Install with the web installer
 
-Open the [web installer](https://radiofoundry.org/flash/index.html), choose **Install**, and follow the steps (a radio
+Open the project's installer from **Firmware**, choose the install action, and follow the steps (a radio
 that runs RadioFoundry already: [Updating RadioFoundry](#updating-radiofoundry)):
 
 1. **Radio.** Pick your radio.

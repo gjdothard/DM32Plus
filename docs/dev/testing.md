@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Testing
 
@@ -71,7 +72,9 @@ The UI runs unchanged on the host. Three tools use it:
 The display classes are `160x120i5` (160x120 with 5 px hidden left and right), `160x128`,
 `240x320i10x5` (16 colors, anti-aliased fonts one size up, 10 px hidden left and right and 5 px top and bottom),
 `128x64` and `240x320`; [the wireframes README](../ux/wireframes/README.md) says which radio uses which.
-The user manual uses the `160x120i5` images.
+The user manual primarily illustrates the tall card `240x320i10x5` layout. The other folders document
+the standard layouts on smaller displays.
+The [firmware screenshot index](../ux/screens/README.md) groups the current card screens by task.
 
 After a UI change, run `ui-gallery` and commit the PNGs with the change, so the review shows the difference. The
 gallery target deletes and rewrites `docs/ux/screens/*/`; commit only what you meant to change. Commit the contact

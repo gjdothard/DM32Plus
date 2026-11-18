@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # The Web Flasher
 
@@ -666,7 +667,7 @@ To have someone install a version that isn't a release (a commit to try out), se
 ```
 https://<site>/flash/?version=<full 40-character commit hash>
 https://<site>/flash/?version=<full commit hash>#radio=<id>
-https://<site>/flash/?version=v26.11
+https://<site>/flash/?version=v1.0.0
 https://<site>/flash/?version=feature/my_radio
 ```
 

@@ -10,7 +10,8 @@ the forms in `.github/ISSUE_TEMPLATE/` (bug, feature, new radio), and pull reque
 ## Branches and pull requests
 
 All changes reach `main` through a pull request. Nobody pushes to `main` directly. For now every pull request goes
-from a feature branch into `main`; there are no release or develop branches.
+from a feature branch into `main`. The product's `Development` and `Testing` branches publish beta and
+release-candidate firmware through the [product release workflow](release.md#release-names).
 
 ### Repository members
 

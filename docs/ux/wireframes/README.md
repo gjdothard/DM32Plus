@@ -1,7 +1,12 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 # Wireframes
 
 ASCII wireframes of the main screens for the three display classes. They show layout, hierarchy and content, not final pixels.
+
+These sketches describe the original standard layout. For the implemented tall card layout and current
+menu order, use the [UI specification](../../spec/ui.md), [user navigation guide](../../user/05-keys-and-navigation.md),
+and [rendered gallery](../screens/). The sketches are design references, not current screenshots.
 
 | File | Display class | Grid used in the drawings |
 |---|---|---|

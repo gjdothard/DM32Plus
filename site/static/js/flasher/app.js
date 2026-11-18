@@ -25,6 +25,7 @@ import { openVendorFile, describe as describeVendorFile, analysisCandidate, offe
 import { pickProblem, errorProblem, vendorContext, supportedFiles, foldSupported, keepNote, nowFor, nowChoice, OFFER } from "./explain.js";
 import { confirmNoCodec } from "./nocodec.js";
 import { PRODUCT, CHANNELS, bundledRelease, loadBundledRelease, lookupRelease, supportsBundledFirmware } from "./release-channels.js";
+import product from "../product.js";
 import { makePlan, KEEP, MERGE } from "./plan.js";
 import { radioPicture, holdKeys } from "./radiotop.js";
 import { validRef, refShort, defaultRef, firmwareName, betaLink } from "./version.js";
@@ -143,10 +144,10 @@ const initialState = () => ({
 const S = initialState();
 
 // Custom builds and the flash log
-const API = "https://api.radiofoundry.org/v1/";
+const API = product.build_api || null;
 // minimal non-invasive reporting for helping the RadioFoundry project track programming failures; opt out with
 // ?reporting=0
-const FLASH_LOG = new URLSearchParams(location.search).get("reporting") !== "0";
+const FLASH_LOG = !!API && new URLSearchParams(location.search).get("reporting") !== "0";
 
 // A version link (/flash/?version=<tag, full commit hash or branch name>) builds that version instead of the latest release. The tab keeps
 // it for the session, so a reload or a visit to another page doesn't lose it; ?version= (empty) or the banner drops it.
@@ -201,6 +202,7 @@ function versionBanner() {
 }
 
 async function api(method, path, body) {
+	if (!API) throw new Error(t("flash.err.build_unavailable"));
 	const r = await fetch(new URL(path, API), body ? { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : { method });
 	const j = await r.json().catch(() => ({}));
 	if (!r.ok) throw new ApiError(typeof j.detail === "string" ? j.detail : `HTTP ${r.status}`);
@@ -213,7 +215,7 @@ async function api(method, path, body) {
 // from the radio. problem (explain.js): what went wrong; for a fault in the page its message goes with the user's note.
 // Not offered in a simulation
 function analysisOffer(cand, boardId, problem = null) {
-	if (!cand || S.sim || bundledMode()) return null;
+	if (!API || !cand || S.sim || bundledMode()) return null;
 	const internal = problem?.problem === "internal";
 	const dump = problem?.problem === "dump";
 	const status = h("p", { class: "small" });
@@ -833,7 +835,7 @@ async function reset() {
 function startView() {
 	// one banner: both APIs missing (Safari, Firefox), or the one that is
 	const usb = S.sim || usbSupported(), serial = S.sim || serialSupported();
-	const support = !usb && !serial ? [notice(t("flash.support.none"), "bad")]
+	const support = bundledMode() ? (serial ? [] : [notice(t("flash.support.serial"), "bad")]) : !usb && !serial ? [notice(t("flash.support.none"), "bad")]
 		: [!usb && notice(t("flash.support.usb"), "bad"), !serial && notice(t("flash.support.serial"), "bad")].filter(Boolean);
 	if (support.length) support.push(notice(t("flash.kit.start"), "info"));
 	const choice = (task, icon) => h("button", { class: "choice", type: "button", onclick: () => { S.task = task; S.step = 0; render(); } },
@@ -2828,10 +2830,6 @@ function kitView(api) {
 async function main() {
 	showBetaNotice();	// before the data loads: the first thing a visitor reads, once per session
 	if (!FLASH_LOG) document.getElementById("flash-log-off")?.replaceWith(t("flash.log.is_off"));
-	// the privacy contact is put together here, so address scrapers don't find it in the page or the repository
-	const mail = ["tseuqer-ycavirp-rdo", "moc.relwofrecneps"].map((x) => [...x].reverse().join("")).join("@");
-	const a = document.getElementById("privacy-mail");
-	if (a) { a.href = `mailto:${mail}`; a.textContent = mail; }
 	try {
 		S.data = await loadData();
 	} catch (e) {
@@ -2839,9 +2837,8 @@ async function main() {
 		app.replaceChildren(notice(t("flash.err.load"), "bad"), reportLine());
 		return;
 	}
-	if (!bundledMode())
-		initReporting({ tool: "flasher", context: reportContext, attachments: reportAttachments,
-			backend: { api: API, meta: reportMeta, practice: () => !!S.sim || SIM_HASH.test(location.hash) } });
+	initReporting({ tool: "flasher", context: reportContext, attachments: reportAttachments,
+		backend: API ? { api: API, meta: reportMeta, practice: () => !!S.sim || SIM_HASH.test(location.hash) } : undefined });
 	c7ui.init({ S, next, render, reset, helpLink, manualKitLine, fb, flashStarted, flashFinished, flashMark, noteReadout, errorText, analysisOffer, problemNotice, failureNotice, useAdapter,
 		stubJson: () => fetch(`${ROOT}data/c7000-stub.json`).then((r) => r.json()) });
 	// #sim=<board>[-stock|-romfail|-slowcable|-openfw|-openfw-nocodec]: that board, running RadioFoundry, its stock firmware or another

@@ -513,8 +513,9 @@ uiFlowTestNoColor: uiFlowTest.c $(UIDEPS)
 uiFlowTestHistory: uiFlowTest.c $(UIDEPS)
 	$(CC) $(UIFLAGS) -DCONFIG_MESSAGE_JOURNAL=1 -o $@ uiFlowTest.c $(UIAPP) -lz
 
+# Include the synthetic conversation fixture in the documentation gallery.
 uiSim: uiSim.c $(UIDEPS)
-	$(CC) $(UIFLAGS) -o $@ uiSim.c $(UIAPP) -lz
+	$(CC) $(UIFLAGS) -DCONFIG_MESSAGE_JOURNAL=1 -o $@ uiSim.c $(UIAPP) -lz
 
 # The highlight colors the gallery shows its color pages in: the list in .github/workflows/ui-gallery.yml, so the
 # committed gallery and a pull request's before / after pictures show the same colors

@@ -1,6 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 Garrett Dothard -->
-<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # USB debug link
 

@@ -4,15 +4,28 @@
 # The Web Site
 
 The product home page introduces the firmware for its target radio, links to installation and the CPS,
-and explains Stable, Testing, and Development releases. Its header uses the product name. Shared reference
-pages retain upstream branding, and the home page credits RadioFoundry and links to the original MIT license.
+and explains Stable, Testing, and Development releases. Every page uses the same product branding and navigation:
+Home, Install, CPS, Docs, Screenshots, Tools, and Releases. The brand always returns to Home. The home page
+credits RadioFoundry and links to the original MIT license.
 Product claims describe implemented behavior; hardware verification remains in the bring-up records.
 
-The site is generated from the repository, like the PDF manual. It lists the radios, their screens
-and features, holds the documentation, and carries two tools that run in the browser with nothing sent to a server:
+The site is generated from the repository, like the PDF manual. Product builds show only the selected board,
+its enabled features, and matching firmware screens. Shared board definitions remain in the source tree.
+The site holds the documentation and carries tools that run in the browser:
 the web flasher (back up, install, restore; [web-flasher.md](web-flasher.md)) and the Codeplug Editor
 ([codeplug-editor.md](codeplug-editor.md)). The site is the recommended way for users to install RadioFoundry and edit
 a codeplug ([Installing](../user/02-installing.md)); this page is for people who change it.
+
+## Published product documentation
+
+Product metadata selects a documentation source directory with `documentation`. Its `user/` pages are published at
+`/docs/user/`, retaining the public manual and installer-help URLs. The product guide describes the current release,
+card menus, and serial-cable workflows. The `/docs` index and chapter navigation list only those selected pages.
+Shared engineering specifications, historical test notes, and other radio ports remain in the source repository.
+Links from the guide to those references open the corresponding file in this project's repository.
+They are not published as additional chapters in the product manual.
+
+Builds without a selected firmware product continue to render the full shared documentation.
 
 ```
 python3 site/build.py                       # build/site/
@@ -69,7 +82,7 @@ GitHub app, configure the following settings. Retry a deployment in that project
 | Build | Command `site/cloudflare-build.sh`, output directory `build/site`, root directory the repository root. The script installs `site/requirements.txt`, lists the releases through the GitHub API, fetches the product images of the newest stable release, passes the newest beta or release candidate when it is newer than that (`--beta`), and runs `site/build.py --strict`. A failed build leaves the last deployment up |
 | Branches | Production branch `main`; every other branch of this repository builds a preview |
 | Variables | `PYTHON_VERSION` `3.12` (both environments). `RFOUNDRY_SENTRY_DSN` in production only, so previews send no error reports. `GITHUB_TOKEN` (encrypted, both environments): a fine-grained token with read-only access to public repositories. Without it the release lookup shares the builders' 60 requests an hour, and a build can fail with 403 "rate limit exceeded" after a minute of retries |
-| Custom domain | `radiofoundry.org` on the project (Custom domains). The `www` name redirects to it |
+| Custom domain | Configure a domain you control in the Pages project's Custom domains settings |
 | Analytics | Cloudflare Web Analytics, turned on in the project's Metrics tab. Pages adds the beacon to each deployment; it sets no cookies |
 | 404 | Pages serves the build's `404.html` for a missing page |
 | Roll back | The project's Deployments list: Rollback on an earlier production deployment |
@@ -80,7 +93,7 @@ Nothing on the site is copied by hand. Each page reads its source at build time:
 
 | Shows | Comes from |
 |---|---|
-| Radios, their order and status | The board registry, `boards/<radio>/board.toml` (`tools/boards.py json --for site`). `order` sorts them; the lowest is the home page's radio |
+| Radios, their order and status | The board registry, `boards/<radio>/board.toml` (`tools/boards.py json --for site`). `order` sorts the radio lists; the home page's radio comes from the selected board's `product.json` |
 | Planned radios | The rows of the [radio survey](../spec/radios.md) "Summary table" that name no board, by their Port cell (`tools/registry_docs.py`): `Planned`, `Planned, hardware needed`, `In progress, #N` (badge "In progress", linked to the pull request) or `Not planned` (not listed), each with an optional `. note` |
 | A radio's cards | One card per board, then one per `looks` entry of its board.toml (another body the board ships in), each with its own drawing and the radios in that body; a look's card links to the board's page. The board's card lists the radios not moved to a look |
 | A radio's one-line note for visitors | board.toml `[status] summary`, the same line the README and the user manual show; a catalog may translate it as `radio.note.<radio>`. A planned radio's: the note of its Port cell, which a catalog may translate as `planned.note.<slug of the survey name>` |
@@ -152,7 +165,7 @@ a copy up a little, smoothly. `site/tests/shots_test.py` checks the scaling.
 | `site/rfoundrysite/device.py` | Radio images: frame, overlay geometry, boot screen composite |
 | `site/rfoundrysite/shots.py` | The gallery screens' scaled copies ([Screenshot copies](#screenshot-copies)) |
 | `site/rfoundrysite/toolzip.py` | `downloads/rfoundry-tool.zip`: rfoundry from the site's commit for the flasher's manual install kit, with a launcher; `data/site.json` `tool` gives its path, size and SHA-256 ([web-flasher.md](web-flasher.md#the-manual-install-kit)). `site/tests/toolzip_test.py` runs it unpacked |
-| `site/rfoundrysite/social.py` | The link preview image (`static/img/social.png`, every page's `og:image`): each radio with a different screen, rasterized with resvg |
+| `site/rfoundrysite/social.py` | Link previews rasterized with resvg: `static/img/product-social.png` for Home and `static/img/social.png` for shared pages |
 | `site/rfoundrysite/tmpl.py`, `site/templates/` | Page markup (below) |
 | `site/i18n/` | String catalogs (below) |
 | `site/static/css/tokens.css`, `site.css` | Design tokens, then layout and components |
@@ -172,10 +185,13 @@ Markup lives in `site/templates/*.html` and `partials/`, with four kinds of plac
 root (static files, data) and `{{home}}` the path to the root of the page's language (links between pages). Loops
 stay in Python, which renders a partial per item.
 
-Every page's footer has two help cards: the community group (`COMMUNITY_URL` in `site/rfoundrysite/build.py`, also
-`community` in `data/site.json`) and the GitHub issues. The web tools' report line under an error (`reportLine()` in
-`static/js/report.js`) links the same two. Their icons are CSS masks (`.icon-*` in `site.css`), drawn in the text
-color.
+The footer and tool error messages link to the repository's GitHub issues. They do not link to a social group.
+The icons are CSS masks (`.icon-*` in `site.css`), drawn in the text color.
+
+`RFOUNDRY_SITE_URL` supplies the production origin for language alternates and link previews. Without it,
+these URLs are relative to the current host; preview builds never advertise an upstream domain.
+The product metadata may explicitly configure `build_api`; without it cloud builds and flash-log uploads
+are disabled, and the installer uses published releases or locally selected firmware files.
 
 Every page's footer ends with a faint build stamp: the firmware release the flasher installs (linked to its GitHub
 release; left out before the first release), a Changelog link to the GitHub releases, the commit the site was built from

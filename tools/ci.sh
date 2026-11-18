@@ -1,6 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 #
 # The release gate: everything CI runs, in one script (docs/testing/README.md).
 #
@@ -328,6 +329,14 @@ for f in sys.argv[1:]:
 			tail -20 "$OUT/release-site.log"
 			bad "site release and beta tests (see $OUT/release-site.log)"
 		fi
+		for test in navigation product_docs; do
+			if $SITE_PY "site/tests/${test}_test.py" > "$OUT/$test-site.log" 2>&1; then
+				ok "site $test tests: $(tail -3 "$OUT/$test-site.log" | head -1)"
+			else
+				tail -20 "$OUT/$test-site.log"
+				bad "site $test tests (see $OUT/$test-site.log)"
+			fi
+		done
 		if $SITE_PY site/tests/i18n_test.py > "$OUT/i18n-site.log" 2>&1; then
 			ok "site catalogs and second language: $(tail -3 "$OUT/i18n-site.log" | head -1)"
 		else

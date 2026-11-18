@@ -82,7 +82,7 @@ the network. A new submodule also goes in the Dockerfile's `SUBMODULE_URLS`.
 Every pull request runs `ci.yml`'s jobs (`unit tests` and the product `firmware (C-SKY)` job) and `checks` on its merge commit. The first job,
 `changes`, looks at the files the pull request changes and skips what they don't touch: source changes (`ci.yml`'s
 paths) run the build and test jobs. When a board's `board.toml` or `board.mk`, a `platform.toml` or the release
-tooling changes, the firmware jobs also run `tools/release_build.sh`: every stable board packaged as a release tag
+tooling changes, the firmware jobs also run `tools/release_build.sh`: the selected product board packaged as a release tag
 would ([release.md](release.md)). `checks` runs on every pull request: the Python and license checks (doc links
 among them) always, and the PDF manual build (as `manual.yml` does) when docs change (`manual.yml`'s paths). The last
 job, `PR checks`, always runs and fails when any job failed or was canceled. It is the one check the `main` ruleset

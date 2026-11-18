@@ -279,8 +279,8 @@ clock`; ? = not known yet). The `RTC` row lists firmware support ([radio-feature
 | FM VOX | `VOX` | 496 | 1,064 |  |
 | Receiver battery saver | `BATTERY_SAVE` | 296 | 740 |  |
 | Frequency trim, Settings > Advanced | `REF_TRIM` | 2,156 | 2,232 | Figures from tools/ci.sh (2026-10-30); the hook on each radio, the page and the setting |
-| Air band AM receive (108-137 MHz) | `AM_RX` | 408* | — | Needs a receiver that does AM; DM-32 board glue not written yet, so nothing runs |
-| Broadcast FM receiver | `BCAST_FM` | ~0* | — | Needs a second receiver chip (DM-32's RDA5807M); glue not written yet |
+| Air band AM receive (108-137 MHz) | `AM_RX` | 408* | — | Needs an AM receiver path. DM-32 board glue is enabled; hardware verification is not recorded |
+| Broadcast FM receiver | `BCAST_FM` | ~0* | — | Needs a second receiver chip. DM-32's RDA5807M glue is enabled; hardware verification is not recorded |
 | DMR Tier II voice (modem, call stack, AMBE FEC, vocoder) | `DMR` | 175,856 | 134,308 | Includes every DMR feature and everything on IP over DMR |
 | Basic privacy (Motorola / Anytone BP) | `DMR_PRIVACY` | 1,936 | 1,992 |  |
 | AES-256/OFB voice sessions | `DMR_AES256` | not measured | not measured | Host-tested; hardware interoperability untested |

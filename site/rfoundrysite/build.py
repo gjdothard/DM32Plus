@@ -49,9 +49,7 @@ def release_and_beta(versions, beta):
 # feature-matrix.md groups of developer tools that never ship in a release: not on the visitor pages
 BENCH_ONLY = {"Bench"}
 # the production address: link previews need absolute URLs (og:url, og:image)
-SITE_URL = "https://radiofoundry.org/"
-# where users help each other: the footer and every failure message link it, next to the GitHub issues
-COMMUNITY_URL = "https://www.facebook.com/groups/radiofoundry/"
+SITE_URL = os.environ.get("RFOUNDRY_SITE_URL", "/").rstrip("/") + "/"
 BOARD_ORDER = {"supported": 0, "testing": 1, "in_progress": 2, "planned": 3}
 # a radio page's documentation links (board.toml [docs]), in this order
 DOC_ORDER = ("hardware", "install", "codec", "bringup")
@@ -116,6 +114,7 @@ class Site:
 		self.variants = repo.variants()
 		vids = [v["id"] for v in self.variants]
 		self.boards, self.planned = repo.boards(list(self.fmap), vids)
+		self.scope_product()
 		# board.toml order: the first is the home page's radio
 		self.boards.sort(key=lambda b: (BOARD_ORDER[b["status"]], b["order"]))
 		self.flash = repo.flash_boards()
@@ -151,6 +150,14 @@ class Site:
 					 if m.get("product") == self.firmware_product and m["board"] == self.product["board"]]
 		self.release, self.beta = release_and_beta([m["version"] for m, _ in self.releases], self.beta)
 
+	def scope_product(self):
+		"""The product site advertises only the board this fork releases."""
+		if self.firmware_product:
+			self.boards = [b for b in self.boards if b["id"] == self.product["board"]]
+			if not self.boards:
+				raise repo.SourceError("product board is missing from the board registry")
+			self.planned = []
+
 	def feature_state(self, board, name, variant="full"):
 		"""on: in this build; off: the board supports it but this build leaves it out; nw: the hardware can, the
 		board's code isn't written yet; na: the hardware can't."""
@@ -181,7 +188,7 @@ class Site:
 		return {
 			"site.json": {"format": "rfoundry-site/1", "git": self.git, "version": self.version, "built": self.built,
 				      "release": self.release, "beta": self.beta, "firmware_product": self.firmware_product,
-				      "branch": self.branch, "repo": self.repo_url, "community": COMMUNITY_URL, "languages": self.i18n.languages, "default_language": self.i18n.default,
+				      "branch": self.branch, "repo": self.repo_url, "languages": self.i18n.languages, "default_language": self.i18n.default,
 				      "reports": {"sentry_dsn": self.sentry_dsn}, "tool": self.tool},
 			"radios.json": {"radios": radios, "planned": planned},
 			"features.json": {"groups": self.groups, "features": features, "reported": repo.reported_features()},
@@ -198,7 +205,8 @@ class Site:
 		rels = self.repo_url + "/releases"
 		line = '<a href="%s">%s</a>' % (html.escape(rels), html.escape(self.i18n.t(lang, "footer.changelog")))
 		if self.release:
-			tag = self.product["prefix"] + "-" + self.release if self.firmware_product else self.release
+			legacy = release_version.parse(self.release)[0] == 0
+			tag = self.product["prefix"] + "-" + self.release if self.firmware_product and legacy else self.release
 			line = '<a href="%s/tag/%s">%s</a> · %s' % (html.escape(rels), html.escape(tag),
 				html.escape(self.i18n.t(lang, "footer.firmware", version=self.release)), line)
 		return line
@@ -256,18 +264,18 @@ class Site:
 		if many:
 			alternates += '<link rel="alternate" hreflang="x-default" href="%s">\n' % html.escape(page_url(self.i18n.default))
 		is_cps = page_class == "codeplug"
-		brand, brand_accent = (self.product["brand"], self.product["accent"]) if is_cps or page_class == "home" else ("Radio", "Foundry")
+		brand, brand_accent = self.product["brand"], self.product["accent"]
 		document_title = title if is_cps else title + " · " + brand + brand_accent
 		ctx = {"lang": lang, "dir": meta.get("dir", "ltr"), "document_title": document_title, "root": root,
 		       "brand": brand, "brand_accent": brand_accent, "product_board": self.product["board"],
-		       "brand_href": root + prefix + ("codeplug/index.html" if is_cps else "index.html"),
+		       "brand_href": root + prefix + "index.html",
 		       "home": root + prefix, "content": content, "page_class": page_class,
 		       "description": description or self.i18n.t(lang, "site.tagline"), "scripts": scripts, "footer": footer,
 		       "languages": langs, "alternates": alternates, "og_locale": meta.get("locale", lang).replace("-", "_"),
 		       "git": self.git, "assets": self.asset_version, "version": self.version, "built": self.built,
 		       "built_at": self.built_at, "built_iso": self.built_iso, "git_full": self.git_full,
 		       "git_stamp": self.git + ("-dirty" if self.git_dirty else ""), "firmware_release": self.firmware_line(lang),
-		       "repo": self.repo_url, "community": COMMUNITY_URL, "nav_current": nav,
+		       "repo": self.repo_url, "nav_current": nav,
 		       "url": SITE_URL + (full[:-len("index.html")] if full.endswith("index.html") else full),
 		       "og_image": SITE_URL + "static/img/social.png?v=" + self.asset_version,
 		       "og_width": social.W * social.ZOOM, "og_height": social.H * social.ZOOM,
@@ -278,15 +286,12 @@ class Site:
 		self.write(full, self.tpl.render("base", ctx, lang).replace("{{root}}", root).replace("{{home}}", root + prefix))
 
 	def nav(self, lang, home, current):
-		items = [("radios", "radios/index.html"), ("features", "features/index.html"),
-			 ("flash", "flash/index.html"), ("codeplug", "codeplug/index.html"), ("docs", "docs/index.html"),
-			 ("screenshots", "screenshots/index.html"), ("tools", "tools/index.html")]
-		if current == "codeplug":
-			items = [("docs", "docs/index.html"), ("tools", "tools/index.html")]
-		elif current == "home":
-			items = [("flash", "flash/index.html#radio=" + self.product["board"]), ("codeplug", "codeplug/index.html"),
-				 ("docs", "docs/index.html"), ("screenshots", "screenshots/index.html")]
-		return "".join('<a href="%s%s"%s>%s</a>' % (home, href, ' aria-current="page"' if key == current else "",
+		items = [("home", home + "index.html"),
+			 ("flash", home + "flash/index.html#radio=" + self.product["board"]),
+			 ("codeplug", home + "codeplug/index.html"), ("docs", home + "docs/index.html"),
+			 ("screenshots", home + "screenshots/index.html"), ("tools", home + "tools/index.html"),
+			 ("releases", self.repo_url + "/releases")]
+		return "".join('<a href="%s"%s>%s</a>' % (html.escape(href), ' aria-current="page"' if key == current else "",
 							    html.escape(self.i18n.t(lang, "nav." + key)))
 			       for key, href in items)
 
@@ -370,7 +375,8 @@ class Site:
 		os.makedirs(self.out)
 		for name in ("LICENSE", "AUTHORS"):
 			shutil.copyfile(repo.path(name), os.path.join(self.out, name))
-		self.docs = docsmod.Docs(self.repo_url, self.ref, self.i18n.codes, self.i18n.default)
+		self.docs = docsmod.Docs(self.repo_url, self.ref, self.i18n.codes, self.i18n.default,
+			self.product.get("documentation", "docs") if self.firmware_product else "docs")
 		shutil.copytree(repo.path("site", "static"), os.path.join(self.out, "static"))
 		self.write("static/js/product.js", "// SPDX-License-Identifier: MIT\n// Copyright (c) 2026 Garrett Dothard\nexport default " + json.dumps(self.product) + ";\n")
 		self.version_imports(os.path.join(self.out, "static", "js"))
@@ -461,7 +467,8 @@ class Site:
 					url = html.unescape(url).split("#")[0].split("?")[0]
 					if not url or re.match(r"[a-z][a-z0-9+.-]*:|//|\{\{", url):
 						continue
-					target = os.path.normpath(os.path.join(dirpath, url))
+					target = os.path.normpath(os.path.join(self.out, url.lstrip("/")) if url.startswith("/")
+							  else os.path.join(dirpath, url))
 					if os.path.isdir(target):
 						target = os.path.join(target, "index.html")
 					if not os.path.exists(target):
@@ -560,6 +567,8 @@ class Site:
 		self.shots.use(b["gallery"], frame_w * geometry["screen_pct"]["width"] / 100)
 
 	def variant_cards(self, lang):
+		if self.firmware_product:
+			return ""
 		out = []
 		for v in self.variants:
 			out.append(self.tpl.partial("variant_card", {
@@ -587,7 +596,7 @@ class Site:
 				"support": note}, lang)))
 		ctx = {"cards": "".join(self.radio_card(lang, b) for b in self.boards),
 		       "rows": "".join(e[3] for e in sorted(entries, key=lambda e: e[:2])),
-		       "request_card": self.request_card(lang)}
+		       "request_card": "" if self.firmware_product else self.request_card(lang)}
 		self.page(lang, "radios/index.html", self.t(lang, "radios.title"),
 			  self.tpl.render("radios", ctx, lang), "radios", nav="radios")
 
@@ -628,8 +637,8 @@ class Site:
 		shot_list = ['<div class="shots">%s</div>' % "".join(items)] if items else []
 		shot_list.append('<p class="shots-all"><a href="{{home}}screenshots/index.html#%s">%s →</a></p>'
 			     % (b["id"], html.escape(self.t(lang, "radio.screens_all"))))
-		docs_links = "".join('<li><a href="{{home}}%s">%s</a></li>'
-				     % (docsmod.site_path(p), html.escape(self.t(lang, "radio.doc." + k)))
+		docs_links = "".join('<li><a href="%s">%s</a></li>'
+				     % (html.escape(self.docs.repo_link(p, False)), html.escape(self.t(lang, "radio.doc." + k)))
 				     for k, p in sorted(b["docs"].items(), key=lambda kv: DOC_ORDER.index(kv[0])))
 		fl = b["flash"]
 		can_flash = ((fl["backend"] == "anyroad-dfu" and bool(self.flash["boards"].get(fl["board"], {}).get("key_sha256")))
@@ -707,7 +716,7 @@ class Site:
 	def features_page(self, lang):
 		bhead = "".join('<th scope="col"><a href="{{home}}radios/%s.html">%s</a></th>'
 				% (b["id"], html.escape(b["model"])) for b in self.boards)
-		groups = []
+		groups, shown_groups = [], []
 		for g in self.groups:
 			if g in BENCH_ONLY:
 				continue
@@ -715,9 +724,11 @@ class Site:
 			for f in self.features:
 				if f["group"] != g:
 					continue
+				if self.firmware_product and f["name"] not in self.boards[0]["config"]["full"]:
+					continue
 				cells = "".join(self.state_cell(lang, self.feature_state(b, f["name"])) for b in self.boards)
 				chips = []
-				for v in self.variants[1:]:
+				for v in ([] if self.firmware_product else self.variants[1:]):
 					if not any(f["name"] in b["config"][v["id"]] for b in self.boards
 						   if f["name"] in b["config"]["full"]) and any(
 							f["name"] in b["config"]["full"] for b in self.boards):
@@ -729,12 +740,18 @@ class Site:
 					"name": f["name"], "title": self.ftitle(lang, f), "help": self.fhelp(lang, f),
 					"notes": f["notes"], "needs": ", ".join(needs) or "—", "size": size or "—",
 					"cells": cells, "chips": "".join(chips), "anchor": f["name"].lower()}, lang))
+			if not rows:
+				continue
+			shown_groups.append(g)
 			groups.append('<tbody><tr class="group"><th colspan="%d" scope="rowgroup" id="%s">%s</th></tr>%s</tbody>'
 				      % (len(self.boards) + 1, docsmod.slug(g), html.escape(self.group_title(lang, g)),
 					 "".join(rows)))
-		ctx = {"board_head": bhead, "groups": "".join(groups), "variants": self.variant_cards(lang),
+		cards = self.variant_cards(lang)
+		ctx = {"board_head": bhead, "groups": "".join(groups),
+		       "variant_section": ('<section class="wrap section"><h2>%s</h2><div class="cards variants">%s</div></section>'
+				   % (html.escape(self.t(lang, "features.variants_title")), cards)) if cards else "",
 		       "toc": "".join('<a href="#%s">%s</a>' % (docsmod.slug(g), html.escape(self.group_title(lang, g)))
-				      for g in self.groups if g not in BENCH_ONLY)}
+				      for g in shown_groups)}
 		self.page(lang, "features/index.html", self.t(lang, "features.title"),
 			  self.tpl.render("features", ctx, lang), "features", nav="features")
 
@@ -749,7 +766,8 @@ class Site:
 		scripts = ('<script type="application/json" id="i18n">%s</script>'
 			   '<script type="module" src="{{root}}static/js/flasher/app.js?v=%s"></script>' % (strings, self.asset_version))
 		# the beta notice, opened once per browser session (static/js/flasher/beta.js)
-		beta = self.tpl.partial("beta_notice", {"repo": self.repo_url, "community": COMMUNITY_URL, "home": "{{home}}"}, lang)	# page() fills in home
+		beta = self.tpl.partial("beta_notice", {"repo": self.repo_url, "home": "{{home}}",
+			"testing_docs": self.docs.repo_link("docs/testing/README.md", False)}, lang)
 		self.page(lang, "flash/index.html", self.t(lang, "flash.title"), self.tpl.render("flash", {"beta": beta}, lang),
 			  "flash", scripts=scripts, nav="flash", footer=self.tpl.partial("flash_log", {"errors": self.errors_paragraph(lang)}, lang))
 
@@ -779,7 +797,11 @@ class Site:
 	def docs_pages(self, lang):
 		prefix = self.i18n.prefix(lang)
 		sections = []
-		for sec in docsmod.SECTIONS:
+		if self.firmware_product:
+			sections = [self.tpl.partial("product_doc_card", {
+				"href": "{{home}}" + p["out"], "title": p["title"], "summary": self.docs.summary(p, lang)}, lang)
+				for p in self.docs.pages]
+		for sec in ([] if self.firmware_product else docsmod.SECTIONS):
 			pages = self.docs.section_pages(sec)
 			if not pages:
 				continue

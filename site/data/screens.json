@@ -893,6 +893,41 @@
    "needs": [
     "DMR_SMS"
    ]
+  },
+  "message_conversations": {
+   "group": "messages",
+   "needs": [
+    "MESSAGE_JOURNAL",
+    "UI_CARD_MENU"
+   ]
+  },
+  "message_thread": {
+   "group": "messages",
+   "needs": [
+    "MESSAGE_JOURNAL",
+    "UI_CARD_MENU"
+   ]
+  },
+  "message_thread_older": {
+   "group": "messages",
+   "needs": [
+    "MESSAGE_JOURNAL",
+    "UI_CARD_MENU"
+   ]
+  },
+  "settings_keys": {
+   "group": "settings",
+   "needs": [
+    "UI_CARD_MENU",
+    "KEY_ASSIGN"
+   ]
+  },
+  "language": {
+   "group": "settings",
+   "needs": [
+    "UI_CARD_MENU",
+    "UI_SETTINGS"
+   ]
   }
  },
  "_copyright": "Copyright (c) 2026 Garrett Dothard",

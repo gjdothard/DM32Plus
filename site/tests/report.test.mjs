@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The USB adapter names (adapter.js), the CH340 banner, and Report a Problem's form and requests (report.js,
 // problemreport.js), against a small stand-in for the DOM. Run with site/tests/run.sh.
 
@@ -309,14 +310,13 @@ test("an error with a catalog key is grouped by the key, so a translated message
 	assert.deepEqual(plain.tags, { stage: "x", code: "5" });
 });
 
-test("the report line under a failure links the community group and the GitHub issues, when the site names them", async () => {
+test("the report line uses this project's issues and ignores legacy community links", async () => {
 	const withLinks = await import("../static/js/report.js?community");
-	globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ community: "https://www.facebook.com/groups/radiofoundry/", repo: "https://github.com/radiofoundry/radiofoundry" }) });
+	globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ community: "https://legacy.example.invalid/group", repo: "https://github.com/gjdothard/DM32Plus" }) });
 	await withLinks.initReporting({ tool: "flasher", context: () => ({}) });
 	const links = find(withLinks.reportLine(), (e) => e.tagName === "A");
 	assert.deepEqual(links.map((a) => [a.attrs.href, a.textContent]), [
-		["https://www.facebook.com/groups/radiofoundry/", en["report.community"]],
-		["https://github.com/radiofoundry/radiofoundry/issues/new/choose", en["report.issue"]]]);
+		["https://github.com/gjdothard/DM32Plus/issues/new/choose", en["report.issue"]]]);
 	// a site without them: the report button alone, no empty "Get help:"
 	const bare = await import("../static/js/report.js?bare");
 	globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({}) });

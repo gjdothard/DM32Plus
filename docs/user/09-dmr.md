@@ -53,7 +53,7 @@ On a DMR memory channel with **Operating talkgroups** assigned, turn the channel
 to cycle through those entries and press Up or Down to change channels. Each entry supplies the timeslot and
 talkgroup together. The first entry is the default. The repeater frequencies, color code, power, and privacy
 settings come from the channel. The RX Group List still controls which additional talkgroups you hear.
-In the web CPS, open a DMR channel and select **Talkgroups**. Use **Add talkgroups** to find and assign
+In the web CPS, open a DMR channel and select **Operating talkgroups**. Use **Add talkgroups** to find and assign
 saved groups, or **Create talkgroup** to add a new contact and assign it together. Use **Move up** and
 **Move down** to set the knob order. **Save channel** applies the edit to your codeplug.
 
@@ -114,7 +114,7 @@ The focus starts on the reply row when there is one.
 
 "Type a number..." opens Find. Type the talkgroup or ID, focus the line you want and press **PTT** or **OK**.
 
-<img src="../ux/screens/160x120i5/talk_target_picker.png" width="200" alt="The talk target picker">
+<img src="../ux/screens/240x320i10x5/talk_target_picker.png" width="200" alt="The talk target picker">
 
 On an FM channel **Talk target** shows "Talk target: DMR channels only".
 
@@ -129,7 +129,7 @@ After a call the radio played, the reply window opens. During the window **PTT**
 answered on the same talkgroup, a private call to the caller. After your own call, **PTT** goes to the same target again. Home shows "Reply→" with
 the target and a countdown.
 
-<img src="../ux/screens/160x120i5/home_reply.png" width="200" alt="Home during the reply window">
+<img src="../ux/screens/240x320i10x5/home_reply.png" width="200" alt="Home during the reply window">
 
 The window lasts as long as **Settings > Talk & listen > Reply window** says (0 to 30 s). 0 turns it off. When that
 setting is left at its start value, the codeplug's hang time applies. Without a hang time in the codeplug, the window
@@ -140,7 +140,7 @@ window ("Reply ended").
 
 On Home, **#** opens the actions for the current or last caller. A digit picks an action.
 
-<img src="../ux/screens/160x120i5/caller_actions.png" width="200" alt="Actions for the last caller">
+<img src="../ux/screens/240x320i10x5/caller_actions.png" width="200" alt="Actions for the last caller">
 
 | # | Action | What it does |
 |---|---|---|
@@ -149,10 +149,11 @@ On Home, **#** opens the actions for the current or last caller. A digit picks a
 | 3 | Message | Opens the message composer ([Messages](10-messages-and-signaling.md)) |
 | 4 | Radio check | Checks that their radio is on and in range |
 | 5 | Call alert | Pages their radio |
-| 6 | Position | Not built yet |
+| 6 | Position | Requests the person's GPS position over LRRP when available ([location](10-messages-and-signaling.md#registration-ars-and-location-lrrp)) |
 | 7 | Save as contact | Opens New Contact with their ID and name ([Contacts](#contacts)). "In contacts" when they are one |
 | 8 | Speak status | Not built yet |
-| 9 | Save to channel | Shown only when the channel has temporary changes |
+| 9 | Last position | Shows the last received position when this feature is built |
+| Next available number | Save to channel | Shown only when the channel has temporary changes; follows Last position when present |
 
 For a talkgroup the actions are Talk to, Make channel default and Message, and 4 Save as contact when it isn't a contact.
 
@@ -160,11 +161,12 @@ Without anyone heard yet, **#** shows "No calls heard yet".
 
 ## Recent
 
-**OK**, **3**. Recent lists the last 12 stations heard and calls made, newest first. Calls you made
+Open **Activity / Logs** with **OK**, **6** on the card Main Menu, or Recent with **OK**, **3** on the standard Hub.
+Recent lists the last 12 stations heard and calls made, newest first. Calls you made
 start with an arrow. Calls to you are highlighted, and private calls show "you" or "priv". Recent is kept in memory
 and starts empty after a restart.
 
-<img src="../ux/screens/160x120i5/recent.png" width="200" alt="Recent">
+<img src="../ux/screens/240x320i10x5/recent.png" width="220" alt="Activity and Logs caller cards">
 
 **PTT** talks to the focused entry (the talkgroup a station was heard on). **OK** uses it for now. Holding **OK** makes
 it permanent. **#** opens its actions.
@@ -178,9 +180,8 @@ Type letters of the name or digits of the ID to filter the current tab.
 **OK** talks to the focused entry for now. Holding **OK** makes it the channel's default. **PTT** talks to it once.
 **#** opens its actions.
 
-<img src="../ux/screens/160x120i5/contacts.png" width="200" alt="Contacts">
 <img src="../ux/screens/240x320i10x5/contacts.png" width="200" alt="Talkgroups tab on the card layout">
-<img src="../ux/screens/160x120i5/contact_actions.png" width="200" alt="Actions for a contact">
+<img src="../ux/screens/240x320i10x5/contact_actions.png" width="200" alt="Actions for a contact">
 
 ### New contact
 
@@ -190,7 +191,7 @@ Make a contact on the radio from a number or a call:
   **OK**. Up to 6 digits start as a talkgroup, 7 and more as a person.
 - In a caller's or talkgroup's actions (**#**), pick **Save as contact**.
 
-<img src="../ux/screens/160x120i5/contact_edit.png" width="200" alt="New Contact">
+<img src="../ux/screens/240x320i10x5/contact_edit.png" width="200" alt="New Contact">
 
 | Row | **OK** does |
 |---|---|
@@ -224,7 +225,7 @@ On the Memory card grid, the keys are **1** Power, **2** Scan, **3** Dual watch,
 
 The standard grid and VFO use the following key positions.
 
-<img src="../ux/screens/160x120i5/quick_dmr.png" width="200" alt="Quick settings on a DMR channel">
+<img src="../ux/screens/240x320i10x5/quick_dmr.png" width="200" alt="Quick settings on a DMR channel">
 
 | Key | Tile | What it does |
 |---|---|---|
@@ -244,7 +245,7 @@ Press **Up** or **Down**, or type the code (0 to 15). Press **OK** to
 apply it. The new
 color code takes effect when the editor closes.
 
-<img src="../ux/screens/160x120i5/quick_cc_editor.png" width="200" alt="Editing the color code">
+<img src="../ux/screens/240x320i10x5/quick_cc_editor.png" width="200" alt="Editing the color code">
 
 Timeslot and color code are temporary. They can't be changed while transmitting. Hold **OK**
 to save them to the channel. In the VFO they are the VFO's own settings and are kept ([the VFO](07-channels-zones-vfo.md#dmr-in-the-vfo)).
@@ -288,14 +289,16 @@ been checked against another radio yet ([Radio reference](23-radios.md)).
   standard Memory grid). Home shows "Priv" or the yellow **PRIVACY** badge. An active **AES-256** binding is shown on
   the Memory card grid's Privacy tile and is managed in the codeplug. **Back** on Home turns temporary basic privacy off.
 
-To set the key on the radio, open **Settings > Privacy** (**OK**, **7**, **4**).
+To set a basic privacy key on the radio, open **Settings > Privacy** (**OK**, **9**, **4** on the card
+Main Menu; **OK**, **7**, **4** on the standard Hub).
 
 1. On **Key type**, press **OK** until it shows Motorola or Anytone.
 2. On **Key**, press **OK**. Type the key in decimal with the number keys (Motorola 1 to 255, Anytone 0 to 65535).
    Press **OK** again.
 
-The radio keeps the key across restarts. Setting the type back to Off removes the key and turns privacy off. The codeplug
-can't hold privacy keys yet. Developers can also load a key over USB with the debug tool:
+The radio keeps the basic privacy key in its settings across restarts. Setting the type back to Off removes it.
+Key values are separate from the codeplug; persistent AES slots are managed through the CPS below.
+Developers can also load a basic privacy key over the host link with the debug tool:
 
 ```
 tools/rfoundry_debug.py radio privacy moto 5          # Motorola basic privacy, key 5
@@ -307,7 +310,7 @@ AES-256 voice is available in builds with `CONFIG_DMR_AES256`. It uses the AES-2
 [the voice specification](../spec/dmr-voice.md#51-aes-256-sessions). Two-way compatibility with stock radios is
 still untested; an AES label alone does not guarantee compatible signaling.
 
-Provisioning currently uses the debug tool. Select a DMR channel and wait until the radio is idle. Put the
+For a temporary RAM-only AES key, use the debug tool. Select a DMR channel and wait until the radio is idle. Put the
 32-byte key in a local file as 64 hexadecimal characters, then run:
 
 ```

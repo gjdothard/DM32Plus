@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 # UI design principles
 
 Goal: some of the best usability of any radio firmware. These ten principles decide every UI question. Each has rules that are concrete enough to check, and a **Test** line that `usability-tests.md` turns into a measurement or an automated check in the SDL simulator.
@@ -17,7 +18,9 @@ Words used below:
 The top 20 tasks (`task-flows.md`) each show their first useful result within two presses from Home, and finish within their budget (most within four, none above six).
 
 - Home has direct keys for: change channel, quick settings, actions on the last caller, find anything (type), monitor.
-- Top-level destinations are few (seven) and each is a noun the user already knows: Contacts, Messages, Recent, Zones, Channels, Tools, Settings.
+- Top-level destinations use familiar names. The standard Hub has seven; the tall card Main Menu has nine,
+  including Radio, Scan, Activity / Logs, and GPS, APRS, and Data. See the current
+  [menu reference](../user/05-keys-and-navigation.md#moving-around).
 - No task requires going through Settings. Settings is for preferences, not for operating the radio.
 
 **Test:** scripted flows in the simulator count presses per task and fail the build if a flow exceeds its budget.

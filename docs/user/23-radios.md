@@ -377,17 +377,19 @@ Installing: [Moving from stock DM-32UV firmware](19-moving-from-stock-dm32.md).
 
 ### DM32Plus
 
-DM32Plus reserves 512 KiB for future conversation history. If your caller-name database exceeds the new
+DM32Plus reserves 512 KiB for persistent conversation history. Eligible blank storage is prepared automatically;
+unknown contents are preserved. See [message history](10-messages-and-signaling.md#reading-messages).
+If your caller-name database exceeds the new
 CPS limit, keep a copy before upgrading and rebuild it with fewer regions or shorter text in **DMR ID
 Database**. The limit applies to caller-name lookups. Channels, talkgroups, and saved contacts have their
 own records.
 
 The DM32Plus offshoot publishes its firmware on [GitHub Releases](https://github.com/gjdothard/DM32Plus/releases).
 
-1. Open the portable CPS with `Start CPS.cmd` using Chrome or Edge, then choose **Install DM32Plus**
-   or **Upgrade to DM32Plus**. See the [portable CPS instructions](../../tools/offline_cps/README.md).
+1. Open the portable CPS with `Start CPS.cmd` using Chrome or Edge, then open **Firmware** and choose **Install DM32+**
+   or **Upgrade to DM32+**. See the [portable CPS instructions](../../tools/offline_cps/README.md).
 2. Choose a **Release channel**. **Development** checks for the newest published Development prerelease.
-   **Testing** checks for the newest published release candidate, identified by an `RC` prefix.
+   **Testing** checks for the newest published release candidate, with a `-rc.N` version suffix.
    **Stable** checks for the newest published stable release. **Bundled (offline)** uses the image
    included in the CPS package.
 3. Review the target version before proceeding. If the installer was open when a new release appeared,

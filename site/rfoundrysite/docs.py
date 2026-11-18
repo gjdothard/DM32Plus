@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """docs/ rendered as site pages, the same Markdown GitHub and the PDF manual show.
 
 The output mirrors the docs tree (docs/user/02-installing.md -> docs/user/02-installing.html, a directory's README.md
 -> its index.html) and every non-Markdown file under docs/ is copied beside it, so relative links and images keep
 working with only .md -> .html rewritten. A link that leaves docs/ goes to the file on the repository web site.
 Heading ids are GitHub's (tools/check_doc_links.py), so anchors that pass the link check work here too.
+Product builds can select another source root with the same section layout. Only that guide is published;
+links to shared Markdown outside it open the source repository instead.
 
 Translations (later): docs/i18n/<lang>/<path under docs> replaces a page for that language; pages without one
 fall back to English with a notice.
@@ -59,7 +62,7 @@ def site_path(rel):
 
 
 class Docs:
-	def __init__(self, repo_url, ref, langs, default_lang):
+	def __init__(self, repo_url, ref, langs, default_lang, source_root="docs"):
 		if MarkdownIt is None:
 			raise repo.SourceError("markdown-it-py is missing")
 		self.md = MarkdownIt("commonmark", {"html": True, "linkify": False}).enable(["table", "strikethrough"])
@@ -67,7 +70,9 @@ class Docs:
 		self.ref = ref
 		self.langs = langs
 		self.default_lang = default_lang
+		self.source_root = source_root
 		self.pages = self._collect()
+		self.outputs = {p["src"]: p["out"] for p in self.pages}
 		self.glossary = _load_glossary()
 		self.terms = self._terms()
 
@@ -82,21 +87,22 @@ class Docs:
 
 	def _collect(self):
 		pages = []
-		docs = repo.path("docs")
+		docs = repo.path(self.source_root)
 		for dirpath, dirs, files in os.walk(docs):
 			dirs[:] = sorted(d for d in dirs if d != "i18n")
 			for f in sorted(files):
 				if not f.endswith(".md"):
 					continue
 				rel = os.path.relpath(os.path.join(dirpath, f), repo.ROOT).replace(os.sep, "/")
-				parts = rel.split("/")
+				public = "docs/" + os.path.relpath(os.path.join(dirpath, f), docs).replace(os.sep, "/")
+				parts = public.split("/")
 				section = parts[1] if len(parts) > 2 else "general"
 				if section not in SECTIONS:
 					section = "general"
 				with open(os.path.join(dirpath, f), encoding="utf-8") as fh:
 					text = fh.read()
 				m = re.search(r"^#\s+(.+)$", text, re.M)
-				pages.append({"src": rel, "out": site_path(rel), "section": section,
+				pages.append({"src": rel, "out": site_path(public), "section": section,
 					      "title": m.group(1).strip() if m else f[:-3], "index": f == "README.md"})
 		# the user manual reads in chapter order (its files are numbered); every other section alphabetically
 		pages.sort(key=lambda p: (SECTIONS.index(p["section"]), not p["index"], p["src"]))
@@ -104,6 +110,14 @@ class Docs:
 
 	def section_pages(self, section):
 		return [p for p in self.pages if p["section"] == section]
+
+	def summary(self, page, lang):
+		text, _ = self.source_for(page, lang)
+		tokens = self.md.parse(text)
+		for i, token in enumerate(tokens):
+			if token.type == "paragraph_open":
+				return " ".join(plain(tokens[i + 1].content).split())
+		return ""
 
 	def source_for(self, page, lang):
 		"""(Markdown text, is a fallback to English) of a page in a language."""
@@ -231,14 +245,18 @@ class Docs:
 		target, _, anchor = href.partition("#")
 		anchor = "#" + anchor if anchor else ""
 		resolved = posixpath.normpath(posixpath.join(posixpath.dirname(src), target))
-		here = posixpath.dirname(site_path(src))
+		here = posixpath.dirname(self.outputs.get(src, site_path(src)))
 		if resolved.startswith("docs/") and not resolved.startswith("docs/i18n/"):
 			full = repo.path(resolved)
 			if resolved.endswith(".md"):
-				return posixpath.relpath(site_path(resolved), here) + anchor
+				if resolved not in self.outputs:
+					return self.repo_link(resolved, False) + anchor
+				return posixpath.relpath(self.outputs[resolved], here) + anchor
 			if os.path.isdir(full):
 				if os.path.isfile(os.path.join(full, "README.md")):
-					return posixpath.relpath(posixpath.join(resolved, "index.html"), here) + anchor
+					index = resolved.rstrip("/") + "/README.md"
+					if index in self.outputs:
+						return posixpath.relpath(self.outputs[index], here) + anchor
 				return self.repo_link(resolved, True) + anchor
 			return posixpath.relpath(resolved, here) + anchor
 		if resolved.startswith(".."):

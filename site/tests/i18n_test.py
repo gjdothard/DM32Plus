@@ -171,9 +171,9 @@ class SecondLanguage(unittest.TestCase):
 				 r'data-no="[^"]+">English</a>')
 		self.assertRegex(sw, r'href="\.\./\.\./es/radios/index\.html" aria-current="true" lang="es" hreflang="es" '
 				 r'data-hint="[^"]+"[^>]*>Español</a>')
-		self.assertIn('<link rel="alternate" hreflang="en" href="https://radiofoundry.org/radios/">', page)
-		self.assertIn('<link rel="alternate" hreflang="es" href="https://radiofoundry.org/es/radios/">', page)
-		self.assertIn('<link rel="alternate" hreflang="x-default" href="https://radiofoundry.org/radios/">', page)
+		self.assertIn('<link rel="alternate" hreflang="en" href="%sradios/">' % build.SITE_URL, page)
+		self.assertIn('<link rel="alternate" hreflang="es" href="%ses/radios/">' % build.SITE_URL, page)
+		self.assertIn('<link rel="alternate" hreflang="x-default" href="%sradios/">' % build.SITE_URL, page)
 		self.assertIn('<meta property="og:locale" content="es_ES">', page)
 		self.assertIn('lang-switch', self.read("radios/index.html"))
 
@@ -182,7 +182,7 @@ class SecondLanguage(unittest.TestCase):
 		product = repo.product()
 		self.assertIn(f"<title>Inicio · {product['brand']}{product['accent']}</title>", page)
 		self.assertIn(">Documentos (es)</a>", page)
-		self.assertIn(">Codeplug</a>", page)	# not in the catalog: English
+		self.assertIn(">CPS</a>", page)	# not in the catalog: English
 		# links between pages stay in the language
 		self.assertIn('href="../es/docs/index.html"', page)
 		self.assertIn("capturas · ", self.read("es/screenshots/index.html"))

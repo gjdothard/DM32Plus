@@ -22,7 +22,7 @@ missing bundles and downgrades leave the current website running.
 
 Deployment verifies checksums before replacing files. It serializes updates, preserves local proxy and port
 configuration, retains a rollback copy, and recreates the Compose service. A failed container health check
-restores the previous site, server files. The public `deployment.json` marker appears only after
+restores the previous site and server files. The public `deployment.json` marker appears only after
 the container passes its health check. It identifies both the release version and firmware commit.
 The release workflow requires this exact marker before reporting website deployment success.
 

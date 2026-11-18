@@ -6,8 +6,8 @@
 Home answers four questions at a glance: where you are, what **PTT** will do, what is happening, and whether the radio
 is OK.
 
-<img src="../ux/screens/160x120i5/home_dmr.png" width="200" alt="Home on a DMR channel">
-<img src="../ux/screens/160x120i5/home_fm.png" width="200" alt="Home on an FM channel">
+<img src="../ux/screens/240x320i10x5/home_dmr.png" width="200" alt="Home on a DMR channel">
+<img src="../ux/screens/240x320i10x5/home_fm.png" width="200" alt="Home on an FM channel">
 
 ## Regions, top to bottom
 
@@ -24,7 +24,7 @@ is OK.
 A field changed for now (a temporary change) is drawn in a highlight color on Home, and the hint row says
 "Back undo  Hold OK save".
 
-<img src="../ux/screens/160x120i5/home_temporary.png" width="200" alt="Home with a temporary power change">
+<img src="../ux/screens/240x320i10x5/home_temporary.png" width="200" alt="Home with a temporary power change">
 
 The battery percentage turns to the warning color at the low battery warning level (15 % by default) and below.
 
@@ -33,6 +33,12 @@ The battery percentage turns to the warning color at the low battery warning lev
 The card layout has a graphic battery gauge, an envelope with a dot when messages are unread, and a
 satellite on GPS-equipped builds. The satellite is green with a fix, yellow while acquiring, and gray
 when fix status is unavailable.
+
+The 24-hour clock sits beside the battery percentage. A recent onboard GPS fix supplies UTC; builds with a
+valid hardware clock can retain time between fixes and power cycles. **Settings > Location > UTC offset**
+sets local time. Without valid time the clock shows `--:--`.
+
+<img src="../ux/screens/240x320i10x5/home_dual.png" width="240" alt="Card Home screen with two channels and a status clock">
 
 The zone name or **VFO MODE** sits above the channel cards. In Memory, the DMR card shows the named
 talkgroup and its ID, slot, and color code. In VFO, the card emphasizes frequency. The power label stays
@@ -67,8 +73,8 @@ During a DMR call, Home shows the caller:
 - the talkgroup, or "Private to you";
 - the signal strength (in DMR, the peak of the last 120 ms, so the empty timeslot doesn't show as a drop).
 
-<img src="../ux/screens/160x120i5/rx_group.png" width="200" alt="Receiving a group call">
-<img src="../ux/screens/160x120i5/rx_private.png" width="200" alt="Receiving a private call">
+<img src="../ux/screens/240x320i10x5/rx_group.png" width="200" alt="Receiving a group call">
+<img src="../ux/screens/240x320i10x5/rx_private.png" width="200" alt="Receiving a private call">
 
 A call that the radio hears but doesn't play shows why. The reasons are "Other TG: not played" (a talkgroup you don't
 listen to), "Encrypted: not played" and "No codec: voice off". Hold **Monitor** to hear a call on another talkgroup.
@@ -84,8 +90,8 @@ On DMR the top line says what kind of call it is: "TG 3100" for a group call, "P
 A private call shows the contact's name, and its ID when there is room. A name too long for the line keeps the name
 and drops the ID.
 
-<img src="../ux/screens/160x120i5/tx.png" width="200" alt="Transmitting a group call">
-<img src="../ux/screens/160x120i5/tx_private.png" width="200" alt="Transmitting a private call">
+<img src="../ux/screens/240x320i10x5/tx.png" width="200" alt="Transmitting a group call">
+<img src="../ux/screens/240x320i10x5/tx_private.png" width="200" alt="Transmitting a private call">
 
 On DMR the screen may first show WAITING (the radio waits for a free slot) or WAKING RPT (it wakes up the repeater).
 
@@ -117,4 +123,4 @@ The low and critical battery levels also limit transmitting. See [Battery and po
 **Settings > Display > Large text** shows only the status line, the channel name and the talk target, each as large as
 it fits. The radio keeps this setting across power off. It keeps **Settings > Display > Hint row** too.
 
-<img src="../ux/screens/160x120i5/home_large_text.png" width="200" alt="Home in large text">
+<img src="../ux/screens/240x320i10x5/home_large_text.png" width="200" alt="Home in large text">

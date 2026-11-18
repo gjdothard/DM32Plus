@@ -2,7 +2,9 @@
 <!-- Copyright (c) 2026 Garrett Dothard -->
 # Information architecture
 
-How the UI is organized: the Home screen, the logical input layer, what each key does in each context, quick settings, the six top-level destinations, settings grouped by intent, and the key maps for the four reference radios. Principles referenced as P1 to P10 are in `principles.md`.
+How the UI is organized: Home, logical inputs, key actions, Quick Controls, menus, settings grouped by intent,
+and reference key maps. The standard Hub has seven destinations; the card Main Menu has nine.
+Principles referenced as P1 to P10 are in `principles.md`.
 
 Hardware details below (key labels, knob types, display sizes) are the designer's understanding and must be checked against `docs/spec/capabilities.md` and the board descriptors when those exist. The design does not depend on them: a wrong assumption only changes a row in a key map table.
 
@@ -103,24 +105,23 @@ Large-text mode (accessibility, or chosen by the user) shows only the status str
 
 ---
 
-## 4. Hub: six top-level destinations
+## 4. Hub: seven top-level destinations
 
 `SELECT` on Home opens the Hub. Items are numbered; digits pick directly. Order is fixed so muscle memory works.
 
 | # | Destination | What is inside |
 |---|---|---|
-| 1 | **Contacts** | Search field on top. Tabs (or filter chips): Talkgroups, People, Listen lists. Item actions: Talk to, Private call, Message, Radio check, Call alert, Request position, Add to speed dial, Edit |
-| 2 | **Messages** | Inbox (unread first), New message, Canned messages, Sent, Drafts |
-| 3 | **Recent** | Everyone heard and every call made, newest first, filters: All / Calls to me / Missed / Talkgroups. Item actions are the same as Contacts, plus "Save as contact" and "Show position" |
+| 1 | **Contacts** | Filtered saved contacts and talkgroups. The card directory separates group and private entries into tabs. Actions include editing saved records, messaging, and private-contact signaling |
+| 2 | **Messages** | Conversations, newest first. Persistent history when active, otherwise the live receive buffer. Open a thread to read or reply; the composer offers canned messages and text entry |
+| 3 | **Recent** | Stations heard and calls made, newest first. PTT uses the focused target; context opens caller actions |
 | 4 | **Zones** | Zone picker, current zone's channels, VFO, Scan lists. A zone's list is also its editor: "Add channel" first, "Zone options" (Rename, Copy as new zone, Share zone to..., Delete zone) last, and Channel actions on a channel (Move up, Move down, Copy here, Edit channel, Share channel to..., Remove from zone; the Share rows with zone sharing) |
 | 5 | **Channels** | Every channel by number; New channel from current settings (first row); a channel's settings, edited in place and saved (ui.md 2.1) |
-| 6 | **Tools** | Scan, Position (GPS), Hotspot, USB network, Single frequency repeater, ID lookup, Signal meter, DTMF, APRS, Registration (ARS), Battery |
+| 6 | **Tools** | Scan, Position, Hotspot, USB network, Single frequency repeater, Roaming, Diagnostics, APRS, Battery, and pending zone offers when available |
 | 7 | **Settings** | Grouped by intent (below), with search |
 
 The dark card layout opens **Tools & Utilities** from Main Menu item 8. It shows the same tools and live values as the standard Tools list.
-Each Tools item keeps its number on every radio and build, so a key path such as `SELECT`, `6`, `7` (Diagnostics) is
-the same everywhere. An item a radio may not have goes last (Battery, 9, on a mobile), so commonly used items have no
-gaps.
+Each Tools item keeps its number across builds. Diagnostics is `SELECT`, `6`, `7` on the standard Hub
+and `SELECT`, `8`, `7` on the card Main Menu. An unavailable item stays in its numbered position.
 
 Contacts, Recent and Messages are the "people" side, Zones, Channels and Tools the "radio" side, Settings the preferences. Nothing operational lives only in Settings (P1).
 

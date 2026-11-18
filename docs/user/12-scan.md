@@ -44,7 +44,7 @@ If dual watch is running, starting a scan stops it. The radio stays on the selec
 | **Back** | Stops the scan |
 | Changing channel, zone or VFO yourself | Ends the scan where you put it |
 
-<img src="../ux/screens/160x120i5/scan_actions.png" width="200" alt="Scan actions">
+<img src="../ux/screens/240x320i10x5/scan_actions.png" width="200" alt="Scan actions">
 
 The scan actions:
 
@@ -95,16 +95,16 @@ knob, digits, Find, Zones, or the **VFO** key. The same goes for A.
 Or press **#**, **3** (Change B) for the picker. The list shows the channels of the zone you are in, with their frequency and mode. Press a channel's number, type part
 of its name, or move to it and press **OK**. The channel you are on is dimmed with "A": it can't be B.
 
-<img src="../ux/screens/160x120i5/dual_pick.png" width="200" alt="Pick B: the channels of a zone">
+<img src="../ux/screens/240x320i10x5/dual_pick.png" width="200" alt="Pick B: the channels of a zone">
 
 For a channel of another zone, or the VFO, go up to the **Zone** row and press **OK**. The list shows **VFO** first,
 then the zones. Pick a zone to see its channels, or **VFO** to watch a VFO frequency.
 
-<img src="../ux/screens/160x120i5/dual_zones.png" width="200" alt="Zone for B: the VFO or a zone">
+<img src="../ux/screens/240x320i10x5/dual_zones.png" width="200" alt="Zone for B: the VFO or a zone">
 
 ### Read Home
 
-<img src="../ux/screens/240x320/home_dual_rx_b.png" width="200" alt="Dual watch Home, a call coming in on B">
+<img src="../ux/screens/240x320i10x5/home_dual_rx_b.png" width="200" alt="Dual watch Home, a call coming in on B">
 
 <img src="../ux/screens/240x320i10x5/home_dual_rx_b.png" width="200" alt="Dual Watch channel cards with A selected and B receiving">
 
@@ -142,14 +142,14 @@ the other channel, that channel becomes the selected one ("Talk back on B"), so 
 starts over with each reply and each call there. After it, the selection goes back ("Talking on A"). **#**, **1**, the
 **A/B** key or **Left** / **Right** go back at once. While it is on, the hint row says "# 1 back to A  Back stop".
 
-<img src="../ux/screens/240x320/home_dual_talk_back.png" width="200" alt="Talk back on B">
+<img src="../ux/screens/240x320i10x5/home_dual_talk_back.png" width="200" alt="Talk back on B">
 
 ### Talk on B
 
 Press **#**, **1** ("Talk on B"). B is now the selected channel. On a radio with a Left / Right pair, **Right** selects B and **Left** selects A. A press of the **A/B** key
 switches, and so does any side key set to **A/B** (Settings > Keys). With dual watch off, the **A/B** key only says "Turn on dual watch first". Hold **PTT** to talk. The watch goes on after you let go.
 
-<img src="../ux/screens/160x120i5/home_dual_on_b.png" width="200" alt="Dual watch Home with B selected">
+<img src="../ux/screens/240x320i10x5/home_dual_on_b.png" width="200" alt="Dual watch Home with B selected">
 
 ### Change A or B
 
@@ -163,7 +163,7 @@ Press **#** on Home. The actions are:
 | 4 | Caller | The actions for the last caller (dim until a call was heard) |
 | 5 | Stop, stay on A (or B) | Ends dual watch on the selected channel |
 
-<img src="../ux/screens/160x120i5/dual_actions.png" width="200" alt="Dual watch actions">
+<img src="../ux/screens/240x320i10x5/dual_actions.png" width="200" alt="Dual watch actions">
 
 A channel can't be both A and B. Changing A or B clears the calls listed for it.
 

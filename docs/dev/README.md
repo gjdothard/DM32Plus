@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Developer Documentation
 
@@ -39,7 +40,7 @@ tooling and link the specs for behavior; they don't repeat them. Users read [doc
 | To | See |
 |---|---|
 | Build a radio | [Building](building.md) |
-| Run everything a pull request must pass | `JOBS=8 tools/ci.sh`, which ends with "all checks passed" ([CI](ci.md#running-the-pieces-locally)) |
+| Run everything a pull request must pass | `JOBS=8 tools/ci.sh --board <product-board-id>`, which ends with "all checks passed" ([CI](ci.md#running-the-pieces-locally)) |
 | Add a feature switch | [build-config.md, "Adding a feature"](../build-config.md#adding-a-feature), then the matrix ([feature-matrix.md](../feature-matrix.md)) |
 | Add a host test | [Testing, "Host tests"](testing.md#host-tests) |
 | Add a HIL test | [tests/hil/README.md](../../tests/hil/README.md), "Writing a test" |

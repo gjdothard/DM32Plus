@@ -5,6 +5,7 @@
   "prefix": "dm32plus",
   "repository": "gjdothard/DM32Plus",
   "board": "dm32",
+  "documentation": "docs/product/dm32",
   "brand": "DM32",
   "accent": "+",
   "version": "1.0.0"
