@@ -1223,9 +1223,13 @@ static void actions_item(uint16_t i, ui_item_t *it)
 		break;
 	case DA_CALLER:
 		sb_str(&b, TR("Caller"));
-		if (!d->caller[0])
+		if (!d->caller[0]) {
 			it->flags |= UI_ITEM_DIM;
-		else if (d->rx != UI_DUAL_NONE)
+#if CONFIG_UI_CARD_MENU
+			if (ui_card_layout(&ui_st))
+				sb_str(&vb, TR("No calls heard yet"));
+#endif
+		} else if (d->rx != UI_DUAL_NONE)
 			sb_str(&vb, d->caller);		// on the air now
 		else
 			caller_age(&vb, d->caller, ui_st.now_ms - d->last_ms);
@@ -1335,10 +1339,26 @@ static void pick_item(uint16_t i, ui_item_t *it)
 	bool on_a = ref_same(&r, &other);
 	if (on_a) {
 		sb_str(&b, pane ? "A" : "B");
+#if CONFIG_UI_CARD_MENU
+		if (ui_card_layout(&ui_st)) {
+			sb_chr(&b, '\n');
+			sb_str(&b, TR("In use"));
+		}
+#endif
 		it->flags |= UI_ITEM_DIM;
 		return;
 	}
 	// "146.940 FM", else "146.940": the channel's name gives way last
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st)) {
+		sb_str(&b, ch.mode == RADIO_MODE_DMR ? "DMR" : "FM");
+		sb_chr(&b, '\n');
+		sb_freq(&b, ch.rx_hz);
+		if (d->on && ref_same(&r, &ref[pane]))
+			it->flags |= UI_ITEM_TEMP;
+		return;
+	}
+#endif
 	sb_str(&b, TEXT_ALT_OPEN);
 	sb_freq(&b, ch.rx_hz);
 	sb_str(&b, ch.mode == RADIO_MODE_DMR ? " DMR" : " FM");

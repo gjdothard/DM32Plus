@@ -1816,7 +1816,10 @@ static void list_draw(const ui_scr_def_t *d)
 	l.empty = tr(d->empty);
 	l.hint = tr(d->hint);
 	l.body = d->body != NULL ? d->body() : NULL;
-	if ((d->flags & SF_FILTER) && filter_keys[0]) {
+	if ((d->flags & SF_FILTER) && (filter_keys[0] ||
+	    (CONFIG_UI_CARD_MENU && ui_card_layout(&ui_st) &&
+	     (f->scr == SCR_CHANNELS || f->scr == SCR_CHPICK || f->scr == SCR_ZPICK ||
+	      f->scr == SCR_SHARE_TO || f->scr == SCR_CRASH_TO)))) {
 		sbuf_t b;
 		sb_init(&b, header, sizeof header);
 		sb_str(&b, TR("Find: "));
@@ -1838,6 +1841,74 @@ static void list_draw(const ui_scr_def_t *d)
 	if (CONFIG_UI_SETTINGS && CONFIG_DMR_ARS && f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_ARS)
 		l.hint = TR("OK change  Back");
 	if (ui_card_layout(&ui_st)) {
+		if (f->scr == SCR_ZCHANNEL || f->scr == SCR_ZONEEDIT || f->scr == SCR_SHARE ||
+		    f->scr == SCR_ROAM || f->scr == SCR_OFFER) {
+			if (f->scr == SCR_ZONEEDIT)
+				l.prefix = TR("Zone Options");
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_ACTIONS);
+			return;
+		}
+		if (f->scr == SCR_ZPICK || f->scr == SCR_OFFER_PREVIEW || f->scr == SCR_APRS_HEARD) {
+			if (f->scr == SCR_APRS_HEARD)
+				l.prefix = TR("APRS Heard");
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_DETAILS);
+			return;
+		}
+		if (f->scr == SCR_ZONEDEL || f->scr == SCR_CONFIRM) {
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_CONFIRM);
+			return;
+		}
+		if (f->scr == SCR_CHZONES || f->scr == SCR_SHARE_TO || f->scr == SCR_OFFER_ZONE ||
+		    f->scr == SCR_APRS_POS || f->scr == SCR_CRASH_TO || f->scr == SCR_INFO ||
+		    f->scr == SCR_CONTACT_POSITION || f->scr == SCR_CRASH
+#if CONFIG_MESSAGE_JOURNAL
+		    || f->scr == SCR_CONVERSATION
+#endif
+		   ) {
+			if (f->scr == SCR_APRS_POS)
+				l.prefix = TR("APRS Position");
+			if (f->scr == SCR_CONTACT_POSITION)
+				l.prefix = TR("Last Position");
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_FIELDS);
+			return;
+		}
+		if (f->scr == SCR_GROUP || f->scr == SCR_DMR_ID || f->scr == SCR_LANGUAGE) {
+			ui_item_t focused = { 0 };
+			if (l.count)
+				l.item(l.focus, &focused);
+			if (f->scr == SCR_GROUP && (focused.flags & UI_ITEM_EDIT))
+				l.hint = TR(TEXT_ALT_OPEN "Up/Dn change  OK keep  Back cancel" TEXT_ALT_NEXT
+					"Up/Dn  OK keep  Back cancel" TEXT_ALT_CLOSE);
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_FIELDS);
+			return;
+		}
+		if (f->scr == SCR_DUAL || f->scr == SCR_DUAL_PICK || f->scr == SCR_DUAL_ZONE) {
+			l.name_in_title = f->scr != SCR_DUAL;
+			ui_draw_card_page(&ui_st, &l, f->scr == SCR_DUAL ? UI_CARD_PAGE_ACTIONS :
+				f->scr == SCR_DUAL_PICK ? UI_CARD_PAGE_DETAILS : UI_CARD_PAGE_FIELDS);
+			return;
+		}
+		if (f->scr == SCR_FIND || f->scr == SCR_PICKER || f->scr == SCR_CHPICK) {
+			if (f->scr == SCR_FIND)
+				l.prefix = TR("Find");
+			ui_draw_card_page(&ui_st, &l, f->scr == SCR_CHPICK ? UI_CARD_PAGE_FIELDS : UI_CARD_PAGE_DETAILS);
+			return;
+		}
+		if (f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_RADIO) {
+			l.prefix = l.name;
+			l.name = NULL;
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_ACTIONS);
+			return;
+		}
+		if (f->scr == SCR_CHANNELS) {
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_DETAILS);
+			return;
+		}
+		if (f->scr == SCR_RECENT) {
+			l.prefix = TR("Activity / Logs");
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_DETAILS);
+			return;
+		}
 		if (f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_GPS) {
 			l.prefix = l.name;
 			ui_draw_numbered_menu(view, &ui_st, &l, false);
@@ -1860,12 +1931,12 @@ static void list_draw(const ui_scr_def_t *d)
 			ui_draw_numbered_menu(view, &ui_st, &l, false);
 			return;
 		}
-#if CONFIG_CONTACT_EDIT
-		if (f->scr == SCR_ACTIONS && f->arg) {
+		if (f->scr == SCR_ACTIONS) {
 			l.prefix = l.name;
-			ui_draw_numbered_menu(view, &ui_st, &l, true);
+			ui_draw_numbered_menu(view, &ui_st, &l, f->arg != 0);
 			return;
 		}
+#if CONFIG_CONTACT_EDIT
 		if (f->scr == SCR_CONTACT_EDIT || f->scr == SCR_CHANNEL || f->scr == SCR_TEXT || f->scr == SCR_DISCARD) {
 			l.hint = TR("OK change  Back");
 			if (f->scr == SCR_TEXT) {

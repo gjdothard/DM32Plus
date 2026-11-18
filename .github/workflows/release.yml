@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 #
-# Firmware releases (docs/dev/release.md): on a v* tag, build the codec-less firmware for every releasable radio
-# (board.toml [status] release = "stable", each build option value's image too) with the toolchains platform.toml
-# pins, one job per toolchain (C-SKY in the csky-elf image, never built from source), write a manifest and SHA256SUMS
+# Firmware releases (docs/dev/release.md): on a v* tag, build codec-less firmware for the selected product board
+# with the compiler pinned by its platform.toml (C-SKY in the existing compiler image), and write a manifest and SHA256SUMS
 # for each image, build rfoundry as single-file executables for Linux, macOS and Windows, and attach everything to
 # the GitHub release (created when missing; the user manual workflow attaches its PDF to the same release). The AMBE
 # codec is never part of any of it.
@@ -57,7 +57,7 @@ jobs:
           m="$m"'{"os":"macos-15-intel","name":"macos-x86_64"},{"os":"windows-2022","name":"windows-x86_64","ext":".exe"}]'
           echo "rfoundry=$m" >> "$GITHUB_OUTPUT"
           if [ "${GITHUB_REF_TYPE}" = tag ] && [ "${GITHUB_REF_NAME#v}" != "${GITHUB_REF_NAME}" ]; then
-            # a release name or nothing: vYY.M, vYY.M.N, either with bN (docs/dev/release.md)
+            # A supported release name (docs/dev/release.md).
             python3 tools/release_version.py check "${GITHUB_REF_NAME}"
             echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
             echo "publish=true" >> "$GITHUB_OUTPUT"
@@ -73,9 +73,7 @@ jobs:
           echo "firmware=$fw" >> "$GITHUB_OUTPUT"
 
   firmware:
-    # one job per toolchain: every releasable board built with it (board.toml [status] release = "stable") and each of
-    # its build option values' images (one per band, for example), all from the registry, so a new radio is released
-    # with no edit here. One artifact per toolchain
+    # Package only the selected product board and its registered build options.
     name: firmware (${{ matrix.name }})
     needs: version
     if: needs.version.outputs.firmware == 'true'
@@ -83,11 +81,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # the [toolchain] ids of platform/*/platform.toml, with their names; a new platform on a toolchain listed here
-        # needs no edit, a new toolchain gets an entry here and its set-up in .github/actions/toolchain
+        # The product board file defines the firmware scope of this fork.
         include:
-          - { toolchain: arm, name: Arm }
-          - { toolchain: csky, name: C-SKY }
+          - { toolchain: csky, name: C-SKY, board_file: boards/dm32/board.toml }
     permissions:
       contents: read
       packages: read   # pulling a private ghcr.io csky-elf image with the job token
@@ -117,23 +113,25 @@ jobs:
         env:
           RUN: ${{ steps.tc.outputs.run }}   # empty, or the csky-elf image's run.sh
           TOOLCHAIN: ${{ matrix.toolchain }}
+          BOARD_FILE: ${{ matrix.board_file }}
         run: |
           set -u
-          tools/ci.sh --quick --steps registry,host,python,licenses
+          tools/ci.sh --quick --steps registry,host,python,licenses || exit $?
           rc=0
-          $RUN tools/ci.sh --quick --steps firmware --toolchain "$TOOLCHAIN" || rc=$?
+          $RUN tools/ci.sh --quick --steps firmware --board "$(basename "$(dirname "$BOARD_FILE")")" || rc=$?
           [ "$rc" != 3 ] || echo "::error::no $TOOLCHAIN compiler: the image ${RFOUNDRY_CSKY_IMAGE:-} isn't available on this runner (docs/dev/ci.md)"
           exit "$rc"
 
-      - name: Build and package every releasable board
+      - name: Build and package the selected board
         env:
           RUN: ${{ steps.tc.outputs.run }}
           TOOLCHAIN: ${{ matrix.toolchain }}
+          BOARD_FILE: ${{ matrix.board_file }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -u
           rc=0
-          $RUN tools/release_build.sh --toolchain "$TOOLCHAIN" --version "$VERSION" --out dist || rc=$?
+          $RUN tools/release_build.sh --toolchain "$TOOLCHAIN" --board "$(basename "$(dirname "$BOARD_FILE")")" --product "$(jq -er .name "$(dirname "$BOARD_FILE")/product.json")" --version "$VERSION" --out dist || rc=$?
           if [ "$rc" = 3 ] && [ "$GITHUB_EVENT_NAME" = pull_request ]; then
             # a pull request's packaging check runs on GitHub's runners, which can't pull the private csky-elf image
             echo "::notice::$TOOLCHAIN packaging skipped: the image ${RFOUNDRY_CSKY_IMAGE:-} isn't available on this runner (docs/dev/ci.md)"
@@ -219,7 +217,7 @@ jobs:
           find artifacts -type f ! -name SHA256SUMS -exec cp {} out/ \;
           (cd out && sha256sum * > SHA256SUMS && cat SHA256SUMS)
           # the manifests' own image hashes must agree with the files
-          for j in out/rfoundry-*.json; do
+          for j in out/*.json; do
             python3 - "$j" <<'EOF'
           import hashlib, json, os, sys
           m = json.load(open(sys.argv[1]))
@@ -236,13 +234,22 @@ jobs:
           set -eu
           TAG="${GITHUB_REF_NAME}"
           NOTES="Firmware images for the radios listed below, without the AMBE codec, and rfoundry for Linux, macOS and
-          Windows. Flash with: rfoundry flash --release ${TAG}. rfoundry keeps the codec already in your radio when
+          Windows. Flash with: rfoundry flash --repo ${GITHUB_REPOSITORY} --release ${TAG}. rfoundry keeps the codec already in your radio when
           that is known to be safe, or writes it from your radio's stock firmware file (--stock). See
           docs/user/02-installing.md."
-          # a beta tag (bN) is a pre-release: the site's default install (the latest release) skips it
+          # a beta or release-candidate tag is a pre-release: the site's default install (the latest release) skips it
           PRE=""
           if python3 tools/release_version.py prerelease "$TAG"; then PRE=--prerelease; fi
           gh release view "$TAG" > /dev/null 2>&1 || \
-            gh release create "$TAG" --verify-tag $PRE --generate-notes --title "RadioFoundry $TAG" --notes "$NOTES" || \
+            gh release create "$TAG" --verify-tag $PRE --generate-notes --title "$(jq -er .name boards/dm32/product.json) $TAG" --notes "$NOTES" || \
             gh release view "$TAG" > /dev/null   # created meanwhile by the manual workflow
           gh release upload "$TAG" out/* --clobber
+
+  website:
+    needs: [version, publish]
+    if: needs.version.outputs.publish == 'true' && !contains(needs.version.outputs.version, '-')
+    uses: ./.github/workflows/website-release.yml
+    permissions:
+      contents: write
+    with:
+      version: ${{ needs.version.outputs.version }}

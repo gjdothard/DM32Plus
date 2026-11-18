@@ -1,0 +1,11 @@
+{
+  "_license": "SPDX-License-Identifier: MIT",
+  "_copyright": "Copyright (c) 2026 Garrett Dothard",
+  "name": "DM32Plus",
+  "prefix": "dm32plus",
+  "repository": "gjdothard/DM32Plus",
+  "board": "dm32",
+  "brand": "DM32",
+  "accent": "+",
+  "version": "1.0.0"
+}

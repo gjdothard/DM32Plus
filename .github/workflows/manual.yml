@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Garrett Dothard
 # Copyright (c) 2026 The RadioFoundry Authors
 #
 # The user manual (docs/dev/release.md): check the doc links, build the PDF from docs/user with pandoc and typst,
@@ -83,11 +84,11 @@ jobs:
         run: |
           set -eu
           TAG="${GITHUB_REF_NAME}"
-          # a beta tag (bN) is a pre-release: the site's default install (the latest release) skips it
+          # a beta or release-candidate tag is a pre-release: the site's default install (the latest release) skips it
           PRE=""
           if python3 tools/release_version.py prerelease "$TAG"; then PRE=--prerelease; fi
           if ! gh release view "$TAG" > /dev/null 2>&1; then
-            gh release create "$TAG" --verify-tag $PRE --generate-notes --title "RadioFoundry $TAG" \
+            gh release create "$TAG" --verify-tag $PRE --generate-notes --title "$(jq -er .name boards/dm32/product.json) $TAG" \
               --notes "Firmware images (without the AMBE codec), rfoundry and the user manual. Flash with: rfoundry flash --release ${TAG} (docs/user/02-installing.md)."
           fi
           gh release upload "$TAG" "$MANUAL_PDF" --clobber

@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 #
 # Nightly CI (docs/dev/ci.md): the long builds the per-push workflow leaves out, on the default branch.
-#   matrix       one job per toolchain (Arm, C-SKY), every board built with it from the registry: a build per feature
-#                switch turned off alone, fm-minimal and maximal, each with zero warnings and its size (tools/ci.sh
-#                --matrix --toolchain; about 4-5 minutes per board on the runner). C-SKY in the csky-elf image unless
+#   matrix       the selected product board: each feature switch off alone, fm-minimal, and maximal, each with
+#                zero warnings and its size (tools/ci.sh --matrix --board). C-SKY in the compiler image unless
 #                the runner has csky-elf GCC (skipped where the image isn't available)
 #   reuse        `reuse lint`, reported as a warning until the tree passes it
 # A scheduled run builds only what changed since the last commit that passed: a successful run saves a cache entry
@@ -79,8 +79,7 @@ jobs:
           key: nightly-ok-${{ github.sha }}
 
   matrix:
-    # one job per toolchain: every board built with it in turn (tools/ci.sh --toolchain, from the registry), so the
-    # checkout, submodules and compiler are set up once per toolchain, not once per radio
+    # Exercise the feature matrix of the selected product board.
     name: matrix (${{ matrix.name }})
     needs: changes
     if: (github.server_url != 'https://github.com' || vars.RFOUNDRY_CI_GITHUB == 'true') && (needs.changes.outputs.run == 'true')
@@ -89,11 +88,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # the [toolchain] ids of platform/*/platform.toml, with their names; a new platform on a toolchain listed here
-        # needs no edit, a new toolchain gets an entry here and its set-up in .github/actions/toolchain
+        # The product board file defines the firmware scope of this fork.
         include:
-          - { toolchain: arm, name: Arm }
-          - { toolchain: csky, name: C-SKY }
+          - { toolchain: csky, name: C-SKY, board_file: boards/dm32/board.toml }
     permissions:
       contents: read
       packages: read   # pulling a private ghcr.io csky-elf image with the job token
@@ -114,14 +111,15 @@ jobs:
           # own token (packages: read)
           registry-user: ${{ vars.RFOUNDRY_CSKY_REGISTRY_USER || github.actor }}
           registry-token: ${{ secrets.RFOUNDRY_CSKY_REGISTRY_TOKEN || github.token }}
-      - name: Feature matrix of every board on the toolchain
+      - name: Feature matrix of the selected board
         env:
           RUN: ${{ steps.tc.outputs.run }}   # empty, or the csky-elf image's run.sh
           TOOLCHAIN: ${{ matrix.toolchain }}
+          BOARD_FILE: ${{ matrix.board_file }}
         run: |
           set -u
           rc=0
-          $RUN tools/ci.sh --matrix --steps firmware --toolchain "$TOOLCHAIN" || rc=$?
+          $RUN tools/ci.sh --matrix --steps firmware --board "$(basename "$(dirname "$BOARD_FILE")")" || rc=$?
           if [ "$rc" = 3 ]; then
             echo "::notice::$TOOLCHAIN matrix skipped: the image ${RFOUNDRY_CSKY_IMAGE:-} isn't available on this runner (docs/dev/ci.md)"
             exit 0

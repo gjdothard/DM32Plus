@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Find (information-architecture.md 6, task-flows.md 1, 3, 5): digits typed on Home search everything at once.
 // The keys are read both as a number and as T9 letters (2 = abc ... 9 = wxyz), matched against the start of each
 // word. Order of the results:
@@ -303,6 +304,20 @@ static void find_item(uint16_t i, ui_item_t *it)
 		break;
 	case FR_CONTACT:
 		if (find_target(i, &t)) {
+#if CONFIG_UI_CARD_MENU
+			if (ui_card_layout(&ui_st)) {
+				if (t.name[0])
+					sb_str(&b, t.name);
+				else
+					sb_u32(&b, t.id, 1);
+				if (t.group)
+					sb_str(&vb, "TG ");
+				sb_u32(&vb, t.id, 1);
+				sb_chr(&vb, '\n');
+				sb_str(&vb, TR(TEXT_ALT_OPEN "Contact" TEXT_ALT_NEXT TEXT_ALT_CLOSE));
+				break;
+			}
+#endif
 			char name[32];
 			if (t.group) {
 				ui_sb_target(name, sizeof name, &t);
@@ -353,6 +368,15 @@ static void find_item(uint16_t i, ui_item_t *it)
 	default:
 		break;
 	}
+#if CONFIG_UI_CARD_MENU
+	if (ui_card_layout(&ui_st) && r->kind != FR_CONTACT && it->value[0]) {
+		char value[sizeof it->value];
+		str_copy(value, sizeof value, it->value);
+		sb_init(&vb, it->value, sizeof it->value);
+		sb_chr(&vb, '\n');
+		sb_str(&vb, value);
+	}
+#endif
 }
 
 static void find_select(uint16_t i, bool hold)

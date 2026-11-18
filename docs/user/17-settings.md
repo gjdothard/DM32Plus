@@ -3,6 +3,10 @@
 
 # Settings
 
+On the card layout, settings groups use the same field cards as the editors. Amber marks a value being edited.
+Numeric edits show the allowed range. **OK** applies the value and **Back** cancels it; toggles and list choices
+keep their existing immediate-save behavior. My Radio and Language use the same frame.
+
 On Home, press **OK**, **9** on the dark card layout or **OK**, **7** on the standard layout. The standard quick
 controls also open Settings with **\***, **0**. Both layouts use the same group numbers, from **1** for Sound to **0**
 for Advanced. Find also reaches each setting by name: type its first letters on Home.

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Zone sharing's service (core/dmr/zoneShareSvc.c, docs/spec/zone-share.md) on the real air queue and a fake data
 // service: offers Off and Ask, one sender at a time, the pending offer kept as it is, expiry and the hourly limit,
 // malformed input, a send's fragments through the queue (confirmed to a radio, unconfirmed to a group), a failed
@@ -118,7 +119,7 @@ static int makeRecord(uint32_t zoneId, int channels, const char *name)
 		zsChannel_t ch = { .dmr = true, .rxHz = 461000000u + (uint32_t)i * 12500u, .colorCode = 1, .timeslot = 1,
 						   .contact = 1 };
 
-		snprintf(ch.name, sizeof(ch.name), "Channel %d", i + 1);
+		snprintf(ch.name, sizeof(ch.name), "CH %u", (unsigned)i + 1u);
 		zsWriterChannel(&w, &ch);
 	}
 	return zsWriterEnd(&w);

@@ -400,7 +400,7 @@ def releases(dist):
 	out = []
 	if not dist:
 		return out
-	for p in sorted(p for prefix in ("rfoundry", "dm32plus")
+	for p in sorted(p for prefix in ("rfoundry", product()["prefix"])
 			for p in glob.glob(os.path.join(dist, "**", prefix + "-*.json"), recursive=True)):
 		with open(p, encoding="utf-8") as f:
 			m = json.load(f)
@@ -418,3 +418,9 @@ def reported_features():
 	block = re.search(r'const char build_features\[\] =(.*?);', src, re.S)
 	# switches only: a derived name in the list (DMR_DATA_CORE) is in no release's features, so it would match none
 	return sorted(set(re.findall(r'"([A-Z0-9_]+),?"', block.group(1))) & set(feature_names())) if block else []
+
+
+def product():
+	"""Product branding and release identity belong to the selected board."""
+	with open(path("boards/dm32/product.json"), encoding="utf-8") as f:
+		return json.load(f)

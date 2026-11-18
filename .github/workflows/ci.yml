@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 #
 # CI on main (docs/dev/ci.md): everything that takes a few minutes, on every push to main that changes firmware
 # sources, tests, build tools or this workflow (docs-only changes run only the manual workflow), and by hand on any
@@ -8,8 +9,7 @@
 #   unit tests the host tests (64 suites, tshark pcap checks) run once, built with --coverage and under ASan and UBSan
 #              (gcovr's report as an artifact, totals in the job summary); the UI screen gallery
 #   checks     Python checks (doc links among them), license checks
-#   firmware   one job per toolchain (Arm, C-SKY): every board built with it, from the registry (tools/ci.sh
-#              --toolchain), each build option value too, with zero warnings, the size report and the app region fit.
+#   firmware   the selected product board: default and maximal configurations, warnings, sizes, and app region fit.
 #              The compiler comes from .github/actions/toolchain (platform.toml's pin); C-SKY builds run in the
 #              csky-elf image (platform.toml's image, public on ghcr.io; the repository variable RFOUNDRY_CSKY_IMAGE
 #              overrides it) unless the runner has csky-elf GCC, and are skipped with a notice where that image
@@ -124,8 +124,7 @@ jobs:
         run: tools/ci.sh --steps registry,python,licenses
 
   firmware:
-    # one job per toolchain, not per radio or platform: one checkout and one compiler for every board built with it
-    # (tools/ci.sh --toolchain takes them from the registry, so a new radio joins with no edit here); 4 cores each
+    # Build the selected product board; shared host tests remain in the unit-tests job.
     name: firmware (${{ matrix.name }})
     if: (github.server_url != 'https://github.com' || vars.RFOUNDRY_CI_GITHUB == 'true')
     runs-on: ubuntu-24.04
@@ -133,11 +132,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # the [toolchain] ids of platform/*/platform.toml, with their names; a new platform on a toolchain listed here
-        # needs no edit, a new toolchain gets an entry here and its set-up in .github/actions/toolchain
+        # The product board file defines the firmware scope of this fork.
         include:
-          - { toolchain: arm, name: Arm }
-          - { toolchain: csky, name: C-SKY }
+          - { toolchain: csky, name: C-SKY, board_file: boards/dm32/board.toml }
     permissions:
       contents: read
       packages: read   # pulling a private ghcr.io csky-elf image with the job token
@@ -162,10 +159,11 @@ jobs:
         env:
           RUN: ${{ steps.tc.outputs.run }}   # empty, or the csky-elf image's run.sh
           TOOLCHAIN: ${{ matrix.toolchain }}
+          BOARD_FILE: ${{ matrix.board_file }}
         run: |
           set -u
           rc=0
-          $RUN tools/ci.sh --quick --steps firmware --toolchain "$TOOLCHAIN" || rc=$?
+          $RUN tools/ci.sh --quick --steps firmware --board "$(basename "$(dirname "$BOARD_FILE")")" || rc=$?
           if [ "$rc" = 3 ]; then
             echo "::notice::$TOOLCHAIN builds skipped: the image ${RFOUNDRY_CSKY_IMAGE:-} isn't available on this runner (docs/dev/ci.md)"
             exit 0

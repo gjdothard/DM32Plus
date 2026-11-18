@@ -315,6 +315,8 @@ TESTS   += boardBandTest
 boardBandTest: boardBandTest.c $(ROOT)/hal/board.h
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ boardBandTest.c
 
+radioCoreTest radioCoreTestNoVfoDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest aprsRadioTest: sim/radio_task.h
+
 run: run-core
 run-core: radioCoreTest radioCoreTestNoVfoDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest inputTest aprsRadioTest quadratureTest serialmicTest miclevelTest \
           rx2LinkTest keyassignTest powerSwitchTest boardBandTest batteryTest
@@ -1353,3 +1355,13 @@ run-webctlassets: httpAssetsTestWebctl
 	./httpAssetsTestWebctl out/http_webctl
 	python3 -I $(ROOT)/tools/gen_http_assets.py --check out/http_webctl $(WEBCTL_ASSETS)
 .PHONY: run-webctlassets
+
+.PHONY: run-releaseversion
+run: run-releaseversion
+run-releaseversion:
+	$(PYTHON) -B releaseVersionTest.py
+
+.PHONY: run-websiterelease
+run: run-websiterelease
+run-websiterelease:
+	$(PYTHON) -B websiteReleaseTest.py

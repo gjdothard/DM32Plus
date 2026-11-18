@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """The site's scaled screenshots (site/rfoundrysite/shots.py): a copy is the gallery screen k times each way, pixel for
 pixel, whatever filters and bit depth the source PNG uses; k covers the largest size a page reported at DPR; and the
 stylesheet still has every size the build reads from it.
@@ -7,6 +8,7 @@ stylesheet still has every size the build reads from it.
     python3 site/tests/shots_test.py
 """
 import glob
+import json
 import os
 import struct
 import sys
@@ -20,6 +22,29 @@ from rfoundrysite import repo, shots  # noqa: E402
 def galleries():
 	"""The UI gallery's directories: each has a boot screen."""
 	return sorted(os.path.basename(os.path.dirname(p)) for p in glob.glob(repo.path("docs", "ux", "screens", "*", "boot.png")))
+
+
+class GalleryCatalog(unittest.TestCase):
+	def test_every_gallery_screen_has_metadata_and_translated_captions(self):
+		with open(repo.path("site", "data", "screens.json"), encoding="utf-8") as f:
+			metadata = json.load(f)
+		features = {feature["name"] for feature in repo.features()}
+		for name, entry in metadata["screens"].items():
+			self.assertTrue(set(entry["needs"]) <= features, name + ": unknown feature")
+		catalogs = {}
+		for path in glob.glob(repo.path("site", "i18n", "*.json")):
+			if os.path.basename(path) == "languages.json":
+				continue
+			with open(path, encoding="utf-8") as f:
+				catalogs[os.path.basename(path)] = json.load(f)
+		for gallery in galleries():
+			for path in glob.glob(repo.path("docs", "ux", "screens", gallery, "*.png")):
+				name = os.path.basename(path).removesuffix(".png").split("__", 1)[0]
+				with self.subTest(gallery=gallery, screen=name):
+					self.assertIn(name, metadata["screens"])
+					self.assertIn(metadata["screens"][name]["group"], metadata["groups"])
+					for language, catalog in catalogs.items():
+						self.assertTrue(catalog.get("screen." + name), language + ": " + name)
 
 
 def paeth(a, b, c):

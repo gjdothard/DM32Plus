@@ -7,6 +7,7 @@
 //
 // Script tokens (separated by spaces):
 //   up down left right ok back quick ctx 0..9 tt mon user1..user4 emerg enc+ enc-   a short press (counted);
+//   quick:<control>     open Quick if needed and press the named control's number (both presses count)
 //   powerkey zone+ zone- scankey lockkey cbkey homekey dualkey abkey: what a reassigned side key sends
 //   long:<key>          a long press (counted)
 //   ptt / ptt:<ms>      PTT pressed for 1 s / ms (counted); pttdown ... pttup holds it
@@ -2350,6 +2351,33 @@ static const char *screen(void)
 	return s.screen;
 }
 
+// Behavior flows name a control; separate order checks exercise its numbered position.
+// Still send real keys, so opening the menu and choosing a tile count against the press budget.
+static bool quick_control(const char *name, char *err, size_t len)
+{
+	static const struct { const char *name; uint8_t kind; } controls[] = {
+		{ "power", QT_POWER }, { "squelch", QT_SQUELCH }, { "timeslot", QT_TIMESLOT },
+		{ "color", QT_CC }, { "privacy", QT_PRIVACY }, { "digital-monitor", QT_HEAR_ALL },
+		{ "monitor", QT_MONITOR }, { "vox", QT_VOX }, { "dual", QT_SCAN },
+	};
+	for (size_t i = 0; i < sizeof controls / sizeof controls[0]; i++) {
+		if (strcmp(name, controls[i].name) != 0)
+			continue;
+		if (strcmp(screen(), "quick") != 0 && !press("quick", false, err, len))
+			return false;
+		for (int tile = 0; tile < UI_QUICK_TILES; tile++) {
+			if (ui_quick_kind(tile, ui_view()) == controls[i].kind) {
+				char key[] = { (char)('1' + tile), 0 };
+				return press(key, false, err, len);
+			}
+		}
+		snprintf(err, len, "no Quick control %s in this mode", name);
+		return false;
+	}
+	snprintf(err, len, "unknown Quick control %s", name);
+	return false;
+}
+
 static bool check(const char *kv, char *err, size_t len)
 {
 	char key[32], want[64], got[64];
@@ -2361,9 +2389,10 @@ static bool check(const char *kv, char *err, size_t len)
 	memcpy(key, kv, (size_t)(eq - kv));
 	key[eq - kv] = 0;
 	snprintf(want, sizeof want, "%s", eq + 1);
-	for (char *p = want; *p; p++)
-		if (*p == '_')
-			*p = ' ';
+	if (strcmp(key, "screen") != 0)
+		for (char *p = want; *p; p++)
+			if (*p == '_')
+				*p = ' ';
 	ui_app_status_t s;
 	ui_app_status(&s);
 	bool prefix = false;
@@ -2520,6 +2549,8 @@ static bool run_token(char *t, char *err, size_t len)
 	char *arg = strchr(t, ':');
 	if (arg != NULL)
 		*arg++ = 0;
+	if (strcmp(t, "quick") == 0 && arg != NULL)
+		return quick_control(arg, err, len);
 	if (strcmp(t, "long") == 0)
 		return press(arg, true, err, len);
 	if (strcmp(t, "ptt") == 0) {

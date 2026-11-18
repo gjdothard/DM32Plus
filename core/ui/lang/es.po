@@ -57,7 +57,7 @@ msgstr "Predet. ahora: "
 msgid "Talking to "
 msgstr "Hablando a "
 
-#: core/ui/ui_app.c core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/ui_app.c core/ui/ui_dual.c core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "No calls heard yet"
 msgstr "Aún no se recibieron llamadas"
 
@@ -444,6 +444,34 @@ msgstr "Sin coincidencia: Atrás borra"
 #: core/ui/ui_app.c core/ui/ui_aprs.c core/ui/ui_menus.c
 msgid "OK change  Back"
 msgstr "OK cambiar  Atrás"
+
+#: core/ui/ui_app.c
+msgid "Zone Options"
+msgstr "Opciones de zona"
+
+#: core/ui/ui_app.c
+msgid "APRS Heard"
+msgstr "APRS recibidos"
+
+#: core/ui/ui_app.c
+msgid "APRS Position"
+msgstr "Posición APRS"
+
+#: core/ui/ui_app.c
+msgid "Last Position"
+msgstr "Última posición"
+
+#: core/ui/ui_app.c
+msgid "{Up/Dn change  OK keep  Back cancel|Up/Dn  OK keep  Back cancel}"
+msgstr "{Arr/Ab cambiar  OK guardar  Atrás cancelar|Arr/Ab  OK guardar  Atrás cancelar}"
+
+#: core/ui/ui_app.c
+msgid "Find"
+msgstr "Buscar"
+
+#: core/ui/ui_app.c core/ui/ui_menus.c
+msgid "Activity / Logs"
+msgstr "Actividad / Registros"
 
 #: core/ui/ui_app.c core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Back"
@@ -941,6 +969,10 @@ msgstr "1-5 elegir  Atrás"
 msgid "Zone"
 msgstr "Zona"
 
+#: core/ui/ui_dual.c core/ui/ui_menus.c
+msgid "In use"
+msgstr "En uso"
+
 #: core/ui/ui_dual.c
 msgid "Watch on"
 msgstr "Escuchar"
@@ -1164,10 +1196,6 @@ msgstr "GPS, APRS y datos"
 #: core/ui/ui_menus.c
 msgid "Zones / Channels"
 msgstr "Zonas / Canales"
-
-#: core/ui/ui_menus.c
-msgid "Activity / Logs"
-msgstr "Actividad / Registros"
 
 #: core/ui/ui_menus.c
 msgid " new"
@@ -1482,12 +1510,12 @@ msgid "OK choose  Back cancel"
 msgstr "OK elegir  Atrás cancelar"
 
 #: core/ui/ui_menus.c core/ui/ui_screens.c
-msgid "To you"
-msgstr "A ti"
-
-#: core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Private"
 msgstr "Privada"
+
+#: core/ui/ui_menus.c core/ui/ui_screens.c
+msgid "To you"
+msgstr "A ti"
 
 #: core/ui/ui_menus.c
 msgid "PTT talk  # more  Back"
@@ -2040,6 +2068,10 @@ msgstr "Editar canal"
 #: core/ui/ui_menus.c
 msgid "Remove from zone"
 msgstr "Quitar de la zona"
+
+#: core/ui/ui_menus.c
+msgid "Share channel to"
+msgstr "Compartir canal"
 
 #: core/ui/ui_menus.c
 msgid "Already first"
@@ -3182,6 +3214,10 @@ msgid "No GPS on this radio"
 msgstr "Sin GPS en esta radio"
 
 #: core/ui/ui_menus.c
+msgid "Backlight"
+msgstr "Luz de fondo"
+
+#: core/ui/ui_menus.c
 msgid "Diagnostics: not in this build"
 msgstr "Diagnóstico: no disponible"
 
@@ -3348,10 +3384,6 @@ msgstr "Nada que ignorar aún"
 #: core/ui/ui_menus.c
 msgid "Scan stopped here"
 msgstr "Escaneo detenido aquí"
-
-#: core/ui/ui_menus.c
-msgid "In use"
-msgstr "En uso"
 
 #: core/ui/ui_menus.c
 msgid "Channel talkgroup list is full"

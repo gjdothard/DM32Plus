@@ -46,7 +46,7 @@ test("a CPS transfer commits to the inactive bank and preserves the old codeplug
 	const converted = convertOperatingTalkgroups(before.bytes).image;
 	const radio = new FakeCpsRadio({ image: before.bytes, features: "FM,DMR,DMR_TALKGROUP_POOL" });
 	const client = new CpsSerial(radio.stream());
-	await client.identify([{ codeplug: { names: ["DM-1701"], base: 0, end: 0xE00000 } }]);
+	await client.identify([{ codeplug: { names: [radio.board], base: 0, end: 0xE00000 } }]);
 	let have = await client.read({ iddb: false });
 	const first = await client.write(converted, have);
 	await client.verify(converted, first.plan);

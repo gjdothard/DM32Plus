@@ -224,6 +224,9 @@ typedef struct {
 	ui_item_fn item;
 	const char *empty;		// shown when count is 0
 	const char *hint;
+#if CONFIG_UI_CARD_MENU
+	bool name_in_title;		// join prefix and name in the card heading instead of a context line
+#endif
 } ui_list_t;
 
 void ui_draw_list(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l);
@@ -253,6 +256,9 @@ void ui_draw_position_footer(const ui_state_t *s);
 const char *ui_ars_status(uint8_t state);
 void ui_draw_data_dashboard(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l);
 void ui_draw_numbered_menu(const radio_view_t *v, const ui_state_t *s, const ui_list_t *l, bool uniform);
+typedef enum { UI_CARD_PAGE_DETAILS, UI_CARD_PAGE_FIELDS, UI_CARD_PAGE_ACTIONS, UI_CARD_PAGE_CONFIRM } ui_card_page_kind_t;
+// value may separate the right-hand value and a secondary line with a newline.
+void ui_draw_card_page(const ui_state_t *s, const ui_list_t *l, ui_card_page_kind_t kind);
 typedef enum {
 	UI_CARD_ZONES, UI_CARD_ZONE_CHANNELS, UI_CARD_TALKGROUPS, UI_CARD_CONTACTS,
 	UI_CARD_SCAN, UI_CARD_SCAN_LISTS, UI_CARD_SCAN_OPTIONS,

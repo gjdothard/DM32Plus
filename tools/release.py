@@ -22,6 +22,7 @@ the codec or break "keep the radio's codec" (tools/rfoundry).
 """
 import argparse
 import hashlib
+import json
 import os
 import struct
 import subprocess
@@ -85,7 +86,7 @@ def check_no_codec(board, image):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--board", required=True)
-    ap.add_argument("--product", choices=["DM32Plus"], help="mark the full DM-32UV image as a DM32Plus release")
+    ap.add_argument("--product", help="product name from the board's product.json (full build only)")
     ap.add_argument("--version", required=True, help="the release tag, e.g. v26.11")
     ap.add_argument("--variant", help="a release variant (config/variants/<name>.mk); default: the full build")
     ap.add_argument("--build-option", action="append", default=[], metavar="NAME=VALUE",
@@ -98,13 +99,20 @@ def main(argv=None):
     ap.add_argument("--features", help="feature list (default: make print-config)")
     ap.add_argument("--toolchain", help="compiler version line (default: the board's compiler --version)")
     args = ap.parse_args(argv)
-    if args.product and (args.board != "dm32" or args.variant not in (None, "", "full") or args.build_option):
-        ap.error("DM32Plus publishes only the full DM-32UV build")
-
     try:
         board = boards.get(args.board)
     except KeyError as e:
         raise SystemExit("release: %s" % e.args[0])
+    product = None
+    if args.product:
+        product_path = os.path.join(ROOT, "boards", board.id, "product.json")
+        try:
+            with open(product_path, encoding="utf-8") as f:
+                product = json.load(f)
+        except (OSError, ValueError) as e:
+            ap.error("cannot read board product metadata: %s" % e)
+        if args.product != product["name"] or args.variant not in (None, "", "full") or args.build_option:
+            ap.error("product releases require the board's product name and full default build")
     variant = None if args.variant in (None, "", "full") else args.variant
     if variant and not os.path.isfile(os.path.join(ROOT, "config", "variants", variant + ".mk")):
         raise SystemExit("release: unknown variant %s (config/variants/)" % variant)
@@ -137,8 +145,8 @@ def main(argv=None):
     bin_name = mf.image_name(name_id, args.version)
     json_name = mf.image_name(name_id, args.version, "json")
     if args.product:
-        bin_name = bin_name.replace("rfoundry-", "dm32plus-", 1)
-        json_name = json_name.replace("rfoundry-", "dm32plus-", 1)
+        bin_name = bin_name.replace("rfoundry-", product["prefix"] + "-", 1)
+        json_name = json_name.replace("rfoundry-", product["prefix"] + "-", 1)
     try:
         man = mf.generate(board, image, args.version, commit, feats, tc, file_name=bin_name)
     except mf.ManifestError as e:
