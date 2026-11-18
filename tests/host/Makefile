@@ -1365,3 +1365,5 @@ run-releaseversion:
 run: run-websiterelease
 run-websiterelease:
 	$(PYTHON) -B websiteReleaseTest.py
+
+include p25.mk
