@@ -30,7 +30,12 @@ Host regression coverage is in `releaseVersionTest.py` and `websiteReleaseTest.p
 tests are in `site/tests/release-channels.test.mjs`, `version.test.mjs` and `offline_cps_test.py`.
 See [website deployment](../dev/website.md#website-deployment-after-a-release) for setup and operations.
 
-The polling account has no login, Docker group membership or general sudo access. A root-owned helper accepts
-no command-line arguments and verifies the official release independently. Its root-owned Compose definition,
+The polling account has no login, Docker group membership or sudo access. A root-owned helper accepts
+no command-line arguments and receives requests through a root-owned Unix socket restricted to the polling group and verifies the official release independently. Its root-owned Compose definition,
 project, image, ports and mounts cannot be changed by the account or a downloaded bundle. Archive extraction
 rejects paths, links, types and permissions that could escape the controlled deployment directory.
+
+Both the polling and privileged services retain no-new-privileges. The polling account streams a version header
+and archive bytes over the local socket, then closes its write direction. The helper authenticates the release
+against GitHub, completes deployment, and returns a bounded JSON success or failure response. The client must
+receive explicit success before accepting the deployed marker. No setuid elevation occurs inside the sandbox.
