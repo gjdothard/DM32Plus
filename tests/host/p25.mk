@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Garrett Dothard
 # Copyright (c) 2026 The RadioFoundry Authors
-# P25 foundation imported from RadioFoundry c34dc440. Host-only until the board,
-# radio core and codeplug are integrated; these flags do not enable firmware TX.
+# P25 foundation imported from RadioFoundry c34dc440. Radio operation awaits
+# board/radio/codeplug integration; these test flags do not enable hardware TX.
 
 P25_FEC := $(wildcard $(CORE)/fec/*.c)
 P25_UNITS := $(CORE)/p25/p25_unit.c $(CORE)/p25/p25_rx.c $(CORE)/p25/p25_call.c
@@ -14,7 +14,14 @@ P25_HEADERS := $(wildcard $(CORE)/p25/*.h $(CORE)/air/*.h $(CORE)/fec/*.h $(CORE
 	$(CORE)/dsp/fxp.h $(ROOT)/hal/hal_air.h $(ROOT)/hal/hal_baseband.h
 
 TESTS += fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest imbeEncTest \
-	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest boardAirTest
+	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest boardAirTest hrc7000AirTest
+
+P25_HRC7 := $(ROOT)/drivers/modem/hrc7000
+hrc7000AirTest: hrc7000AirTest.c fuzz.h $(P25_HRC7)/hrc7000_air.c $(P25_HRC7)/hrc7000_air.h \
+	$(P25_HRC7)/hrc7000_dmr.c $(P25_HRC7)/hrc7000.c $(CORE)/dmr/fec/dmrFec.c $(P25_HEADERS) \
+	$(wildcard $(P25_HRC7)/*.h)
+	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ hrc7000AirTest.c $(P25_HRC7)/hrc7000_air.c \
+		$(P25_HRC7)/hrc7000_dmr.c $(P25_HRC7)/hrc7000.c $(CORE)/dmr/fec/dmrFec.c
 
 boardAirTest: boardAirTest.c $(CORE)/air/air_session.c $(P25_FRAMER) $(P25_HEADERS) $(ROOT)/hal/board.h
 	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ boardAirTest.c $(CORE)/air/air_session.c $(P25_FRAMER)
@@ -57,10 +64,14 @@ airSoftmodemTest: airSoftmodemTest.c $(CORE)/air/air_softmodem.c $(P25_UNITS) $(
 	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ airSoftmodemTest.c $(CORE)/air/air_softmodem.c \
 		$(P25_UNITS) $(P25_FRAMER) $(P25_FEC) -lm
 
-.PHONY: run-p25
+.PHONY: run-p25 run-p25-build
 run: run-p25
+run-p25: run-p25-build
+run-p25-build:
+	$(PYTHON) -B p25BuildTest.py --make "$(MAKE)" --cc "$(CC)"
 run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest imbeEncTest \
-	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest boardAirTest
+	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest boardAirTest hrc7000AirTest
+	./hrc7000AirTest
 	./boardAirTest
 	./fecTest
 	./airFramerTest

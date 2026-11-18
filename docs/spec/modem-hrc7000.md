@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 # HR_C7000 as a DMR modem
 
 How the baseband inside the HR_C7000 SoC is driven as a DMR Tier II layer-2 modem and as an FM modem: registers,
@@ -873,3 +874,23 @@ What a working DMR driver does that a first attempt tends to miss. Details are i
    RDY_NEXT_SHORT_LC). The split duplex TX half doesn't need it: it uses the physical layer (2.10).
 9. A slot length trim for the physical layer mode (2.10 finding 13): LAYER2_MAX_CNT has none. Whether the trim works
    in the layer 2 timing (LAYER2_CONTROL b5 layer2slot), and any other register that does, is untested.
+
+## 10. Core-framed air provider: integration status
+
+`drivers/modem/hrc7000/hrc7000_air.c` implements the
+[air-interface contract](air-interface.md) and sample taps. It is imported from
+the project's pinned upstream; the [P25 provenance record](../../core/p25/UPSTREAM.md)
+identifies that revision. It compiles only with `CONFIG_AIR`.
+
+Receive uses the FM receive copy with playback disabled, copying each half into
+a ring for task-level sample reads or soft-modem processing. Transmit uses the
+physical-layer TX halves, queues symbol chunks, scales modulation to the
+profile, and restores the saved setup on release. The platform must stop the
+DMR slot owner before opening this provider and route interrupts/deferred work
+to it until closed. The provider does not replace channel TX admission.
+
+`hrc7000AirTest` passes simulated register/buffer, overrun, underrun, abort,
+close/reopen and shared-memory reuse checks against the existing DMR driver.
+The disabled provider also compiles. Platform ownership, interrupt routing,
+audio coexistence and target timing are not integrated or qualified yet; do
+not infer on-radio operation from these host checks.

@@ -16,6 +16,9 @@ The import includes:
 - The host sources `fecTest.c`, `airFramerTest.c`, `p25Test.c`,
   `p25EngineTest.c`, `mbeTest.c`, `imbeEncTest.c`, `p25TrunkTest.c`,
   `p25VoiceTest.c`, `fxpTest.c`, and `airSoftmodemTest.c`.
+- The follow-on provider import adds `drivers/modem/hrc7000/hrc7000_air.c`,
+  its header, and `tests/host/hrc7000AirTest.c` from the same pinned revision.
+  The existing DMR driver is retained. Platform ownership/routing is pending.
 
 Original notices are retained. `imbe_dec.c` and `imbe_tab.c` carry ISC notices
 for mbelib's dequantizer and tables; the original notice text stays in those
@@ -28,7 +31,10 @@ copyright notice and normalizing line endings. The engine test's callback
 tables use designated initializers so the same test builds without warnings
 with trunking both enabled and disabled. Local host rules live
 in `tests/host/p25.mk`; they add an engine build with trunking enabled as well
-as the conventional build. Production build selection is unchanged.
+as the conventional build. Later local integration adds default-off protocol
+switches and conditional firmware source selection in `config/p25.mk`, optional
+board provider fields, and conditional IMBE About-page attribution. None of
+these changes connects a working radio channel or enables hardware access.
 
 Future refreshes must compare against this exact revision, preserve the ISC
 notices, and rerun the foundation tests. Imported test results are evidence of

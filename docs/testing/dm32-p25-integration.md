@@ -73,19 +73,22 @@ UI/CPS schema design can proceed while provider work is being tested.
   board initializers omit them and remain without providers.
 - [x] M2.1: Exercise missing/unsupported/busy providers, successful acquisition,
   retune and idempotent release through the actual air-session implementation.
-- [ ] M2.2: Add coordinated CONFIG switches and source selection; keep product
+- [x] M2.2 (host checked; target build pending): Add coordinated CONFIG switches and source selection; keep product
   activation deferred until the radio core and storage use them. Retain the
   IMBE About-page attribution when the codec is compiled.
 - [ ] M2.3: Port the HR_C7000 air provider and its required DMR-engine ownership
   changes together. Route interrupts and deferred events through the owner;
   release cleanly on failed open, stop, retune and mode change.
+- [x] M2.3a: Import the provider and its simulated register tests from the pinned
+  upstream. Keep the current DMR driver; the provider passes against it.
+- [ ] M2.3b: Wire platform ownership, interrupts, deferred work and board callbacks.
 - [ ] M2.4: Port audio scheduling and memory/stack changes required by that
   provider. Preserve FM/DMR/APRS operation and the private AMBE slot.
 - [ ] M2.5: Run simulated modem/provider tests and obtain a reproducible C-SKY
   firmware build with measured RAM, stack and image size. Build affected
   switches off before marking M2 complete.
 
-Next task: M2.2, followed by the provider dependency import in M2.3. Do not
+Next task: M2.3b, the platform/board ownership integration. Do not
 advertise P25 in VERSION, the UI or CPS until the matching integration gates pass.
 
 ## Required test cases to carry through later stages
@@ -109,13 +112,21 @@ advertise P25 in VERSION, the UI or CPS until the matching integration gates pas
 |---|---|---|
 | M0/M1, `ae0ade75` | Exact-source audit of 60 imported files; 11 host configurations passed with Zig 0.14.1 and `-Wall -Wextra -Wshadow -Werror`. | Includes trunking on/off and passive PTT; not board/radio/CPS integration. |
 | M1 documentation | 153 Markdown files, zero broken links; generic-code check passed. | Full CI and target build not run. |
-| M2.1, current work | `boardAirTest`: 20 checks passed; existing `boardBandTest` passed, warnings as errors. | Simulated provider; no board driver enabled or hardware touched. |
+| M2.1, `71f2367a` | `boardAirTest`: 20 checks passed; existing `boardBandTest` passed, warnings as errors. | Simulated provider; no board driver enabled or hardware touched. |
+| M2.2 | Actual Make selection plus C compile/link matrix for default-off, P25-only, P25+trunking and explicit-off; invalid dependencies and overrides rejected; conditional license attribution and idempotence checked. | Host compile/link, not a target image. |
+| M2.3a | `hrc7000AirTest`: 13,306 simulated checks passed with the current DMR driver. Provider-off object build checked by `p25BuildTest.py`. | Platform does not yet route ownership, callbacks or interrupts to this provider. |
+| Combined host Make run | `run-p25`: 13 executable configurations and 5 Python build/attribution tests passed with warnings as errors. Documentation: 155 files, zero broken links; generic-code check passed. | No C-SKY target build, sanitizer run, complete host suite or hardware session yet. |
 | Scope update | Owner requested retaining TX and honoring existing CPS RX-only; permission matrix above replaces the earlier passive-only product scope. | Hardware TX still requires its own authorized test session and --allow-rf. |
 
 Local ignored test output is in `build/p25-host`. Python works outside the
-sandbox; the earlier launcher failures were sandbox access failures. Native
-Make/GCC/C-SKY tools are not on PATH, and WSL is not installed. Portable Zig is
-available for host checks. Establish the target toolchain before M2 acceptance;
+sandbox; the earlier launcher failures were sandbox access failures. A portable
+GNU Make binary is now available under ignored `build/host-tools`, downloaded
+from MSYS2 with its published SHA-256 verified. It uses Git's existing runtime;
+no system installation or firmware-source import was involved. Portable Zig
+is available for host checks. The Windows host Make run overrides the existing
+ELF attribute-stripping CFLAGS, which otherwise break Windows runtime inlines;
+warnings remain errors. WSL is not installed and C-SKY GCC is not on PATH.
+Establish the target toolchain before M2 acceptance;
 do not equate host success with firmware fit.
 
 No branch push, deployment, CPS/radio session or hardware test has been performed.

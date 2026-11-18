@@ -71,6 +71,7 @@ BUILD := build/$(BOARD)$(if $(VARIANT),-$(VARIANT))$(OPTION_SUFFIX)
 TARGET := $(BUILD)/rfoundry_$(BOARD)$(OPTION_SUFFIX)
 
 CORE_DIRS := core/app core/radio core/ui core/input core/codeplug core/settings core/storage
+include config/p25.mk
 ifeq ($(CONFIG_DMR),y)
 CORE_DIRS += core/dmr/call core/dmr/ambe core/dmr/fec
 endif
@@ -320,7 +321,7 @@ $(shell echo '$(RFOUNDRY_PRESET) $(RFOUNDRY_OFF)' | cmp -s - $(BUILD)/build_info
 	rm -f $(BUILD)/core/hostlink/build_info.o; })
 # The About page's authors and third-party list (tools/gen_about.py), and the objects that include it when it changed
 ABOUT_OBJ := $(patsubst %.c,$(BUILD)/%.o,$(shell grep -l rfoundry_about.h $(APP_SRC) 2>/dev/null))
-$(shell python3 tools/gen_about.py AUTHORS platform/$(PLATFORM)/THIRD_PARTY $(BUILD)/gen/rfoundry_about.h | grep -q changed \
+$(shell python3 tools/gen_about.py AUTHORS platform/$(PLATFORM)/THIRD_PARTY $(BUILD)/gen/rfoundry_about.h $(ABOUT_MORE) | grep -q changed \
 	&& rm -f $(ABOUT_OBJ))
 # The language tables (tools/i18n.py, core/ui/lang/*.po); i18n.o is rebuilt when they changed. A failure stops the
 # build: the old tables would link without a word
