@@ -14,7 +14,7 @@ banner is up to open the message. The radio plays a short three-note tone with t
 Message tone** is off. On a radio with a vibration motor it also vibrates twice, unless **Settings > Sound > Vibrate**
 is off. A call alert or a private call to you gives one long vibration, an emergency four.
 
-<img src="../ux/screens/160x120i5/banner_message.png" width="200" alt="A message banner">
+<img src="../ux/screens/240x320i10x5/banner_message.png" width="200" alt="A message banner">
 
 After the banner, the status line shows "M" and the number of unread messages, and the hub shows "1 new" next to
 Messages.
@@ -35,8 +35,8 @@ Messages.
 The reply target is the sender for a private message and the destination talkgroup for a group message.
 **#** opens actions for that target. **PTT** calls that target from the open message.
 
-<img src="../ux/screens/160x120i5/messages.png" width="200" alt="Messages">
-<img src="../ux/screens/160x120i5/message_view.png" width="200" alt="A message">
+<img src="../ux/screens/240x320i10x5/messages.png" width="220" alt="Live conversation cards when archive history is unavailable">
+<img src="../ux/screens/240x320i10x5/message_view.png" width="200" alt="A message">
 
 The radio keeps the last 4 messages received, in memory. If an open message drops out of the inbox,
 the screen reports that the message is gone. The inbox is cleared when the radio turns off.
@@ -58,12 +58,17 @@ appear at the bottom automatically. A message from a different conversation stil
 The standard layout opens the newest full message first.
 When history is unavailable, Messages groups the four live received messages by the other party or talkgroup. On the dark card layout, unread live messages have a dot
 and each live inbox card shows the other party, local receipt time, and a short preview. Inside a conversation, **You** identifies this radio's DMR ID.
-The radio takes UTC from a recent GPS fix and applies **Settings → Location → UTC offset** when it displays
+The radio takes UTC from a recent onboard GPS fix or a valid retained hardware clock and applies
+**Settings → Location → UTC offset** when it displays
 the time in 24-hour format. If no time was captured, including for older archive entries,
 the time is shown as `--:--`. Incoming messages show the sender first. Archived outgoing messages show the time first,
 then the recipient and a **You** label with the send result. The outgoing time is when that result was recorded.
 Select a conversation to read the full messages. The dark layout also applies to the canned-message list and the text composer.
 Archived text is stored in plaintext.
+
+<img src="../ux/screens/240x320i10x5/message_conversations.png" width="220" alt="Saved conversation directory with previews and local times">
+<img src="../ux/screens/240x320i10x5/message_thread.png" width="220" alt="Full incoming and outgoing conversation bubbles">
+<img src="../ux/screens/240x320i10x5/message_thread_older.png" width="220" alt="Scrolling into older conversation history">
 
 ## Sending a message
 
@@ -76,9 +81,10 @@ Archived text is stored in plaintext.
    up to 140 characters. On radios without a numeric keypad, use Up and Down to change the current character,
    **OK** to add another character, and hold **OK** to send.
 
-<img src="../ux/screens/160x120i5/compose.png" width="200" alt="The message composer">
+<img src="../ux/screens/240x320i10x5/compose.png" width="200" alt="The message composer">
 
-The radio shows "Sending to ..." and returns to Home. A message to a person asks for a confirmation. When none comes, the radio tries again, in every format. The result
+The radio shows "Sending to ..." and returns to the open conversation when replying from a thread, otherwise Home.
+A message to a person asks for a confirmation. When none comes, the radio tries again, in every format. The result
 comes as a banner:
 
 | Banner | Meaning |
@@ -90,7 +96,8 @@ comes as a banner:
 With confirmed IP data turned off (`tools/rfoundry_debug.py data ip-settings auto off`), ETSI messages to a person also go
 once, with "Sent to".
 
-Messages you send aren't stored in the radio.
+With message history active, outgoing messages and their send results are stored in the archive.
+Without history, outgoing messages are not retained after sending.
 
 ## Message formats
 
@@ -123,7 +130,7 @@ When someone sends you a call alert, the radio shows "Call alert from ..." with 
 banner is up for the caller's actions. Your radio acknowledges the alert unless **Settings > Connections > Answer call
 alerts** is off.
 
-<img src="../ux/screens/160x120i5/banner_call_alert.png" width="200" alt="A call alert banner">
+<img src="../ux/screens/240x320i10x5/banner_call_alert.png" width="200" alt="A call alert banner">
 
 ## Radio check
 
@@ -136,7 +143,7 @@ that the other radio does not support or allow this signaling format.
 3. The radio tries up to 3 times. The result is a banner. "... answered (0.8 s)" gives the round-trip time. "...: no
    answer" comes with "Off, out of range or elsewhere".
 
-<img src="../ux/screens/160x120i5/banner_radio_check.png" width="200" alt="A radio check result">
+<img src="../ux/screens/240x320i10x5/banner_radio_check.png" width="200" alt="A radio check result">
 
 Your radio answers radio checks from others while **Settings > Connections > Answer radio checks** is on, the default.
 An answer is a short transmission the radio makes without you pressing PTT; turn the setting off if you don't want that.
@@ -144,7 +151,11 @@ An answer is a short transmission the radio makes without you pressing PTT; turn
 ## Registration (ARS) and location (LRRP)
 
 ARS registers the radio with a presence server at power-up and after a channel change. It is off until a server ID is
-set. There is no menu item for it yet. Developers set it over the debug link.
+set. On the card layout, open **GPS, APRS, and Data > ARS & LRRP** to set **Server ID**, inspect status,
+or register manually. A server ID of 0 disables registration. **Answer GPS requests** is available on the
+same page. The debug link also exposes ARS and LRRP settings.
+
+<img src="../ux/screens/240x320i10x5/ars.png" width="220" alt="ARS and LRRP status and registration controls">
 
 Choose **Position** in the action menu for a private contact to request its current GPS coordinates over DMR.
 The target radio needs to support LRRP and have **Settings > Location > Answer GPS requests** enabled if it

@@ -11,8 +11,8 @@ On Home, press **OK**, **9** on the dark card layout or **OK**, **7** on the sta
 controls also open Settings with **\***, **0**. Both layouts use the same group numbers, from **1** for Sound to **0**
 for Advanced. Find also reaches each setting by name: type its first letters on Home.
 
-<img src="../ux/screens/160x120i5/settings.png" width="200" alt="Settings">
-<img src="../ux/screens/160x120i5/settings_display.png" width="200" alt="Settings, Display">
+<img src="../ux/screens/240x320i10x5/settings.png" width="220" alt="Settings on the card layout">
+<img src="../ux/screens/240x320i10x5/settings_display.png" width="220" alt="Display settings on the card layout">
 
 ## Changing a setting
 
@@ -24,7 +24,7 @@ Each row shows its current value.
   or between steps, isn't taken: the radio says "Not changed" with the range.
 - A setting takes effect and is saved as soon as you change it. There is no separate save step.
 
-<img src="../ux/screens/160x120i5/settings_editor.png" width="200" alt="Editing a number setting">
+<img src="../ux/screens/240x320i10x5/settings_editor.png" width="220" alt="Numeric setting editor showing its range on the card layout">
 
 Some settings are on the menu before the feature behind them exists, or don't apply to this radio. They are dimmed.
 **OK** on a dimmed row says why. The Status column of each table shows this:
@@ -101,6 +101,7 @@ in 15-minute steps, from −720 to +840 minutes. The default is 0. Change it if 
 | Position format | Degrees, Deg min sec, Grid | Degrees | How positions are shown | Dimmed without GPS |
 | Send position | Off, 1 min, 5 min, 15 min | Off | Send your position at this interval | Dimmed without GPS |
 | Answer GPS requests | On, Off | On | Answer LRRP location requests (Find also finds it as "position"). Without GPS the answer is "no fix" | Works |
+| UTC offset | -720 to +840 minutes, steps of 15 | 0 | Local offset for the status clock and message timestamps. UTC remains stored internally | Works |
 
 ### Connections (key 6)
 
@@ -138,6 +139,9 @@ The list has a row pair for each key the menus don't need; [the radio's list](23
 key settings are also in the codeplug, so a codeplug written to the radio can set them, and a change here is written to
 the codeplug.
 
+<img src="../ux/screens/240x320i10x5/settings_keys.png" width="220" alt="Key assignment field cards">
+<img src="../ux/screens/240x320i10x5/language.png" width="220" alt="Language cards identifying the active catalog">
+
 ### My radio (key 9)
 
 | Setting | What it does |
@@ -148,23 +152,24 @@ the codeplug.
 
 | Item | What it does |
 |---|---|
-| About | "RadioFoundry", the release name (such as v26.11) and the commit it was built from, or only the commit for a build between releases, the firmware's date (the commit's, or the build's for a build with local changes), and the radio model. Then the authors and the license of each part: RadioFoundry (MIT), the third-party libraries, and the AMBE+2 codec. The codec shows as "stock": it comes from your radio's own firmware and isn't part of RadioFoundry. The page is text in small print, with nothing cut short and no status bar. The status bar comes back during a call. **Up**, **Down** or the knob scroll a page longer than the screen |
+| About | Firmware name, release (such as `v1.0.0`), commit, date, radio model, authors, and licenses. The AMBE+2 codec is marked "stock" because it comes from your radio. **Up**, **Down**, or the knob scrolls the page. The status bar is hidden while idle and returns during a call |
 | Codeplug | Where the channels come from (built-in or from the CPS), the number of zones and channels |
 | Diagnostics | The diagnostics page (also **OK**, **6**, **7**) |
 | Factory reset | Puts every setting back to its default ([below](#factory-reset)) |
 | Crash log | What the last crash left, and sending it to the developers ([below](#crash-log)) |
+| Message history | Prepares eligible blank archive storage after confirmation. Existing unknown data is preserved. Available when the build and board provide a message reserve ([Messages](10-messages-and-signaling.md#reading-messages)) |
 | Freq trim | Moves the radio's receive and transmit frequency together, for a radio that is off frequency. Measure the error (a frequency counter, a service monitor, or a hotspot's BER test) and enter it with the sign reversed. The page shows what the trim comes to in Hz at 440 MHz and 144 MHz: a radio 2 kHz high at 440 MHz takes about -4.5 ppm (-1980 Hz). The page shows the trim in large type over a slider from -10 to +10, with "+ to increase frequency" under it where the display has room. Up and Down (or the knob) step 0.1 ppm, # flips the sign, digits type it (# 4 5 OK is -4.5 ppm). Takes effect once you stop changing it. Only on radios that have it ([which radios](../feature-matrix.md)). Range -10.0 to +10.0 ppm in 0.1 ppm steps, default 0 |
 
-<img src="../ux/screens/160x120i5/about.png" width="200" alt="Settings > Advanced > About">
+<img src="../ux/screens/240x320i10x5/about.png" width="200" alt="Settings > Advanced > About">
 
-<img src="../ux/screens/160x120i5/settings_advanced.png" width="200" alt="Settings, Advanced">
+<img src="../ux/screens/240x320i10x5/settings_advanced.png" width="200" alt="Settings, Advanced">
 
 ## Factory reset
 
 **Settings > Advanced > Factory reset** asks "Reset all settings to factory defaults? Channels stay. This can't be
 undone." The focus starts on "No, keep settings". Focus "Yes, reset" and press **OK**.
 
-<img src="../ux/screens/160x120i5/factory_reset.png" width="200" alt="Factory reset confirmation">
+<img src="../ux/screens/240x320i10x5/factory_reset.png" width="200" alt="Factory reset confirmation">
 
 The reset puts every setting back to its default (brightness, radio settings, the privacy key, the channel
 position), erases RadioFoundry's own data area, and restarts the radio. The codeplug and the calibration stay.
@@ -177,7 +182,7 @@ Crash log** shows the record: what happened, how many crashes in a row, how long
 build. Without a record it says "No crash recorded." Switching the radio off may lose the record: look before you
 turn it off.
 
-<img src="../ux/screens/160x120i5/crash_log.png" width="200" alt="Settings > Advanced > Crash log">
+<img src="../ux/screens/240x320i10x5/crash_log.png" width="200" alt="Settings > Advanced > Crash log">
 
 | Item | What it does |
 |---|---|
@@ -186,11 +191,11 @@ turn it off.
 | After a crash | Off: nothing happens at the restart. Ask: the radio asks whether to send the report. Auto: it sends the report without asking. Off is the default |
 | Clear | Forgets the record |
 
-<img src="../ux/screens/160x120i5/crash_send_to.png" width="200" alt="Crash log, Send to">
+<img src="../ux/screens/240x320i10x5/crash_send_to.png" width="200" alt="Crash log, Send to">
 
 With **After a crash** at Ask, the radio asks once after the restart:
 
-<img src="../ux/screens/160x120i5/crash_prompt.png" width="200" alt="The question after a crash">
+<img src="../ux/screens/240x320i10x5/crash_prompt.png" width="200" alt="The question after a crash">
 
 Ask and Auto need a Send to contact and a DMR channel the radio may transmit on. The report is at most about 150 bytes and
 holds no audio, messages or location: only the crash record and the firmware build. Nothing on the air confirms
@@ -203,7 +208,7 @@ A few settings exist in the radio but not yet on the menu:
 - busy channel lockout and the roger beep;
 - the scan's resume mode and timing;
 - VOX sensitivity;
-- the ARS server and the emergency settings;
+- the emergency settings; the ARS server has a menu on the card layout under **GPS, APRS, and Data > ARS & LRRP**;
 - the IP data settings (header compression, confirmed data) and the SNMP communities;
 - the roaming threshold, hysteresis and periodic search;
 - the SFR idle beacon.

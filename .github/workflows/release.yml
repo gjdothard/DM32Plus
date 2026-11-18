@@ -57,7 +57,7 @@ jobs:
           m="$m"'{"os":"macos-15-intel","name":"macos-x86_64"},{"os":"windows-2022","name":"windows-x86_64","ext":".exe"}]'
           echo "rfoundry=$m" >> "$GITHUB_OUTPUT"
           if [ "${GITHUB_REF_TYPE}" = tag ] && [ "${GITHUB_REF_NAME#v}" != "${GITHUB_REF_NAME}" ]; then
-            # a release name or nothing: vYY.M, vYY.M.N, either with bN (docs/dev/release.md)
+            # A supported release name (docs/dev/release.md).
             python3 tools/release_version.py check "${GITHUB_REF_NAME}"
             echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
             echo "publish=true" >> "$GITHUB_OUTPUT"
@@ -131,7 +131,7 @@ jobs:
         run: |
           set -u
           rc=0
-          $RUN tools/release_build.sh --toolchain "$TOOLCHAIN" --board "$(basename "$(dirname "$BOARD_FILE")")" --version "$VERSION" --out dist || rc=$?
+          $RUN tools/release_build.sh --toolchain "$TOOLCHAIN" --board "$(basename "$(dirname "$BOARD_FILE")")" --product "$(jq -er .name "$(dirname "$BOARD_FILE")/product.json")" --version "$VERSION" --out dist || rc=$?
           if [ "$rc" = 3 ] && [ "$GITHUB_EVENT_NAME" = pull_request ]; then
             # a pull request's packaging check runs on GitHub's runners, which can't pull the private csky-elf image
             echo "::notice::$TOOLCHAIN packaging skipped: the image ${RFOUNDRY_CSKY_IMAGE:-} isn't available on this runner (docs/dev/ci.md)"
@@ -217,7 +217,7 @@ jobs:
           find artifacts -type f ! -name SHA256SUMS -exec cp {} out/ \;
           (cd out && sha256sum * > SHA256SUMS && cat SHA256SUMS)
           # the manifests' own image hashes must agree with the files
-          for j in out/rfoundry-*.json; do
+          for j in out/*.json; do
             python3 - "$j" <<'EOF'
           import hashlib, json, os, sys
           m = json.load(open(sys.argv[1]))
@@ -234,13 +234,22 @@ jobs:
           set -eu
           TAG="${GITHUB_REF_NAME}"
           NOTES="Firmware images for the radios listed below, without the AMBE codec, and rfoundry for Linux, macOS and
-          Windows. Flash with: rfoundry flash --release ${TAG}. rfoundry keeps the codec already in your radio when
+          Windows. Flash with: rfoundry flash --repo ${GITHUB_REPOSITORY} --release ${TAG}. rfoundry keeps the codec already in your radio when
           that is known to be safe, or writes it from your radio's stock firmware file (--stock). See
           docs/user/02-installing.md."
-          # a beta tag (bN) is a pre-release: the site's default install (the latest release) skips it
+          # a beta or release-candidate tag is a pre-release: the site's default install (the latest release) skips it
           PRE=""
           if python3 tools/release_version.py prerelease "$TAG"; then PRE=--prerelease; fi
           gh release view "$TAG" > /dev/null 2>&1 || \
-            gh release create "$TAG" --verify-tag $PRE --generate-notes --title "RadioFoundry $TAG" --notes "$NOTES" || \
+            gh release create "$TAG" --verify-tag $PRE --generate-notes --title "$(jq -er .name boards/dm32/product.json) $TAG" --notes "$NOTES" || \
             gh release view "$TAG" > /dev/null   # created meanwhile by the manual workflow
           gh release upload "$TAG" out/* --clobber
+
+  website:
+    needs: [version, publish]
+    if: needs.version.outputs.publish == 'true' && !contains(needs.version.outputs.version, '-')
+    uses: ./.github/workflows/website-release.yml
+    permissions:
+      contents: write
+    with:
+      version: ${{ needs.version.outputs.version }}

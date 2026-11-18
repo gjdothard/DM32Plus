@@ -377,17 +377,19 @@ Installing: [Moving from stock DM-32UV firmware](19-moving-from-stock-dm32.md).
 
 ### DM32Plus
 
-DM32Plus reserves 512 KiB for future conversation history. If your caller-name database exceeds the new
+DM32Plus reserves 512 KiB for persistent conversation history. Eligible blank storage is prepared automatically;
+unknown contents are preserved. See [message history](10-messages-and-signaling.md#reading-messages).
+If your caller-name database exceeds the new
 CPS limit, keep a copy before upgrading and rebuild it with fewer regions or shorter text in **DMR ID
 Database**. The limit applies to caller-name lookups. Channels, talkgroups, and saved contacts have their
 own records.
 
 The DM32Plus offshoot publishes its firmware on [GitHub Releases](https://github.com/gjdothard/DM32Plus/releases).
 
-1. Open the portable CPS with `Start CPS.cmd` using Chrome or Edge, then choose **Install DM32Plus**
-   or **Upgrade to DM32Plus**. See the [portable CPS instructions](../../tools/offline_cps/README.md).
+1. Open the portable CPS with `Start CPS.cmd` using Chrome or Edge, then open **Firmware** and choose **Install DM32+**
+   or **Upgrade to DM32+**. See the [portable CPS instructions](../../tools/offline_cps/README.md).
 2. Choose a **Release channel**. **Development** checks for the newest published Development prerelease.
-   **Testing** checks for the newest published release candidate, identified by an `RC` prefix.
+   **Testing** checks for the newest published release candidate, with a `-rc.N` version suffix.
    **Stable** checks for the newest published stable release. **Bundled (offline)** uses the image
    included in the CPS package.
 3. Review the target version before proceeding. If the installer was open when a new release appeared,
@@ -402,14 +404,16 @@ and the [DMR](09-dmr.md#timeslot-and-color-code) and [FM](08-fm.md#quick-setting
 grids. The [operating talkgroup instructions](09-dmr.md#choosing-a-talk-target) show how to assign and select
 talkgroups for a repeater.
 
-Pushing to `Development` or `Testing` runs the [product firmware workflow](../../.github/workflows/product-firmware.yml).
-It assigns the next calendar prerelease version, builds the DM-32UV application, and checks task-stack usage.
+Pushing to `Development` runs the [product firmware workflow](../../.github/workflows/product-firmware.yml).
+It assigns the next `v1.0.0-beta.N` prerelease from the base version in `boards/dm32/product.json`,
+builds the DM-32UV application, and checks task-stack usage.
 When those checks pass, it tags the built commit and publishes the image, manifest, and SHA-256 checksums used
-by the corresponding CPS channel. Testing prepends `RC-` to the GitHub tag, such as `RC-dm32plus-v26.11b1`.
+by the corresponding CPS channel.
 The release image excludes the proprietary voice codec.
 
 Pushing to `Testing` runs the same build and checks with a separate version sequence. Its GitHub prerelease
-names start with `RC ` and its tags start with `RC-dm32plus-`. Find these release candidates on GitHub Releases.
+names start with `RC ` and its tags use `v1.0.0-rc.N`. The counter is independent of Development.
+Stable releases use `v1.0.0`, without a suffix. Find these release candidates on GitHub Releases.
 
 Development prerelease **v26.11b4** was confirmed working on a physical DM-32UV by the radio owner.
 

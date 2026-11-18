@@ -76,7 +76,7 @@ Each variant file starts with `## title:` and `## summary:` lines, and the comme
 left out; the site shows both. The lists are a draft for the project lead to settle.
 
 The firmware version (`RFOUNDRY_GIT`) is the commit plus `-dirty` when the tree differs from it (tracked changes, or
-untracked sources in the built directories). The release name (`RFOUNDRY_RELEASE`, for example `v26.11`) is the
+untracked sources in the built directories). The release name (`RFOUNDRY_RELEASE`, for example `v1.0.0`) is the
 release tag on that commit, empty for a dirty tree or an untagged commit; `make RELEASE=<tag>` sets it and `RELEASE=`
 leaves it out ([dev/release.md](dev/release.md#release-names)). Only the few files that use either are rebuilt when it
 changes.
@@ -104,7 +104,7 @@ below are for an STM32F4 radio.
 | `CONFIG_DMR_PRIVACY` | = DMR | basic privacy (Motorola / Anytone BP) on the voice path, `core/dmr/dmrPrivacy.c` (`docs/spec/dmr-voice.md` 5) |
 | `CONFIG_DMR_TALKGROUP_ENTRIES` | = DMR | Per-channel DMR operating entries with timeslot and talkgroup ID. Memory Home's encoder cycles through them |
 | `CONFIG_TALKGROUP_EDIT` | Channel editing and DMR operating entries | Add, reorder, and remove saved group contacts from the shared operating talkgroup pool on the radio |
-| `CONFIG_DMR_AES256` | = DMR_PRIVACY | AES-256/OFB voice, PI and late-entry MI signaling; needs DMR_PRIVACY; RAM session provisioning (`docs/spec/dmr-voice.md` 5.1) |
+| `CONFIG_DMR_AES256` | = DMR_PRIVACY | AES-256/OFB voice, PI and late-entry MI signaling; needs DMR_PRIVACY. Supports RAM sessions, persistent CPS key slots, and per-channel bindings ([voice specification](spec/dmr-voice.md#51-aes-256-sessions)) |
 | `CONFIG_DMR_TALKER_ALIAS` | = DMR | talker alias decode and our own alias TX (`docs/spec/dmr-voice.md` 3) |
 | `CONFIG_DMR_GPS` | = DMR | ETSI GPS Info in the embedded LC (FLCO 8): the caller's position on the receive screen (with distance and bearing when ours is known), in Recent and on the debug link; ours sent in the alias superframes when the position-in-DMR-calls setting under Tools > APRS is on and a position source has a fix (the APRS position: GPS, host, fixed; `docs/spec/dmr-voice.md`) |
 | `CONFIG_DMR_SMS` | = DMR | text messages: ETSI IP text (the default format) and ETSI defined short data, received (inbox, ETSI response) and sent (docs/spec/dmr-data.md 5). Includes the keypad composer even without `CONFIG_CHANNEL_EDIT`. |

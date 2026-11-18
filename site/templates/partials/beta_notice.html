@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 <dialog id="beta-notice" class="confirm beta-notice" aria-labelledby="beta-notice-title">
 	<h2 id="beta-notice-title" tabindex="-1" autofocus>{{t flash.beta.title}}</h2>
 	<p>{{t flash.beta.lead}}</p>
@@ -10,7 +12,7 @@
 	<div class="notice ok"><p><strong>{{t flash.beta.safe_title}}</strong> {{t flash.beta.safe_text}}</p></div>
 	<h3>{{t flash.beta.help_title}}</h3>
 	<p>{{t flash.beta.help_text}}</p>
-	<p class="beta-links"><a href="{{ community }}" target="_blank" rel="noopener">{{t flash.beta.help_facebook}}</a> · <a href="{{ repo }}/issues" target="_blank" rel="noopener">{{t flash.beta.help_github}}</a></p>
+	<p class="beta-links"><a href="{{ repo }}/issues" target="_blank" rel="noopener">{{t flash.beta.help_github}}</a></p>
 	<h3>{{t flash.beta.faq_title}}</h3>
 	<details>
 		<summary>{{t flash.beta.faq_testing_q}}</summary>
@@ -21,7 +23,7 @@
 			<li><strong>{{t flash.beta.faq_testing_ui_t}}</strong> {{t flash.beta.faq_testing_ui}}</li>
 			<li><strong>{{t flash.beta.faq_testing_code_t}}</strong> {{t flash.beta.faq_testing_code}}</li>
 		</ul>
-		<p><a href="{{ home }}docs/testing/index.html" target="_blank" rel="noopener">{{t flash.beta.faq_testing_link}}</a></p>
+		<p><a href="{{ testing_docs }}" target="_blank" rel="noopener">{{t flash.beta.faq_testing_link}}</a></p>
 	</details>
 	<details>
 		<summary>{{t flash.beta.faq_damage_q}}</summary>
@@ -43,7 +45,7 @@
 	<details>
 		<summary>{{t flash.beta.faq_feedback_q}}</summary>
 		<p>{{t flash.beta.faq_feedback_a}}</p>
-		<p class="beta-links"><a href="{{ repo }}/issues/new/choose" target="_blank" rel="noopener">{{t flash.beta.faq_feedback_github}}</a> · <a href="{{ community }}" target="_blank" rel="noopener">{{t flash.beta.faq_feedback_facebook}}</a></p>
+		<p class="beta-links"><a href="{{ repo }}/issues/new/choose" target="_blank" rel="noopener">{{t flash.beta.faq_feedback_github}}</a></p>
 	</details>
 	<form method="dialog" class="confirm-actions">
 		<button class="btn btn-primary" value="ok">{{t flash.beta.ok}}</button>

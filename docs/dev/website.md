@@ -4,15 +4,28 @@
 # The Web Site
 
 The product home page introduces the firmware for its target radio, links to installation and the CPS,
-and explains Stable, Testing, and Development releases. Its header uses the product name. Shared reference
-pages retain upstream branding, and the home page credits RadioFoundry and links to the original MIT license.
+and explains Stable, Testing, and Development releases. Every page uses the same product branding and navigation:
+Home, Install, CPS, Docs, Screenshots, Tools, and Releases. The brand always returns to Home. The home page
+credits RadioFoundry and links to the original MIT license.
 Product claims describe implemented behavior; hardware verification remains in the bring-up records.
 
-The site is generated from the repository, like the PDF manual. It lists the radios, their screens
-and features, holds the documentation, and carries two tools that run in the browser with nothing sent to a server:
+The site is generated from the repository, like the PDF manual. Product builds show only the selected board,
+its enabled features, and matching firmware screens. Shared board definitions remain in the source tree.
+The site holds the documentation and carries tools that run in the browser:
 the web flasher (back up, install, restore; [web-flasher.md](web-flasher.md)) and the Codeplug Editor
 ([codeplug-editor.md](codeplug-editor.md)). The site is the recommended way for users to install RadioFoundry and edit
 a codeplug ([Installing](../user/02-installing.md)); this page is for people who change it.
+
+## Published product documentation
+
+Product metadata selects a documentation source directory with `documentation`. Its `user/` pages are published at
+`/docs/user/`, retaining the public manual and installer-help URLs. The product guide describes the current release,
+card menus, and serial-cable workflows. The `/docs` index and chapter navigation list only those selected pages.
+Shared engineering specifications, historical test notes, and other radio ports remain in the source repository.
+Links from the guide to those references open the corresponding file in this project's repository.
+They are not published as additional chapters in the product manual.
+
+Builds without a selected firmware product continue to render the full shared documentation.
 
 ```
 python3 site/build.py                       # build/site/
@@ -27,6 +40,12 @@ command with `uv run --no-project --with-requirements site/requirements.txt`). T
 npm packages: plain HTML, CSS and ES modules. `tools/ci.sh` builds the site and runs the tests (Python step).
 
 ## Portable offline CPS
+
+Product feature selection uses the [on-demand build service](../../tools/firmware_builder/README.md).
+Full/default options use a published image. Changed options are built on the operator's compiler worker and verified
+against the requested version and enabled features before flashing. The worker has no Docker socket or public port.
+Its same-origin proxy is configured with `CPS_BUILD_API` and `CPS_BUILD_ORIGINS` on the production server.
+The root-owned Compose definition retains that connection across ordinary website updates.
 
 `tools/package_cps.py` packages a built site with an embeddable Windows Python runtime. Supply the runtime ZIP and
 a JSON file containing its published `sha256`, source `url`, and `version`. Verify that hash against the runtime
@@ -51,31 +70,25 @@ Both the install and upgrade actions load and verify that local release.
 The package contains the application and manifest. The installer obtains a compatible codec locally
 from the radio or a stock firmware file supplied by the operator.
 
-Cloudflare Pages builds and deploys it (see [Hosting](#hosting)):
-
-| Event | Does |
-|---|---|
-| Push to `main` | Builds the site with `site/cloudflare-build.sh` and deploys it to radiofoundry.org |
-| Push to another branch of this repository | Builds a preview at its own `*.radiofoundry.pages.dev` address; a pull request shows the link. Pull requests from forks get no preview |
-| Release published | `.github/workflows/site.yml` calls the project's deploy hook, so `main` is built again with the new release's images for the flasher |
-| By hand | Actions > Web site > Run workflow (the same deploy hook), or Retry deployment in the Pages project |
+Stable releases use the Docker host updater described in
+[Website deployment after a release](#website-deployment-after-a-release). The release workflow builds the matching
+website bundle and verifies its deployed version. No Cloudflare deploy-hook workflow runs on release publication.
 
 The pull request's unit tests job also builds the site (`--strict`) and runs the flasher's tests (`tools/ci.sh`'s
 Python step).
 
 ## Hosting
 
-The site is static files on Cloudflare Pages, project `radiofoundry`, connected to this repository through
-Cloudflare's GitHub app. Pages builds in its own build image (Python and Node.js preinstalled) and switches the site to
-a new deployment in one step, so a deployment has no downtime.
+The production website uses the [Docker host updater](#website-deployment-after-a-release).
+Cloudflare Pages remains an optional hosting alternative. If a Pages project is connected through Cloudflare's
+GitHub app, configure the following settings. Retry a deployment in that project's Deployments list when needed.
 
 | Part | Setup |
 |---|---|
-| Build | Command `site/cloudflare-build.sh`, output directory `build/site`, root directory the repository root. The script installs `site/requirements.txt`, lists the releases through the GitHub API, fetches the `rfoundry-*` images of the newest one that is not a pre-release, passes the newest pre-release (a `bN` tag) when it is newer than that (`--beta`), and runs `site/build.py --strict`. A failed build leaves the last deployment up |
+| Build | Command `site/cloudflare-build.sh`, output directory `build/site`, root directory the repository root. The script installs `site/requirements.txt`, lists the releases through the GitHub API, fetches the product images of the newest stable release, passes the newest beta or release candidate when it is newer than that (`--beta`), and runs `site/build.py --strict`. A failed build leaves the last deployment up |
 | Branches | Production branch `main`; every other branch of this repository builds a preview |
 | Variables | `PYTHON_VERSION` `3.12` (both environments). `RFOUNDRY_SENTRY_DSN` in production only, so previews send no error reports. `GITHUB_TOKEN` (encrypted, both environments): a fine-grained token with read-only access to public repositories. Without it the release lookup shares the builders' 60 requests an hour, and a build can fail with 403 "rate limit exceeded" after a minute of retries |
-| Custom domain | `radiofoundry.org` on the project (Custom domains). The `www` name redirects to it |
-| Release rebuild | The project's deploy hook, as `CLOUDFLARE_DEPLOY_HOOK` in the `site` environment (main and release tags only), which `site.yml` calls |
+| Custom domain | Configure a domain you control in the Pages project's Custom domains settings |
 | Analytics | Cloudflare Web Analytics, turned on in the project's Metrics tab. Pages adds the beacon to each deployment; it sets no cookies |
 | 404 | Pages serves the build's `404.html` for a missing page |
 | Roll back | The project's Deployments list: Rollback on an earlier production deployment |
@@ -86,7 +99,7 @@ Nothing on the site is copied by hand. Each page reads its source at build time:
 
 | Shows | Comes from |
 |---|---|
-| Radios, their order and status | The board registry, `boards/<radio>/board.toml` (`tools/boards.py json --for site`). `order` sorts them; the lowest is the home page's radio |
+| Radios, their order and status | The board registry, `boards/<radio>/board.toml` (`tools/boards.py json --for site`). `order` sorts the radio lists; the home page's radio comes from the selected board's `product.json` |
 | Planned radios | The rows of the [radio survey](../spec/radios.md) "Summary table" that name no board, by their Port cell (`tools/registry_docs.py`): `Planned`, `Planned, hardware needed`, `In progress, #N` (badge "In progress", linked to the pull request) or `Not planned` (not listed), each with an optional `. note` |
 | A radio's cards | One card per board, then one per `looks` entry of its board.toml (another body the board ships in), each with its own drawing and the radios in that body; a look's card links to the board's page. The board's card lists the radios not moved to a look |
 | A radio's one-line note for visitors | board.toml `[status] summary`, the same line the README and the user manual show; a catalog may translate it as `radio.note.<radio>`. A planned radio's: the note of its Port cell, which a catalog may translate as `planned.note.<slug of the survey name>` |
@@ -158,7 +171,7 @@ a copy up a little, smoothly. `site/tests/shots_test.py` checks the scaling.
 | `site/rfoundrysite/device.py` | Radio images: frame, overlay geometry, boot screen composite |
 | `site/rfoundrysite/shots.py` | The gallery screens' scaled copies ([Screenshot copies](#screenshot-copies)) |
 | `site/rfoundrysite/toolzip.py` | `downloads/rfoundry-tool.zip`: rfoundry from the site's commit for the flasher's manual install kit, with a launcher; `data/site.json` `tool` gives its path, size and SHA-256 ([web-flasher.md](web-flasher.md#the-manual-install-kit)). `site/tests/toolzip_test.py` runs it unpacked |
-| `site/rfoundrysite/social.py` | The link preview image (`static/img/social.png`, every page's `og:image`): each radio with a different screen, rasterized with resvg |
+| `site/rfoundrysite/social.py` | Link previews rasterized with resvg: `static/img/product-social.png` for Home and `static/img/social.png` for shared pages |
 | `site/rfoundrysite/tmpl.py`, `site/templates/` | Page markup (below) |
 | `site/i18n/` | String catalogs (below) |
 | `site/static/css/tokens.css`, `site.css` | Design tokens, then layout and components |
@@ -178,10 +191,13 @@ Markup lives in `site/templates/*.html` and `partials/`, with four kinds of plac
 root (static files, data) and `{{home}}` the path to the root of the page's language (links between pages). Loops
 stay in Python, which renders a partial per item.
 
-Every page's footer has two help cards: the community group (`COMMUNITY_URL` in `site/rfoundrysite/build.py`, also
-`community` in `data/site.json`) and the GitHub issues. The web tools' report line under an error (`reportLine()` in
-`static/js/report.js`) links the same two. Their icons are CSS masks (`.icon-*` in `site.css`), drawn in the text
-color.
+The footer and tool error messages link to the repository's GitHub issues. They do not link to a social group.
+The icons are CSS masks (`.icon-*` in `site.css`), drawn in the text color.
+
+`RFOUNDRY_SITE_URL` supplies the production origin for language alternates and link previews. Without it,
+these URLs are relative to the current host; preview builds never advertise an upstream domain.
+The product metadata may explicitly configure `build_api`; without it cloud builds and flash-log uploads
+are disabled, and the installer uses published releases or locally selected firmware files.
 
 Every page's footer ends with a faint build stamp: the firmware release the flasher installs (linked to its GitHub
 release; left out before the first release), a Changelog link to the GitHub releases, the commit the site was built from
@@ -388,3 +404,62 @@ Automatic reports go through `diag.scrub()`, which removes callsigns, DMR IDs an
 is pinned with an SRI hash in `report.js`. It loads without breadcrumbs or other default integrations, so it sends only
 what `diag.error` hands it. `?reporting=0` turns sending off, as it does for the flash log. Ad blockers often block
 Sentry; the page then works the same and offers the download only.
+
+## Website deployment after a release
+
+The release workflow calls `website-release.yml` after firmware assets are published. Only final versions
+update production. Development and Testing prereleases remain available through their CPS channels.
+The job checks out the release commit, renders the site with that run's firmware artifact, and verifies
+its product identity, version, image checksum and codec exclusion before packaging it.
+The deployment archive is retained as a workflow artifact.
+
+The `website-production` environment records deployment status. The job uploads
+`website-<version>.tar.gz` to that release, then checks the public `/deployment.json` marker for both
+the version and commit. An old page or an unhealthy deployment cannot produce a successful job.
+`WEBSITE_URL` can override the public URL for another deployment.
+
+The host uses `tools/website/update.py` with outbound HTTPS, so a private host does not need inbound
+SSH from GitHub or a repository deployment secret. The root-owned configuration names the public repository
+and the fixed deployment directory. The updater checks every two minutes. It requires a newer stable release
+with an uploaded website asset and a matching GitHub SHA-256 digest. Missing bundles leave the site running.
+
+An administrator runs `tools/website/install-updater.sh DEPLOYMENT PRODUCT_JSON` once. The installer creates
+a separate system account named `website-updater`, with a locked password, a `nologin` shell, a private state
+directory and no supplementary groups. It installs a system service and timer. It does not enable user lingering.
+The account cannot access the Docker socket or write website deployment files, installed code, or configuration.
+It has no sudo permissions. It can connect only to `/run/website-updater/deploy.sock`, a local Unix socket
+owned by root and its dedicated group with mode 660. No network port is opened.
+
+A socket-activated root service receives the bundle and independently verifies the latest stable version
+and GitHub asset digest. It rejects archive paths outside the site and explicit server files, links, device files,
+duplicate paths, writable permissions and excessive sizes. It uses a fixed root-owned Compose definition;
+a release cannot supply Docker options, host mounts, an image, a service name or a deployment path to the helper.
+The definition preserves the existing project's ports and public host setting, runs the Python image as an
+unprivileged user, drops all container capabilities and disables privilege escalation. Mounts are read-only.
+The updater can cause deployment of the official newer website release only. Both services keep
+`NoNewPrivileges=true`; the polling process never elevates its identity. The helper acknowledges completion
+over the socket only after deployment and the container health check finish. This avoids the incompatibility
+between sandbox-implied no-new-privileges and a setuid sudo helper.
+
+For an existing installation of the original sudo helper, an administrator runs
+`tools/website/upgrade-socket-helper.sh`. It retains backup files, installs the socket units, revokes the old
+sudo permission, and retries the current official bundle.
+
+The host needs Python 3.11+, systemd, `tar`, `sha256sum`, `realpath`, `flock`, and Docker Compose with `--wait`.
+Inspect the timer with `systemctl status website-release.timer` and logs with
+`journalctl -u website-release.service`. The existing proxy and operator Compose files are preserved.
+The root-owned definition is captured at installation; an administrator must review later port or proxy changes.
+Release deployment refreshes content and recreates the existing service. It does not publish a separate image.
+
+`tools/website/deploy.sh` verifies the archive checksum and every bundled file before replacing the site and
+server. It retains a rollback copy in `release.previous.*`, waits for the CPS HTTP health check, and restores
+all previous files if startup fails. Deployments are serialized. The public deployment marker appears only after
+the health check passes. A deployment failure fails the release workflow even though the firmware remains published.
+Rerun the failed workflow job to retry deployment of the same release.
+
+To roll back manually, stop `website-release.timer`, restore the site and server files from the chosen
+`release.previous.*` directory, and recreate the service with the appropriate operator or root-owned Compose file.
+To remove automation, stop the polling timer and service, stop the socket and any active `website-deploy@`
+instances, remove their system units and installed code,
+and remove the dedicated account after preserving any diagnostic files. Retain the running site's files and the
+root-owned Compose definition until the operator Compose mounts have been restored and verified.

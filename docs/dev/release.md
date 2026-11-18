@@ -1,28 +1,38 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Releases
 
-A release is a git tag on main named for its year and month (`v26.11`, below) and a GitHub release that carries,
-for each releasable radio, the firmware image **without the AMBE codec**, its manifest, `SHA256SUMS`, the `rfoundry`
+A release is a git tag on main named `vMAJOR.MINOR.PATCH` and a GitHub release that carries,
+for the selected product board, the firmware image **without the AMBE codec**, its manifest, `SHA256SUMS`, the `rfoundry`
 flashing tool as single-file executables for Linux, macOS and Windows, and the user manual as a PDF. Users never
 build firmware: `rfoundry` downloads the image, checks it, and either keeps the codec already in the radio or writes
 the codec from the user's own stock firmware file ([tools/rfoundry/README.md](../../tools/rfoundry/README.md)).
 
 ## Release names
 
-A release is named for the year and month it comes out, so a user sees at a glance how old the firmware is.
-`tools/release_version.py` holds the rule; the Makefile, `tools/release_build.sh`, the release workflow and the site
-all ask it.
+New release tags use these names:
 
-| Name | When |
-|---|---|
-| `vYY.M` | The first release of a month: `v26.11` |
-| `vYY.M.N` | Another release that month: `v26.11.1`, `v26.11.2` |
-| `vYY.MbN` | A pre-release (beta) of that name: `v26.12b1`. The final keeps the name even if it ships the next month |
+| Name | Channel | Example |
+|---|---|---|
+| `vMAJOR.MINOR.PATCH` | Stable | `v1.0.0` |
+| `vMAJOR.MINOR.PATCH-beta.N` | Development | `v1.0.0-beta.1` |
+| `vMAJOR.MINOR.PATCH-rc.N` | Testing | `v1.0.0-rc.1` |
 
-The year has two digits (`26` is 2026) and a beta is a bare `b` and its count, to save room on the radios' small
-displays. The month has no leading zero and the count starts at 1, so `v26.11.3` never reads as March. Main is the
-alpha; there is no release candidate yet. `tools/release_build.sh` and the release workflow refuse any other tag.
+Components have no leading zeros. Major, minor and patch range from 0 to 999999; prerelease counters
+range from 1 to 999999. Other prerelease labels and build metadata are not supported.
+Ordering is numeric, with beta before rc before the final of the same version.
+`tools/release_version.py` and the installer's matching parser enforce these rules.
+
+The board's `product.json` holds the next base `version` without `v`. Branch pushes allocate the next
+counter for their own channel. Retrying a commit reuses its existing channel tag. Once a final tag exists,
+advance the base version before publishing more prereleases. Final tags are created explicitly from the
+reviewed release commit; branch automation does not publish a stable release.
+
+Historical calendar spellings `vYY.M[.N][bN]` remain readable and sort before the new version series,
+so `v1.0.0` upgrades an installation on `v26.11`. Calendar-shaped names are reserved for compatibility
+and recognized first. Existing product-prefixed calendar tags, including `RC-` candidates, remain downloadable.
+New semantic tags have no product prefix.
 
 **On the radio.** A clean build of a commit that carries a release tag gets `RFOUNDRY_RELEASE` (the Makefile reads the
 tag; `make RELEASE=<tag>` sets it, as `tools/release_build.sh` does, and `RELEASE=` leaves it out). The splash screen
@@ -31,7 +41,7 @@ shows the release name in place of the commit, About shows both, and the debug l
 id, the manifests and the CPS id need it. The build service fetches tags, so a custom build of a tagged commit shows
 the release name too.
 
-**Betas.** A tag ending `bN` becomes a GitHub pre-release. GitHub's latest release skips pre-releases, and so does
+**Betas.** A tag ending `-beta.N` or `-rc.N` becomes a GitHub pre-release. GitHub's latest release skips pre-releases, and so does
 the site: the flasher installs the newest release that is not a pre-release by default, and offers a newer beta only as
 an opt-in version link (`?version=<tag>`, [website.md](website.md#flasher-notices)). `?version=main` still builds main.
 
@@ -41,7 +51,8 @@ edit them into a short list of what changed for users.
 
 ## Checklist
 
-1. Main is green: `JOBS=8 tools/ci.sh` ends with "all checks passed" ([ci.md](ci.md)), on a machine with both compilers and `reuse`.
+1. Main is green: `JOBS=8 tools/ci.sh --board <product-board-id>` ends with "all checks passed"
+   ([ci.md](ci.md)), using the platform's pinned compiler.
 2. The project lead runs the similarity scan against the reference trees and reviews every hit
    ([docs/testing/README.md](../testing/README.md) 1).
 3. A comprehensive legal scan of what the release ships, reviewed by the project lead: the license and notices of
@@ -58,13 +69,20 @@ edit them into a short list of what changed for users.
 9. Tag and push the tag:
 
    ```
-   git tag -a v26.11 -m "RadioFoundry 26.11"
-   git push origin v26.11
+   git tag -a v1.0.0 -m "Release 1.0.0"
+   git push origin v1.0.0
    ```
 
 10. The release workflow builds the firmware and rfoundry and attaches them; the manual workflow attaches the PDF
     ([manual-pdf.md](manual-pdf.md)). Edit the release notes on GitHub (they are the changelog the site links).
-11. The next push to main redeploys the site, which then installs the new release (or offers the new beta).
+11. For a stable product release, the release workflow builds and publishes the matching website bundle.
+    The host updater deploys it and the workflow verifies its public version and commit marker
+    ([website deployment](website.md#website-deployment-after-a-release)). Prereleases remain available in their CPS channels.
+
+For a product release, the workflow passes the board metadata name to `--product`. Its full image and
+manifest use `<prefix>-<board>-<version>` and include the product identity expected by the CPS.
+The same build also produces generic `rfoundry-` filenames for the command-line flasher; pass the
+product repository with `--repo` when downloading them.
 
 ## Release artifacts
 
@@ -76,7 +94,7 @@ edit them into a short list of what changed for users.
 | `SHA256SUMS` | SHA-256 of every file above |
 | `RadioFoundry-manual-<version>.pdf` | The user manual (the manual workflow) |
 
-`tools/release.py --board <id> --version v26.11` writes the first two (with `--variant amateur`, the image of `make
+`tools/release.py --board <id> --version v1.0.0` writes the first two (with `--variant amateur`, the image of `make
 VARIANT=amateur` as `rfoundry-<board>-amateur-<version>.bin`, its manifest naming the variant: [build-config.md](../build-config.md#variants)) and the sums for a built image into `dist/`
 (or `--out DIR`). It refuses an image that reaches into a codec sector or carries the codec's signature word, so a
 release can never contain the codec, even by accident.
@@ -87,8 +105,8 @@ The manifest (`format` `rfoundry-release/1`, written and checked by `tools/rfoun
 {
   "format": "rfoundry-release/1",
   "board": "<id>", "board_name": "<name>",
-  "version": "v26.11", "git": "5f034440", "git_full": "5f03444001b77a00ebaef28d3358dd902c03474b",
-  "image": {"file": "rfoundry-<id>-v26.11.bin", "size": 220780, "sha256": "dc8b8ed7..."},
+  "version": "v1.0.0", "git": "5f034440", "git_full": "5f03444001b77a00ebaef28d3358dd902c03474b",
+  "image": {"file": "rfoundry-<id>-v1.0.0.bin", "size": 220780, "sha256": "dc8b8ed7..."},
   "ranges": [{"addr": "0x0800C000", "size": 220780}],
   "sectors": [3, 4, 5, 6],
   "codec": {"included": false, "profile": "<id>-<codec>-s11", "sectors": [10, 11],
@@ -200,9 +218,10 @@ never handles the key. Updates of a radio that runs RadioFoundry need no stock f
 
 | Job | Does |
 |---|---|
-| `firmware (<toolchain>)` | One job per toolchain: `firmware (Arm)` and `firmware (C-SKY)`. Sets up the pinned compiler with `.github/actions/toolchain` ([ci.md](ci.md#toolchains)): the self-hosted image's, the Arm GNU Toolchain checked by SHA-256, or the csky-elf image, never a source build. Without csky-elf GCC on the runner and without the image, the C-SKY job fails. On a tag runs the gate: `tools/ci.sh --quick --steps registry,host,python,licenses` on the runner, then `tools/ci.sh --quick --steps firmware --toolchain <id>` with the toolchain's compiler (through `tools/docker/csky-toolchain/run.sh` for the image). Then `tools/release_build.sh --toolchain <id>`, the same way: for every board on the toolchain with `[status] release = "stable"` (`tools/boards.py list --toolchain <id> --release stable`), it builds the default image and each build option value's image (`tools/boards.py builds`) and runs `tools/release.py` on each. Uploads them as `firmware-arm` or `firmware-csky` |
-| `rfoundry` | On Ubuntu 22.04, macOS 14 (arm64), macOS 13 (x86_64) and Windows 2022: installs the package, runs its tests, builds a single-file executable with PyInstaller 6.11.1 (libusb from the `libusb-package` wheel, the `certifi` CA bundle, and `serial_loader`, `hrc7000_codec` and `stubtool` for the serial route inside) and runs `--version` on it |
+| `firmware (<toolchain>)` | The matrix selects the product's `board_file` and pinned platform compiler. On a tag it runs shared registry, host, Python, and license checks, then firmware checks with `--board <product-board-id>`. Packaging passes `--board` and the metadata's product name to `tools/release_build.sh`. The compiler image and local compiler use the same commands |
+| `rfoundry` | On Ubuntu 22.04, macOS 15 (arm64), macOS 15 Intel, and Windows 2022: installs and tests the package, builds a single-file executable with PyInstaller 6.11.1 and the required serial, USB, and certificate dependencies, then runs `--version` |
 | `publish` | On a `v*` tag only, after every toolchain's job and every rfoundry build passed: one `SHA256SUMS` over everything, checks every manifest against its image and that none includes the codec, creates the release if the manual workflow hasn't, uploads with `--clobber` |
+| `website` | After stable publication, calls `website-release.yml` to package the matching site and verify the host's deployment marker |
 
 On a pull request nothing is published and the release gate doesn't run (the pull request's own checks run the same
 tests):
@@ -211,7 +230,7 @@ tests):
 |---|---|
 | `tools/rfoundry/` (with the `registry.json` a `board.toml` change regenerates), the serial flashing tools, `stub/stubtool.py` | `release.yml`: `version` and `rfoundry`, as artifacts |
 | `release.yml` or the toolchain action | `release.yml`: everything, as artifacts |
-| A `board.toml`, `board.mk` or `platform.toml`, `tools/release.py`, `tools/release_build.sh`, `tools/boards.py`, the toolchain scripts | `pr-tests.yml`: its `firmware (<toolchain>)` jobs run `tools/release_build.sh` after their builds, so every stable board is packaged as a tag would package it |
+| A `board.toml`, `board.mk` or `platform.toml`, `tools/release.py`, `tools/release_build.sh`, `tools/boards.py`, the toolchain scripts | `pr-tests.yml`: its firmware job runs `tools/release_build.sh --board <product-board-id>` after the build to check the selected product board's packaging |
  A manual run on a tag rebuilds and
 replaces the assets.
 

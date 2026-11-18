@@ -13,14 +13,14 @@ No Python installation, administrator access, or internet connection is needed t
 If the browser does not open, use Edge or Chrome to visit **http://localhost:8765/codeplug/**.
 
 The product installer remembers the selected release channel. **Bundled (offline)** uses the image in
-the package. **Stable** uses the newest published stable release, and **Development** uses the newest
-published prerelease. The online channels require internet access. The installer displays the target
+the package. **Stable** uses the newest published final release, **Development** the newest beta, and
+**Testing** the newest release candidate. The online channels require internet access. The installer displays the target
 version before proceeding.
 Use Edge or Chrome for the browser serial connection used for radio programming.
 
 ## Offline use
 
-- Read and program a supported radio with its USB cable.
+- Read and program a supported radio with its USB or serial programming cable.
 - Edit channels, zones, contacts, encryption settings, and other codeplug settings.
 - Open and save codeplug files. Import a locally saved contact database.
 - Use the bundled documentation and the web updater with locally saved firmware files.
@@ -44,3 +44,6 @@ Starting the same copy twice reopens the existing app. If a different app occupi
 
 The portable runtime's license is in `runtime/LICENSE.txt`. RadioFoundry's license is in `LICENSE-RadioFoundry.txt`.
 `build-info.json` identifies this package; `SHA256SUMS` lists its file checksums.
+
+See [Programming the radio](../../docs/user/04-programming.md) for editing, files, drafts, encryption,
+and the current CPS screenshots.

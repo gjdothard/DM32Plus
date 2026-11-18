@@ -100,6 +100,11 @@ static const struct { const char *name, *script; } gallery[] = {
 #endif
 	{ "messages", "msg:3101234,Meet_at_the_north_lot msg:3105678,On_my_way wait:9000 ok 2" },
 	{ "messages_empty", "ok 2" },
+#if CONFIG_UI_CARD_MENU && CONFIG_MESSAGE_JOURNAL
+	{ "message_conversations", "branded-home history ok 2" },
+	{ "message_thread", "branded-home history ok 2 ok" },
+	{ "message_thread_older", "branded-home history ok 2 ok up up" },
+#endif
 	{ "recent", "call:3101234,91,g call:3105678,3100,g call:3102222,0,p ok 3" },
 	{ "zones", "ok 4" },
 	{ "channels", "ok 5" },
@@ -171,6 +176,10 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "roaming", "ok 6 6 1 wait:4000" },
 	{ "settings", "ok 7" },
 	{ "settings_display", "ok 7 2" },
+#if CONFIG_UI_CARD_MENU
+	{ "settings_keys", "branded-home ok 9 8" },
+	{ "language", "branded-home ok 9 2 up ok" },
+#endif
 	{ "settings_editor", "ok 7 2 ok up" },
 	{ "settings_freq_trim", "trim ok 7 0 up" },	// on a radio with a reference trim (radio-features.md 6.1)
 	{ "freq_trim", "trim ok 7 0 up ok ctx 4 5 ok" },
@@ -588,6 +597,9 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 {
 	unsigned flags = gallery_flags(i);
 	if ((!strcmp(gallery[i].name, "usb_info") || !strcmp(gallery[i].name, "repeater_info") ||
+	     !strcmp(gallery[i].name, "settings_keys") || !strcmp(gallery[i].name, "language") ||
+	     !strncmp(gallery[i].name, "message_thread", strlen("message_thread")) ||
+	     !strcmp(gallery[i].name, "message_conversations") ||
 	     !strcmp(gallery[i].name, "aprs_position") || !strcmp(gallery[i].name, "aprs_heard") ||
 	     !strcmp(gallery[i].name, "battery_info") || !strcmp(gallery[i].name, "contact_position_empty") ||
 	     !strcmp(gallery[i].name, "radio_menu") || !strcmp(gallery[i].name, "gps_data") || !strcmp(gallery[i].name, "ars") ||
@@ -601,7 +613,71 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 		return false;
 	if (c == 0) {
 		snprintf(name, nlen, "%s", gallery[i].name);
-		if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "tools"))
+		// Branded firmware uses the card layout; standard Hub routes render the wrong menu or Home.
+		static const struct { const char *name, *script; } card_routes[] = {
+			{ "home_dmr", "" },
+			{ "home_dmr_lastheard", "call:3101234,91,g wait:11000" },
+			{ "home_reply", "call:3101234,91,g" },
+			{ "home_fm", "down" },
+			{ "home_temporary", "quick:power up ok back" },
+			{ "home_vfo", "vfokey" },
+			{ "home_vfo_entry", "vfokey 4 4 6" },
+			{ "home_vfo_dmr", "vfokey quick 4 back" },
+			{ "quick_vfo_fm", "vfokey quick" },
+			{ "quick_vfo_split", "vfokey quick 5 1 4 6 1" },
+			{ "home_vfo_split_dmr", "vfokey quick 4 6 up ok back wait:5000" },
+			{ "home_vfo_tx", "vfokey quick 5 up ok back pttdown" },
+			{ "home_vfo_dmr_tx", "vfokey quick 4 6 up ok back pttdown" },
+			{ "quick_vfo_dmr", "vfokey quick 4" },
+			{ "quick_vfo_cc_editor", "vfokey quick 4 3 7" },
+			{ "home_copy_to_vfo", "down copykey" },
+			{ "home_monitor", "down mondown" },
+			{ "home_plain", "strip:off" },
+			{ "home_locked", "long:quick 5" },
+			{ "home_usb_ip", "usbnet:on" },
+			{ "home_usb_ip_up", "usbnet:up" },
+			{ "home_dual", "quick:dual ctx 3 5 ok wait:3000" },
+			{ "home_dual_heard", "quick:dual ctx 3 5 ok wait:3000 tune:b call:3101234,91,g tune:a call:3107777,3100,g wait:4000" },
+			{ "home_dual_busy", "quick:dual ctx 3 5 ok wait:3000 tune:b call:3101234,91,g busy:a" },
+			{ "home_dual_tx", "quick:dual ctx 3 5 ok wait:3000 pttdown" },
+			{ "home_dual_vfo", "quick:dual ctx 1 vfokey ctx 1 wait:3000" },
+			{ "home_dual_pill_row3", "quick:dual ctx 1 wait:3000" },
+			{ "home_dual_other_zone", "quick:dual ctx 1 zone+ ctx 1 wait:3000 tune:b fmrx" },
+			{ "home_dual_two_rx", "receivers:2 quick:dual ctx 3 5 ok wait:3000 rxa:3101234,3100,g rxb:3107777,91,g wait:1000" },
+			{ "home_dual_tx_b", "receivers:2 quick:dual ctx 3 5 ok wait:3000 ctx 1 wait:500 rxa:3101234,3100,g wait:1000 pttdown" },
+			{ "home_dual_talk_back", "ok 9 3 down down down down down down ok long:back quick:dual ctx 3 5 ok wait:3000 tune:b call:3101234,91,g wait:4000" },
+			{ "rx_group", "rx:3101234,91,g,K1ABC_Joe_-_Boston,_MA" },
+			{ "rx_private", "rx:3105678,0,p" },
+			{ "tx", "pttdown" },
+			{ "tx_private", "5 6 3 ok wait:5000 pttdown" },
+			{ "banner_message", "msg:3101234,Meet_at_the_north_lot_in_15_minutes._Bring_the_spare_battery." },
+			{ "banner_call_alert", "alert:3105678" },
+			{ "banner_radio_check", "call:3101234,91,g wait:11000 ctx 4 wait:1000" },
+			{ "banner_zone_offer", "zoneoffer:3101234" },
+			{ "quick_fm_squelch", "down quick:squelch up" },
+			{ "quick_cc_editor", "quick:color 7" },
+			{ "contacts_find", "ok 3 5 6" },
+			{ "contact_actions", "ok 3 5 6 ctx" },
+			{ "contact_edit", "3 1 0 9 8 7 6 down down ok" },
+			{ "contact_edit_save", "call:3101999,91,g wait:11000 ctx 7" },
+			{ "diagnostics", "ok 8 7" },
+			{ "about", "ok 9 0 ok" },
+			{ "freq_trim", "trim ok 9 0 up ok ctx 4 5 ok" },
+			{ "freq_trim_typing", "trim ok 9 0 up ok 1 2" },
+		};
+		const char *card_script = NULL;
+		if (!strcmp(g->name, "240x320i10x5"))
+			for (size_t j = 0; j < sizeof card_routes / sizeof card_routes[0]; j++)
+				if (!strcmp(name, card_routes[j].name)) {
+					card_script = card_routes[j].script;
+					break;
+				}
+		if (card_script)
+			snprintf(script, slen, "branded-home %s", card_script);
+		else if (!strcmp(g->name, "240x320i10x5") && !strncmp(name, "channel", strlen("channel")) &&
+			 !strncmp(gallery[i].script, "ok 5", strlen("ok 5")))
+			snprintf(script, slen, "branded-home ok 1 2%s", gallery[i].script + strlen("ok 5"));
+		else if (!strcmp(g->name, "240x320i10x5") && !strcmp(name, "tools"))
 			snprintf(script, slen, "branded-home ok 8");
 		else if (!strcmp(g->name, "240x320i10x5") && (!strcmp(name, "position") ||
 			 !strcmp(name, "gps_sky") || !strcmp(name, "gps_signal")))

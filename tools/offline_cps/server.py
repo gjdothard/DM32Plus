@@ -13,6 +13,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
+import sys
+
+# The packaged server carries the same parser as the source checkout.
+sys.path.insert(0, str(Path(__file__).resolve().parent if Path(__file__).with_name("release_version.py").is_file() else Path(__file__).resolve().parents[1]))
+import release_version
 
 APP = "radiofoundry-offline-cps"
 HEALTH = "/__offline_cps_health"
@@ -35,11 +40,11 @@ class LocalHTTPServer(http.server.ThreadingHTTPServer):
 	allow_reuse_address = False
 
 
-def make_handler(site, package_id):
+def make_handler(site, package_id, allowed_hosts=("localhost", "127.0.0.1"), build_api=None, build_origins=()):
 	products = []
 	for product in release_products():
 		prefix, board = re.escape(product["prefix"]), re.escape(product["board"])
-		pattern = re.compile(rf"/_{prefix}_release/(?:(RC)/)?({prefix}-{board}-(v\d{{2}}\.\d{{1,2}}(?:\.\d+)?(?:b\d+)?))\.(bin|json)")
+		pattern = re.compile(rf"/_{prefix}_release/(?:(RC)/)?({prefix}-{board}-(v[0-9A-Za-z.-]+))\.(bin|json)")
 		products.append((pattern, product))
 	class Handler(http.server.SimpleHTTPRequestHandler):
 		extensions_map = {
@@ -53,13 +58,15 @@ def make_handler(site, package_id):
 				host = urllib.parse.urlsplit("//" + self.headers.get("Host", "")).hostname
 			except ValueError:
 				host = None
-			if host not in ("localhost", "127.0.0.1"):
+			if host not in allowed_hosts:
 				self.send_error(403, "Local access only")
 				return
 			path = urllib.parse.urlsplit(self.path).path
 			asset, product = next(((match, product) for pattern, product in products
 				if (match := pattern.fullmatch(path))), (None, None))
-			if asset:
+			if path.startswith("/_firmware_build/v1/"):
+				self._build_request(path, head=head)
+			elif asset:
 				self._release_asset(asset, product, head)
 			elif path == HEALTH:
 				body = json.dumps({"app": APP, "package": package_id}).encode()
@@ -76,7 +83,11 @@ def make_handler(site, package_id):
 
 		def _release_asset(self, match, product, head):
 			candidate, base, version, extension = match.groups()
-			tag = ("RC-" if candidate else "") + product["prefix"] + "-" + version
+			key = release_version.parse(version)
+			if key is None or (candidate and key[0] != 0):
+				self.send_error(404, "Invalid release version")
+				return
+			tag = version if key[0] == 1 else ("RC-" if candidate else "") + product["prefix"] + "-" + version
 			url = f"https://github.com/{product['repository']}/releases/download/{tag}/{base}.{extension}"
 			request = urllib.request.Request(url, headers={"User-Agent": product["name"] + "-CPS"})
 			limit = 1024 * 1024 if extension == "bin" else 32 * 1024
@@ -100,6 +111,55 @@ def make_handler(site, package_id):
 
 		def do_HEAD(self):
 			self._request(head=True)
+
+		def do_POST(self):
+			try:
+				host = urllib.parse.urlsplit("//" + self.headers.get("Host", "")).hostname
+				origin = self.headers.get("Origin", "")
+				origins = set(build_origins) | {o for _, product in products for o in product.get("build_origins", [])}
+				local_origin = urllib.parse.urlsplit(origin)
+				same_origin = local_origin.netloc == self.headers.get("Host") and local_origin.scheme in ("http", "https")
+			except ValueError:
+				return self.send_error(403)
+			if host not in allowed_hosts or not origin or (origin not in origins and not same_origin):
+				return self.send_error(403)
+			self._build_request(urllib.parse.urlsplit(self.path).path, post=True)
+
+		def _build_request(self, path, post=False, head=False):
+			tail = path.removeprefix("/_firmware_build/v1/")
+			valid = tail == "builds" if post else bool(re.fullmatch(r"health|builds/[a-f0-9]{64}(?:/firmware\.(?:bin|json))?", tail))
+			if not path.startswith("/_firmware_build/v1/") or not valid:
+				return self.send_error(404)
+			if not build_api:
+				body, status = b'{"detail":"Custom firmware builds are unavailable on this server"}', 503
+			else:
+				try:
+					data = None
+					if post:
+						size = int(self.headers.get("Content-Length", "0"))
+						if not 0 < size <= 32768:
+							return self.send_error(413)
+						self.connection.settimeout(10)
+						data = self.rfile.read(size)
+					request = urllib.request.Request(build_api.rstrip("/") + "/" + tail, data=data,
+						headers={"Content-Type": "application/json"}, method="POST" if post else "GET")
+					try:
+						response = urllib.request.urlopen(request, timeout=15)
+						status = response.status
+					except urllib.error.HTTPError as error:
+						response, status = error, error.code
+					with response:
+						body = response.read(2 * 1024 * 1024 + 1)
+					if len(body) > 2 * 1024 * 1024:
+						raise ValueError("Build artifact exceeds the response limit")
+				except (OSError, ValueError):
+					body, status = b'{"detail":"Firmware build service is unavailable"}', 502
+			self.send_response(status)
+			self.send_header("Content-Type", "application/octet-stream" if tail.endswith(".bin") else "application/json")
+			self.send_header("Content-Length", str(len(body)))
+			self.end_headers()
+			if not head:
+				self.wfile.write(body)
 
 		def end_headers(self):
 			self.send_header("Cache-Control", "no-cache")

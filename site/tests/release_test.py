@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """The release the site's flasher installs, the beta it offers (site/rfoundrysite/build.py release_and_beta) and the
 footer's firmware line. Needs site/requirements.txt (tools/ci.sh runs it with the site build's Python).
 
@@ -28,7 +29,7 @@ class Release(unittest.TestCase):
 
 	def test_bad_beta_refused(self):
 		with self.assertRaises(repo.SourceError):
-			build.release_and_beta(["v26.11"], "v1.0.0")
+			build.release_and_beta(["v26.11"], "v1.0")
 
 	def test_footer_line(self):
 		with tempfile.TemporaryDirectory() as out:

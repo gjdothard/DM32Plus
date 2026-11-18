@@ -36,6 +36,7 @@ def package(site, runtime_zip, runtime_info, out):
 	root = Path(__file__).resolve().parent.parent
 	for name in ("server.py", "Start CPS.cmd", "README.md"):
 		shutil.copyfile(root / "tools" / "offline_cps" / name, out / name)
+	shutil.copyfile(root / "tools" / "release_version.py", out / "release_version.py")
 	products = []
 	for path in sorted((root / "boards").glob("*/product.json")):
 		products.append({**json.loads(path.read_text(encoding="utf-8")), "board": path.parent.name})

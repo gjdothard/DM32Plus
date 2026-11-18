@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Garrett Dothard
+services:
+  cps:
+    image: python:3.12-slim
+    restart: unless-stopped
+    user: "65534:65534"
+    read_only: true
+    command: ["python", "-B", "-u", "/app/serve.py"]
+    environment:
+      CPS_PUBLIC_HOST: "${CPS_PUBLIC_HOST:-}"
+    ports:
+      - "${CPS_BIND_ADDRESS:-127.0.0.1}:${CPS_PORT:-8082}:8080"
+    volumes:
+      - ./site:/app/site:ro
+      - ./serve.py:/app/serve.py:ro
+      - ./server.py:/app/server.py:ro
+      - ./release_version.py:/app/release_version.py:ro
+      - ./release-products.json:/app/release-products.json:ro
+    healthcheck:
+      test: ["CMD", "python", "-B", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8080/codeplug/', timeout=3).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

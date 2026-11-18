@@ -97,3 +97,23 @@ test("Testing selects only RC prereleases and checks the unchanged firmware mani
 	assert.equal(fw.source, `RC ${product.name} v26.11b1`);
 	assert.deepEqual(requested, [`../_${product.prefix}_release/RC/${name}.json`, `../_${product.prefix}_release/RC/${name}.bin`]);
 });
+
+const semantic = (version) => ({ ...published(version, version.includes("-")), tag_name: version });
+test("canonical semantic channels supersede calendar versions and stay separate", () => {
+ const releases = [published("v99.12", false), published("v99.12b9", true),
+  ...["v1.0.0-beta.2", "v1.0.0-beta.10", "v1.0.0-rc.2", "v1.0.0-rc.10", "v1.0.0"].map(semantic)];
+ assert.equal(newestRelease(releases, "stable").version, "v1.0.0");
+ assert.equal(newestRelease(releases, "development").version, "v1.0.0-beta.10");
+ assert.equal(newestRelease(releases, "testing").version, "v1.0.0-rc.10");
+ assert.equal(newestRelease([{ ...semantic("v1.0.0-rc.1"), prerelease: false }], "testing"), null);
+});
+test("canonical candidates use the canonical tag endpoint and verify the manifest", async () => {
+ const selected = newestRelease([semantic("v1.0.0-rc.1")], "testing"), requested = [];
+ const filename = `${product.prefix}-${BOARD}-${selected.version}`;
+ const candidateManifest = { ...manifest, version: selected.version, image: { ...manifest.image, file: filename + ".bin" } };
+ await loadBundledRelease(selected, "../", fb, async url => {
+  requested.push(url);
+  return new Response(url.endsWith(".json") ? JSON.stringify(candidateManifest) : bytes);
+ });
+ assert.deepEqual(requested, ["json", "bin"].map(ext => `../_${product.prefix}_release/${filename}.${ext}`));
+});

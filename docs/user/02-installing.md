@@ -1,9 +1,10 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Installing
 
 The recommended way to install RadioFoundry, update it, back up a radio and restore it is the **web installer** on the
-project's web site, [radiofoundry.org](https://radiofoundry.org/flash/index.html). It runs in a Chromium-based browser
+project's site or [portable CPS](../../tools/offline_cps/README.md), under **Firmware**. It runs in a Chromium-based browser
 (Chrome, Edge) and needs nothing installed. The files you load into it never leave your computer. Nothing here changes
 the radio's calibration.
 
@@ -34,7 +35,7 @@ backup. The web installer's own backup (below) holds it too.
 
 ## Install with the web installer
 
-Open the [web installer](https://radiofoundry.org/flash/index.html), choose **Install**, and follow the steps (a radio
+Open the project's installer from **Firmware**, choose the install action, and follow the steps (a radio
 that runs RadioFoundry already: [Updating RadioFoundry](#updating-radiofoundry)):
 
 1. **Radio.** Pick your radio.
@@ -348,3 +349,11 @@ Factory Update Mode"), and Restore uses it too.
 3. Write your codeplug backup with the manufacturer's CPS. The stock firmware can't read the codeplug RadioFoundry used.
 
 Your radio's section in the [Radio reference](23-radios.md) says which way applies.
+
+## Release versions
+
+Stable releases use names such as `v1.0.0`. Development builds use `v1.0.0-beta.1`; Testing candidates
+use `v1.0.0-rc.1`. Select Development or Testing explicitly in the CPS to install those builds.
+For the same base version, beta comes before rc and the final comes last. Counters compare numerically.
+A stable installation is offered final updates only. Older calendar releases remain supported for upgrading
+to the new version series.

@@ -513,8 +513,9 @@ uiFlowTestNoColor: uiFlowTest.c $(UIDEPS)
 uiFlowTestHistory: uiFlowTest.c $(UIDEPS)
 	$(CC) $(UIFLAGS) -DCONFIG_MESSAGE_JOURNAL=1 -o $@ uiFlowTest.c $(UIAPP) -lz
 
+# Include the synthetic conversation fixture in the documentation gallery.
 uiSim: uiSim.c $(UIDEPS)
-	$(CC) $(UIFLAGS) -o $@ uiSim.c $(UIAPP) -lz
+	$(CC) $(UIFLAGS) -DCONFIG_MESSAGE_JOURNAL=1 -o $@ uiSim.c $(UIAPP) -lz
 
 # The highlight colors the gallery shows its color pages in: the list in .github/workflows/ui-gallery.yml, so the
 # committed gallery and a pull request's before / after pictures show the same colors
@@ -1355,3 +1356,13 @@ run-webctlassets: httpAssetsTestWebctl
 	./httpAssetsTestWebctl out/http_webctl
 	python3 -I $(ROOT)/tools/gen_http_assets.py --check out/http_webctl $(WEBCTL_ASSETS)
 .PHONY: run-webctlassets
+
+.PHONY: run-releaseversion
+run: run-releaseversion
+run-releaseversion:
+	$(PYTHON) -B releaseVersionTest.py
+
+.PHONY: run-websiterelease
+run: run-websiterelease
+run-websiterelease:
+	$(PYTHON) -B websiteReleaseTest.py

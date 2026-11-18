@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Hotspot Mode
 
@@ -63,7 +64,7 @@ and the firmware version.
 The radio enters hotspot mode by itself when the host opens the port and sends its first MMDVM request. The screen
 changes to the hotspot screen.
 
-<img src="../ux/screens/160x120i5/hotspot.png" width="200" alt="The hotspot screen">
+<img src="../ux/screens/240x320i10x5/hotspot.png" width="200" alt="The hotspot screen">
 
 The hotspot screen shows:
 

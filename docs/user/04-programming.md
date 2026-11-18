@@ -4,7 +4,7 @@
 # Programming the Radio
 
 The codeplug holds the channels, zones, contacts, RX group lists, the DMR ID database and your DMR ID. Edit it with the
-**Codeplug Editor** on the project's web site, [radiofoundry.org](https://radiofoundry.org/codeplug/index.html). It runs
+**Codeplug Editor** in this project's site or [portable CPS](../../tools/offline_cps/README.md). It runs
 in a Chromium-based browser (Chrome, Edge, Opera), needs nothing installed, and works with every RadioFoundry radio,
 over USB or over the programming cable. qdmr, the free codeplug editor, is an alternative.
 
@@ -14,13 +14,15 @@ over USB or over the programming cable. qdmr, the free codeplug editor, is an al
 | [qdmr](https://github.com/hmatuschek/qdmr) | Windows, macOS, Linux | Your existing qdmr codeplugs, and scripting. Needs a radio qdmr's driver can reach ([qdmr](#programming-with-qdmr)) |
 | `tools/cps_client.py` and TFTP | A terminal | Raw backups and scripts ([Backups](#backups)) |
 
-All of them use the same codeplug format and the radio's own codeplug interface, so a codeplug written by one reads
-back in the others. How each radio is wired for this is in the [Radio reference](23-radios.md#programming).
+They share the base codeplug layout. Shared operating talkgroups and channel encryption assignments require
+compatible firmware and an editor that preserves those extensions. How each radio connects is in the
+[Radio reference](23-radios.md#programming).
 
 ## The Codeplug Editor
 
-Open **Codeplug Editor** in the site's menu. It reads and writes the radio from the browser. Nothing is sent to a
-server: files, the codeplug and your RadioID API key stay on your computer.
+Open **Codeplug Editor** in the site's menu. It reads and writes the radio from the browser. Codeplug editing
+and file conversion run locally. A RadioID API key is sent only to RadioID.net; optional error reports can
+include a codeplug only when you choose to attach it.
 
 On a fresh visit, choose **Read from Radio**, **Open File**, or **Create codeplug**. A saved working draft opens
 directly in the editor. The header's theme control applies to the workspace and its dialogs. Firmware installation
@@ -82,6 +84,7 @@ TFTP ([USB network](15-usb-network.md#programming-over-the-network)).
 | Tab | Holds |
 |---|---|
 | Radio | DMR ID, radio name (callsign), boot text, group and private call hang times |
+| Encryption | Persistent AES key slots and the radio default; needs a compatible connected radio. Key values are excluded from files and drafts |
 | Channels | Every channel. The pencil button opens the full form: FM, DMR, scan and power, location, single frequency repeater |
 | Zones | Zones and their channels |
 | Contacts | Talkgroups and private-call contacts |
@@ -93,6 +96,14 @@ TFTP ([USB network](15-usb-network.md#programming-over-the-network)).
 Choose **Add** to create a record in its editor. **Save** adds it to the codeplug; canceling leaves the codeplug
 unchanged. The pencil beside a record opens its editor again. A new channel and any talkgroups created with it
 can be undone together.
+
+For a DMR channel, the full form also holds **Operating talkgroups** and **Encryption**. Assign saved group contacts
+and order them for the channel knob. **Channels > Convert Operating Talkgroups** converts legacy assignments
+to shared saved contacts; review the counts and any conversion warning before writing. See
+[operating talkgroups](09-dmr.md#choosing-a-talk-target) and [privacy](09-dmr.md#privacy).
+
+Set the channel's key-slot assignment under **Advanced > Encryption**. Provision the key itself in the
+workspace's **Encryption** tab before using that slot.
 
 The channel table starts with the common fields. Open **Columns** to show additional fields; the browser remembers
 your choice. The channel name and edit controls stay visible while scrolling horizontally. Filtering includes
@@ -202,11 +213,12 @@ qdmr read back what they wrote, but RadioFoundry doesn't act on those parts.
 Changes made on the radio (a channel saved with hold **OK**, a permanent talk target) are written to the same
 codeplug, so the next read shows them.
 
-The codeplug can't set these yet:
+These settings are stored separately from the base codeplug:
 
-- Privacy keys ([DMR](09-dmr.md#privacy)).
+- Privacy key values. The CPS **Encryption** tab programs persistent AES slots directly on the connected radio;
+  channel slot assignments are saved in the codeplug ([DMR](09-dmr.md#privacy)).
 - RadioFoundry's own settings ([Settings](17-settings.md)): they are kept separately from the codeplug. The codeplug's
-  quick key assignments are ignored.
+  side-key assignments are the exception: they are shared with the codeplug.
 - Emergency, ARS and text message format.
 - SFR settings, in qdmr. The Codeplug Editor sets them on each channel.
 

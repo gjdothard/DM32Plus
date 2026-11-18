@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Garrett Dothard
+[Unit]
+Description=Deploy a verified website release
+[Service]
+Type=exec
+User=root
+ExecStart=/usr/bin/python3 -I /usr/local/lib/website-updater/privileged.py
+StandardInput=socket
+StandardOutput=journal
+StandardError=journal
+RuntimeMaxSec=300
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_FOWNER CAP_CHOWN

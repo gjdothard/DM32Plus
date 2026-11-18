@@ -72,6 +72,16 @@ class OfflineServerTest(unittest.TestCase):
 				self.assertEqual(upstream.call_args.args[0].full_url,
 					f"https://github.com/{product['repository']}/releases/download/{tag}/{filename}")
 
+	def test_semantic_release_assets_use_canonical_tags(self):
+		product = server_module.release_products()[0]
+		for version in ("v1.0.0", "v1.0.0-beta.10", "v1.0.0-rc.2"):
+			filename = f"{product['prefix']}-{product['board']}-{version}.json"
+			with patch.object(server_module.urllib.request, "urlopen", return_value=BytesIO(b"{}")) as upstream:
+				with self.opener.open(self.base + f"/_{product['prefix']}_release/" + filename) as response:
+					self.assertEqual(response.read(), b"{}")
+			self.assertEqual(upstream.call_args.args[0].full_url,
+				f"https://github.com/{product['repository']}/releases/download/{version}/{filename}")
+
 	def test_second_listener_cannot_take_existing_port(self):
 		with self.assertRaises(OSError):
 			server_module.LocalHTTPServer(("127.0.0.1", self.port), server_module.make_handler(Path(self.tmp.name), "test"))
@@ -82,7 +92,9 @@ class OfflineServerTest(unittest.TestCase):
 		with patch.object(server_module.urllib.request, "urlopen") as upstream:
 			for path in (f"/_{prefix}_release/{prefix}-other-v26.11.bin",
 				     f"/_{prefix}_release/{prefix}-{board}-v26.11.zip",
-				     f"/_{prefix}_release/RC/../../outside.bin"):
+				     f"/_{prefix}_release/RC/../../outside.bin",
+				     f"/_{prefix}_release/{prefix}-{board}-v1.0.0-beta.01.bin",
+				     f"/_{prefix}_release/RC/{prefix}-{board}-v1.0.0-rc.1.bin"):
 				with self.subTest(path=path), self.assertRaises(urllib.error.HTTPError) as error:
 					self.opener.open(self.base + path)
 				self.assertEqual(error.exception.code, 404)

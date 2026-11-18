@@ -17,6 +17,7 @@ import { convert as convertDb, readHeader as dbHeader } from "../codeplug/iddb.j
 import { convertIddb, iddbEnd } from "../codeplug/sources/output.js";
 import { convertOperatingTalkgroups } from "../codeplug/convert-talkgroups.js";
 import { FakeCpsRadio } from "../codeplug/fakecps.js";
+import product from "../product.js";
 import { Grid } from "./grid.js";
 import { History } from "./undo.js";
 import { DraftSaver, isUnusedDraft } from "./draft.js";
@@ -703,8 +704,10 @@ async function connect() {
 			// #sim-compact: firmware that reads a format C ID database; &release=vYY.M: a radio that runs that release;
 			// &git_time=N: a build of a commit from that time (Unix seconds)
 			const hash = location.hash;
-			S.fake = S.fake || new FakeCpsRadio({ board: "DM-1701", image: CodeplugImage.blank().bytes, foreign: hash === "#sim-foreign",
-				features: hash.startsWith("#sim-compact") ? "FM,DMR,IDDB_COMPACT" : "FM,DMR", release: hash.match(/[#&]release=([\w.]+)/)?.[1],
+			const radio = S.radios.find((r) => r.id === product.board) || S.radios[0];
+			S.fake = S.fake || new FakeCpsRadio({ board: radio.codeplug.names[0], base: radio.codeplug.base,
+				end: radio.codeplug.end, image: CodeplugImage.blank().bytes, foreign: hash === "#sim-foreign",
+				features: hash.startsWith("#sim-compact") ? "FM,DMR,IDDB_COMPACT" : "FM,DMR", release: hash.match(/[#&]release=([\w.-]+)/)?.[1],
 				gitTime: Number(hash.match(/[#&]git_time=(\d+)/)?.[1]) || 0 });
 			stream = S.fake.stream();
 		} else {

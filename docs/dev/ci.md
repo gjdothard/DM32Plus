@@ -23,7 +23,7 @@ so one set serves the self-hosted Gitea runner and GitHub.
 | `ci.yml` | `ubuntu-24.04` | every push to `main` that changes source (below); by hand on any branch | the unit tests (once, with coverage and sanitizers), Python and license checks, the product board's default and maximal builds |
 | `pr-tests.yml` | `ubuntu-24.04` | every pull request; a fork's after a maintainer approves the run | `ci.yml`'s jobs and the manual check, for the files the pull request changes; `PR checks` gates the merge. A branch's only CI |
 | `nightly.yml` | `ubuntu-24.04` | 07:17 UTC daily when a file the firmware builds read changed since the last pass; by hand | the product board's feature matrix, `reuse lint` |
-| `site.yml` | `ubuntu-24.04` | a published release; by hand | asks Cloudflare Pages to build `main` again, for the new release's images. Pages itself builds every push ([website.md](website.md)); pull requests also build the site in the unit tests job |
+| `website-release.yml` | `ubuntu-24.04` | called after a stable release publishes its firmware | builds the website with matching firmware, publishes its bundle and verifies deployment by the Docker host updater ([website.md](website.md#website-deployment-after-a-release)) |
 | `hil.yml` | `rfoundry-hil` (the bench Mac) | by hand; nightly only when `RFOUNDRY_HIL_SCHEDULE=true` | `tests/hil` against the radio and the SDR bench |
 | `ui-gallery.yml` | `ubuntu-24.04` | a pull request that changes the UI (`core/ui/`, the simulator, `uiSim`) | renders the screen gallery at the base and at the pull request, and makes the side-by-side artifact |
 | `ui-gallery-comment.yml` | `ubuntu-24.04` | when `ui-gallery.yml` finishes on a pull request | posts the pull request's gallery comment with the changed screens attached |
@@ -82,7 +82,7 @@ the network. A new submodule also goes in the Dockerfile's `SUBMODULE_URLS`.
 Every pull request runs `ci.yml`'s jobs (`unit tests` and the product `firmware (C-SKY)` job) and `checks` on its merge commit. The first job,
 `changes`, looks at the files the pull request changes and skips what they don't touch: source changes (`ci.yml`'s
 paths) run the build and test jobs. When a board's `board.toml` or `board.mk`, a `platform.toml` or the release
-tooling changes, the firmware jobs also run `tools/release_build.sh`: every stable board packaged as a release tag
+tooling changes, the firmware jobs also run `tools/release_build.sh`: the selected product board packaged as a release tag
 would ([release.md](release.md)). `checks` runs on every pull request: the Python and license checks (doc links
 among them) always, and the PDF manual build (as `manual.yml` does) when docs change (`manual.yml`'s paths). The last
 job, `PR checks`, always runs and fails when any job failed or was canceled. It is the one check the `main` ruleset

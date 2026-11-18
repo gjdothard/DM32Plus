@@ -122,7 +122,7 @@ proto=1                 protocol version (this document)
 view=4                  GET_VIEW record version (3.7)
 git=5277f73a            firmware git hash
 git_time=1761840000     the commit's time (a dirty build's: the build's), Unix seconds; absent without git
-release=v26.11          release name; only in a build of a release tag
+release=v1.0.0          release name; only in a build of a release tag
 board=XR-100UV
 features=FM,SUBTONE,DMR,DMR_PRIVACY,...,USB,HOSTLINK,DEBUGLINK
 codec=<profile>-s11  the codec profile found in flash (below)
@@ -850,3 +850,12 @@ it; a test that resets, waits a moment and then starts its traffic is not affect
 Add the number to `debuglink_proto.h`, a handler in `core/debuglink/debuglink.c` (short, non-blocking, reply at most
 1024 bytes), a row here, and a method in `tools/rfoundry_debug.py`. New view keys need only the renderer and the table
 in 3.7.
+
+## Release comparison
+
+The `release=` value accepts `vMAJOR.MINOR.PATCH`, `-beta.N` and `-rc.N` suffixes, and historical
+calendar names. Components compare numerically; beta precedes rc, which precedes the final.
+The semantic series follows all historical calendar versions. Stable installations receive final
+updates only. A prerelease installation can receive newer prereleases or finals. Developer builds
+without a release name compare commit times and receive finals only. Updates must match the board
+and full variant. See [release names](../dev/release.md#release-names).
