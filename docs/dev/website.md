@@ -405,17 +405,25 @@ An administrator runs `tools/website/install-updater.sh DEPLOYMENT PRODUCT_JSON`
 a separate system account named `website-updater`, with a locked password, a `nologin` shell, a private state
 directory and no supplementary groups. It installs a system service and timer. It does not enable user lingering.
 The account cannot access the Docker socket or write website deployment files, installed code, or configuration.
-It has one sudo permission: invoke `/usr/local/sbin/website-deploy` without arguments.
+It has no sudo permissions. It can connect only to `/run/website-updater/deploy.sock`, a local Unix socket
+owned by root and its dedicated group with mode 660. No network port is opened.
 
-The root-owned helper reads the bundle from standard input and independently verifies the latest stable version
+A socket-activated root service receives the bundle and independently verifies the latest stable version
 and GitHub asset digest. It rejects archive paths outside the site and explicit server files, links, device files,
 duplicate paths, writable permissions and excessive sizes. It uses a fixed root-owned Compose definition;
 a release cannot supply Docker options, host mounts, an image, a service name or a deployment path to the helper.
 The definition preserves the existing project's ports and public host setting, runs the Python image as an
 unprivileged user, drops all container capabilities and disables privilege escalation. Mounts are read-only.
-The updater can cause deployment of the official newer website release only.
+The updater can cause deployment of the official newer website release only. Both services keep
+`NoNewPrivileges=true`; the polling process never elevates its identity. The helper acknowledges completion
+over the socket only after deployment and the container health check finish. This avoids the incompatibility
+between sandbox-implied no-new-privileges and a setuid sudo helper.
 
-The host needs Python 3.11+, sudo, systemd, `tar`, `sha256sum`, `realpath`, `flock`, and Docker Compose with `--wait`.
+For an existing installation of the original sudo helper, an administrator runs
+`tools/website/upgrade-socket-helper.sh`. It retains backup files, installs the socket units, revokes the old
+sudo permission, and retries the current official bundle.
+
+The host needs Python 3.11+, systemd, `tar`, `sha256sum`, `realpath`, `flock`, and Docker Compose with `--wait`.
 Inspect the timer with `systemctl status website-release.timer` and logs with
 `journalctl -u website-release.service`. The existing proxy and operator Compose files are preserved.
 The root-owned definition is captured at installation; an administrator must review later port or proxy changes.
@@ -429,6 +437,7 @@ Rerun the failed workflow job to retry deployment of the same release.
 
 To roll back manually, stop `website-release.timer`, restore the site and server files from the chosen
 `release.previous.*` directory, and recreate the service with the appropriate operator or root-owned Compose file.
-To remove automation, disable and remove both system units, delete the helper's sudoers entry and installed code,
+To remove automation, stop the polling timer and service, stop the socket and any active `website-deploy@`
+instances, remove their system units and installed code,
 and remove the dedicated account after preserving any diagnostic files. Retain the running site's files and the
 root-owned Compose definition until the operator Compose mounts have been restored and verified.

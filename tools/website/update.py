@@ -6,8 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-import shutil
-import subprocess
+import socket
 import tempfile
 import urllib.error
 import urllib.request
@@ -32,6 +31,25 @@ def selected_asset(release, current=None):
 
 def request(url):
     return urllib.request.Request(url, headers={"User-Agent": "website-release-updater", "Accept": "application/vnd.github+json"})
+
+
+def send_bundle(archive, version, address="/run/website-updater/deploy.sock"):
+    """Send bytes to the fixed root service without changing this process's privileges."""
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+        connection.settimeout(240)
+        connection.connect(str(address))
+        connection.sendall((json.dumps({"version": version}) + "\n").encode())
+        with archive.open("rb") as source:
+            while chunk := source.read(1024 * 1024):
+                connection.sendall(chunk)
+        connection.shutdown(socket.SHUT_WR)
+        with connection.makefile("rb") as response:
+            line = response.readline(4097)
+        if len(line) > 4096 or not line.endswith(b"\n"):
+            raise ValueError("invalid deployment helper response")
+        result = json.loads(line)
+        if result.get("ok") is not True:
+            raise ValueError("deployment helper failed: " + str(result.get("error", "unknown error")))
 
 
 def update(root, config_file=None):
@@ -69,13 +87,7 @@ def update(root, config_file=None):
                     output.write(chunk)
             if checksum.hexdigest() != digest:
                 raise ValueError("website archive does not match GitHub's digest")
-            # The account cannot access Docker or write the deployment. Its only
-            # privileged operation sends a bundle to the fixed, root-owned helper.
-            with tempfile.TemporaryFile() as payload, archive.open("rb") as source:
-                payload.write((json.dumps({"version": version}) + "\n").encode())
-                shutil.copyfileobj(source, payload)
-                payload.seek(0)
-                subprocess.run(["sudo", "-n", "/usr/local/sbin/website-deploy"], stdin=payload, check=True)
+            send_bundle(archive, version)
             deployed = json.loads(marker.read_text(encoding="utf-8"))
             if deployed.get("version") != version:
                 raise ValueError("deployed website version differs from release")

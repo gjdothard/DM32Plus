@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import socket
 import subprocess
 import sys
 import tarfile
@@ -69,8 +70,21 @@ def deploy(stream, config, work):
                         str(archive), selected[2], version], env=env, check=True)
 
 
+def serve_connection(connection, config, work):
+    """Report completion only after the verified deployment and health check finish."""
+    connection.settimeout(240)
+    with connection.makefile("rb") as stream:
+        try:
+            deploy(stream, config, work)
+        except Exception as error:
+            connection.sendall((json.dumps({"ok": False, "error": str(error)[:1000]}) + "\n").encode())
+            raise
+        connection.sendall(b'{"ok":true}\n')
+
+
 if __name__ == "__main__":
     if os.geteuid() != 0 or len(sys.argv) != 1:
         raise SystemExit("the deployment helper requires root and accepts no arguments")
     config = json.loads(Path("/etc/website-updater/config.json").read_text())
-    deploy(sys.stdin.buffer, config, Path("/var/lib/website-deployer"))
+    with socket.socket(fileno=0) as connection:
+        serve_connection(connection, config, Path("/var/lib/website-deployer"))

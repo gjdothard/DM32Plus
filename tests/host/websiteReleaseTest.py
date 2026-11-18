@@ -9,10 +9,12 @@ import json
 import os
 from pathlib import Path
 import shutil
+import socket
 import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -113,6 +115,53 @@ class WebsiteReleaseTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "digest"):
                 privileged.deploy(BytesIO(header + b"tampered"), config, self.root)
             run.assert_not_called()
+
+    @unittest.skipUnless(os.name == "posix", "host socket transport runs on Linux")
+    def test_socket_transport_under_no_new_privileges(self):
+        self.bundle()
+        address = self.root / "deploy.sock"
+        received, failures = [], []
+
+        def check_payload(stream, config, work):
+            received.append((json.loads(stream.readline()), stream.read()))
+
+        def serve(listener):
+            try:
+                connection, _ = listener.accept()
+                with connection:
+                    privileged.serve_connection(connection, {}, self.root)
+            except Exception as error:
+                failures.append(error)
+
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as listener:
+            listener.bind(str(address))
+            listener.listen(1)
+            listener.settimeout(10)
+            with patch.object(privileged, "deploy", side_effect=check_payload):
+                thread = threading.Thread(target=serve, args=(listener,))
+                thread.start()
+                code = '''import ctypes, sys
+from pathlib import Path
+sys.path[:0] = [sys.argv[1], str(Path(sys.argv[1]).parent)]
+from update import send_bundle
+if ctypes.CDLL(None).prctl(38, 1, 0, 0, 0) != 0:
+    raise SystemExit("cannot set no-new-privileges")
+send_bundle(Path(sys.argv[2]), "v1.0.0", sys.argv[3])
+'''
+                result = subprocess.run([sys.executable, "-c", code, str(ROOT / "tools/website"), str(self.archive), str(address)], capture_output=True, timeout=15)
+                thread.join(timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr.decode())
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(failures, [])
+        self.assertEqual(received, [({"version": "v1.0.0"}, self.archive.read_bytes())])
+
+    @unittest.skipUnless(os.name == "posix", "host socket transport runs on Linux")
+    def test_socket_helper_reports_deployment_failure(self):
+        client, server = socket.socketpair()
+        with client, server, patch.object(privileged, "deploy", side_effect=ValueError("rejected bundle")):
+            with self.assertRaisesRegex(ValueError, "rejected bundle"):
+                privileged.serve_connection(server, {}, self.root)
+            self.assertEqual(json.loads(client.recv(4096)), {"ok": False, "error": "rejected bundle"})
 
     @unittest.skipUnless(os.name == "posix" and shutil.which("flock"), "deployment runs on Linux")
     def test_deploy_and_failed_health_check_restore_every_file(self):

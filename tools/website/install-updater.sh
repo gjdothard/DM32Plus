@@ -10,7 +10,7 @@ case ${root#/opt/} in ''|*[!A-Za-z0-9_-]*) echo "invalid deployment directory" >
 here=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
 test -s "$root/compose.yaml"
 test -d "$root/site"
-for path in /etc/website-updater /usr/local/lib/website-updater /usr/local/sbin/website-deploy /etc/sudoers.d/website-updater /etc/systemd/system/website-release.service /etc/systemd/system/website-release.timer /var/lib/website-deployer; do
+for path in /etc/website-updater /usr/local/lib/website-updater /usr/local/sbin/website-deploy /etc/sudoers.d/website-updater /etc/systemd/system/website-release.service /etc/systemd/system/website-release.timer /var/lib/website-deployer /etc/systemd/system/website-deploy.socket /etc/systemd/system/website-deploy@.service; do
     [ ! -e "$path" ] || { echo "refusing to overwrite existing path: $path" >&2; exit 1; }
 done
 # Refuse to silently reuse an account that may already have broader permissions.
@@ -57,27 +57,16 @@ base = pathlib.Path("/etc/website-updater")
     "_copyright":"Copyright (c) 2026 Garrett Dothard", "repository":repo, "deployment_root":str(root)}, indent=2)+"\n")
 ' "$root" "$2"
 chmod 644 /etc/website-updater/compose.yaml /etc/website-updater/config.json
-cat > /usr/local/sbin/website-deploy <<'EOF'
-#!/bin/sh
-# SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Garrett Dothard
-[ "$#" = 0 ] || exit 2
-exec /usr/bin/python3 -I /usr/local/lib/website-updater/privileged.py
-EOF
-chmod 755 /usr/local/sbin/website-deploy
-sudoers=$(mktemp)
-trap 'rm -f "$sudoers"' EXIT
-printf '%s\n' '# SPDX-License-Identifier: MIT' '# Copyright (c) 2026 Garrett Dothard' \
-    'website-updater ALL=(root) NOPASSWD: /usr/local/sbin/website-deploy ""' > "$sudoers"
-visudo -cf "$sudoers"
-install -m 440 "$sudoers" /etc/sudoers.d/website-updater
+install -m 644 "$here/website-deploy.socket" /etc/systemd/system/website-deploy.socket
+install -m 644 "$here/website-deploy@.service" /etc/systemd/system/website-deploy@.service
 cat > /etc/systemd/system/website-release.service <<'EOF'
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Garrett Dothard
 [Unit]
 Description=Fetch the latest stable website release
-After=network-online.target
+After=network-online.target website-deploy.socket
 Wants=network-online.target
+Requires=website-deploy.socket
 [Service]
 Type=oneshot
 User=website-updater
@@ -86,6 +75,7 @@ WorkingDirectory=/var/lib/website-updater
 ExecStart=/usr/bin/python3 /usr/local/lib/website-updater/update.py
 TimeoutStartSec=300
 UMask=0077
+NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
@@ -106,6 +96,7 @@ Persistent=true
 WantedBy=timers.target
 EOF
 systemctl daemon-reload
+systemctl enable --now website-deploy.socket
 systemctl enable --now website-release.timer
 systemctl start website-release.service
 systemctl status website-release.timer --no-pager
@@ -120,4 +111,10 @@ done
 if runuser -u website-updater -- test -r /var/run/docker.sock; then
     echo "updater unexpectedly has Docker socket access" >&2; exit 1
 fi
-sudo -l -U website-updater
+# A successful policy query can exit zero even when every command is denied.
+permissions=$(LC_ALL=C sudo -l -U website-updater 2>&1)
+printf '%s\n' "$permissions"
+case $permissions in
+*"is not allowed to run sudo"*) ;;
+*) echo "updater unexpectedly has sudo permissions" >&2; exit 1 ;;
+esac
