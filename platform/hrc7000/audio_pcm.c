@@ -7,7 +7,8 @@
 // With AUDIO_CONTROL b4 set the modem fills 80 mic samples at 0x18000000 every 10 ms and raises PCM_wr (PIC 28). The
 // mic interrupt paces everything: two halves make a 20 ms block, the task runs the block callback (never in the ISR)
 // and queues the speaker block it returned. While the speaker is routed (AUDIO_CONTROL b7, set by the board's hook)
-// the task pushes the queue to the prompt FIFO, 32 samples at a time while b31 says there is room, as stock does. The
+// a dedicated timer pushes the queue with CONFIG_AIR; otherwise the task polls the FIFO. Both push 32 samples when
+// b31 says there is room. The
 // CPU-fed speaker buffer (b5, 0x180000A0) sounded rough and choppy on the bench with every sample layout tried.
 //
 // Sample format: mic buffer 16-bit native words; prompt FIFO 16-bit samples, low byte first (bench).
@@ -54,12 +55,33 @@ static bool isr_registered;
 static volatile bool air_gated;
 static bool ring_want;
 static uint32_t spk_generation;
+#define PCM_REFILL_US	1000u
+#define PCM_SETTLE_US	200u	// defer across ticks after observing room; never spin in the interrupt
+#define PCM_PRIME_BLOCKS	2u
+_Static_assert(TIMER_PCM_REFILL != TIMER_TICK && TIMER_PCM_REFILL != TIMER_CLOCK
+	       && TIMER_PCM_REFILL != TIMER_PA && TIMER_PCM_REFILL != TIMER_AFSK
+	       && TIMER_PCM_REFILL != TIMER_BOARD, "PCM refill timer conflicts with another owner");
+static bool refill_active, refill_room_seen, spk_primed;
+static uint32_t refill_room_at;
+static bool spk_loud[SPK_BLOCKS];
+static volatile bool loud_recent;
+static volatile uint32_t loud_pushed;
+#define PCM_FIFO_PLAY_US	8000u	// two 32-sample halves at 8 kHz
+static void refill_update(void);
+
+static void refill_reset(void)
+{
+	refill_room_seen = false;
+	spk_primed = false;
+	loud_recent = false;
+}
 
 static void speaker_drop(void)
 {
 	spk_head = spk_tail = 0;
 	spk_pos = 0;
 	spk_generation++;
+	refill_reset();
 }
 
 static void ring_apply(void)
@@ -87,6 +109,7 @@ bool hrc_audio_pcm_air_gate(void)
 	air_gated = true;
 	speaker_drop();
 	ring_apply();
+	refill_update();
 	hrc_irq_restore(saved);
 	return true;
 }
@@ -98,6 +121,7 @@ void hrc_audio_pcm_air_release(void)
 		speaker_drop();
 		air_gated = false;
 		ring_apply();
+		refill_update();
 	}
 	hrc_irq_restore(saved);
 }
@@ -150,26 +174,52 @@ static void isr_pcm_wr(void)
 	}
 }
 
-// Push 32-sample chunks while the FIFO has room (AUDIO_CONTROL b31 clear). Task context: the task tops it up every
+// CONFIG_AIR uses a bounded timer refill so a codec callback cannot stall playback. Otherwise the task polls every
 // 2 ms while the speaker is routed, faster than a chunk (4 ms) plays
 static void fifo_feed(void)
 {
 #if CONFIG_AIR
-	for (;;) {
-		// A gate edge cannot land between checking ownership and pushing a chunk
-		uint32_t saved = hrc_irq_save();
-		if (!spk_routed || fifo_held || air_gated || spk_tail == spk_head
-		    || !hrc7000_prompt_push(modem, &spk_q[spk_tail][spk_pos])) {
+	// One bounded push per timer interrupt; no callback or RTOS work here
+	uint32_t saved = hrc_irq_save();
+	if (!refill_active || !spk_routed || fifo_held || air_gated || spk_tail == spk_head) {
+		refill_room_seen = false;
+		hrc_irq_restore(saved);
+		return;
+	}
+	if (!spk_primed) {
+		uint8_t queued = (uint8_t)((spk_head + SPK_BLOCKS - spk_tail) % SPK_BLOCKS);
+		if (queued < PCM_PRIME_BLOCKS) {
 			hrc_irq_restore(saved);
 			return;
 		}
+		spk_primed = true;
+	}
+	if ((hrc7000_rd(modem, C7_AUDIO_CONTROL) & C7_AUDIO_RING_FULL) != 0) {
+		refill_room_seen = false;
+		hrc_irq_restore(saved);
+		return;
+	}
+	uint32_t now = hrc_micros();
+	if (!refill_room_seen) {
+		refill_room_at = now;
+		refill_room_seen = true;
+		hrc_irq_restore(saved);
+		return;
+	}
+	if (now - refill_room_at >= PCM_SETTLE_US
+	    && hrc7000_prompt_push(modem, &spk_q[spk_tail][spk_pos])) {
+		if (spk_loud[spk_tail]) {
+			loud_pushed = now;
+			loud_recent = true;
+		}
+		refill_room_seen = false;
 		spk_pos = (uint8_t)(spk_pos + C7_PROMPT_CHUNK);
 		if (spk_pos >= AUDIO_BLOCK_SAMPLES) {
 			spk_pos = 0;
 			spk_tail = (uint8_t)((spk_tail + 1u) % SPK_BLOCKS);
 		}
-		hrc_irq_restore(saved);
 	}
+	hrc_irq_restore(saved);
 #else
 	if (!spk_routed || fifo_held) {
 		return;
@@ -184,10 +234,50 @@ static void fifo_feed(void)
 #endif
 }
 
+#if CONFIG_AIR
+static void isr_pcm_refill(void)
+{
+	hrc_timer_ack(TIMER_PCM_REFILL);
+	fifo_feed();
+}
+
+// Called with CPU interrupts masked when stream, route, gate or FIFO ownership changes
+static void refill_update(void)
+{
+	bool want = running && spk_routed && !fifo_held && !air_gated;
+	if (want && !refill_active) {
+		refill_room_seen = false;
+		refill_active = true;
+		hrc_timer_periodic(TIMER_PCM_REFILL, PCM_REFILL_US);
+		hrc_irq_enable(IRQ_TIMER6, true);
+	} else if (!want && refill_active) {
+		hrc_timer_stop(TIMER_PCM_REFILL);
+		hrc_irq_enable(IRQ_TIMER6, false);
+		refill_active = false;
+		refill_room_seen = false;
+	}
+}
+
+static bool speaker_pending(void)
+{
+	uint32_t saved = hrc_irq_save();
+	bool pending = false;
+	for (uint8_t i = spk_tail; i != spk_head; i = (uint8_t)((i + 1u) % SPK_BLOCKS))
+		pending |= spk_loud[i];
+	if (loud_recent && hrc_micros() - loud_pushed >= PCM_FIFO_PLAY_US)
+		loud_recent = false;
+	pending |= loud_recent;
+	hrc_irq_restore(saved);
+	return pending;
+}
+#endif
+
 static void audio_poll_once(void)
 {
 	static int16_t mic[AUDIO_BLOCK_SAMPLES];
+#if !CONFIG_AIR
 	fifo_feed();
+#endif
 	uint32_t s = hrc_irq_save();
 	int8_t idx = mic_ready;
 	if (idx >= 0) {
@@ -207,11 +297,15 @@ static void audio_poll_once(void)
 	// Separate callback storage survives a queue reset or route change during encode
 	static int16_t speaker[AUDIO_BLOCK_SAMPLES];
 	cb(mic, speaker, ctx);
+	bool loud = false;
+	for (uint16_t i = 0; i < AUDIO_BLOCK_SAMPLES && !loud; i++)
+		loud = speaker[i] != 0;
 	s = hrc_irq_save();
 	uint8_t next = (uint8_t)((spk_head + 1u) % SPK_BLOCKS);
 	if (running && block_cb == cb && block_ctx == ctx && generation == spk_generation
 	    && !air_gated && spk_routed && next != spk_tail) {
 		memcpy(spk_q[spk_head], speaker, sizeof speaker);
+		spk_loud[spk_head] = loud;
 		spk_head = next;
 	}
 	hrc_irq_restore(s);
@@ -226,14 +320,20 @@ static void audio_poll_once(void)
 	}
 #endif
 	blocks++;
+#if !CONFIG_AIR
 	fifo_feed();
+#endif
 }
 
 static void audio_task(void *arg)
 {
 	(void)arg;
 	for (;;) {
+#if CONFIG_AIR
+		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+#else
 		ulTaskNotifyTake(pdTRUE, spk_routed ? pdMS_TO_TICKS(2) : portMAX_DELAY);
+#endif
 		audio_poll_once();
 	}
 }
@@ -261,6 +361,8 @@ bool hrc_audio_pcm_hold(bool on)
 #endif
 	fifo_held = on;
 #if CONFIG_AIR
+	refill_room_seen = false;
+	refill_update();
 	hrc_irq_restore(saved);
 #endif
 	return true;
@@ -272,6 +374,9 @@ static void isr_register(void)
 	uint32_t s = hrc_irq_save();	// the stream (audio users' task) and the meter (radio task) can both get here first
 	if (!isr_registered) {
 		hrc_irq_register(IRQ_PCM_WR, isr_pcm_wr);
+#if CONFIG_AIR
+		hrc_irq_register(IRQ_TIMER6, isr_pcm_refill);
+#endif
 		isr_registered = true;
 	}
 	hrc_irq_restore(s);
@@ -296,12 +401,16 @@ static bool start(audio_block_cb_t cb, void *ctx)
 	spk_pos = 0;
 #if CONFIG_AIR
 	spk_generation++;
+	refill_reset();
 #endif
 	hrc_barrier();
 	running = true;
 	hrc7000_wr(modem, C7_INTERP_CLEAR, C7_INT_PCM_WR);
 	hrc_irq_enable(IRQ_PCM_WR, true);
 	hrc7000_audio_bits(modem, C7_AUDIO_PCM_MIC, 0);	// under the lock set at attach
+#if CONFIG_AIR
+	refill_update();
+#endif
 	hrc_irq_restore(saved);
 	return true;
 }
@@ -313,6 +422,7 @@ static void stop(void)
 	block_cb = NULL;
 #if CONFIG_AIR
 	speaker_drop();
+	refill_update();
 #endif
 #if CONFIG_VOX
 	bool keep = meter_on;
@@ -337,6 +447,7 @@ static void speaker_pcm(bool on)
 		// Route-on can be requested inside the callback producing its first block
 		if (!on)
 			spk_generation++;
+		refill_reset();
 #endif
 		spk_head = spk_tail = 0;
 		spk_pos = 0;
@@ -345,6 +456,9 @@ static void speaker_pcm(bool on)
 	if (speaker_pcm_cb != NULL) {
 		speaker_pcm_cb(on);
 	}
+#if CONFIG_AIR
+	refill_update();
+#endif
 	hrc_irq_restore(saved);
 }
 
@@ -352,6 +466,9 @@ const hal_audio_t hrc_audio_pcm = {
 	.start = start,
 	.stop = stop,
 	.speaker_pcm = speaker_pcm,
+#if CONFIG_AIR
+	.spk_pending = speaker_pending,
+#endif
 };
 
 void hrc_audio_pcm_stats(uint32_t *b, uint32_t *ov, uint32_t *un)

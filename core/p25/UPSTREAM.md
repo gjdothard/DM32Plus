@@ -26,8 +26,10 @@ files and the existing `LICENSES/ISC.txt` remains in the tree. Other imported
 files identify MIT. No proprietary codec, stock image, recording, dump or key
 is included.
 
-Imported implementation is unchanged apart from adding Garrett Dothard's
-copyright notice and normalizing line endings. The engine test's callback
+The initial implementation import changed only Garrett Dothard's
+copyright notice and line endings. Local `p25Voice.c` now honors the optional
+audio-provider tail-drain hook on natural call completion; its host test covers
+that change. The engine test's callback
 tables use designated initializers so the same test builds without warnings
 with trunking both enabled and disabled. Local host rules live
 in `tests/host/p25.mk`; they add an engine build with trunking enabled as well
@@ -52,7 +54,12 @@ audio-gate callbacks, centralizes ring-play requests, arbitrates APRS FIFO
 ownership, and rejects stale callback output using a generation check and
 separate scratch storage. Tests use the actual PCM/APRS worker and a modem
 lifecycle linked to the real gate. This adapts the existing PCM driver; it does
-not import upstream's timer-based FIFO refill or claim target qualification.
+not claim target qualification. Follow-on local scheduling reserves timer 6,
+primes two PCM blocks and bounds each refill interrupt to one chunk, with a
+nonblocking room-settling interval. This uses the pinned upstream's prompt-FIFO
+settling observation; it does not copy its busy-wait wrapper. The optional audio
+tail-drain hook prevents P25 and DMR natural completion from clipping queued
+speech. Simulated timing and drain tests do not establish hardware behavior.
 
 Future refreshes must compare against this exact revision, preserve the ISC
 notices, and rerun the foundation tests. Imported test results are evidence of

@@ -130,7 +130,8 @@ run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 	./imbeEncTest
 	./p25TrunkTest
 	./p25VoiceTest
+	./ambeVoiceTest
 	./fxpTest
 	./airSoftmodemTest
 
-run-p25: pcmGateTest pcmGateTestNoAir pcmGateTestVox pcmGateTestNoAirVox modemGluePcmTest
+run-p25: pcmGateTest pcmGateTestNoAir pcmGateTestVox pcmGateTestNoAirVox modemGluePcmTest ambeVoiceTest

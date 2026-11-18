@@ -17,6 +17,7 @@ static int failures, checks;
 
 // ── The board's PCM stream ──
 static bool running, spk_on;
+static bool tail_pending;
 static int starts, stops;
 static bool fake_start(audio_block_cb_t cb, void *ctx)
 {
@@ -28,7 +29,10 @@ static bool fake_start(audio_block_cb_t cb, void *ctx)
 }
 static void fake_stop(void) { running = false; stops++; }
 static void fake_speaker(bool on) { spk_on = on; }
-static const hal_audio_t audio = { .start = fake_start, .stop = fake_stop, .speaker_pcm = fake_speaker };
+static bool fake_pending(void) { return tail_pending; }
+static const hal_audio_t audio = {
+	.start = fake_start, .stop = fake_stop, .speaker_pcm = fake_speaker, .spk_pending = fake_pending
+};
 
 static p25_voice_mem_t vmem;
 static const p25_engine_hooks_t *hk;
@@ -120,6 +124,9 @@ static void testPlayback(void)
 		heard |= block();
 	CHECK(heard, "the late LDU did not play");
 	CHECK(spk_on, "route off before the queue ran dry");
+	tail_pending = true;
+	CHECK(!block() && spk_on, "provider tail was muted");
+	tail_pending = false;
 	CHECK(!block() && !spk_on, "the route stayed on after the call");
 	p25VoiceGetStats(&s);
 	CHECK(s.rx_frames == 18, "frames %u", (unsigned)s.rx_frames);

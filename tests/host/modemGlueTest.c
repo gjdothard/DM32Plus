@@ -46,6 +46,7 @@ uint32_t hrc_modem_irqs_mask(void) { uint32_t prior = modem_mask; modem_mask = 1
 void hrc_modem_irqs_restore(uint32_t saved) { modem_mask = saved; }
 void hrc_timer_stop(uint8_t n) { (void)n; }
 void hrc_timer_oneshot(uint8_t n, uint32_t us) { (void)n; (void)us; }
+void hrc_timer_periodic(uint8_t n, uint32_t us) { (void)n; (void)us; }
 BaseType_t xTaskCreate(void (*fn)(void *), const char *name, uint32_t stack, void *ctx,
 		      uint32_t priority, TaskHandle_t *handle)
 {

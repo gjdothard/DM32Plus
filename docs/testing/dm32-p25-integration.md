@@ -91,13 +91,17 @@ UI/CPS schema design can proceed while provider work is being tested.
 - [x] M2.4a (host): PCM gate/release, latest ring request, stale-block rejection,
   callback scratch storage, and exclusive APRS hold. Test P25/VOX on/off and
   link the actual PCM gate into the modem lifecycle test.
-- [ ] M2.4b: Qualify/refine FIFO refill across long codec callbacks and measure
-  target stack/RAM/image cost. Hardware-paced refill is not imported yet.
+- [x] M2.4b (host scheduling): Add timer-driven FIFO refill independent of codec
+  callbacks, bounded writes, deferred settling and two-block priming. Natural
+  P25/DMR completion waits for queued non-silent speaker audio to drain.
+- [ ] M2.4b (target qualification): Measure FIFO behavior, sustained codec
+  throughput, stack/RAM and image cost. The simulated FIFO model is not measured
+  hardware behavior.
 - [ ] M2.5: Run simulated modem/provider tests and obtain a reproducible C-SKY
   firmware build with measured RAM, stack and image size. Build affected
   switches off before marking M2 complete.
 
-Next task: M2.4b/M2.5, refill scheduling and a reproducible target build. Do not
+Next task: M2.4b/M2.5, a reproducible target build and resource checks. Do not
 advertise P25 in VERSION, the UI or CPS until the matching integration gates pass.
 
 ## Required test cases to carry through later stages
@@ -129,6 +133,9 @@ advertise P25 in VERSION, the UI or CPS until the matching integration gates pas
 | Combined run after M2.3b | `run-p25`: 17 executable configurations and 6 Python build/attribution tests passed, including the optimized handoff tests. Documentation: 155 files, zero broken links; generic-code check passed. | Target builds, full CI, board/audio attachment and hardware qualification are still pending. |
 | M2.3c/M2.4a | PCM/APRS tests: 50/16/50/16 checks for P25/VOX on/off. Modem lifecycle linked to the real PCM gate: 96 checks. Changed board/radio files compile with P25 on/off and DMR off. | Simulated CPU/IRQ/RTOS services; native compiler checks are not a C-SKY image or hardware qualification. |
 | Combined run after PCM attachment | `run-p25`: 22 executable configurations and 7 Python build/attribution tests passed with warnings as errors. Documentation: 155 files, zero broken links; generic-code check passed. | Hardware-paced refill, target resource checks, full CI and radio/CPS channel integration remain pending. |
+| M2.4b host refill/drain | PCM/APRS: 246/17/246/17 checks for P25/VOX on/off; includes clock wrap, a 30 ms callback, bounded IRQ writes, ownership and silent-tail completion. P25 voice: 66 checks; DMR voice: 107 checks. | Timer 6 and two-half FIFO behavior require target validation; priming adds one block of startup buffering. |
+| Combined run after refill | `run-p25`: 23 executable configurations and 7 Python build/attribution tests passed with optimized warnings-as-errors builds. | No C-SKY target build, complete host suite, full CI or hardware qualification. |
+| Existing audio/radio regressions | Radio core/features/receive bands/roaming/USRP: 2181/892/262/216/121 checks passed. Board/radio attachment compiles with P25 on/off and DMR off. Documentation: 155 files, zero broken links; generic-code check passed. | Host compiler with fake CPU services; not target resource or hardware evidence. |
 | Scope update | Owner requested retaining TX and honoring existing CPS RX-only; permission matrix above replaces the earlier passive-only product scope. | Hardware TX still requires its own authorized test session and --allow-rf. |
 
 Local ignored test output is in `build/p25-host`. Python works outside the

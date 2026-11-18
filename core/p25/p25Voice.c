@@ -184,6 +184,10 @@ static void rx_block(int16_t *spk)
 	}
 	if (queued == 0) {
 		if (ended) {
+			if (aud != NULL && aud->spk_pending != NULL && aud->spk_pending()) {
+				silence(spk);
+				return;	// the provider still holds the call's tail
+			}
 			cb_live = cb_playing = false;
 			speaker(false);
 			silence(spk);

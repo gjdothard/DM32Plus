@@ -84,6 +84,21 @@ board route releases the hold. Neither owner steals the other's path.
 
 `pcmGateTest` runs the actual PCM worker and APRS TX-start path on simulated
 hardware, with air and VOX independently on/off. `modemGluePcmTest` links the
-actual modem lifecycle to the real PCM gate/release callbacks. Physical FIFO
-timing, long codec-callback refill scheduling and target budgets remain separate
-qualification work; software queue tests do not establish those properties.
+actual modem lifecycle to the real PCM gate/release callbacks.
+
+With `CONFIG_AIR`, a dedicated 1 ms timer refills the speaker FIFO independently
+of codec callbacks. It primes two 20 ms blocks, then pushes at most one 32-sample
+chunk per interrupt. After observing room, it defers at least 200 us before
+pushing; it never spins or invokes a codec in the interrupt. Stream stop, air
+gating and APRS ownership disable refill. The feature-off path retains task polling.
+
+The optional `hal_audio_t.spk_pending` reports queued non-silent audio and an
+8 ms allowance after its last FIFO push. Natural P25 and DMR call completion
+keeps speaker routing until this tail drains. Silence does not keep a call open;
+forced stop or gating discards the queue immediately. Providers without this
+hook retain immediate completion. Priming adds one block of startup buffering.
+
+The FIFO simulation checks a 30 ms callback, bounded writes, clock wrap, tail
+drain and ownership changes. Its two-half FIFO model is not a measurement.
+Physical timing, sustained codec throughput and target budgets remain
+qualification work.

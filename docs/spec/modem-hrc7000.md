@@ -896,5 +896,8 @@ and deferred work by ownership and protects the queue overlays during handoff.
 `modemGlueTest` checks these paths and the return to DMR, with air and split
 support on/off. See the [ownership contract](air-interface.md) for admission,
 audio-gate callbacks, completion ordering and stale PA-timer handling.
-Board callbacks, audio coexistence and target timing are not integrated or
-qualified yet; do not infer on-radio operation from these host checks.
+Board callbacks and PCM/APRS ownership are connected and host tested. Air-mode
+PCM refill uses a dedicated timer; natural voice completion waits for queued
+audio to drain. See the ownership contract for timing and buffering details.
+Target timing and memory fit remain unqualified; do not infer on-radio operation
+from these host checks.

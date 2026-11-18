@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // The PCM stream shared with a host audio session (core/usbaudio/audio_mux.c) and USRP on the radio's network address
 // (core/usbaudio/usrp_net.c), against a fake board stream, IP gateway and radio core (docs/spec/usb-audio.md)
@@ -32,7 +33,7 @@ static struct {
 static bool a_start(audio_block_cb_t cb, void *ctx) { (void)ctx; hw.starts++; if (hw.fail) { return false; } hw.cb = cb; hw.streaming = true; return true; }
 static void a_stop(void) { hw.stops++; hw.streaming = false; hw.cb = NULL; }
 static void a_pcm(bool on) { (void)on; }
-static const hal_audio_t fake_audio = { a_start, a_stop, a_pcm };
+static const hal_audio_t fake_audio = { .start = a_start, .stop = a_stop, .speaker_pcm = a_pcm };
 
 static int16_t mic[AUDIO_BLOCK_SAMPLES], spk[AUDIO_BLOCK_SAMPLES];
 

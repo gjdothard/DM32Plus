@@ -223,7 +223,8 @@ CONTROLREG: bit 0 enable, bit 1 user-defined (periodic reload) mode, bit 2 inter
 | 2 (0x14000014) | 34 | 1 kHz system tick |
 | 3 (0x14000028) | 35 | DMR PA one-shot (`TIMER_PA`) |
 | 4 (0x1400003C) | 36 | APRS AFSK: tops up the prompt FIFO (`TIMER_AFSK`) |
-| 5, 6 | 37, 38 | unused |
+| 5 (0x14000050) | 37 | Board-owned one-shot (`TIMER_BOARD`) |
+| 6 (0x14000064) | 38 | PCM FIFO refill with `CONFIG_AIR` (`TIMER_PCM_REFILL`), 1 ms |
 
 ### 3.5 Watchdog (0x14010000)
 
@@ -888,6 +889,13 @@ to the shared HR_C7000 providers. The board's `dmr_board` supplies
 APRS and air TX refuse conflicting prompt-FIFO ownership. These paths are host
 tested; target FIFO timing, stack/RAM fit and on-radio operation remain
 unqualified. P25 remains default-off and is not yet a working channel mode.
+
+Timer 6 refills PCM independently of codec callbacks with `CONFIG_AIR`.
+It primes two blocks and bounds each interrupt to one FIFO chunk. The
+[air-interface specification](air-interface.md) describes deferred settling
+and speaker-tail draining. Timer 3 remains the PA owner, Timer 4 remains APRS,
+and Timer 5 remains board-owned. These assignments and the two-half FIFO model
+need target validation before enabling P25 in a release.
 
 | Element | Detail |
 |---|---|
