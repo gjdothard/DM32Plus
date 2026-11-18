@@ -42,5 +42,24 @@ by the owner, with lifetimes covering outstanding callbacks and queued events.
 retuning and release through the real session. `hrc7000AirTest` checks simulated
 register/buffer behavior: receive-copy order, overrun, transmit half selection,
 underrun, abort, suspend/resume, close/reopen and DMR reuse of shared memory.
-The imported provider remains without a platform owner; these tests establish
-host behavior, not target timing or radio interoperability.
+The platform now exports `hrc_air` and `hrc_baseband` through the modem glue.
+`modemGlueTest` executes the real glue and drivers with simulated IRQ/RTOS
+services, including a deferred poll at the first scheduler resume. Air and
+split-hotspot support are tested independently on and off.
+
+Acquisition requires active DMR hardware with its stack stopped, no DMR TX,
+and no FM receive-copy hook. The scheduler and modem interrupts remain held
+while the old queues become the new state. Aligned storage and size assertions
+cover both overlays. While leased, every DMR queue/BS operation refuses work;
+the deferred task never drains that memory as DMR events.
+
+An air TX fit requires both `air_tx_gate` and `air_tx_release` board hooks.
+The gate must isolate speaker PCM/beeps from the modulator. It stays acquired
+until deferred TX completion; another transmission cannot start while an old
+completion is pending. Forced close releases it after RF stops and discards
+callbacks. A late PA-timer interrupt only keys if TX is still active. These
+hooks do not replace channel/system permission.
+
+Task-side provider wrappers use `.flashfunc`; the linker keeps them out of
+interrupt RAM. Board provider pointers and audio-gate callbacks are not wired
+yet. Host results do not establish target timing or radio interoperability.

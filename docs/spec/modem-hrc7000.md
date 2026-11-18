@@ -891,6 +891,10 @@ to it until closed. The provider does not replace channel TX admission.
 
 `hrc7000AirTest` passes simulated register/buffer, overrun, underrun, abort,
 close/reopen and shared-memory reuse checks against the existing DMR driver.
-The disabled provider also compiles. Platform ownership, interrupt routing,
-audio coexistence and target timing are not integrated or qualified yet; do
-not infer on-radio operation from these host checks.
+The disabled provider also compiles. The platform now routes modem interrupts
+and deferred work by ownership and protects the queue overlays during handoff.
+`modemGlueTest` checks these paths and the return to DMR, with air and split
+support on/off. See the [ownership contract](air-interface.md) for admission,
+audio-gate callbacks, completion ordering and stale PA-timer handling.
+Board callbacks, audio coexistence and target timing are not integrated or
+qualified yet; do not infer on-radio operation from these host checks.

@@ -81,14 +81,17 @@ UI/CPS schema design can proceed while provider work is being tested.
   release cleanly on failed open, stop, retune and mode change.
 - [x] M2.3a: Import the provider and its simulated register tests from the pinned
   upstream. Keep the current DMR driver; the provider passes against it.
-- [ ] M2.3b: Wire platform ownership, interrupts, deferred work and board callbacks.
+- [x] M2.3b (host): Wire platform ownership, interrupts and deferred work. Protect
+  shared queues against DMR/BS calls and scheduler preemption; serialize audio
+  gate release with TX completion; reject stale PA-timer keying after close.
+- [ ] M2.3c: Attach board provider pointers and audio-gate callbacks with M2.4.
 - [ ] M2.4: Port audio scheduling and memory/stack changes required by that
   provider. Preserve FM/DMR/APRS operation and the private AMBE slot.
 - [ ] M2.5: Run simulated modem/provider tests and obtain a reproducible C-SKY
   firmware build with measured RAM, stack and image size. Build affected
   switches off before marking M2 complete.
 
-Next task: M2.3b, the platform/board ownership integration. Do not
+Next task: M2.4/M2.3c, PCM scheduling/isolation and board attachment. Do not
 advertise P25 in VERSION, the UI or CPS until the matching integration gates pass.
 
 ## Required test cases to carry through later stages
@@ -114,8 +117,10 @@ advertise P25 in VERSION, the UI or CPS until the matching integration gates pas
 | M1 documentation | 153 Markdown files, zero broken links; generic-code check passed. | Full CI and target build not run. |
 | M2.1, `71f2367a` | `boardAirTest`: 20 checks passed; existing `boardBandTest` passed, warnings as errors. | Simulated provider; no board driver enabled or hardware touched. |
 | M2.2 | Actual Make selection plus C compile/link matrix for default-off, P25-only, P25+trunking and explicit-off; invalid dependencies and overrides rejected; conditional license attribution and idempotence checked. | Host compile/link, not a target image. |
-| M2.3a | `hrc7000AirTest`: 13,306 simulated checks passed with the current DMR driver. Provider-off object build checked by `p25BuildTest.py`. | Platform does not yet route ownership, callbacks or interrupts to this provider. |
+| M2.3a, `a8de90c0` | `hrc7000AirTest`: 13,306 simulated checks passed with the current DMR driver. Provider-off object build checked by `p25BuildTest.py`. | Initial driver import; subsequent platform ownership is covered by M2.3b. |
+| M2.3b | Real glue/driver lifecycle tests with air and split support independently on/off: 94, 11, 100 and 11 checks passed. Optimized builds checked. Existing DMR, split-DMR and BS-driver regressions passed. DMR-disabled glue compiles in the build matrix. | Simulated IRQ/RTOS services; audio-gate callbacks are fakes. Board attachment, target memory/timing and hardware behavior remain pending. |
 | Combined host Make run | `run-p25`: 13 executable configurations and 5 Python build/attribution tests passed with warnings as errors. Documentation: 155 files, zero broken links; generic-code check passed. | No C-SKY target build, sanitizer run, complete host suite or hardware session yet. |
+| Combined run after M2.3b | `run-p25`: 17 executable configurations and 6 Python build/attribution tests passed, including the optimized handoff tests. Documentation: 155 files, zero broken links; generic-code check passed. | Target builds, full CI, board/audio attachment and hardware qualification are still pending. |
 | Scope update | Owner requested retaining TX and honoring existing CPS RX-only; permission matrix above replaces the earlier passive-only product scope. | Hardware TX still requires its own authorized test session and --allow-rf. |
 
 Local ignored test output is in `build/p25-host`. Python works outside the

@@ -93,6 +93,16 @@ class P25BuildTest(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIn(f"CONFIG_{name} is derived", self.probe(f"CONFIG_{name}=y", fails=True))
 
+    def test_modem_glue_compiles_without_dmr(self):
+        data = self.probe("CONFIG_DMR=n", "CONFIG_P25=n", "CONFIG_P25_TRUNK=n")
+        result = subprocess.run(
+            shlex.split(OPTIONS.cc) + ["-std=gnu99", "-Wall", "-Wextra", "-Wshadow", "-Werror",
+                                      "-Icore", "-Ihal", "-Idrivers", "-c"]
+            + shlex.split(data["DEFS"]) + [str(ROOT / "platform/hrc7000/dmr_glue.c"),
+                                           "-o", str(self.work / "glue.o")],
+            cwd=ROOT, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_optional_about_notice_and_idempotence(self):
         output = self.work / "about.h"
         command = [sys.executable, str(ROOT / "tools/gen_about.py"), str(ROOT / "AUTHORS"),

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // HR_C7000 (Dahua DH4570) SoC with a C-SKY CK803S core: register map and platform services for boards built on it
 // (docs/spec/hardware-dm32.md 1-4). The modem / baseband registers are the driver's (drivers/modem/hrc7000).
 #ifndef PLATFORM_HRC7000_H
@@ -10,6 +11,9 @@
 #include "hal_system.h"
 #include "hal_flash.h"
 #include "hal_input.h"
+
+// Task-side functions in a translation unit whose interrupt handlers live in RAM
+#define HRC_FLASHFUNC __attribute__((section(".flashfunc"), noinline))
 
 #define REG32(a)		(*(volatile uint32_t *)(uintptr_t)(a))
 

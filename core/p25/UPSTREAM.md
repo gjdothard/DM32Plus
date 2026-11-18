@@ -18,7 +18,7 @@ The import includes:
   `p25VoiceTest.c`, `fxpTest.c`, and `airSoftmodemTest.c`.
 - The follow-on provider import adds `drivers/modem/hrc7000/hrc7000_air.c`,
   its header, and `tests/host/hrc7000AirTest.c` from the same pinned revision.
-  The existing DMR driver is retained. Platform ownership/routing is pending.
+  The existing DMR driver is retained.
 
 Original notices are retained. `imbe_dec.c` and `imbe_tab.c` carry ISC notices
 for mbelib's dequantizer and tables; the original notice text stays in those
@@ -35,6 +35,17 @@ as the conventional build. Later local integration adds default-off protocol
 switches and conditional firmware source selection in `config/p25.mk`, optional
 board provider fields, and conditional IMBE About-page attribution. None of
 these changes connects a working radio channel or enables hardware access.
+
+The platform ownership wrappers in `platform/hrc7000/dmr_glue.c` are adapted
+from the same upstream revision. Local changes suspend the scheduler during
+queue handoff, refuse a lease while a DMR callback is attached, preserve the
+existing DMR/BS logic, require explicit audio-gate callbacks for air TX, and
+serialize gate release with deferred completion. The DMR byte queue is now
+pointer-aligned with `_Alignas`; compile-time assertions check the reused
+storage. The PA timer checks current TX activity before keying. Task wrappers
+use the upstream `.flashfunc` mechanism in the linker. These adaptations are
+covered by `modemGlueTest`; board/audio attachment and target qualification
+remain pending.
 
 Future refreshes must compare against this exact revision, preserve the ISC
 notices, and rerun the foundation tests. Imported test results are evidence of

@@ -14,9 +14,27 @@ P25_HEADERS := $(wildcard $(CORE)/p25/*.h $(CORE)/air/*.h $(CORE)/fec/*.h $(CORE
 	$(CORE)/dsp/fxp.h $(ROOT)/hal/hal_air.h $(ROOT)/hal/hal_baseband.h
 
 TESTS += fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest imbeEncTest \
-	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest boardAirTest hrc7000AirTest
+	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest boardAirTest hrc7000AirTest \
+	modemGlueTest modemGlueTestNoAir modemGlueTestSplit modemGlueTestNoAirSplit
 
 P25_HRC7 := $(ROOT)/drivers/modem/hrc7000
+P25_GLUE := modemGlueTest.c $(P25_HRC7)/hrc7000_air.c $(P25_HRC7)/hrc7000_dmr.c \
+	$(P25_HRC7)/hrc7000_bs.c $(P25_HRC7)/hrc7000.c $(CORE)/dmr/fec/dmrFec.c $(CORE)/air/air_softmodem.c
+P25_GLUE_DEPS := $(ROOT)/platform/hrc7000/dmr_glue.c $(wildcard $(ROOT)/platform/hrc7000/*.h) \
+	$(wildcard $(P25_HRC7)/*.h stubs/modem_rtos/*.h) $(P25_HEADERS)
+P25_GLUE_FLAGS := -I$(ROOT)/platform/hrc7000 -Istubs/modem_rtos
+
+modemGlueTest: $(P25_GLUE) $(P25_GLUE_DEPS)
+	$(CC) $(CFLAGS) $(P25_FLAGS) $(P25_GLUE_FLAGS) -DCONFIG_HOTSPOT_SPLIT=0 -o $@ $(P25_GLUE) -lm
+modemGlueTestSplit: $(P25_GLUE) $(P25_GLUE_DEPS)
+	$(CC) $(CFLAGS) $(P25_FLAGS) $(P25_GLUE_FLAGS) -DCONFIG_HOTSPOT_SPLIT=1 -o $@ $(P25_GLUE) -lm
+modemGlueTestNoAir: $(P25_GLUE) $(P25_GLUE_DEPS)
+	$(CC) $(CFLAGS) $(P25_FLAGS) $(P25_GLUE_FLAGS) -UCONFIG_P25 -DCONFIG_P25=0 \
+		-UCONFIG_IMBE -DCONFIG_IMBE=0 -DCONFIG_HOTSPOT_SPLIT=0 -o $@ $(P25_GLUE) -lm
+modemGlueTestNoAirSplit: $(P25_GLUE) $(P25_GLUE_DEPS)
+	$(CC) $(CFLAGS) $(P25_FLAGS) $(P25_GLUE_FLAGS) -UCONFIG_P25 -DCONFIG_P25=0 \
+		-UCONFIG_IMBE -DCONFIG_IMBE=0 -DCONFIG_HOTSPOT_SPLIT=1 -o $@ $(P25_GLUE) -lm
+
 hrc7000AirTest: hrc7000AirTest.c fuzz.h $(P25_HRC7)/hrc7000_air.c $(P25_HRC7)/hrc7000_air.h \
 	$(P25_HRC7)/hrc7000_dmr.c $(P25_HRC7)/hrc7000.c $(CORE)/dmr/fec/dmrFec.c $(P25_HEADERS) \
 	$(wildcard $(P25_HRC7)/*.h)
@@ -70,7 +88,12 @@ run-p25: run-p25-build
 run-p25-build:
 	$(PYTHON) -B p25BuildTest.py --make "$(MAKE)" --cc "$(CC)"
 run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest imbeEncTest \
-	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest boardAirTest hrc7000AirTest
+	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest boardAirTest hrc7000AirTest \
+	modemGlueTest modemGlueTestNoAir modemGlueTestSplit modemGlueTestNoAirSplit
+	./modemGlueTest
+	./modemGlueTestNoAir
+	./modemGlueTestSplit
+	./modemGlueTestNoAirSplit
 	./hrc7000AirTest
 	./boardAirTest
 	./fecTest
