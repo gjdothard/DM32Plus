@@ -8,7 +8,8 @@ Status: the parameter codecs and shared vectors are imported from RadioFoundry
 `c34dc440aaf2d3952458bc0bd85b8c56c76f6b23`. The keyed store, channel tags,
 system readers and P25 settings loaders are available through an explicit
 configuration API. Stored conventional P25 now uses radio channel/PTT dispatch.
-Trunked dispatch and mode-aware UI/CPS editing remain pending.
+[Trunked dispatch](p25-trunking.md) is connected behind its feature switch.
+Mode-aware UI/CPS editing remains pending.
 
 ## Reuse boundary
 
@@ -26,7 +27,7 @@ The upstream integration uses these shared layers:
 | `codeplug_tag` | Bind a channel kind and its parameters to a legacy channel | Imported; explicit configuration adapter tested |
 | `codeplug_records` | Radio-wide records, systems, sites, control channels and identifier plans | Imported; exercised by stored P25 tests |
 | `p25_codeplug` loaders | Resolve identity, targets, channel parameters and a trunked system | Restored; simulated-flash tests pass |
-| `radio_p25` | Start/stop engines and request permitted TX | Conventional channel/PTT connected; trunked owner pending |
+| `radio_p25` | Start/stop engines and request permitted TX | Conventional and trunked channel/PTT connected; hardware qualification pending |
 
 The tagged design stores a receive-only DMR stand-in in the legacy channel
 record. The tag supplies the logical P25 kind and its TX permission. Older
@@ -40,7 +41,8 @@ safe base record. Its current legacy-only decoder is not sufficient.
 permission in an unaware radio reader would let its DMR path treat a tagged
 channel as transmitting DMR. The radio uses `codeplug_radio_channel` and
 recognizes tagged kinds before mode dispatch. The registry enables conventional
-P25 with its build switch; other tagged channel kinds remain unrunnable.
+P25 with its build switch and trunked P25 with `CONFIG_P25_TRUNK`; other tagged
+channel kinds remain unrunnable.
 See [tagged channel records](channel-modes.md) for the shared format.
 
 ## Parameter blocks

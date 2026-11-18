@@ -25,6 +25,7 @@ TESTS += codeplugTagTest
 TESTS += p25AdmissionTest p25AdmissionTestTrunk
 TESTS += radioP25OwnerTest radioP25OwnerTestTrunk
 TESTS += radioP25StateTest
+TESTS += radioP25TrunkStateTest
 TESTS += radioP25OffTest codeplugTagTestNoP25
 
 P25_STORE_CORE := $(CORE)/codeplug/codeplug.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c \
@@ -51,11 +52,15 @@ radioP25StateTest: $(P25_STATE) radioP25OwnerTest.c $(P25_HEADERS) $(P25_STORE_H
 	$(CC) $(CFLAGS) $(P25_FLAGS) -I. -DCONFIG_AM_RX=0 -DCONFIG_BCAST_FM=0 -DCONFIG_DMR_IP_GATEWAY=0 \
 		-DCONFIG_HOTSPOT=0 -DCONFIG_APRS=0 -DCONFIG_NET_USRP=0 -DCONFIG_BEEP=0 -DCONFIG_SFR=0 -DDMR_RX_TRACE=0 \
 		-o $@ $(P25_STATE) -lm
+radioP25TrunkStateTest: radioP25TrunkStateTest.c radioP25StateTest.c $(P25_STATE) radioP25OwnerTest.c $(P25_HEADERS) $(P25_STORE_HEADERS)
+	$(CC) $(CFLAGS) $(P25_FLAGS) -UCONFIG_P25_TRUNK -DCONFIG_P25_TRUNK=1 -I. -DCONFIG_AM_RX=0 -DCONFIG_BCAST_FM=0 \
+		-DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_HOTSPOT=0 -DCONFIG_APRS=0 -DCONFIG_NET_USRP=0 -DCONFIG_BEEP=0 -DCONFIG_SFR=0 -DDMR_RX_TRACE=0 \
+		-o $@ radioP25TrunkStateTest.c $(filter-out radioP25StateTest.c,$(P25_STATE)) $(CORE)/p25/p25_follow.c $(CORE)/p25/p25_tsbk.c -lm
 radioP25OwnerTest: $(P25_OWNER) $(P25_HEADERS) $(P25_STORE_HEADERS) $(CORE)/radio/radio_p25.h
 	$(CC) $(CFLAGS) $(P25_FLAGS) -DCONFIG_AM_RX=0 -DCONFIG_BCAST_FM=0 -o $@ $(P25_OWNER) -lm
-radioP25OwnerTestTrunk: $(P25_OWNER) $(P25_HEADERS) $(P25_STORE_HEADERS) $(CORE)/radio/radio_p25.h $(CORE)/p25/p25_tsbk.c
+radioP25OwnerTestTrunk: $(P25_OWNER) $(P25_HEADERS) $(P25_STORE_HEADERS) $(CORE)/radio/radio_p25.h $(CORE)/p25/p25_tsbk.c $(CORE)/p25/p25_follow.c
 	$(CC) $(CFLAGS) $(P25_FLAGS) -UCONFIG_P25_TRUNK -DCONFIG_P25_TRUNK=1 -DCONFIG_AM_RX=0 -DCONFIG_BCAST_FM=0 \
-		-o $@ $(P25_OWNER) $(CORE)/p25/p25_tsbk.c -lm
+		-o $@ $(P25_OWNER) $(CORE)/p25/p25_tsbk.c $(CORE)/p25/p25_follow.c -lm
 
 P25_ADMISSION := p25AdmissionTest.c $(CORE)/p25/p25_admission.c $(CORE)/p25/p25_codeplug.c $(P25_STORE_CORE) sim/sim_flash.c
 p25AdmissionTest: $(P25_ADMISSION) $(P25_HEADERS) $(P25_STORE_HEADERS) sim/sim_flash.h
@@ -223,6 +228,7 @@ run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 	./radioP25OwnerTest
 	./radioP25OwnerTestTrunk
 	./radioP25StateTest
+	./radioP25TrunkStateTest
 	./radioP25OffTest
 	./codeplugTagTestNoP25
 	./ambeVoiceTest
@@ -241,4 +247,5 @@ run-p25: codeplugTagTest
 run-p25: p25AdmissionTest p25AdmissionTestTrunk
 run-p25: radioP25OwnerTest radioP25OwnerTestTrunk
 run-p25: radioP25StateTest
+run-p25: radioP25TrunkStateTest
 run-p25: radioP25OffTest codeplugTagTestNoP25

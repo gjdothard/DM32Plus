@@ -80,6 +80,9 @@ static void core_section(const radio_view_t *v, dl_text_t *t)
 	dl_text(t, "mode=%s\n", v->ch.mode == RADIO_MODE_P25 ? "p25" : v->ch.mode == RADIO_MODE_NONE ? "unsupported" : v->ch.mode == RADIO_MODE_DMR ? "dmr" : "fm");
 #if CONFIG_P25
 	dl_text(t, "p25.active=%u\np25.rx=%u\n", v->p25_active, v->p25_rx);
+#if CONFIG_P25_TRUNK
+	dl_text(t, "p25.trunk.state=%u\np25.trunk.reg=%u\np25.trunk.req=%u\n", v->p25_trunk_state, v->p25_registration, v->p25_request);
+#endif
 #endif
 	dl_text(t, "am=%u\nbcast=%u\nbcast_fault=%u\nbcast_khz=%u\n", v->am, v->bcast, v->bcast_fault, (unsigned)v->bcast_khz);
 	dl_text(t, "vfo=%u\nvfo_index=%u\n", v->vfo, v->vfo_index);

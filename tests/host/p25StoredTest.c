@@ -160,7 +160,7 @@ static void test_conv_load(void)
 	CHECK(codeplug_tagged_channel(10, &c) && c.kind == CODEPLUG_KIND_P25 && !c.rx_only);
 	// Run where the board's air interface carries P25, parked elsewhere, whatever the codec says
 	CHECK(codeplug_kind_built(CODEPLUG_KIND_P25) && strcmp(codeplug_kind_name(c.kind), "P25") == 0);
-	CHECK(!codeplug_kind_built(CODEPLUG_KIND_P25_TRUNK));
+	CHECK(codeplug_kind_built(CODEPLUG_KIND_P25_TRUNK) == (CONFIG_P25_TRUNK != 0));
 	p25_conv_t only;
 	CHECK(p25_conv_params(10, &c, &only) && only.rx_nac == 0x34 && only.squelch == P25_SQUELCH_SELECTIVE);
 

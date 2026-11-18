@@ -144,4 +144,15 @@ Legacy CPS/fast-CPS/TFTP writes refuse tagged codeplugs and cannot overwrite
 managed metadata. Mode-aware editing and its synchronous quiescence contract
 remain pending. State-machine tests use the real stored records, DMR stack and
 owner with simulated RF/PCM/air hardware. The home mode label, mic gain and beep
-mixer follow existing product paths. Trunked channel dispatch remains disabled.
+mixer follow existing product paths.
+
+The trunked owner now adapts this same pinned implementation's follower
+configuration, provider/radio-task exclusion, deferred retunes and subscriber
+PTT lifecycle. Configuration arrays and pending work join the existing loan;
+the stored-loader output shares voice scratch only before voice startup.
+Local safeguards check strict permissions and normal radio admission for each
+actual frequency, bind queued bursts to their retune generation, clear failed
+starts, and reject stale grants or invalid retunes. Voice callbacks are gated
+to a confirmed followed channel. No upstream RAM overrides, setting overrides
+or permanent diagnostic snapshots are imported. Encrypted calls are always
+skipped; fallback activation and mode-aware UI/CPS remain pending.

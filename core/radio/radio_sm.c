@@ -16,6 +16,9 @@
 #include "radio/radio_p25.h"
 #include "codeplug/codeplug_kv.h"
 #include "storage/storage.h"
+#if CONFIG_P25_TRUNK
+#include "hal_time.h"
+#endif
 #endif
 
 static bool read_channel(uint16_t number, channel_t *ch)
@@ -24,7 +27,11 @@ static bool read_channel(uint16_t number, channel_t *ch)
 	if (ch->kind != CODEPLUG_KIND_NONE) {
 		ch->mode = RADIO_MODE_NONE;
 #if CONFIG_P25
-		if (ch->kind == CODEPLUG_KIND_P25) { ch->mode = RADIO_MODE_P25; ch->bw = RADIO_BW_12K5; }
+		if (ch->kind == CODEPLUG_KIND_P25
+#if CONFIG_P25_TRUNK
+		    || ch->kind == CODEPLUG_KIND_P25_TRUNK
+#endif
+		   ) { ch->mode = RADIO_MODE_P25; ch->bw = RADIO_BW_12K5; }
 #endif
 	}
 	return true;
@@ -516,6 +523,9 @@ static bool listen_band(uint32_t hz)
 	return false;
 }
 
+#if CONFIG_P25_TRUNK
+static bool p25_key(uint32_t hz, bool automatic, void *ctx);
+#endif
 static void tune(radio_sm_t *sm, uint32_t now_ms)
 {
 	// Resolve storage in the task, before its next request or modem tick. PTT stays blocked in the meantime.
@@ -536,6 +546,9 @@ static void tune(radio_sm_t *sm, uint32_t now_ms)
 	end_reception(sm, now_ms);
 #if CONFIG_P25
 	sm->view.p25_active = sm->view.p25_rx = false;
+#if CONFIG_P25_TRUNK
+	sm->view.p25_trunk_state = sm->view.p25_registration = sm->view.p25_request = 0;
+#endif
 	if (!radio_p25_end()) {
 		sm->view.ch.mode = RADIO_MODE_NONE;
 		outputs(sm);
@@ -589,6 +602,9 @@ static void tune(radio_sm_t *sm, uint32_t now_ms)
 #if CONFIG_P25
 	else if (sm->view.ch.mode == RADIO_MODE_P25) {
 		sm->view.p25_active = radio_p25_begin(&sm->view.ch, sm->view.channel_number);
+#if CONFIG_P25_TRUNK
+		radio_p25_trunk_keyer(p25_key, sm);
+#endif
 	}
 #endif
 	outputs(sm);
@@ -875,13 +891,13 @@ static bool bcl_busy(const radio_sm_t *sm)
 	return carrier && tone_needed(sm) && !sm->view.tone_ok;
 }
 
-static uint8_t tx_check(const radio_sm_t *sm)
+static uint8_t tx_check_at(const radio_sm_t *sm, uint32_t hz)
 {
 	const channel_t *ch = &sm->view.ch;
 	if (ch->mode == RADIO_MODE_NONE || (ch->kind != CODEPLUG_KIND_NONE && ch->mode != RADIO_MODE_P25)) return TXDENY_MODE;
 	if (ch->mode == RADIO_MODE_P25) {
 #if CONFIG_P25
-		if (ch->kind != CODEPLUG_KIND_P25 || !radio_p25_running() || sm->host_audio) return TXDENY_MODE;
+		if (!radio_p25_running() || sm->host_audio) return TXDENY_MODE;
 #else
 		return TXDENY_MODE;
 #endif
@@ -901,16 +917,16 @@ static uint8_t tx_check(const radio_sm_t *sm)
 		return TXDENY_INHIBIT;
 	}
 #if CONFIG_AM_RX
-	if (sm->view.am || radio_am_tx_refused(ch->tx_hz)) {
+	if (sm->view.am || radio_am_tx_refused(hz)) {
 		return TXDENY_AM;	// the air band is receive only, whatever the codeplug says
 	}
 #endif
 #if CONFIG_BCAST_FM
-	if (sm->view.bcast || radio_bcast_tx_refused(ch->tx_hz)) {
+	if (sm->view.bcast || radio_bcast_tx_refused(hz)) {
 		return TXDENY_BCAST;	// so is the broadcast band
 	}
 #endif
-	if (ch->tx_hz == 0) {
+	if (hz == 0) {
 		return TXDENY_NO_FREQ;
 	}
 	if (ch->rx_only) {
@@ -919,7 +935,7 @@ static uint8_t tx_check(const radio_sm_t *sm)
 	if (ch->mode == RADIO_MODE_DMR ? !CONFIG_DMR : ch->mode == RADIO_MODE_P25 ? !CONFIG_P25 : !CONFIG_FM) {
 		return TXDENY_MODE;
 	}
-	if (!board_in_band(ch->tx_hz, true)) {
+	if (!board_in_band(hz, true)) {
 		return TXDENY_BAND;
 	}
 	if (sm->batt.level == BATT_CRITICAL) {
@@ -935,8 +951,23 @@ static uint8_t tx_check(const radio_sm_t *sm)
 	return TXDENY_NONE;
 }
 
+static uint8_t tx_check(const radio_sm_t *sm)
+{
+	uint32_t hz = sm->view.ch.tx_hz;
+#if CONFIG_P25_TRUNK
+	if (sm->view.ch.mode == RADIO_MODE_P25 && radio_p25_trunked()) {
+		hz = radio_p25_tx_frequency();
+		if (hz == 0) hz = sm->view.ch.rx_hz; // preflight only; every actual emission checks its assigned frequency
+	}
+#endif
+	return tx_check_at(sm, hz);
+}
+
 static void deny(radio_sm_t *sm, uint8_t reason)
 {
+#if CONFIG_P25
+	if (sm->view.ch.mode == RADIO_MODE_P25 && radio_p25_tx_state() != AIR_TX_IDLE) radio_p25_tx_abort();
+#endif
 	sm->view.state = RS_TX_DENIED;
 	sm->view.tx_deny = reason;
 	sm->view.tot_warning = false;
@@ -963,6 +994,21 @@ static void tx_timer(radio_sm_t *sm, uint32_t now_ms)
 }
 
 #if CONFIG_P25
+#if CONFIG_P25_TRUNK
+static bool p25_key(uint32_t hz, bool automatic, void *ctx)
+{
+	radio_sm_t *sm = ctx;
+	if (sm->power_off_req || sm->view.state == RS_TX_DENIED || tx_check_at(sm, hz) != TXDENY_NONE) return false;
+	static const subtone_t none = { TONE_NONE, 0 };
+	if (!board.radio->tx(hz, RADIO_BW_12K5, sm->view.power, &none)) return false;
+	sm->view.state = RS_TX; sm->view.tx_auto = automatic;
+	sm->view.tx_deny = TXDENY_NONE; sm->view.tx_elapsed_ms = 0;
+	sm->tx_start_ms = hal_millis();
+	sm->view.last_tx_ms = sm->tx_start_ms != 0 ? sm->tx_start_ms : 1;
+	outputs(sm); changed(sm);
+	return true;
+}
+#endif
 static void p25_follow(radio_sm_t *sm, uint32_t now_ms)
 {
 	if (!sm->view.p25_active) return;
@@ -975,13 +1021,32 @@ static void p25_follow(radio_sm_t *sm, uint32_t now_ms)
 		return;
 	}
 	bool rx = sm->view.p25_rx;
+#if CONFIG_P25_TRUNK
+	uint8_t trunk_state = sm->view.p25_trunk_state, registration = sm->view.p25_registration, request = sm->view.p25_request;
+	radio_p25_trunk_status(&sm->view.p25_trunk_state, &sm->view.p25_registration, &sm->view.p25_request);
+	if (trunk_state != sm->view.p25_trunk_state || registration != sm->view.p25_registration || request != sm->view.p25_request)
+		changed(sm);
+#endif
 	sm->view.p25_rx = v.rx_active;
+#if CONFIG_P25_TRUNK
+	if (radio_p25_trunked() && sm->ptt && sm->view.state != RS_TX && sm->view.state != RS_TX_DENIED) {
+		uint8_t why = tx_check(sm);
+		if (why != TXDENY_NONE || radio_p25_trunk_failed()) {
+			radio_p25_tx_abort(); deny(sm, why != TXDENY_NONE ? why : TXDENY_REJECTED); return;
+		}
+	}
+#endif
 	if (sm->view.state == RS_TX) {
 		tx_timer(sm, now_ms);
 		uint8_t why = tx_check(sm);
 		if (sm->view.tot_s && sm->view.tx_elapsed_ms >= (uint32_t)sm->view.tot_s * 1000u) why = TXDENY_TIMEOUT;
 		if (why != TXDENY_NONE) { radio_p25_tx_abort(); deny(sm, why); return; }
-		if (v.tx == AIR_TX_DONE) {
+#if CONFIG_P25_TRUNK
+		if (radio_p25_trunked() && v.tx == AIR_TX_IDLE && !sm->view.tx_auto) {
+			radio_p25_tx_abort(); deny(sm, TXDENY_REJECTED); return;
+		}
+#endif
+		if (v.tx == AIR_TX_DONE || (sm->view.tx_auto && v.tx == AIR_TX_IDLE)) {
 			radio_p25_tx_clear();
 			sm->view.state = RS_IDLE;
 			sm->view.last_tx_ms = now_ms != 0 ? now_ms : 1;
@@ -3991,6 +4056,12 @@ static void ptt_down(radio_sm_t *sm, uint32_t now_ms)
 	}
 #if CONFIG_P25
 	if (sm->view.ch.mode == RADIO_MODE_P25) {
+#if CONFIG_P25_TRUNK
+		if (radio_p25_trunked()) {
+			if (!radio_p25_trunk_ptt(true)) deny(sm, TXDENY_REJECTED);
+			return;
+		}
+#endif
 		storage_lock();
 		reason = tx_check(sm);
 		bool ok = reason == TXDENY_NONE && radio_p25_tx_prepare();
@@ -4057,6 +4128,12 @@ static void ptt_release(radio_sm_t *sm, bool roger, uint32_t now_ms)
 	activity(sm, now_ms);
 #if CONFIG_P25
 	if (sm->view.ch.mode == RADIO_MODE_P25) {
+#if CONFIG_P25_TRUNK
+		if (radio_p25_trunked()) {
+			radio_p25_trunk_ptt(false);
+			if (sm->view.state == RS_TX && sm->view.tx_auto) return;
+		}
+#endif
 		if (sm->view.state == RS_TX) radio_p25_tx_stop();
 		else {
 			radio_p25_tx_clear();

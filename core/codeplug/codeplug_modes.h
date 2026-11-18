@@ -14,7 +14,7 @@
 #include <stdint.h>
 #include "config.h"
 
-// Conventional channels have a radio owner. The trunked owner is still pending.
+// Both P25 owners are connected; unsupported providers still refuse startup.
 #define CODEPLUG_RUNS_P25 CONFIG_P25
 #define CODEPLUG_RUNS_NXDN 0
 
@@ -22,7 +22,7 @@
 #define CODEPLUG_KINDS(X) \
 	X(1, DMR_TRUNK, "T3", 0) \
 	X(2, P25, "P25", CODEPLUG_RUNS_P25) \
-	X(3, P25_TRUNK, "P25T", 0) \
+	X(3, P25_TRUNK, "P25T", CONFIG_P25_TRUNK) \
 	X(4, NXDN, "NXDN", CODEPLUG_RUNS_NXDN)
 
 // System types: the first byte of a system record

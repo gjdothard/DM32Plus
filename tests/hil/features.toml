@@ -33,9 +33,9 @@ manual = ["Qualify conventional receive/transmit and FM/DMR mode transitions wit
 
 [feature.p25_trunk]
 switch = "P25_TRUNK"
-spec = "docs/spec/p25-codeplug.md"
+spec = "docs/spec/p25-trunking.md"
 source = ["core/p25", "core/radio/radio_p25.c", "core/radio/radio_p25.h", "core/codeplug/codeplug_records.c", "core/codeplug/codeplug_tag.c", "core/codeplug/codeplug_kv.c"]
-manual = ["After radio-owner integration: qualify hunt, follow, return and permitted signaling against authorized test equipment.", "Measure no RF emissions for channel RX-only or system listen-only during acquisition, idle, PTT, grants and permission revocation."]
+manual = ["Qualify hunt, follow, return and permitted signaling against authorized test equipment.", "Measure no RF emissions for channel RX-only or system listen-only during acquisition, idle, PTT, grants and permission revocation."]
 
 [feature.fm]
 switch = "FM"

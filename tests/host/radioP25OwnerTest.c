@@ -25,6 +25,9 @@ bool ambeVoiceStreaming(void) { return ambe_running; }
 static unsigned sequence, close_at, off_at, stop_at, return_at;
 static bool opened, on, keyed, audio_fail, open_fail, go_fail, return_fail, loaned, edit_on_open;
 static uint32_t fit, now_us, token;
+#if CONFIG_P25_TRUNK && !defined(P25_STATE_TEST)
+uint32_t hal_millis(void) { return now_us / 1000u; }
+#endif
 static unsigned queued, starts, lends;
 static air_tx_chunk_t queue[4];
 static air_event_cb_t air_cb;
@@ -73,11 +76,12 @@ static const hal_audio_t audio = { .start = audio_start, .stop = audio_stop, .sp
 static void tx_off(void) { keyed = false; off_at = ++sequence; }
 static unsigned key_calls;
 static radio_mode_t physical_mode;
+static uint32_t last_rx_hz, last_tx_hz;
 static void set_mode(radio_mode_t mode) { physical_mode = mode; }
 static bool rx(uint32_t hz, radio_bw_t bw, const subtone_t *tone)
-{ (void)bw; (void)tone; return board_in_band(hz, false); }
+{ (void)bw; (void)tone; last_rx_hz = hz; return board_in_band(hz, false); }
 static bool tx_rf(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t *tone)
-{ (void)bw; (void)power; (void)tone; key_calls++; keyed = board_in_band(hz, true); return keyed; }
+{ (void)bw; (void)power; (void)tone; last_tx_hz = hz; key_calls++; keyed = board_in_band(hz, true); return keyed; }
 static void status(radio_status_t *s) { *s = (radio_status_t){ .rssi_dbm = -120, .noise = 255, .tone_ok = true }; }
 static void audio_route(bool open) { (void)open; }
 static const hal_radio_t rf = { .tx_off = tx_off, .set_mode = set_mode, .rx = rx, .tx = tx_rf, .status = status, .audio = audio_route };

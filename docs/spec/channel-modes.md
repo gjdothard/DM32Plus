@@ -5,7 +5,8 @@
 
 Status: the shared MIT RadioFoundry format is imported for P25 configuration.
 The radio reader applies tags and dispatches conventional P25 when `CONFIG_P25`
-is enabled. Other tagged kinds remain parked. The generic tag/store guard is
+is enabled, and trunked P25 with `CONFIG_P25_TRUNK`. Other tagged kinds remain
+parked. The generic tag/store guard is
 always built so disabled or unsupported kinds cannot enter FM/DMR operation.
 
 ## Channel tags

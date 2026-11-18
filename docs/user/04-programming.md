@@ -3,11 +3,14 @@
 
 # Programming the Radio
 
-Experimental P25 builds can operate preconfigured conventional P25 channels.
+Experimental P25 builds can operate preconfigured conventional and Phase 1
+trunked P25 channels within the radio's supported bands.
 The home screen shows P25. P25 settings editors are still being integrated.
 Codeplugs containing tagged channels currently allow reads and backups, but
 refuse legacy CPS and raw codeplug writes to protect mode-specific permissions.
-Keep a backup before using experimental codeplugs. Trunked operation is pending.
+Keep a backup before using experimental codeplugs. Channel Receive only and
+system listen-only also block automatic trunked signaling. Hardware qualification
+and mode-aware editing remain pending.
 
 The codeplug holds the channels, zones, contacts, RX group lists, the DMR ID database and your DMR ID. Edit it with the
 **Codeplug Editor** on the project's web site, [radiofoundry.org](https://radiofoundry.org/codeplug/index.html). It runs

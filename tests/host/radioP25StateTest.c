@@ -44,6 +44,7 @@ static void setup(bool rx_only)
 	key_calls = 0;
 }
 
+#ifndef P25_TRUNK_STATE_TEST
 int main(void)
 {
 	setup(true);
@@ -161,6 +162,15 @@ int main(void)
 	CHECK(sm.view.tx_deny == TXDENY_MODE && key_calls == 0);
 	request(RREQ_PTT, 0);
 	CHECK(radio_p25_end());
+	setup(false);
+	unknown.kind = CODEPLUG_KIND_P25_TRUNK;
+	CHECK(codeplug_tag_write(10, channel.name, &unknown, NULL, 0));
+	step(30);
+	CHECK(sm.view.ch.mode == RADIO_MODE_NONE && !loaned && !sm.dmr_running);
+	request(RREQ_PTT, 1);
+	CHECK(sm.view.tx_deny == TXDENY_MODE && key_calls == 0);
+	request(RREQ_PTT, 0);
+	CHECK(radio_p25_end());
 
 	setup(false);
 	request(RREQ_PTT, 1);
@@ -181,3 +191,4 @@ int main(void)
 	sim_flash_free();
 	return failures != 0;
 }
+#endif
