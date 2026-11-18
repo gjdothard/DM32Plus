@@ -69,6 +69,7 @@ class P25BuildTest(unittest.TestCase):
                     "core/codeplug/codeplug_talk.c",
                     "core/codeplug/codeplug_kv.c", "core/codeplug/codeplug_tag.c",
                     "core/codeplug/codeplug_tagged.c", "core/codeplug/codeplug_records.c",
+                    "core/radio/radio_p25.c",
                     "tests/host/sim/p25_link_sim.c")]
                 output = self.work / ("probe.exe" if os.name == "nt" else "probe")
                 result = subprocess.run(
@@ -103,7 +104,7 @@ class P25BuildTest(unittest.TestCase):
         for settings in [(), ("CONFIG_DMR=n",), ("CONFIG_P25=y", "CONFIG_P25_TRUNK=n")]:
             with self.subTest(settings=settings):
                 data = self.probe(*settings)
-                for module in ("core/p25/p25_codeplug.c", "core/p25/p25_admission.c", "core/codeplug/codeplug_kv.c",
+                for module in ("core/p25/p25_codeplug.c", "core/p25/p25_admission.c", "core/radio/radio_p25.c", "core/codeplug/codeplug_kv.c",
                                "core/codeplug/codeplug_tag.c", "core/codeplug/codeplug_tagged.c",
                                "core/codeplug/codeplug_records.c"):
                     result = subprocess.run(
@@ -131,7 +132,7 @@ class P25BuildTest(unittest.TestCase):
                     cwd=ROOT, text=True, capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 symbols = output.read_bytes()
-                for name in ("voice", "engine", "session", "softmodem", "workspace", "workspace_lease"):
+                for name in ("voice", "engine", "session", "softmodem", "workspace", "workspace_lease", "owner"):
                     self.assertEqual(("p25_bytes_" + name).encode() in symbols, enabled)
                 self.assertEqual(b"p25_bytes_follower" in symbols, trunk)
 

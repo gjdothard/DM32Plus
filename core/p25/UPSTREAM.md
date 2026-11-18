@@ -120,3 +120,18 @@ local `codeplug_kv_lookup` distinguishes a missing optional key from an I/O
 failure; existing `codeplug_kv_get` behavior stays unchanged. The radio owner
 must still connect these permissions to actual emissions and cancel queued
 work when settings change.
+
+`core/radio/radio_p25.[ch]` adapts the pinned upstream's conventional stored
+parameters, engine/voice startup, polling and transmit lifecycle. Local changes
+use a sized exclusive codec loan, put the active channel and generation snapshot
+inside that loan, omit upstream's RAM overrides and persistent diagnostic state,
+and reject trunked/VFO startup at this stage. Stored TX permissions and band
+checks guard prepare/go; teardown and abort unkey before returning memory.
+The state-machine caller still owns keying and its normal RF protections.
+The keyed store now supplies a full-width generation for session invalidation.
+
+The shared `air_session_tx_go` locally aborts queued chunks when the provider
+refuses its start. The new owner test reproduces that failure and verifies the
+queue is empty before retry. `radioP25OwnerTest.c` is local integration code
+using real engines/voice with simulated hardware. Channel/PTT dispatch is not
+connected by this owner-component import.

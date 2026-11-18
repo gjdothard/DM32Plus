@@ -23,12 +23,22 @@ TESTS += codeplugKvTest
 TESTS += p25StoredTest p25StoredTestTrunk
 TESTS += codeplugTagTest
 TESTS += p25AdmissionTest p25AdmissionTestTrunk
+TESTS += radioP25OwnerTest radioP25OwnerTestTrunk
 
 P25_STORE_CORE := $(CORE)/codeplug/codeplug.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c \
 	$(CORE)/codeplug/codeplug_talk.c \
 	$(CORE)/codeplug/codeplug_kv.c $(CORE)/codeplug/codeplug_tag.c $(CORE)/codeplug/codeplug_tagged.c \
 	$(CORE)/codeplug/codeplug_records.c
 P25_STORE_HEADERS := $(wildcard $(CORE)/codeplug/*.h)
+
+P25_OWNER := radioP25OwnerTest.c $(CORE)/radio/radio_p25.c $(CORE)/p25/p25_workspace.c \
+	$(CORE)/p25/p25_admission.c $(CORE)/p25/p25_codeplug.c $(CORE)/p25/p25Voice.c $(P25_ENGINE) $(P25_MBE) \
+	$(P25_STORE_CORE) sim/sim_flash.c
+radioP25OwnerTest: $(P25_OWNER) $(P25_HEADERS) $(P25_STORE_HEADERS) $(CORE)/radio/radio_p25.h
+	$(CC) $(CFLAGS) $(P25_FLAGS) -DCONFIG_AM_RX=0 -DCONFIG_BCAST_FM=0 -o $@ $(P25_OWNER) -lm
+radioP25OwnerTestTrunk: $(P25_OWNER) $(P25_HEADERS) $(P25_STORE_HEADERS) $(CORE)/radio/radio_p25.h $(CORE)/p25/p25_tsbk.c
+	$(CC) $(CFLAGS) $(P25_FLAGS) -UCONFIG_P25_TRUNK -DCONFIG_P25_TRUNK=1 -DCONFIG_AM_RX=0 -DCONFIG_BCAST_FM=0 \
+		-o $@ $(P25_OWNER) $(CORE)/p25/p25_tsbk.c -lm
 
 P25_ADMISSION := p25AdmissionTest.c $(CORE)/p25/p25_admission.c $(CORE)/p25/p25_codeplug.c $(P25_STORE_CORE) sim/sim_flash.c
 p25AdmissionTest: $(P25_ADMISSION) $(P25_HEADERS) $(P25_STORE_HEADERS) sim/sim_flash.h
@@ -193,6 +203,8 @@ run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 	./codeplugTagTest
 	./p25AdmissionTest
 	./p25AdmissionTestTrunk
+	./radioP25OwnerTest
+	./radioP25OwnerTestTrunk
 	./ambeVoiceTest
 	./vocoderMemoryTest
 	./vocoderMemoryTestTrunk
@@ -207,3 +219,4 @@ run-p25: codeplugKvTest
 run-p25: p25StoredTest p25StoredTestTrunk
 run-p25: codeplugTagTest
 run-p25: p25AdmissionTest p25AdmissionTestTrunk
+run-p25: radioP25OwnerTest radioP25OwnerTestTrunk

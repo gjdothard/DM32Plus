@@ -26,7 +26,7 @@ The upstream integration uses these shared layers:
 | `codeplug_tag` | Bind a channel kind and its parameters to a legacy channel | Imported; explicit configuration adapter tested |
 | `codeplug_records` | Radio-wide records, systems, sites, control channels and identifier plans | Imported; exercised by stored P25 tests |
 | `p25_codeplug` loaders | Resolve identity, targets, channel parameters and a trunked system | Restored; simulated-flash tests pass |
-| `radio_p25` | Start/stop engines, follow grants, retune and request permitted TX | Pending |
+| `radio_p25` | Start/stop engines, follow grants, retune and request permitted TX | Conventional component tested; channel/PTT dispatch and trunked owner pending |
 
 The tagged design stores a receive-only DMR stand-in in the legacy channel
 record. The tag supplies the logical P25 kind and its TX permission. Older

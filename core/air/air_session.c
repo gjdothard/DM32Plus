@@ -135,6 +135,7 @@ bool air_session_tx_go(air_session_t *s)
 	// From here the provider's task owns the transmit side: the state first, its events can come inside tx_begin
 	s->tx = s->finished ? AIR_TX_ENDING : AIR_TX_ON;
 	if (!s->air->tx_begin()) {
+		s->air->tx_abort(); // a refused start still owns primed chunks; never reuse them on the next attempt
 		s->tx = AIR_TX_DONE;
 		return false;
 	}

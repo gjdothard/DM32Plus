@@ -24,9 +24,9 @@ static bool nac_ok(uint16_t value, bool tx)
 }
 
 // Compare fields that affect P25 operation, without comparing struct padding or unrelated DMR settings.
-static bool same_channel(const channel_t *a, const channel_t *b)
+bool p25_channel_matches(const channel_t *a, const channel_t *b)
 {
-	return strncmp(a->name, b->name, sizeof a->name) == 0 && a->kind == b->kind && a->system == b->system &&
+	return a != NULL && b != NULL && strncmp(a->name, b->name, sizeof a->name) == 0 && a->kind == b->kind && a->system == b->system &&
 	       a->rx_hz == b->rx_hz && a->tx_hz == b->tx_hz && a->rx_only == b->rx_only && a->dmr_id == b->dmr_id &&
 	       a->contact == b->contact && a->listen_list == b->listen_list && a->dmo == b->dmo &&
 	       a->privacy_slot == b->privacy_slot;
@@ -83,7 +83,7 @@ static uint8_t permissions(uint16_t number, const channel_t *active)
 	ch.kind = tag.kind;
 	ch.system = tag.system;
 	ch.rx_only = false;
-	if (!same_channel(&ch, active)) return 0;
+	if (!p25_channel_matches(&ch, active)) return 0;
 	uint8_t allowed_flags = CODEPLUG_TAG_TX | CODEPLUG_TAG_BASE_OWN | CODEPLUG_TAG_FALLBACK;
 #if CONFIG_P25_TRUNK
 	if (ch.kind == CODEPLUG_KIND_P25_TRUNK) allowed_flags |= P25_TAG_NO_FALLBACK;

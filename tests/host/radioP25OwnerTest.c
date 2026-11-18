@@ -1,0 +1,280 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
+// Real stored records, engine and voice path; only air, PCM, RF and codec-loan hardware are simulated.
+#include <stdio.h>
+#include <string.h>
+#include "board.h"
+#include "radio/radio_p25.h"
+#include "p25/p25_codeplug.h"
+#include "codeplug/codeplug_tag.h"
+#include "codeplug/codeplug_kv.h"
+#include "storage/storage.h"
+#include "air/air_syms.h"
+#include "sim/sim_flash.h"
+
+static unsigned checks, failures;
+#define CHECK(c) do { checks++; if (!(c)) { failures++; printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #c); } } while (0)
+void storage_lock(void) {}
+void storage_unlock(void) {}
+static bool ambe_running;
+bool ambeVoiceStreaming(void) { return ambe_running; }
+static unsigned sequence, close_at, off_at, stop_at, return_at;
+static bool opened, on, keyed, audio_fail, open_fail, go_fail, return_fail, loaned, edit_on_open;
+static uint32_t fit, now_us, token;
+static unsigned queued, starts, lends;
+static air_tx_chunk_t queue[4];
+static air_event_cb_t air_cb;
+static void *air_ctx;
+static audio_block_cb_t audio_cb;
+static void *audio_ctx;
+static uint64_t pool[(sizeof(radio_p25_mem_t) + 7u) / 8u];
+static size_t capacity;
+
+static void event(uint8_t kind, const air_chunk_t *chunk)
+{
+	air_event_t e = { .kind = kind, .t_us = now_us, .chunk = chunk };
+	if (air_cb) air_cb(&e, air_ctx);
+}
+static uint32_t air_fit(const air_profile_t *p) { return p->sym_rate == 4800 ? fit : 0; }
+static bool air_open(const air_profile_t *p, air_event_cb_t cb, void *ctx)
+{
+	(void)p;
+	if (open_fail) return false;
+	opened = true; air_cb = cb; air_ctx = ctx;
+	if (edit_on_open) CHECK(codeplug_kv_set_u32(0x7000, 42));
+	return true;
+}
+static void air_close(void) { opened = on = false; queued = 0; air_cb = NULL; close_at = ++sequence; }
+static void restart(void) {}
+static bool air_go(void) { starts++; if (go_fail) return false; on = true; return true; }
+static bool air_queue(const air_tx_chunk_t *c) { if (queued == 4) return false; queue[queued++] = *c; return true; }
+static uint8_t air_space(void) { return (uint8_t)(4u - queued); }
+static void air_end(void) { if (queued) queue[queued - 1].flags |= AIR_TX_LAST; }
+static void air_abort(void) { queued = 0; on = false; event(AIR_EV_TX_DONE, NULL); }
+static uint32_t air_now(void) { return now_us; }
+static const hal_air_t air = {
+	.fit = air_fit, .open = air_open, .close = air_close, .rx_restart = restart,
+	.tx_begin = air_go, .tx_queue = air_queue, .tx_space = air_space, .tx_end = air_end,
+	.tx_abort = air_abort, .now_us = air_now, .tx_chunk_syms = 144, .tx_queue_depth = 4, .tx_lead_ms = 60,
+};
+static bool audio_start(audio_block_cb_t cb, void *ctx)
+{
+	if (audio_fail || audio_cb != NULL) return false;
+	audio_cb = cb; audio_ctx = ctx;
+	return true;
+}
+static void audio_stop(void) { audio_cb = NULL; stop_at = ++sequence; }
+static void speaker(bool on_pcm) { (void)on_pcm; }
+static const hal_audio_t audio = { .start = audio_start, .stop = audio_stop, .speaker_pcm = speaker };
+static void tx_off(void) { keyed = false; off_at = ++sequence; }
+static const hal_radio_t rf = { .tx_off = tx_off };
+static bool lend(size_t bytes, size_t alignment, hal_vocoder_loan_t *out)
+{
+	lends++;
+	if (loaned || bytes > capacity || alignment > 8) return false;
+	loaned = true;
+	*out = (hal_vocoder_loan_t){ .data = pool, .bytes = capacity, .token = ++token };
+	return true;
+}
+static bool reclaim(hal_vocoder_loan_t *in)
+{
+	CHECK(!opened && !on && !keyed && audio_cb == NULL);
+	if (return_fail || !loaned || in->data != pool || in->token != token) return false;
+	loaned = false; return_at = ++sequence;
+	return true;
+}
+static const hal_vocoder_t vocoder = { .lend = lend, .reclaim = reclaim };
+static const band_t bands[] = {{136000000,174000000,true},{400000000,480000000,true},{490000000,491000000,false}};
+const board_t board = { .name = "test", .bands = bands, .band_count = 3, .power_count = 9,
+	.flash = &sim_flash, .air = &air, .audio = &audio, .radio = &rf, .vocoder = &vocoder };
+static const hal_flash_map_t map = { .settings_addr = 0x11000, .settings_size = 0x8000,
+	.journal_addr = 0x19000, .openfw_eeprom = 0, .openfw_flash = 0x20000, .openfw_end = 0x200000,
+	.calibration_addr = 0x10000, .calibration_size = 0x200 };
+static channel_t channel;
+
+static void fresh(bool rx_only)
+{
+	return_fail = false;
+	CHECK(radio_p25_end());
+	CHECK(!loaned);
+	opened = on = keyed = audio_fail = open_fail = go_fail = ambe_running = edit_on_open = false;
+	queued = starts = lends = sequence = close_at = off_at = stop_at = return_at = 0;
+	fit = AIR_FIT_RX | AIR_FIT_TX;
+	capacity = sizeof pool;
+	sim_flash_create(0x200000, &map);
+	CHECK(storage_init());
+	codeplug_init();
+	CHECK(codeplug_set_dmr_id(1234567));
+	channel = (channel_t){ .name = "P25", .rx_hz = 453100000, .tx_hz = 458100000, .mode = RADIO_MODE_DMR,
+		.bw = RADIO_BW_12K5, .power = CODEPLUG_POWER_DEFAULT, .rx_only = rx_only, .color_code = 1, .timeslot = 1 };
+	p25_conv_t pc = {0x293, 0x293, P25_SQUELCH_NORMAL};
+	CHECK(p25_conv_save(10, &channel, &pc));
+	CHECK(codeplug_tagged_channel(10, &channel));
+	p25VoiceResetStats();
+}
+
+static void pcm(void)
+{
+	int16_t mic[AUDIO_BLOCK_SAMPLES] = {0}, spk[AUDIO_BLOCK_SAMPLES];
+	if (audio_cb) audio_cb(mic, spk, audio_ctx);
+}
+
+static void deliver(const uint8_t *syms, uint16_t first, uint16_t n)
+{
+	while (n) {
+		uint8_t packed[144 / 4] = {0};
+		uint16_t take = n > 144 ? 144 : n;
+		for (unsigned i = 0; i < take; i++) air_sym_put(packed, i, air_sym_get(syms, first + i));
+		air_chunk_t c = { .t_us = now_us, .nsyms = take, .sync_at = -1, .hard = packed };
+		event(AIR_EV_RX, &c);
+		now_us += (uint32_t)take * 208u;
+		CHECK(radio_p25_poll(NULL));
+		pcm();
+		first += take; n -= take;
+	}
+}
+
+static void test_receive(void)
+{
+	fresh(true);
+	CHECK(radio_p25_begin(&channel, 10) && loaned && opened);
+	CHECK(!radio_p25_tx_prepare() && !radio_p25_tx_go() && queued == 0 && starts == 0);
+	p25_call_tx_t tx;
+	p25_lc_t lc = { .lcf = P25_LCF_GROUP, .tgid = 1, .src = 42 };
+	p25_call_tx_begin(&tx, 0x293, &lc, P25_SS_UNKNOWN);
+	unsigned voice = 0;
+	for (unsigned guard = 0; guard < 500 && !p25_call_tx_done(&tx); guard++) {
+		uint16_t first, n = p25_call_tx_ready(&tx, &first);
+		if (n) { deliver(tx.unit, first, n); p25_call_tx_sent(&tx, n); }
+		else if (voice < 18) { p25_call_tx_voice(&tx, imbe_silence); voice++; }
+		else p25_call_tx_end(&tx, imbe_silence);
+	}
+	CHECK(p25_call_tx_done(&tx));
+	p25_engine_view_t view;
+	CHECK(radio_p25_poll(&view) && view.rx_calls == 1 && view.rx.lc.src == 42 && view.rx.lc.tgid == 1);
+	p25_voice_stats_t stats;
+	p25VoiceGetStats(&stats);
+	CHECK(stats.rx_in == 18 && stats.rx_frames > 0 && audio_cb != NULL);
+	CHECK(radio_p25_end());
+	CHECK(close_at < off_at && off_at < stop_at && stop_at < return_at && !loaned);
+	CHECK(!radio_p25_running() && !radio_p25_tx_prepare() && radio_p25_end());
+}
+
+static void test_transmit(void)
+{
+	fresh(false);
+	CHECK(radio_p25_begin(&channel, 10));
+	CHECK(radio_p25_tx_prepare() && queued > 0 && audio_cb != NULL && starts == 0);
+	keyed = true; // the future state-machine caller keys only after its normal TX checks
+	CHECK(radio_p25_tx_go() && on && starts == 1);
+	p25_call_rx_t rx;
+	air_framer_t fr;
+	uint8_t frame[P25_UNIT_BYTES_MAX];
+	const p25_call_sink_t sink = {0};
+	p25_call_rx_init(&rx, 0x293, &sink, NULL);
+	air_framer_init(&fr, &p25_air_mode, &rx.rx, frame, NULL, P25_UNIT_SYMS_MAX);
+	for (unsigned tick = 0; tick < 500 && radio_p25_tx_state() != AIR_TX_DONE; tick++) {
+		pcm();
+		if (tick == 20) radio_p25_tx_stop();
+		CHECK(queued > 0);
+		if (!queued) break;
+		air_tx_chunk_t c = queue[0];
+		memmove(queue, queue + 1, (--queued) * sizeof queue[0]);
+		air_chunk_t chunk = { .t_us = now_us, .nsyms = c.nsyms, .sync_at = -1, .hard = c.syms };
+		air_framer_rx(&fr, &chunk);
+		now_us += 30000;
+		if (c.flags & AIR_TX_LAST) { on = false; event(AIR_EV_TX_DONE, NULL); }
+		else event(AIR_EV_TX_SPACE, NULL);
+	}
+	CHECK(radio_p25_tx_state() == AIR_TX_DONE && !on);
+	CHECK(rx.stats.calls == 1 && rx.stats.voice >= 9 && rx.call.lc.src == 1234567 && rx.call.lc.tgid == 1);
+	radio_p25_tx_clear();
+	CHECK(!keyed && radio_p25_tx_state() == AIR_TX_IDLE);
+	CHECK(radio_p25_end() && !loaned);
+}
+
+static void test_failures(void)
+{
+	fresh(false);
+	ambe_running = true;
+	CHECK(!radio_p25_begin(&channel, 10) && lends == 0);
+	ambe_running = false;
+	capacity = sizeof(radio_p25_mem_t) - 1;
+	CHECK(!radio_p25_begin(&channel, 10) && !loaned);
+	capacity = sizeof pool;
+	open_fail = true;
+	CHECK(!radio_p25_begin(&channel, 10) && !loaned && !audio_cb);
+	open_fail = false;
+	edit_on_open = true;
+	CHECK(!radio_p25_begin(&channel, 10) && !loaned && !opened);
+	edit_on_open = false;
+	CHECK(radio_p25_begin(&channel, 10));
+	CHECK(!radio_p25_begin(&channel, 10));
+	audio_fail = true;
+	CHECK(!radio_p25_tx_prepare() && !on && queued == 0);
+	radio_p25_tx_clear();
+	audio_fail = false;
+	CHECK(radio_p25_tx_prepare());
+	keyed = true; go_fail = true;
+	CHECK(!radio_p25_tx_go() && !keyed && queued == 0 && !on);
+	go_fail = false;
+	radio_p25_tx_clear();
+	CHECK(radio_p25_tx_prepare());
+	uint8_t value = 1;
+	CHECK(codeplug_kv_set(0x7000, &value, 1));
+	keyed = true;
+	CHECK(!radio_p25_tx_go() && starts == 1 && !keyed && queued == 0);
+	CHECK(!radio_p25_poll(NULL) && !opened && !loaned);
+	CHECK(radio_p25_begin(&channel, 10));
+	CHECK(radio_p25_tx_prepare());
+	keyed = true;
+	CHECK(radio_p25_tx_go());
+	channel.rx_only = true;
+	CHECK(codeplug_tagged_set_channel(10, &channel));
+	CHECK(!radio_p25_poll(NULL) && !keyed && !opened && audio_cb == NULL && !loaned);
+	CHECK(radio_p25_begin(&channel, 10));
+	return_fail = true;
+	CHECK(!radio_p25_end() && loaned && !radio_p25_running());
+	CHECK(!radio_p25_begin(&channel, 10));
+	return_fail = false;
+	CHECK(radio_p25_end() && !loaned);
+
+	fresh(false);
+	channel.rx_hz = 800000000;
+	CHECK(!radio_p25_begin(&channel, 10) && lends == 0);
+	fresh(false);
+	channel.tx_hz = 490500000;
+	CHECK(codeplug_tagged_set_channel(10, &channel));
+	CHECK(radio_p25_begin(&channel, 10) && !radio_p25_tx_prepare());
+	CHECK(radio_p25_end());
+	fresh(false);
+	fit = AIR_FIT_RX;
+	CHECK(radio_p25_begin(&channel, 10) && !radio_p25_tx_prepare() && !radio_p25_tx_go() && starts == 0);
+	CHECK(radio_p25_end());
+	fresh(false);
+	fit = 0;
+	CHECK(!radio_p25_begin(&channel, 10) && lends == 0);
+	fresh(false);
+	channel.tx_hz++;
+	CHECK(!radio_p25_begin(&channel, 10) && lends == 0);
+	fresh(false);
+	codeplug_tag_t tag = { .kind = CODEPLUG_KIND_P25, .system = CODEPLUG_SYSTEM_NONE, .flags = CODEPLUG_TAG_TX };
+	CHECK(codeplug_tag_write(10, channel.name, &tag, NULL, 0));
+	CHECK(radio_p25_begin(&channel, 10) && !radio_p25_tx_prepare()); // tolerant receive, no implicit TX defaults
+	CHECK(radio_p25_end());
+	fresh(false);
+	CHECK(radio_p25_begin(&channel, 10));
+	uint8_t before = codeplug_kv_serial();
+	for (unsigned n = 0; n < 256; n++) CHECK(codeplug_kv_set_u32(0x7000, n));
+	CHECK(codeplug_kv_serial() == before);
+	CHECK(!radio_p25_poll(NULL) && !loaned); // session generation must not wrap with the UI's low-byte serial
+}
+
+int main(void)
+{
+	test_receive(); test_transmit(); test_failures();
+	CHECK(radio_p25_end());
+	sim_flash_free();
+	printf("radioP25OwnerTest: %u checks, %u failed\n", checks, failures);
+	return failures != 0;
+}

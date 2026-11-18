@@ -64,6 +64,8 @@ int codeplug_kv_get(uint16_t key, void *buf, uint16_t max);
 // Strict lookup: true after a complete successful search (length = -1 when absent). False on invalid area, bad
 // arguments or any failed read. Use where a missing optional value may inherit a default but a read error must not.
 bool codeplug_kv_lookup(uint16_t key, void *buf, uint16_t max, int *length);
+// Full-width edit generation for active mode sessions. Compare alongside codeplug_serial(), which covers base edits.
+uint32_t codeplug_kv_generation(void);
 // A value that is a DMR ID: false when absent, empty, not a scalar or above CODEPLUG_DMR_ID_MAX (as if absent)
 bool codeplug_kv_get_id(uint16_t key, uint32_t *id);
 

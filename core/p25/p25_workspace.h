@@ -30,6 +30,8 @@ typedef struct {
 // Initialize lease to zero. Acquisition clears the workspace. A malformed provider loan whose cleanup fails stays
 // in lease for a later release; other failures preserve the lease. Check success before using its data.
 bool p25_workspace_acquire(p25_workspace_lease_t *lease, const hal_vocoder_t *vocoder);
+// A mode owner may append state to the workspace. Its alignment must not exceed the workspace's alignment.
+bool p25_workspace_acquire_bytes(p25_workspace_lease_t *lease, const hal_vocoder_t *vocoder, size_t bytes);
 bool p25_workspace_release(p25_workspace_lease_t *lease);
 
 #endif

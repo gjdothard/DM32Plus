@@ -28,13 +28,13 @@
 [feature.p25]
 switch = "P25"
 spec = "docs/spec/p25.md"
-source = ["core/p25", "core/air", "core/mbe", "core/codeplug/codeplug_tag.c", "core/codeplug/codeplug_kv.c", "hal/hal_air.h", "hal/hal_baseband.h"]
+source = ["core/p25", "core/air", "core/mbe", "core/radio/radio_p25.c", "core/radio/radio_p25.h", "core/codeplug/codeplug_tag.c", "core/codeplug/codeplug_kv.c", "hal/hal_air.h", "hal/hal_baseband.h"]
 manual = ["After radio-owner integration: qualify conventional receive/transmit and FM/DMR mode transitions with owner-authorized equipment.", "Measure no RF emissions for RX-only during startup, idle, PTT, settings changes and queued-work cancellation."]
 
 [feature.p25_trunk]
 switch = "P25_TRUNK"
 spec = "docs/spec/p25-codeplug.md"
-source = ["core/p25", "core/codeplug/codeplug_records.c", "core/codeplug/codeplug_tag.c", "core/codeplug/codeplug_kv.c"]
+source = ["core/p25", "core/radio/radio_p25.c", "core/radio/radio_p25.h", "core/codeplug/codeplug_records.c", "core/codeplug/codeplug_tag.c", "core/codeplug/codeplug_kv.c"]
 manual = ["After radio-owner integration: qualify hunt, follow, return and permitted signaling against authorized test equipment.", "Measure no RF emissions for channel RX-only or system listen-only during acquisition, idle, PTT, grants and permission revocation."]
 
 [feature.fm]

@@ -215,6 +215,14 @@ int main(void)
 	((p25_workspace_t *)lease.loan.data)->engine.tx_stop = true;
 	p25_workspace_lease_t stale_lease = lease;
 	CHECK(p25_workspace_release(&lease) && lease.vocoder == NULL && lease.loan.data == NULL);
+	CHECK(!p25_workspace_acquire_bytes(&lease, &hrc_vocoder, sizeof(p25_workspace_t) - 1));
+	CHECK(!p25_workspace_acquire_bytes(&lease, &hrc_vocoder, sizeof enc_state + 1));
+	memset(enc_state, 0x55, sizeof enc_state);
+	CHECK(p25_workspace_acquire_bytes(&lease, &hrc_vocoder, sizeof(p25_workspace_t) + 16));
+	CHECK(filled(lease.loan.data, sizeof(p25_workspace_t) + 16, 0));
+	CHECK(filled((uint8_t *)lease.loan.data + sizeof(p25_workspace_t) + 16,
+		     sizeof enc_state - sizeof(p25_workspace_t) - 16, 0x55));
+	CHECK(p25_workspace_release(&lease));
 	CHECK(!p25_workspace_release(&lease) && !p25_workspace_release(NULL));
 	CHECK(p25_workspace_acquire(&lease, &hrc_vocoder));
 	CHECK(!p25_workspace_release(&stale_lease) && !hrc_vocoder.present());

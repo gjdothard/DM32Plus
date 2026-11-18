@@ -196,7 +196,15 @@ int codeplug_kv_next(codeplug_kv_cursor_t *c, uint16_t *key, void *buf, uint16_t
 	return found;
 }
 
-static uint8_t kv_serial;	// codeplug_kv_serial(): one byte, only compared for a change
+static uint32_t kv_serial;	// full-width session generation; existing cursors use its low byte
+
+uint32_t codeplug_kv_generation(void)
+{
+	storage_lock();
+	uint32_t generation = kv_serial;
+	storage_unlock();
+	return generation;
+}
 
 uint8_t codeplug_kv_serial(void)
 {

@@ -37,6 +37,11 @@ inherit a default only after a successful search proves it absent. The older
 `codeplug_kv_get` API retains its tolerant absent/error behavior for existing
 readers. Both APIs take the storage lock and use the first duplicate key.
 
+`codeplug_kv_generation` exposes the full 32-bit edit generation for a running
+mode session. Compare it alongside `codeplug_serial` for base-record edits.
+The existing 8-bit `codeplug_kv_serial` remains the inexpensive UI/cache change
+hint; a session must not rely on it after an entire low-byte wrap.
+
 | Key range | Upstream family reserved for integration |
 |---|---|
 | 0x0100..0x01FF | Systems |

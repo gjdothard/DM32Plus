@@ -6,22 +6,27 @@
 
 bool p25_workspace_acquire(p25_workspace_lease_t *lease, const hal_vocoder_t *vocoder)
 {
-	if (lease == NULL || lease->vocoder != NULL || lease->loan.data != NULL
+	return p25_workspace_acquire_bytes(lease, vocoder, sizeof(p25_workspace_t));
+}
+
+bool p25_workspace_acquire_bytes(p25_workspace_lease_t *lease, const hal_vocoder_t *vocoder, size_t bytes)
+{
+	if (bytes < sizeof(p25_workspace_t) || lease == NULL || lease->vocoder != NULL || lease->loan.data != NULL
 	    || lease->loan.bytes != 0 || lease->loan.token != 0 || vocoder == NULL
 	    || vocoder->lend == NULL || vocoder->reclaim == NULL)
 		return false;
 	hal_vocoder_loan_t loan = {0};
-	if (!vocoder->lend(sizeof(p25_workspace_t), _Alignof(p25_workspace_t), &loan))
+	if (!vocoder->lend(bytes, _Alignof(p25_workspace_t), &loan))
 		return false;
 	lease->loan = loan;
 	lease->vocoder = vocoder;
-	if (loan.data == NULL || loan.bytes < sizeof(p25_workspace_t) || loan.token == 0
+	if (loan.data == NULL || loan.bytes < bytes || loan.token == 0
 	    || (uintptr_t)loan.data % _Alignof(p25_workspace_t) != 0) {
 		// A broken provider must not make its outstanding loan unreachable if cleanup fails.
 		p25_workspace_release(lease);
 		return false;
 	}
-	memset(loan.data, 0, sizeof(p25_workspace_t));
+	memset(loan.data, 0, bytes);
 	return true;
 }
 
