@@ -51,31 +51,25 @@ Both the install and upgrade actions load and verify that local release.
 The package contains the application and manifest. The installer obtains a compatible codec locally
 from the radio or a stock firmware file supplied by the operator.
 
-Cloudflare Pages builds and deploys it (see [Hosting](#hosting)):
-
-| Event | Does |
-|---|---|
-| Push to `main` | Builds the site with `site/cloudflare-build.sh` and deploys it to radiofoundry.org |
-| Push to another branch of this repository | Builds a preview at its own `*.radiofoundry.pages.dev` address; a pull request shows the link. Pull requests from forks get no preview |
-| Release published | `.github/workflows/site.yml` calls the project's deploy hook, so `main` is built again with the new release's images for the flasher |
-| By hand | Actions > Web site > Run workflow (the same deploy hook), or Retry deployment in the Pages project |
+Stable releases use the Docker host updater described in
+[Website deployment after a release](#website-deployment-after-a-release). The release workflow builds the matching
+website bundle and verifies its deployed version. No Cloudflare deploy-hook workflow runs on release publication.
 
 The pull request's unit tests job also builds the site (`--strict`) and runs the flasher's tests (`tools/ci.sh`'s
 Python step).
 
 ## Hosting
 
-The site is static files on Cloudflare Pages, project `radiofoundry`, connected to this repository through
-Cloudflare's GitHub app. Pages builds in its own build image (Python and Node.js preinstalled) and switches the site to
-a new deployment in one step, so a deployment has no downtime.
+The production website uses the [Docker host updater](#website-deployment-after-a-release).
+Cloudflare Pages remains an optional hosting alternative. If a Pages project is connected through Cloudflare's
+GitHub app, configure the following settings. Retry a deployment in that project's Deployments list when needed.
 
 | Part | Setup |
 |---|---|
-| Build | Command `site/cloudflare-build.sh`, output directory `build/site`, root directory the repository root. The script installs `site/requirements.txt`, lists the releases through the GitHub API, fetches the `rfoundry-*` images of the newest one that is not a pre-release, passes the newest pre-release (a `bN` tag) when it is newer than that (`--beta`), and runs `site/build.py --strict`. A failed build leaves the last deployment up |
+| Build | Command `site/cloudflare-build.sh`, output directory `build/site`, root directory the repository root. The script installs `site/requirements.txt`, lists the releases through the GitHub API, fetches the product images of the newest stable release, passes the newest beta or release candidate when it is newer than that (`--beta`), and runs `site/build.py --strict`. A failed build leaves the last deployment up |
 | Branches | Production branch `main`; every other branch of this repository builds a preview |
 | Variables | `PYTHON_VERSION` `3.12` (both environments). `RFOUNDRY_SENTRY_DSN` in production only, so previews send no error reports. `GITHUB_TOKEN` (encrypted, both environments): a fine-grained token with read-only access to public repositories. Without it the release lookup shares the builders' 60 requests an hour, and a build can fail with 403 "rate limit exceeded" after a minute of retries |
 | Custom domain | `radiofoundry.org` on the project (Custom domains). The `www` name redirects to it |
-| Release rebuild | The project's deploy hook, as `CLOUDFLARE_DEPLOY_HOOK` in the `site` environment (main and release tags only), which `site.yml` calls |
 | Analytics | Cloudflare Web Analytics, turned on in the project's Metrics tab. Pages adds the beacon to each deployment; it sets no cookies |
 | 404 | Pages serves the build's `404.html` for a missing page |
 | Roll back | The project's Deployments list: Rollback on an earlier production deployment |
