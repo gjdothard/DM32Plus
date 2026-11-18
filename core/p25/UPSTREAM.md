@@ -47,7 +47,9 @@ serialize gate release with deferred completion. The DMR byte queue is now
 pointer-aligned with `_Alignas`; compile-time assertions check the reused
 storage. The PA timer checks current TX activity before keying. Task wrappers
 use the upstream `.flashfunc` mechanism in the linker. These adaptations are
-covered by `modemGlueTest`.
+covered by `modemGlueTest`. Target linking exposed an interrupt-RAM overflow;
+local follow-on placement moves task-only DMR wrappers, deferred work and
+diagnostics to flash while retaining IRQ callbacks and PA state reads in RAM.
 
 Local PCM isolation work connects the board's air provider fields and its
 audio-gate callbacks, centralizes ring-play requests, arbitrates APRS FIFO

@@ -72,6 +72,37 @@ class P25BuildTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 subprocess.run([str(output)], cwd=ROOT, check=True)
 
+    def test_ui_compiles_without_dmr(self):
+        data = self.probe("CONFIG_DMR=n")
+        result = subprocess.run(
+            shlex.split(OPTIONS.cc) + ["-std=gnu11", "-Wall", "-Wextra", "-Wshadow", "-Werror",
+                                      "-Wno-unused-parameter", "-Icore", "-Ihal", "-Idrivers"]
+            + shlex.split(data["DEFS"])
+            + ["-c", "core/ui/ui_screens.c", "-o", str(self.work / "screens.o")],
+            cwd=ROOT, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_resource_probe_markers(self):
+        for settings, enabled, trunk in [
+            ((), False, False),
+            (("CONFIG_P25=y", "CONFIG_P25_TRUNK=n"), True, False),
+            (("CONFIG_P25=y",), True, True),
+        ]:
+            with self.subTest(settings=settings):
+                data = self.probe(*settings)
+                output = self.work / "resources.o"
+                result = subprocess.run(
+                    shlex.split(OPTIONS.cc) + ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
+                                              "-Icore", "-Ihal"]
+                    + shlex.split(data["DEFS"])
+                    + ["-c", "tools/p25_resource_probe.c", "-o", str(output)],
+                    cwd=ROOT, text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                symbols = output.read_bytes()
+                for name in ("voice", "engine", "session", "softmodem"):
+                    self.assertEqual(("p25_bytes_" + name).encode() in symbols, enabled)
+                self.assertEqual(b"p25_bytes_follower" in symbols, trunk)
+
     def test_invalid_protocol_dependencies(self):
         self.assertIn("CONFIG_P25_TRUNK=y needs CONFIG_P25=y",
                       self.probe("CONFIG_P25=n", "CONFIG_P25_TRUNK=y", fails=True))

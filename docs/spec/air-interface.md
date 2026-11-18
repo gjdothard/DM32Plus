@@ -61,7 +61,9 @@ callbacks. A late PA-timer interrupt only keys if TX is still active. These
 hooks do not replace channel/system permission.
 
 Task-side provider wrappers use `.flashfunc`; the linker keeps them out of
-interrupt RAM. A board can now attach the PCM isolation callbacks and provider
+interrupt RAM. The deferred modem task, DMR HAL methods, initialization and
+diagnostic formatting also use flash. Interrupt callbacks, shared locking and
+the PA's TX-active state read remain in interrupt RAM. A board can now attach the PCM isolation callbacks and provider
 pointers. Host results do not establish target timing or radio interoperability.
 
 ## PCM isolation and APRS coexistence

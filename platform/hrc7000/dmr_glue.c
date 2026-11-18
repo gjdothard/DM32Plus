@@ -154,7 +154,7 @@ static void isr_pa_timer(void)
 	}
 }
 
-static void irqs_enable(bool on)
+HRC_FLASHFUNC static void irqs_enable(bool on)
 {
 	hrc_irq_enable(IRQ_MODEM_SYS, on || eng.fm_rx != NULL);	// FM receive audio uses it outside DMR too
 	hrc_irq_enable(IRQ_MODEM_TS_TX, on);
@@ -166,8 +166,9 @@ static void irqs_enable(bool on)
 }
 
 // --- Deferred event task ---
+// Task entry, HAL methods and diagnostics stay in flash; IRQ callbacks and PA state reads stay in RAM.
 
-static void modem_poll_once(void)
+HRC_FLASHFUNC static void modem_poll_once(void)
 {
 #if CONFIG_AIR
 	if (air_on) {
@@ -186,7 +187,7 @@ static void modem_poll_once(void)
 	}
 }
 
-static void dmr_task(void *arg)
+HRC_FLASHFUNC static void dmr_task(void *arg)
 {
 	(void)arg;
 	for (;;) {
@@ -197,7 +198,7 @@ static void dmr_task(void *arg)
 
 // --- The radio's interface ---
 
-void hrc_dmr_board_init(hrc7000_t *modem, const hrc_dmr_board_t *hooks)
+HRC_FLASHFUNC void hrc_dmr_board_init(hrc7000_t *modem, const hrc_dmr_board_t *hooks)
 {
 	brd = hooks;
 	hrc7000_dmr_init(&eng, modem, &ops);
@@ -213,7 +214,7 @@ void hrc_dmr_board_init(hrc7000_t *modem, const hrc_dmr_board_t *hooks)
 	}
 }
 
-void hrc_dmr_enter(void)
+HRC_FLASHFUNC void hrc_dmr_enter(void)
 {
 #if CONFIG_AIR
 	if (air_on) {
@@ -228,7 +229,7 @@ void hrc_dmr_enter(void)
 	irqs_enable(true);
 }
 
-void hrc_dmr_leave(void)
+HRC_FLASHFUNC void hrc_dmr_leave(void)
 {
 	irqs_enable(false);
 	active = false;
@@ -241,7 +242,7 @@ void hrc_dmr_leave(void)
 	hrc7000_dmr_halt(&eng);
 }
 
-bool hrc_dmr_fm_rx_hook(void (*fn)(void))
+HRC_FLASHFUNC bool hrc_dmr_fm_rx_hook(void (*fn)(void))
 {
 #if CONFIG_AIR
 	vTaskSuspendAll();
@@ -260,7 +261,7 @@ bool hrc_dmr_fm_rx_hook(void (*fn)(void))
 	return true;
 }
 
-void hrc_dmr_rx_restart(void)
+HRC_FLASHFUNC void hrc_dmr_rx_restart(void)
 {
 #if CONFIG_AIR
 	if (air_on) {
@@ -281,7 +282,7 @@ bool hrc_dmr_tx_active(void)
 	return active && hrc7000_dmr_is_transmitting(&eng);
 }
 
-void hrc_dmr_tx_drop(void)
+HRC_FLASHFUNC void hrc_dmr_tx_drop(void)
 {
 	if (!active) {
 		return;
@@ -298,7 +299,7 @@ void hrc_dmr_tx_drop(void)
 
 // --- hal_dmr_modem_t ---
 
-static bool start(const dmr_config_t *cfg, dmr_event_cb_t cb, void *ctx)
+HRC_FLASHFUNC static bool start(const dmr_config_t *cfg, dmr_event_cb_t cb, void *ctx)
 {
 	if (!active || AIR_ON()) {
 		return false;	// the radio is not in DMR mode (set_mode(RADIO_MODE_DMR) first)
@@ -310,7 +311,7 @@ static bool start(const dmr_config_t *cfg, dmr_event_cb_t cb, void *ctx)
 	return true;
 }
 
-static void stop(void)
+HRC_FLASHFUNC static void stop(void)
 {
 	stack_cb = NULL;
 	if (active && !AIR_ON() && hrc7000_dmr_is_transmitting(&eng)) {
@@ -318,24 +319,24 @@ static void stop(void)
 	}
 }
 
-static void configure(const dmr_config_t *cfg) { if (!AIR_ON()) hrc7000_dmr_configure(&eng, cfg); }
-static void rx_restart(void) { if (!AIR_ON()) hrc7000_dmr_rx_restart(&eng); }
-static void rx_lock_slot(int8_t ts) { if (!AIR_ON()) hrc7000_dmr_rx_lock_slot(&eng, ts); }
+HRC_FLASHFUNC static void configure(const dmr_config_t *cfg) { if (!AIR_ON()) hrc7000_dmr_configure(&eng, cfg); }
+HRC_FLASHFUNC static void rx_restart(void) { if (!AIR_ON()) hrc7000_dmr_rx_restart(&eng); }
+HRC_FLASHFUNC static void rx_lock_slot(int8_t ts) { if (!AIR_ON()) hrc7000_dmr_rx_lock_slot(&eng, ts); }
 
-static bool tx_begin(dmr_timing_t timing, int8_t ts, dmr_access_t access)
+HRC_FLASHFUNC static bool tx_begin(dmr_timing_t timing, int8_t ts, dmr_access_t access)
 {
 	return active && !AIR_ON() && hrc7000_dmr_tx_begin(&eng, timing, ts, access);
 }
 
-static bool tx_queue(const dmr_tx_burst_t *b) { return !AIR_ON() && hrc7000_dmr_tx_queue(&eng, b); }
-static uint8_t tx_queue_space(void) { return AIR_ON() ? 0 : hrc7000_dmr_tx_queue_space(&eng); }
-static void tx_listen(void) { if (!AIR_ON()) hrc7000_dmr_tx_listen(&eng); }
-static int8_t tx_fill(const dmr_tx_burst_t *b) { return AIR_ON() ? -1 : hrc7000_dmr_tx_fill(&eng, b); }
-static void tx_end(void) { if (!AIR_ON()) hrc7000_dmr_tx_end(&eng); }
-static void tx_abort(void) { if (!AIR_ON()) hrc7000_dmr_tx_abort(&eng); }
-static void set_embedded_lc(const uint8_t lc[9]) { if (!AIR_ON()) hrc7000_dmr_set_embedded_lc(&eng, lc); }
-static void set_cc_filter(int8_t cc) { if (!AIR_ON()) hrc7000_dmr_set_cc_filter(&eng, cc); }
-static bool is_transmitting(void) { return !AIR_ON() && hrc7000_dmr_is_transmitting(&eng); }
+HRC_FLASHFUNC static bool tx_queue(const dmr_tx_burst_t *b) { return !AIR_ON() && hrc7000_dmr_tx_queue(&eng, b); }
+HRC_FLASHFUNC static uint8_t tx_queue_space(void) { return AIR_ON() ? 0 : hrc7000_dmr_tx_queue_space(&eng); }
+HRC_FLASHFUNC static void tx_listen(void) { if (!AIR_ON()) hrc7000_dmr_tx_listen(&eng); }
+HRC_FLASHFUNC static int8_t tx_fill(const dmr_tx_burst_t *b) { return AIR_ON() ? -1 : hrc7000_dmr_tx_fill(&eng, b); }
+HRC_FLASHFUNC static void tx_end(void) { if (!AIR_ON()) hrc7000_dmr_tx_end(&eng); }
+HRC_FLASHFUNC static void tx_abort(void) { if (!AIR_ON()) hrc7000_dmr_tx_abort(&eng); }
+HRC_FLASHFUNC static void set_embedded_lc(const uint8_t lc[9]) { if (!AIR_ON()) hrc7000_dmr_set_embedded_lc(&eng, lc); }
+HRC_FLASHFUNC static void set_cc_filter(int8_t cc) { if (!AIR_ON()) hrc7000_dmr_set_cc_filter(&eng, cc); }
+HRC_FLASHFUNC static bool is_transmitting(void) { return !AIR_ON() && hrc7000_dmr_is_transmitting(&eng); }
 
 #if defined(CONFIG_HOTSPOT_SPLIT) && CONFIG_HOTSPOT_SPLIT
 // --- Split duplex (docs/spec/split-duplex.md 5): the slot clock and the TX half's BS outbound (hrc7000_bs.c) ---
@@ -598,7 +599,7 @@ HRC_FLASHFUNC void hrc_air_stats(hrc7000_air_stats_t *st)
 
 // --- Bring-up counters (the board's diagnostics page shows these lines first) ---
 
-void hrc_dmr_stats_reset(void)
+HRC_FLASHFUNC void hrc_dmr_stats_reset(void)
 {
 	// Every field before last_rx_type_info is a uint32_t counter (hrc7000_dmr.h); the ISRs update them
 	lock(NULL);
@@ -610,14 +611,14 @@ typedef struct {
 	char *p, *end;
 } out_t;
 
-static void put(out_t *o, const char *s)
+HRC_FLASHFUNC static void put(out_t *o, const char *s)
 {
 	while (*s && o->p < o->end) {
 		*o->p++ = *s++;
 	}
 }
 
-static void put_u(out_t *o, uint32_t v)
+HRC_FLASHFUNC static void put_u(out_t *o, uint32_t v)
 {
 	char t[11];
 	int n = 0;
@@ -630,21 +631,21 @@ static void put_u(out_t *o, uint32_t v)
 	}
 }
 
-static void put_x(out_t *o, uint32_t v, int digits)
+HRC_FLASHFUNC static void put_x(out_t *o, uint32_t v, int digits)
 {
 	for (int i = digits - 1; i >= 0 && o->p < o->end; i--) {
 		*o->p++ = "0123456789ABCDEF"[(v >> (4 * i)) & 0xFu];
 	}
 }
 
-static void put_kv(out_t *o, const char *k, uint32_t v)
+HRC_FLASHFUNC static void put_kv(out_t *o, const char *k, uint32_t v)
 {
 	put(o, k);
 	put_u(o, v);
 }
 
 // Lines of at most about 20 characters (the 120-pixel-wide diagnostics page)
-bool hrc_dmr_stats_line(uint8_t i, char *buf, uint8_t len)
+HRC_FLASHFUNC bool hrc_dmr_stats_line(uint8_t i, char *buf, uint8_t len)
 {
 	if (len == 0) {
 		return false;

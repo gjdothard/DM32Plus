@@ -246,6 +246,20 @@ make BOARD=<id> print-not-written       # what is not written yet
 notes give the reasons; a radio's hardware spec (`hardware-<id>.md`) holds the facts behind them. The switches off on
 most boards are `CONFIG_AUDIO_PROBE` (a bench diagnostic) and the ones that need a part the radio lacks.
 
+## P25 resource probe
+
+`make BOARD=<id> CONFIG_P25=y BUILD=build/p25-probe p25-resources` compiles a
+diagnostic object with the selected target ABI. Its `p25_bytes_*` symbol sizes
+report voice, engine, session, soft-modem and, with trunking enabled, follower
+state. The object is never linked into firmware. Use a separate `BUILD` for
+each switch combination. With P25 disabled it emits no size markers.
+
+These are individual type sizes, not a sum or a runtime allocation plan.
+Some state may share storage across modes. An enabled firmware link can discard
+unreferenced engines until channel integration calls them; its image size does
+not prove that an active P25 mode will fit. Check retained code, caller-owned
+state, task stacks and memory ownership before enabling the mode.
+
 ## Adding a feature
 
 1. Add the switch with a comment and its default to `config/features.mk`, to `FEATURES`, and to the dependency checks.

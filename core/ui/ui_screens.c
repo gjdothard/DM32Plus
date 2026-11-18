@@ -3849,6 +3849,7 @@ void ui_draw_data_dashboard(const radio_view_t *v, const ui_state_t *s, const ui
 	}
 	row_text(font, 5, 159, width - 10, TR("Refresh interval"), value, ui_col.dim, ui_col.fg, false);
 	dashboard_control(l, DATA_SERVER, 1, 171, width - 2, CONFIG_DMR_ARS);
+#if CONFIG_DMR
 	if (v->dmr.active) {
 		char id[16];
 		sb_init(&b, id, sizeof id);
@@ -3863,6 +3864,7 @@ void ui_draw_data_dashboard(const radio_view_t *v, const ui_state_t *s, const ui
 		sb_u32(&b, v->dmr.cc, 1);
 		row_text(font, 5, 191, width - 10, value, id, ui_col.fg, ui_col.dim, false);
 	}
+#endif
 	dashboard_subscriptions(s, &data, width, footer);
 	card_list_footer(s, footer, TR("OK Select"), TR("Back"), fit, sizeof fit);
 }

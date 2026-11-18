@@ -385,6 +385,14 @@ $(BUILD)/%.o: %.S
 size: $(TARGET).elf
 	$(SIZE) -A $< | grep -E '^\.(isr_vector|text|rodata|data|bss|ccmram)'
 
+# Target ABI sizes, without allocating these diagnostic markers in the image
+.PHONY: p25-resources
+p25-resources: tools/p25_resource_probe.c
+	@mkdir -p $(BUILD)/tools
+	$(CC) $(CFLAGS_APP) -c $< -o $(BUILD)/tools/p25_resource_probe.o
+	$(CROSS)nm --print-size --size-sort --radix=d $(BUILD)/tools/p25_resource_probe.o > $(BUILD)/tools/p25_resource_probe.sizes
+	@grep 'p25_bytes_' $(BUILD)/tools/p25_resource_probe.sizes || test '$(CONFIG_P25)' != y
+
 test: $(REGISTRY_JSON)
 	$(MAKE) -C tests/host
 
