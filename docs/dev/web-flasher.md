@@ -3,6 +3,11 @@
 
 # The Web Flasher
 
+Product custom builds use the [firmware build service](../spec/firmware-builds.md). The release-channel picker stays
+available while choosing features. Full/default selections use the published image; changed selections use the
+product's same-origin build proxy. Upgrade offers Edit build and preserves the installed selection by default.
+The build API is separate from reporting: selecting it does not enable telemetry or report uploads.
+
 The browser tool that backs up, installs, updates and restores a radio, from `site/static/js/flasher/`. For users it is the
 recommended way to install RadioFoundry ([Installing](../user/02-installing.md)); this page is for people who change it.
 The site that hosts it is described in [website.md](website.md).

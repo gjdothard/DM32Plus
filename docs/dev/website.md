@@ -41,6 +41,12 @@ npm packages: plain HTML, CSS and ES modules. `tools/ci.sh` builds the site and 
 
 ## Portable offline CPS
 
+Product feature selection uses the [on-demand build service](../../tools/firmware_builder/README.md).
+Full/default options use a published image. Changed options are built on the operator's compiler worker and verified
+against the requested version and enabled features before flashing. The worker has no Docker socket or public port.
+Its same-origin proxy is configured with `CPS_BUILD_API` and `CPS_BUILD_ORIGINS` on the production server.
+The root-owned Compose definition retains that connection across ordinary website updates.
+
 `tools/package_cps.py` packages a built site with an embeddable Windows Python runtime. Supply the runtime ZIP and
 a JSON file containing its published `sha256`, source `url`, and `version`. Verify that hash against the runtime
 publisher's release manifest. The packaging command has no network access and refuses existing output paths.

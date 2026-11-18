@@ -42,14 +42,15 @@ class ProductDocs(unittest.TestCase):
 			site.docs = self.guide
 			site.docs_pages("en")
 			index = (Path(out) / "docs/index.html").read_text(encoding="utf-8")
-			self.assertIn("DM32+ firmware guide", index)
+			title = self.product["brand"] + self.product["accent"] + " firmware guide"
+			self.assertIn(title, index)
 			self.assertEqual(index.count('<article class="card">'), len(self.guide.pages))
 			self.assertNotIn("USB Network Mode", index)
-			self.assertNotIn("Moving from Stock MD-380", index)
+			self.assertNotIn("Moving from Stock", index)
 			self.assertNotIn("Hardware survey", index)
 			self.assertFalse((Path(out) / "docs/spec").exists())
 			chapter = (Path(out) / "docs/user/02-installing.html").read_text(encoding="utf-8")
-			self.assertIn("DM32+ firmware guide", chapter)
+			self.assertIn(title, chapter)
 			self.assertNotIn('href="15-usb-network.html"', chapter)
 			self.assertNotIn("Zadig", chapter)
 

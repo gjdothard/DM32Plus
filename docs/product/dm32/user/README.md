@@ -27,7 +27,8 @@ Use **Install** in the header for firmware and **CPS** for channels, contacts, a
 ## Firmware scope
 
 The host connection uses the USB-to-serial **programming cable**. The radio does not provide a native USB data connection.
-USB network adapter mode, DFU/Zadig driver instructions, and upstream custom build services do not apply to this release.
+USB network adapter mode and DFU/Zadig driver instructions do not apply to this release.
+Custom selections use this project's build service; the original upstream build service is not used.
 VOX is not available in the current board implementation. Air band AM and broadcast FM receive are included,
 but their on-air verification is not recorded in the feature matrix.
 

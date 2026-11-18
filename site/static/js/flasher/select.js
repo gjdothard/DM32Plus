@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Picking features "a la carte": a set of switches for one radio that respects the dependencies in
 // config/features.mk (data/features.json "needs") and the radio's limits (BOARD_UNSUPPORTED). A selection that equals
 // a prebuilt variant can be flashed right away; any other is a custom build, which the build API makes on request (or
@@ -31,6 +32,7 @@ export class Selection {
 	useVariant(id) {
 		this.base = id;
 		this.on = new Set(this.radio.config[id]);
+		for (const name of this.radio.required) this.enable(name);
 	}
 
 	// Turning a switch on turns on what it needs; off turns off what needs it. Returns the switches that changed.

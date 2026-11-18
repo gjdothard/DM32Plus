@@ -329,7 +329,7 @@ for f in sys.argv[1:]:
 			tail -20 "$OUT/release-site.log"
 			bad "site release and beta tests (see $OUT/release-site.log)"
 		fi
-		for test in navigation product_docs; do
+		for test in navigation product_docs firmware_builder build_proxy builder_install offline_cps; do
 			if $SITE_PY "site/tests/${test}_test.py" > "$OUT/$test-site.log" 2>&1; then
 				ok "site $test tests: $(tail -3 "$OUT/$test-site.log" | head -1)"
 			else

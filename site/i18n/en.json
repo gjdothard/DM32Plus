@@ -523,7 +523,7 @@
  "flash.build.failed": "The firmware build failed: {error}",
  "flash.build.unavailable": "{error} You can also build the firmware yourself (see below).",
  "flash.build.built": "custom build {version}",
- "flash.build.on_request": "The firmware is built when you continue. This usually takes less than a minute.",
+ "flash.build.on_request": "Changed options are built when you continue. New builds may take several minutes; matching completed builds are reused.",
  "flash.build.version_on_request": "Version {ref} is built when you continue. This usually takes less than a minute.",
  "flash.nav.build_version": "Build Version {ref}",
  "flash.version.title": "Version {ref}.",
@@ -1988,5 +1988,8 @@
  "screen.language": "Language selection",
  "nav.home": "Home",
  "nav.releases": "Releases",
- "flash.err.build_unavailable": "Choose a published firmware release. Custom cloud builds are not available on this site."
+ "flash.err.build_unavailable": "Choose a published firmware release. Custom cloud builds are not available on this site.",
+ "flash.product.custom_help": "Full/default options use the published image. Changed options are built on demand and need internet access. Programming and recovery remain enabled.",
+ "group.network-usb-network-adapter-and-ip-over-dmr": "Networking and IP over DMR",
+ "group.host-link-and-usb": "Host connections"
 }

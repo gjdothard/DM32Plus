@@ -28,7 +28,13 @@ Without a usable codec, analog FM and DMR data can work, but DMR voice cannot.
 
 Online channels need an internet connection. A channel with no matching published image is unavailable.
 Semantic release tags use forms such as `v1.0.0`, `v1.0.0-dev.1`, and `v1.0.0-rc.1`.
-The installer uses the published product image; it does not offer upstream Amateur, Commercial, or Custom builds.
+Choose **Full** to use the published product image. To change what is included, choose a preset or **Custom** and
+select the features before continuing. Dependencies follow your choices: turning off a feature also turns off its dependents.
+Programming and recovery remain enabled so CPS can still connect and update the radio.
+
+A changed selection is compiled on demand and requires internet access to the build service. CPS shows queue and build progress;
+matching completed selections use the build cache. A build that exceeds memory limits reports the problem instead of being flashed.
+The selected release channel still determines the firmware version.
 
 ## Install
 
@@ -49,6 +55,9 @@ Manufacturer CPS files are not interchangeable with every supported import forma
 Start with DM32+ running normally and choose **Update**. Connect, choose the desired release channel, and follow the
 installer's instructions. Save a current codeplug before updating. Check the installed version in
 **Settings > Advanced > About** afterward.
+
+Choose **Edit build** to enable or disable firmware features before upgrading. The existing selection is the starting point.
+Review choices for features added since your installed build. **Keep build** returns to preserving the installed selection.
 
 The [Releases page](https://github.com/gjdothard/DM32Plus/releases) contains this project's downloads and release notes.
 

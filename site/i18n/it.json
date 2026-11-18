@@ -509,7 +509,7 @@
  "flash.build.failed": "La compilazione del firmware è fallita: {error}",
  "flash.build.unavailable": "{error} Puoi anche compilare il firmware da solo (vedi sotto).",
  "flash.build.built": "build personalizzata {version}",
- "flash.build.on_request": "Il firmware viene compilato quando continui. Di solito richiede meno di un minuto.",
+ "flash.build.on_request": "Le opzioni modificate vengono compilate quando continui. Le nuove compilazioni possono richiedere diversi minuti; quelle già disponibili vengono riutilizzate.",
  "flash.build.version_on_request": "La versione {ref} viene compilata quando continui. Di solito richiede meno di un minuto.",
  "flash.nav.build_version": "Compila la versione {ref}",
  "flash.version.title": "Versione {ref}.",
@@ -1988,5 +1988,8 @@
  "screen.language": "Selezione della lingua",
  "nav.home": "Home",
  "nav.releases": "Versioni",
- "flash.err.build_unavailable": "Scegli una versione del firmware pubblicata. Questo sito non offre build personalizzate nel cloud."
+ "flash.err.build_unavailable": "Scegli una versione del firmware pubblicata. Questo sito non offre build personalizzate nel cloud.",
+ "flash.product.custom_help": "Le opzioni complete predefinite usano l’immagine pubblicata. Le opzioni modificate vengono compilate su richiesta e richiedono internet. Programmazione e ripristino restano attivi.",
+ "group.network-usb-network-adapter-and-ip-over-dmr": "Reti e IP su DMR",
+ "group.host-link-and-usb": "Connessioni al computer"
 }

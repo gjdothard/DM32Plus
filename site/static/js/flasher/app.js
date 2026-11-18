@@ -26,6 +26,7 @@ import { pickProblem, errorProblem, vendorContext, supportedFiles, foldSupported
 import { confirmNoCodec } from "./nocodec.js";
 import { PRODUCT, CHANNELS, bundledRelease, loadBundledRelease, lookupRelease, supportsBundledFirmware } from "./release-channels.js";
 import product from "../product.js";
+import { publishedSelection, buildSelectionKey, checkCustomManifest } from "./custom-build.js";
 import { makePlan, KEEP, MERGE } from "./plan.js";
 import { radioPicture, holdKeys } from "./radiotop.js";
 import { validRef, refShort, defaultRef, firmwareName, betaLink } from "./version.js";
@@ -143,11 +144,9 @@ const initialState = () => ({
 });
 const S = initialState();
 
-// Custom builds and the flash log
-const API = product.build_api || null;
-// minimal non-invasive reporting for helping the RadioFoundry project track programming failures; opt out with
-// ?reporting=0
-const FLASH_LOG = !!API && new URLSearchParams(location.search).get("reporting") !== "0";
+// Custom builds use the product's build service. Reports remain local downloads.
+const API = product.build_api ? new URL(product.build_api, location.href).href : null;
+const FLASH_LOG = false;
 
 // A version link (/flash/?version=<tag, full commit hash or branch name>) builds that version instead of the latest release. The tab keeps
 // it for the session, so a reload or a visit to another page doesn't lose it; ?version= (empty) or the banner drops it.
@@ -194,7 +193,7 @@ function confirmVersion() {
 
 // on every step while a version link is in use: what gets built, and the way back to the release
 function versionBanner() {
-	if (!VERSION_REF) return null;
+	if (bundledMode() || !VERSION_REF) return null;
 	const ok = validRef(VERSION_REF);
 	return h("div", { class: `notice ${ok ? "warn" : "bad"} version-banner` },
 		h("p", {}, ok ? [h("b", {}, t("flash.version.title", { ref: versionShort() })), " ", t("flash.version.text")] : t("flash.version.bad", { ref: VERSION_REF })),
@@ -914,7 +913,7 @@ async function connectForUpdate(status) {
 	S.decided = {};
 	planUpdate(S.current, S.selection, S.decided);
 	// a build the radio doesn't say: the build step, starting from the closest variant
-	S.editBuild = !bundledMode() && S.current.kind === "unknown";
+	S.editBuild = (!bundledMode() || !!API) && S.current.kind === "unknown";
 	diag.note("update: radio", { board: p.board, git: p.git, build: S.current.kind, preset: S.current.preset || S.current.guess || null });
 }
 
@@ -946,7 +945,7 @@ function updateView() {
 		const p = S.now.probe, cur = S.current;
 		// the radio's own build, unless the build step has the selection (edits kept when the user comes back)
 		const bundled = bundledMode();
-		const plan = bundled || S.editBuild ? { preset: bundled ? "full" : S.selection.matches(startCode), added: [], ask: [], ready: true } : planUpdate(cur, S.selection, S.decided);
+		const plan = (bundled && !API) || S.editBuild ? { preset: bundled && !API ? "full" : S.selection.matches(startCode), added: [], ask: [], ready: true } : planUpdate(cur, S.selection, S.decided);
 		// an image built for another selection no longer applies
 		if (S.firmware?.selection && S.firmware.selection !== selectionKey(S.selection)) S.firmware = null;
 		const vtitle = (id) => (t(`variant.${id}.title`) !== `variant.${id}.title` ? t(`variant.${id}.title`) : S.data.variants.find((v) => v.id === id)?.title || id);
@@ -979,14 +978,15 @@ function updateView() {
 			h("dl", { class: "kv-list" },
 				h("dt", {}, t("flash.update.radio")), h("dd", {}, S.radio.name),
 				h("dt", {}, t("flash.update.version")), h("dd", {}, t("flash.update.from_to", { from: firmwareName(p.version), to: updateVersion() })),
-				h("dt", {}, t("flash.update.build")), h("dd", {}, bundled ? PRODUCT : buildText, " ", bundled || cur.kind === "unknown" ? null : edit)),
+				h("dt", {}, t("flash.update.build")), h("dd", {}, bundled && !API ? PRODUCT : buildText, " ", (bundled && !API) || cur.kind === "unknown" ? null : edit)),
 			picker || (cur.kind === "unknown" ? notice(t("flash.update.unknown_text", { variant: vtitle(cur.guess) }), "info") : null),
 			S.editBuild ? null : asks, S.editBuild ? null : added, backup, backupPanel, image, status));
 		const go = async () => {
 			if (S.editBuild) return next();
+			const requested = selectionKey(S.selection);
 			if (!S.firmware && S.sim) await ensureFirmware();
 			if (!S.firmware && !S.sim) await requestBuild(draw);
-			if (S.firmware) next();
+			if (S.firmware && requested === selectionKey(S.selection) && stepsFor()[S.step] === "update") next();
 		};
 		S.forward(button(busy ? [spinner(), t("flash.nav.building")] : t(S.editBuild ? "flash.update.to_build" : "flash.update.go"), go,
 			{ primary: true, disabled: busy || (bundled && !releaseForRadio()) || (!S.editBuild && !plan.ready) || (S.updateBackup && !!backupPanel) }),
@@ -1045,6 +1045,7 @@ function variantLines(r) {
 }
 
 function selectRadio(r) {
+	if (bundledMode() && API) r = { ...r, required: [...new Set([...r.required, ...product.build_required])] };
 	if (S.radio && S.radio.id !== r.id) Promise.resolve(backend().release?.()).then(() => { S.c7 = null; });
 	S.radio = r;
 	S.board = fb().boards[r.flash.board];
@@ -1061,7 +1062,7 @@ function selectRadio(r) {
 // install: the build (variant, a la carte)
 
 function buildView() {
-	if (bundledMode() && !S.sim) return bundledBuildView();
+	if (bundledMode() && !API && !S.sim) return bundledBuildView();
 	const sel = S.selection;
 	const wrap = h("div", { class: "flasher" });
 	const vtitle = (v) => (t(`variant.${v.id}.title`) !== `variant.${v.id}.title` ? t(`variant.${v.id}.title`) : v.title);
@@ -1078,14 +1079,15 @@ function buildView() {
 	};
 	// Continue gets the image first: built on request, then on to the next step
 	const go = async () => {
-		if (!S.firmware && VERSION_REF && validRef(VERSION_REF)) {
+		const requested = selectionKey(sel);
+		if (!bundledMode() && !S.firmware && VERSION_REF && validRef(VERSION_REF)) {
 			const yes = await confirmVersion();
 			if (!yes) return;
 			if (yes === "release") dropVersion(false);	// and go on with the release
 		}
 		if (!S.firmware && S.sim) await ensureFirmware();
 		if (!S.firmware && !S.sim) await requestBuild(draw);
-		if (S.firmware || S.sim) next();
+		if ((S.firmware || S.sim) && requested === selectionKey(S.selection) && stepsFor()[S.step] === "build") next();
 	};
 	const forward = S.forward;
 	// the browser asks for a language the radio has a pack for and the build leaves it out: offer it (langsuggest.js)
@@ -1153,7 +1155,8 @@ function buildView() {
 		// every feature this radio supports, one collapsible group per feature-matrix group, each with its count
 		const groups = S.data.groups.map((g) => {
 			// what this radio can't run is listed too, grayed out, so nobody wonders where it went
-			const all = S.data.features.filter((f) => f.group === g && f.name !== "AUDIO_PROBE" && !startCode(f.name));
+			const all = S.data.features.filter((f) => f.group === g && f.name !== "AUDIO_PROBE" && !startCode(f.name)
+				&& (!bundledMode() || sel.supported(f.name)));
 			const items = all.filter((f) => sel.supported(f.name));
 			if (!all.length) return null;
 			const on = items.filter((f) => sel.on.has(f.name)).length;
@@ -1201,21 +1204,25 @@ function buildView() {
 					: t("flash.build.custom_start")));
 		const busy = building && !S.build.error;
 		const missing = buildOptions().find((o) => !S.buildOptions?.[o.name]);
-		forward(button(busy ? [spinner(), t("flash.nav.building")] : t(missing ? "flash.nav.choose" : S.firmware || S.sim ? `flash.nav.to_${stepsFor()[S.step + 1]}`
-			: VERSION_REF ? "flash.nav.build_version" : "flash.nav.build", { what: missing?.title.toLowerCase(), ref: VERSION_REF && versionShort() }), go, { primary: true, disabled: busy || !!missing }), summary);
+		const picker = bundledMode() ? releasePicker(draw, !!busy) : null;
+		const usingPublished = bundledMode() && publishedSelection(sel, S.buildOptions);
+		forward(button(busy ? [spinner(), t("flash.nav.building")] : usingPublished ? t("flash.product.continue") : t(missing ? "flash.nav.choose" : S.firmware || S.sim ? `flash.nav.to_${stepsFor()[S.step + 1]}`
+			: VERSION_REF ? "flash.nav.build_version" : "flash.nav.build", { what: missing?.title.toLowerCase(), ref: VERSION_REF && versionShort() }), go, { primary: true, disabled: busy || !!missing || (bundledMode() && !releaseForRadio()) }), summary);
 		// every image, prebuilt choice or not, comes from the build service (or is the user's own)
 		// the image's state, then building it yourself: one line and a fold under the features, not a card of its own
 		const image = h("div", { class: "build-image" },
 			S.firmware ? notice(t("flash.build.image_ready", { what: S.firmware.source }), "ok")
 				: building && S.build.error ? buildErrorNotice(S.build.error)
 				: building ? h("p", { class: "muted", role: "status" }, spinner(), S.build.text)
-				: h("p", { class: "small muted" }, t(S.sim ? "flash.sim.image" : VERSION_REF ? "flash.build.version_on_request" : "flash.build.on_request", { ref: versionShort() })),
+				: usingPublished ? null : h("p", { class: "small muted" }, t(S.sim ? "flash.sim.image" : VERSION_REF ? "flash.build.version_on_request" : "flash.build.on_request", { ref: versionShort() })),
 			h("details", { class: "small" }, h("summary", {}, t("flash.build.self_title")),
 				h("p", {}, t("flash.build.self_text")), h("pre", {}, h("code", {}, sel.makeCommand(S.buildOptions))),
 				filePicker(t("flash.build.own_image"), ".bin", (f) => loadOwnImage(f, draw)),
 				filePicker(t("flash.build.own_manifest"), ".json", async (f) => { S.ownManifest = JSON.parse(new TextDecoder().decode(f.data)); })));
 		wrap.replaceChildren(
 			panel(t("flash.build.title"),
+				picker,
+				bundledMode() ? notice(t("flash.product.custom_help"), "info") : null,
 				// "back up first" only where the original firmware can be backed up before the installation
 				S.radio.status !== "supported" ? notice(t(S.radio.backup?.stock === "none" ? "flash.build.untested_keep_file" : "flash.build.untested", { name: S.radio.name }), "bad") : null,
 				...options,
@@ -1316,7 +1323,8 @@ function nest(items) {
 	return out;
 }
 
-const selectionKey = (sel) => `${VERSION_REF || ""}:${sel.radio.id}:${JSON.stringify(S.buildOptions || {})}:${[...sel.on].sort().join(",")}`;
+const selectionKey = (sel) => buildSelectionKey(sel, bundledMode() ?
+	JSON.stringify([releaseForRadio()?.version, !!releaseForRadio()?.testing]) : VERSION_REF, S.buildOptions);
 
 // Ask the build API for the current selection, wait for it, and take the image like a release's
 async function requestBuild(redraw) {
@@ -1325,19 +1333,22 @@ async function requestBuild(redraw) {
 	S.build = { selection: key, text: t("flash.build.sending") };
 	redraw();
 	try {
-		if (bundledMode()) {
+		if (bundledMode() && publishedSelection(sel, S.buildOptions)) {
 			const firmware = await loadBundledRelease(releaseForRadio(), ROOT, fb());
 			if (current()) {
-				S.firmware = firmware;
+				S.firmware = { ...firmware, selection: key };
 				S.build = null;
 				redraw();
 			}
 			return;
 		}
 		const rels = S.data.releases.filter((x) => x.board === S.radio.id);
-		if (VERSION_REF && !validRef(VERSION_REF)) throw new Error(t("flash.version.bad", { ref: VERSION_REF }));
+		if (!bundledMode() && VERSION_REF && !validRef(VERSION_REF)) throw new Error(t("flash.version.bad", { ref: VERSION_REF }));
 		const id = useId();
-		let b = await api("POST", "builds", { board: S.radio.id, ref: VERSION_REF || (rels.length ? rels[rels.length - 1].version : defaultRef(S.data.site.branch)), features: [...sel.on].sort(),
+		const ref = bundledMode() ? releaseForRadio()?.version : VERSION_REF || (rels.length ? rels[rels.length - 1].version : defaultRef(S.data.site.branch));
+		const testing = bundledMode() && !!releaseForRadio()?.testing;
+		if (bundledMode() && !ref) throw new Error(t("flash.build.no_image"));
+		let b = await api("POST", "builds", { board: S.radio.id, ref, testing, features: [...sel.on].sort(),
 			options: S.buildOptions || {}, tool: "web", tool_version: S.data.site.version || "", task: "install", id, ...(id ? { languages: browserLanguages() } : {}) });
 		while (b.status === "queued" || b.status === "running") {
 			if (!current()) return;
@@ -1356,6 +1367,7 @@ async function requestBuild(redraw) {
 		const [m, img] = await Promise.all([fetch(new URL(b.manifest, API)).then((r) => r.json()),
 			fetch(new URL(b.image, API)).then((r) => r.arrayBuffer()).then((x) => new Uint8Array(x))]);
 		await verify(m, img, fb(), S.board.id);
+		if (bundledMode()) checkCustomManifest(m, sel, product, ref, testing);
 		for (const [name, value] of Object.entries(S.buildOptions || {}))
 			if (m.build_options?.[name] !== value) throw new Error(t("flash.build.wrong_options", { name, value }));
 		if (!current()) return;
@@ -2837,8 +2849,7 @@ async function main() {
 		app.replaceChildren(notice(t("flash.err.load"), "bad"), reportLine());
 		return;
 	}
-	initReporting({ tool: "flasher", context: reportContext, attachments: reportAttachments,
-		backend: API ? { api: API, meta: reportMeta, practice: () => !!S.sim || SIM_HASH.test(location.hash) } : undefined });
+	initReporting({ tool: "flasher", context: reportContext, attachments: reportAttachments });
 	c7ui.init({ S, next, render, reset, helpLink, manualKitLine, fb, flashStarted, flashFinished, flashMark, noteReadout, errorText, analysisOffer, problemNotice, failureNotice, useAdapter,
 		stubJson: () => fetch(`${ROOT}data/c7000-stub.json`).then((r) => r.json()) });
 	// #sim=<board>[-stock|-romfail|-slowcable|-openfw|-openfw-nocodec]: that board, running RadioFoundry, its stock firmware or another
