@@ -18,6 +18,12 @@ TESTS += fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 	modemGlueTest modemGlueTestNoAir modemGlueTestSplit modemGlueTestNoAirSplit
 TESTS += pcmGateTest pcmGateTestNoAir pcmGateTestVox pcmGateTestNoAirVox modemGluePcmTest
 TESTS += vocoderMemoryTest vocoderMemoryTestTrunk vocoderMemoryTestNoP25
+TESTS += p25CodeplugTest p25CodeplugTestTrunk
+
+p25CodeplugTest: p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c $(CORE)/p25/p25_codeplug.h ../vectors/p25-codeplug.txt
+	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c
+p25CodeplugTestTrunk: p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c $(CORE)/p25/p25_codeplug.h ../vectors/p25-codeplug.txt
+	$(CC) $(CFLAGS) $(P25_FLAGS) -UCONFIG_P25_TRUNK -DCONFIG_P25_TRUNK=1 -o $@ p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c
 
 P25_MEMORY := vocoderMemoryTest.c $(CORE)/p25/p25_workspace.c
 P25_MEMORY_DEPS := $(ROOT)/platform/hrc7000/vocoder.c $(P25_HEADERS) $(ROOT)/hal/hal_vocoder.h \
@@ -143,6 +149,8 @@ run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 	./imbeEncTest
 	./p25TrunkTest
 	./p25VoiceTest
+	./p25CodeplugTest
+	./p25CodeplugTestTrunk
 	./ambeVoiceTest
 	./vocoderMemoryTest
 	./vocoderMemoryTestTrunk
@@ -152,3 +160,4 @@ run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 
 run-p25: pcmGateTest pcmGateTestNoAir pcmGateTestVox pcmGateTestNoAirVox modemGluePcmTest ambeVoiceTest
 run-p25: vocoderMemoryTest vocoderMemoryTestTrunk vocoderMemoryTestNoP25
+run-p25: p25CodeplugTest p25CodeplugTestTrunk

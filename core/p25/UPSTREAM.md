@@ -12,7 +12,7 @@ The import includes:
 - `core/air/`, `core/fec/`, `core/dsp/`, `core/mbe/`.
 - `hal/hal_air.h` and `hal/hal_baseband.h`.
 - `core/p25/` framing, receive/call engine, voice, signaling and follower sources;
-  it excludes upstream's codeplug codec and all radio-core integration.
+  the initial import excluded the codeplug codec and radio-core integration.
 - The host sources `fecTest.c`, `airFramerTest.c`, `p25Test.c`,
   `p25EngineTest.c`, `mbeTest.c`, `imbeEncTest.c`, `p25TrunkTest.c`,
   `p25VoiceTest.c`, `fxpTest.c`, and `airSoftmodemTest.c`.
@@ -72,3 +72,15 @@ the imported state types and borrows idle codec state through optional HAL loan
 hooks. The HR_C7000 adaptation lends its existing encoder-state buffer, excludes
 codec calls while lent and reinitializes both codec states after return. It never
 lends or changes the private codec's executable window or flash slot.
+
+The follow-on `p25_codeplug.[ch]` import reuses the parameter-only sections of
+the pinned upstream: conventional, unit-ID, trunk-system, site, control-channel
+and identifier codecs. Function bodies are unchanged. Storage/tag/system loaders
+remain deferred until their generic backend is ported; the header includes
+`config.h` instead of the absent backend model. The alternative local record
+format was discarded before commit. `p25CodeplugTest.c` isolates upstream's
+vector test, skips unrelated name checks, uses standard C tokenization, and
+checks 28/39 applicable rows. `tests/vectors/p25-codeplug.txt` contains the
+unchanged P25 rows from upstream's `tests/vectors/channel-modes.txt`, with the
+original MIT notice retained. The [integration spec](../../docs/spec/p25-codeplug.md)
+records the backend dependencies and safe stand-in/RX-only adaptation still needed.

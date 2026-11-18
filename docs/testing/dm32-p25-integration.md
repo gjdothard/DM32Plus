@@ -56,7 +56,7 @@ preserve DM32Plus history, product identity, custom UI and release configuration
 | M0 | Complete | Branch, revision pins, clean-room/provenance review. | Branch based on main; no foreign/GPL implementation imported. |
 | M1 | Complete (host) | FEC, air framing/session/soft modem, IMBE, P25 engines and follower. | Eleven host configurations pass with warnings as errors; notices retained. |
 | M2 | In progress | Build switches, optional board interfaces, modem/audio ownership and target baseline. | Default and feature-off builds clean; provider tests and target stack/RAM checks pass. |
-| M3 | Queued | Versioned channel/system records and RX-only admission. | Existing records preserved; real record decoder passes the permission matrix above. |
+| M3 | In progress | Upstream tagged channel/system records and RX-only admission. | Existing records preserved; real record decoder passes the permission matrix above. |
 | M4 | Queued | Conventional P25 radio-core receive and transmit. | Stored-channel RX/TX, startup/failure cleanup, RX-only PTT refusal and FM/DMR transitions pass host integration tests. |
 | M5 | Queued | Trunked acquisition, grant following and active subscriber path. | Hunt/hold/follow/return and allowed TX pass simulated-site tests; RX-only blocks every signaling path. |
 | M6 | Queued | Product UI and companion CPS. | Mode/settings editing, capability/version checks and firmware/CPS round trips work; translations and gallery reviewed. |
@@ -112,7 +112,38 @@ then M4 will consume the workspace lease during mode changes. M2's physical FIFO
 and throughput qualification still needs an owner-authorized hardware session. Do not
 advertise P25 in VERSION, the UI or CPS until the matching integration gates pass.
 
-## Target resource baseline (2026-11-18)
+## Current work: M3 and reuse strategy
+
+Before implementing each remaining layer, compare the pinned upstream's code,
+spec and tests. Reuse its format and implementation where possible; adapt only
+the local storage map, product UI, CPS behavior, RX-only admission and stricter
+memory ownership. Batch target links after backend changes stabilize. Use
+focused host/configuration tests during pure-codec and format work.
+
+- [x] M3.1: Import the parameter-only portions of `p25_codeplug.[ch]` and all
+  39 upstream P25 vectors (28 apply without trunking). No alternate record format.
+- [ ] M3.2: Port `codeplug_kv`, `codeplug_tag`, `codeplug_modes` and
+  `codeplug_records` with their simulated-flash and power-cut tests. Preserve
+  the fork's talkgroup/AES extensions and foreign-data protection.
+- [ ] M3.3: Restore upstream P25 storage loaders and adapt the logical channel
+  model. Test malformed/missing tags, copies, deletes, saves and CPS round trips.
+- [ ] M3.4: Prove channel RX-only and system listen-only block PTT and all
+  automatic signaling. `NO_REG` is not receive-only permission.
+
+The upstream tag writes the legacy base as receive-only DMR and reconstructs
+logical P25 permissions from its TX flag. The existing CPS checkbox must edit
+that logical permission through the P25 adapter; reading only the base bit is
+insufficient. Do not activate tagged channels until this mapping is tested.
+See [P25 codeplug integration](../spec/p25-codeplug.md).
+
+M4/M5 should adapt upstream `core/radio/radio_p25.[ch]`, including its task
+handoff, retune and queued signaling logic. Replace its simple memory-lending
+call with the local exclusive lease API and measure the complete owner state;
+the current minimum workspace does not include all future owner bookkeeping.
+M6 should reuse upstream `site/static/js/codeplug/mode_p25.js` where compatible
+with the companion CPS, preserving this fork's existing editor behavior.
+
+## Initial target resource baseline (2026-11-18)
 
 The existing local QEMU builder runs GCC 14.2.0 in
 `ghcr.io/radiofoundry/rfoundry-csky-gcc14:20261011b`, image ID
@@ -272,6 +303,7 @@ activate a P25 channel, or establish RF/voice interoperability.
 | M2.5 target build/resource milestone | Default, P25, conventional-only and DMR-off C-SKY images build with `-Werror`; default and P25 static task-stack checks pass. Retained-entry-point ELF and target ABI probe expose current code/state costs. Task-only placement fixes a 2,152-byte RAM overflow. | Caller-owned P25 state is not allocated yet; memory ownership and restoration remain open. |
 | Host checks after target placement | All 23 `run-p25` executables and 9 Python build/attribution/probe/feature-off checks pass. | Full CI and owner-authorized hardware qualification remain pending. |
 | M2.5c memory ownership | 26 `run-p25` executables and 10 Python checks pass; real codec-wrapper/workspace ownership tests pass with P25/trunking independently on/off. Target probe confirms the grouped workspace fits the existing encoder pool, and four firmware configurations build without warnings. | Codec stand-ins validate the wrapper, not proprietary codec behavior on hardware. The real channel owner has not acquired or released a workspace yet. |
+| M3.1 upstream codecs | Exact-source audit: 14 parameter/helper functions and all 39 P25 vectors match the pin. Vector tests: 30 checks without trunking, 42 with it. All 28 `run-p25` executables and 11 Python checks pass with warnings as errors. | Parameter bodies only; generic storage, loaders, RX-only admission and CPS mapping remain pending. Target links are batched with the backend integration. |
 | Scope update | Owner requested retaining TX and honoring existing CPS RX-only; permission matrix above replaces the earlier passive-only product scope. | Hardware TX still requires its own authorized test session and --allow-rf. |
 
 Local ignored test output is in `build/p25-host`. Python works outside the
