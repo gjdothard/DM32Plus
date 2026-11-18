@@ -6,7 +6,8 @@
 
 Status: the parameter codecs and shared vectors are imported from RadioFoundry
 `c34dc440aaf2d3952458bc0bd85b8c56c76f6b23`. The generic keyed store, channel
-tags, system readers and radio-core loaders are not connected yet. No P25
+tags, system readers and radio-core loaders are not connected yet. The keyed
+store is now imported and tested separately. No P25
 channel can be programmed or activated through this import alone.
 
 ## Reuse boundary
@@ -21,7 +22,7 @@ The upstream integration uses these shared layers:
 
 | Layer | Purpose | Local status |
 |---|---|---|
-| `codeplug_kv` | Versioned keyed EEPROM sector, CRC, journaled batches and raw-transfer preservation | Pending |
+| `codeplug_kv` | Versioned keyed EEPROM sector, CRC, journaled batches and raw-transfer preservation | Imported; host tested; transfer callers pending |
 | `codeplug_tag` | Bind a channel kind and its parameters to a legacy channel | Pending |
 | `codeplug_records` | Radio-wide records, systems, sites, control channels and identifier plans | Pending |
 | `p25_codeplug` loaders | Resolve identity, targets, channel parameters and a trunked system | Pending |

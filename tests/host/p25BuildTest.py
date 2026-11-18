@@ -96,13 +96,14 @@ class P25BuildTest(unittest.TestCase):
         for settings in [(), ("CONFIG_DMR=n",), ("CONFIG_P25=y", "CONFIG_P25_TRUNK=n")]:
             with self.subTest(settings=settings):
                 data = self.probe(*settings)
-                result = subprocess.run(
-                    shlex.split(OPTIONS.cc) + ["-std=gnu99", "-Wall", "-Wextra", "-Wshadow", "-Werror",
-                                              "-Icore", "-Ihal"]
-                    + shlex.split(data["DEFS"])
-                    + ["-c", "core/p25/p25_codeplug.c", "-o", str(self.work / "p25-codeplug.o")],
-                    cwd=ROOT, text=True, capture_output=True)
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                for module in ("core/p25/p25_codeplug.c", "core/codeplug/codeplug_kv.c"):
+                    result = subprocess.run(
+                        shlex.split(OPTIONS.cc) + ["-std=gnu99", "-Wall", "-Wextra", "-Wshadow", "-Werror",
+                                                  "-Icore", "-Ihal"]
+                        + shlex.split(data["DEFS"])
+                        + ["-c", module, "-o", str(self.work / (Path(module).stem + ".o"))],
+                        cwd=ROOT, text=True, capture_output=True)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_resource_probe_markers(self):
         for settings, enabled, trunk in [

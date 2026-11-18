@@ -84,3 +84,15 @@ checks 28/39 applicable rows. `tests/vectors/p25-codeplug.txt` contains the
 unchanged P25 rows from upstream's `tests/vectors/channel-modes.txt`, with the
 original MIT notice retained. The [integration spec](../../docs/spec/p25-codeplug.md)
 records the backend dependencies and safe stand-in/RX-only adaptation still needed.
+
+`core/codeplug/codeplug_kv.[ch]` and `tests/host/codeplugKvTest.c` are also from
+the pinned upstream. The backend is initially selected with `CONFIG_P25`.
+Local adaptations use the fork's existing storage-ready guard instead of the
+unavailable upstream foreign-codeplug API, reject absent callbacks and wrapping
+maps, refuse to format nonblank unknown contents anywhere in the sector, and
+reject a NULL nonempty operation batch. Raw commit holds the recursive storage
+lock across its keep decision and journal write. Local tests cover those guards
+and an injected writer at the unlock boundary; removing the outer lock makes
+that test lose the key. The full upstream power-cut/format/cursor suite remains.
+The simulated-flash read counter is adapted from upstream for its walk-cost tests.
+No transfer caller or channel tag is connected by this backend import alone.

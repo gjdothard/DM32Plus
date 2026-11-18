@@ -19,6 +19,12 @@ TESTS += fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 TESTS += pcmGateTest pcmGateTestNoAir pcmGateTestVox pcmGateTestNoAirVox modemGluePcmTest
 TESTS += vocoderMemoryTest vocoderMemoryTestTrunk vocoderMemoryTestNoP25
 TESTS += p25CodeplugTest p25CodeplugTestTrunk
+TESTS += codeplugKvTest
+
+codeplugKvTest: codeplugKvTest.c $(CORE)/codeplug/codeplug_kv.c $(CORE)/codeplug/codeplug_kv.h \
+	$(CORE)/codeplug/codeplug.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c sim/sim_flash.c sim/sim_flash.h
+	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ codeplugKvTest.c $(CORE)/codeplug/codeplug_kv.c \
+		$(CORE)/codeplug/codeplug.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c sim/sim_flash.c
 
 p25CodeplugTest: p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c $(CORE)/p25/p25_codeplug.h ../vectors/p25-codeplug.txt
 	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c
@@ -151,6 +157,7 @@ run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 	./p25VoiceTest
 	./p25CodeplugTest
 	./p25CodeplugTestTrunk
+	./codeplugKvTest
 	./ambeVoiceTest
 	./vocoderMemoryTest
 	./vocoderMemoryTestTrunk
@@ -161,3 +168,4 @@ run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 run-p25: pcmGateTest pcmGateTestNoAir pcmGateTestVox pcmGateTestNoAirVox modemGluePcmTest ambeVoiceTest
 run-p25: vocoderMemoryTest vocoderMemoryTestTrunk vocoderMemoryTestNoP25
 run-p25: p25CodeplugTest p25CodeplugTestTrunk
+run-p25: codeplugKvTest

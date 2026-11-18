@@ -125,6 +125,10 @@ focused host/configuration tests during pure-codec and format work.
 - [ ] M3.2: Port `codeplug_kv`, `codeplug_tag`, `codeplug_modes` and
   `codeplug_records` with their simulated-flash and power-cut tests. Preserve
   the fork's talkgroup/AES extensions and foreign-data protection.
+- [x] M3.2a (host): Reuse the upstream keyed store and its full test suite.
+  Adapt local storage guards, preserve unknown data and serialize raw commits.
+- [ ] M3.2b: Port the mode registry, tag layer and system readers. Before any
+  channel activation, verify unsupported modes remain parked with features off.
 - [ ] M3.3: Restore upstream P25 storage loaders and adapt the logical channel
   model. Test malformed/missing tags, copies, deletes, saves and CPS round trips.
 - [ ] M3.4: Prove channel RX-only and system listen-only block PTT and all
@@ -304,6 +308,7 @@ activate a P25 channel, or establish RF/voice interoperability.
 | Host checks after target placement | All 23 `run-p25` executables and 9 Python build/attribution/probe/feature-off checks pass. | Full CI and owner-authorized hardware qualification remain pending. |
 | M2.5c memory ownership | 26 `run-p25` executables and 10 Python checks pass; real codec-wrapper/workspace ownership tests pass with P25/trunking independently on/off. Target probe confirms the grouped workspace fits the existing encoder pool, and four firmware configurations build without warnings. | Codec stand-ins validate the wrapper, not proprietary codec behavior on hardware. The real channel owner has not acquired or released a workspace yet. |
 | M3.1 upstream codecs | Exact-source audit: 14 parameter/helper functions and all 39 P25 vectors match the pin. Vector tests: 30 checks without trunking, 42 with it. All 28 `run-p25` executables and 11 Python checks pass with warnings as errors. | Parameter bodies only; generic storage, loaders, RX-only admission and CPS mapping remain pending. Target links are batched with the backend integration. |
+| M3.2a keyed-store reuse | Full imported NOR/power-cut suite plus local guard/interleaving tests: 4,471 checks pass. Removing the raw-commit outer lock reproduces key loss and fails the new regression. All 29 `run-p25` executables, 11 Python checks and both existing codeplug test configurations pass. | Host only; no transfer caller or tagged channel is activated. Target linking/resource checks are batched with the tag/reader integration. |
 | Scope update | Owner requested retaining TX and honoring existing CPS RX-only; permission matrix above replaces the earlier passive-only product scope. | Hardware TX still requires its own authorized test session and --allow-rf. |
 
 Local ignored test output is in `build/p25-host`. Python works outside the
