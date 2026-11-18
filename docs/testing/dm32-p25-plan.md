@@ -3,6 +3,11 @@
 
 # P25 upstream integration assessment
 
+The working checklist, current scope and test evidence are maintained in the
+[integration tracker](dm32-p25-integration.md). The owner has expanded the
+initial passive-only scope: retain conventional and trunked TX while honoring
+the existing CPS RX-only option. This assessment is background to that plan.
+
 Assessment: 2026-11-18. The initial host foundation is imported on
 `codex/p25-integration`; radio firmware selection is unchanged. Nothing was
 installed or tested on hardware.
@@ -16,7 +21,7 @@ installed or tested on hardware.
 ## Decision
 
 Use current RadioFoundry's MIT firmware as the implementation source for P25
-Phase 1 and passive trunking. An independent trunking implementation is no
+Phase 1 and trunking. An independent trunking implementation is no
 longer the first choice. Do not import the GPL fork or assume access to private
 Open25 Next source.
 
@@ -53,18 +58,21 @@ board/air provider and codeplug contracts, then adapt product radio/UI/CPS paths
 
 ## Requested behavior
 
-Passive Phase 1 trunking: decode control signaling, follow desired clear group
-calls, and return to control. Never register, affiliate, acknowledge, or request
-a voice channel. PTT must be refused for trunked channels. Conventional P25
-transmit is optional and is not required for passive trunking.
+Conventional and trunked Phase 1 receive and transmit, with the existing CPS
+RX-only option respected. RX-only channels must not register, affiliate,
+request a voice channel or transmit on PTT. A listen-only system independently
+inhibits transmit. Channels and systems permitting transmit retain the upstream
+active paths and normal admission checks. The tracker gives the permission
+matrix and migration test requirements.
 
 Start with C4FM Phase 1 control and voice channels within the board's usable
-bands. Phase 2 voice, LSM/CQPSK, encryption, extra RF bands, and trunked transmit
-are outside this integration's acceptance scope. One receiver misses control
+bands. Phase 2 voice, LSM/CQPSK, encryption and extra RF bands are outside this
+integration's acceptance scope. One receiver misses control
 signaling while following voice; quantify the practical effect.
 
-Before hardware qualification, identify the intended system's frequencies,
-control and voice modulation, Phase 1 availability, site, and talkgroups. A
+Before hardware qualification, select representative test frequencies, control
+and voice modulation, Phase 1 calls, site and talkgroups; no particular live
+system is required by the owner. A
 700/800 MHz-only target is outside the DM-32UV's coverage. Unsupported TDMA or
 encrypted grants must be skipped rather than interpreted as clear Phase 1.
 
@@ -104,8 +112,9 @@ also be audited for product-specific differences.
 - `P25_TSYS_NO_REG` / `P25_FOLLOW_NO_REG` is not a passive mode: it can request
   voice without registration. Never present it as receive-only in the CPS.
 
-Configure both the system as listen-only and its channels as RX-only. Test
-these controls through the real CPS record decoder and radio state machine,
+For passive operation configure the system as listen-only or its channels as
+RX-only. Retain TX when both allow it. Test these controls through the real CPS
+record decoder and radio state machine,
 including restart, failed load, mode changes, retuning and PTT while following
 voice. Measure zero RF emissions during the separately authorized bench session.
 Upstream also implements active trunked transmit; merely enabling
@@ -125,16 +134,16 @@ Upstream also implements active trunked transmit; merely enabling
    storage/data changes. Audit each against new modes and record formats. The
    local CI/release tools need explicit adaptation because upstream's build and
    test tooling has also changed.
-4. Add passive P25 system/channel editing to the companion CPS against the exact
+4. Add P25 system/channel editing to the companion CPS against the exact
    imported record specification. Preserve FM/DMR and unknown records; do not
    initialize or erase on detection. Reject incompatible firmware explicitly.
 5. Enable P25 and P25 trunking in the product preset and verify default and
    feature-off builds. Upstream `CONFIG_P25` currently needs `CONFIG_DMR` because
    it uses codeplug contacts. It derives IMBE, AIR and MBE dependencies. Decide
    whether NXDN belongs in this product separately; do not enable it incidentally.
-6. Run host, storage, UI, C-SKY stack/ABI and firmware checks, then qualify passive
-   control acquisition and voice following against an independent source and
-   the intended site type. Record built, bench-tested and live-system-tested
+6. Run host, storage, UI, C-SKY stack/ABI and firmware checks, then qualify
+   control acquisition, voice following and allowed TX against independent
+   equipment and representative site types. Record built, bench-tested and live-system-tested
    separately. Live reception alone does not establish all failure behavior.
 
 Prefer carrying the coordinated upstream firmware over cherry-picking the P25

@@ -14,7 +14,10 @@ P25_HEADERS := $(wildcard $(CORE)/p25/*.h $(CORE)/air/*.h $(CORE)/fec/*.h $(CORE
 	$(CORE)/dsp/fxp.h $(ROOT)/hal/hal_air.h $(ROOT)/hal/hal_baseband.h
 
 TESTS += fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest imbeEncTest \
-	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest
+	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest boardAirTest
+
+boardAirTest: boardAirTest.c $(CORE)/air/air_session.c $(P25_FRAMER) $(P25_HEADERS) $(ROOT)/hal/board.h
+	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ boardAirTest.c $(CORE)/air/air_session.c $(P25_FRAMER)
 
 fecTest: fecTest.c $(P25_FEC) $(P25_HEADERS)
 	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ fecTest.c $(P25_FEC)
@@ -57,7 +60,8 @@ airSoftmodemTest: airSoftmodemTest.c $(CORE)/air/air_softmodem.c $(P25_UNITS) $(
 .PHONY: run-p25
 run: run-p25
 run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest imbeEncTest \
-	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest
+	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest boardAirTest
+	./boardAirTest
 	./fecTest
 	./airFramerTest
 	./p25Test
