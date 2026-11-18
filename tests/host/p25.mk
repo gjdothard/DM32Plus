@@ -16,6 +16,7 @@ P25_HEADERS := $(wildcard $(CORE)/p25/*.h $(CORE)/air/*.h $(CORE)/fec/*.h $(CORE
 TESTS += fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest imbeEncTest \
 	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest boardAirTest hrc7000AirTest \
 	modemGlueTest modemGlueTestNoAir modemGlueTestSplit modemGlueTestNoAirSplit
+TESTS += pcmGateTest pcmGateTestNoAir pcmGateTestVox pcmGateTestNoAirVox modemGluePcmTest
 
 P25_HRC7 := $(ROOT)/drivers/modem/hrc7000
 P25_GLUE := modemGlueTest.c $(P25_HRC7)/hrc7000_air.c $(P25_HRC7)/hrc7000_dmr.c \
@@ -23,6 +24,25 @@ P25_GLUE := modemGlueTest.c $(P25_HRC7)/hrc7000_air.c $(P25_HRC7)/hrc7000_dmr.c 
 P25_GLUE_DEPS := $(ROOT)/platform/hrc7000/dmr_glue.c $(wildcard $(ROOT)/platform/hrc7000/*.h) \
 	$(wildcard $(P25_HRC7)/*.h stubs/modem_rtos/*.h) $(P25_HEADERS)
 P25_GLUE_FLAGS := -I$(ROOT)/platform/hrc7000 -Istubs/modem_rtos
+P25_PCM := pcmGateTest.c sim/afsk_platform_sim.c $(P25_HRC7)/hrc7000.c \
+	$(CORE)/aprs/afsk.c $(CORE)/aprs/hdlc.c $(CORE)/aprs/ax25.c
+P25_PCM_DEPS := $(ROOT)/platform/hrc7000/audio_pcm.c $(ROOT)/platform/hrc7000/hrc_afsk.c \
+	$(P25_GLUE_DEPS) $(ROOT)/drivers/audio/miclevel/miclevel.h
+P25_PCM_FLAGS := $(P25_FLAGS) $(P25_GLUE_FLAGS) -DCONFIG_APRS_RX=0
+
+pcmGateTest: $(P25_PCM) $(P25_PCM_DEPS)
+	$(CC) $(CFLAGS) $(P25_PCM_FLAGS) -DCONFIG_VOX=0 -o $@ $(P25_PCM) -lm
+pcmGateTestVox: $(P25_PCM) $(P25_PCM_DEPS)
+	$(CC) $(CFLAGS) $(P25_PCM_FLAGS) -DCONFIG_VOX=1 -o $@ $(P25_PCM) -lm
+pcmGateTestNoAir: $(P25_PCM) $(P25_PCM_DEPS)
+	$(CC) $(CFLAGS) $(P25_PCM_FLAGS) -UCONFIG_P25 -DCONFIG_P25=0 -UCONFIG_IMBE -DCONFIG_IMBE=0 \
+		-DCONFIG_VOX=0 -o $@ $(P25_PCM) -lm
+pcmGateTestNoAirVox: $(P25_PCM) $(P25_PCM_DEPS)
+	$(CC) $(CFLAGS) $(P25_PCM_FLAGS) -UCONFIG_P25 -DCONFIG_P25=0 -UCONFIG_IMBE -DCONFIG_IMBE=0 \
+		-DCONFIG_VOX=1 -o $@ $(P25_PCM) -lm
+modemGluePcmTest: $(P25_GLUE) sim/pcm_platform_sim.c $(P25_PCM_DEPS)
+	$(CC) $(CFLAGS) $(P25_FLAGS) $(P25_GLUE_FLAGS) -DCONFIG_HOTSPOT_SPLIT=0 -DCONFIG_VOX=0 \
+		-DMODEM_TEST_PCM -o $@ $(P25_GLUE) sim/pcm_platform_sim.c -lm
 
 modemGlueTest: $(P25_GLUE) $(P25_GLUE_DEPS)
 	$(CC) $(CFLAGS) $(P25_FLAGS) $(P25_GLUE_FLAGS) -DCONFIG_HOTSPOT_SPLIT=0 -o $@ $(P25_GLUE) -lm
@@ -90,6 +110,11 @@ run-p25-build:
 run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest imbeEncTest \
 	p25TrunkTest p25VoiceTest fxpTest airSoftmodemTest boardAirTest hrc7000AirTest \
 	modemGlueTest modemGlueTestNoAir modemGlueTestSplit modemGlueTestNoAirSplit
+	./pcmGateTest
+	./pcmGateTestNoAir
+	./pcmGateTestVox
+	./pcmGateTestNoAirVox
+	./modemGluePcmTest
 	./modemGlueTest
 	./modemGlueTestNoAir
 	./modemGlueTestSplit
@@ -107,3 +132,5 @@ run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 	./p25VoiceTest
 	./fxpTest
 	./airSoftmodemTest
+
+run-p25: pcmGateTest pcmGateTestNoAir pcmGateTestVox pcmGateTestNoAirVox modemGluePcmTest

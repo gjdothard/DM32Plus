@@ -61,5 +61,29 @@ callbacks. A late PA-timer interrupt only keys if TX is still active. These
 hooks do not replace channel/system permission.
 
 Task-side provider wrappers use `.flashfunc`; the linker keeps them out of
-interrupt RAM. Board provider pointers and audio-gate callbacks are not wired
-yet. Host results do not establish target timing or radio interoperability.
+interrupt RAM. A board can now attach the PCM isolation callbacks and provider
+pointers. Host results do not establish target timing or radio interoperability.
+
+## PCM isolation and APRS coexistence
+
+`hrc_audio_pcm_air_gate` closes ring playback and discards queued speaker
+blocks. Microphone capture and the block callback continue, so the vocoder can
+encode. `hrc_audio_pcm_ring` keeps the latest route request while gated and
+applies it after release. Gate/release are serialized with each FIFO push.
+
+The callback writes separate scratch storage. It publishes a speaker block
+only if its stream and gate generation still match; an encode finishing across
+a gate edge or stream restart cannot requeue stale samples. Space is checked
+after the callback, so a full queue at entry can accept a block if space became
+available. Turning speaker routing on from the callback retains its first block.
+
+`hrc_audio_pcm_hold` now reports failure when air TX owns the prompt path. APRS
+checks that result before changing the board route. Conversely, the air gate
+refuses while APRS holds the FIFO, including its drain interval. A failed APRS
+board route releases the hold. Neither owner steals the other's path.
+
+`pcmGateTest` runs the actual PCM worker and APRS TX-start path on simulated
+hardware, with air and VOX independently on/off. `modemGluePcmTest` links the
+actual modem lifecycle to the real PCM gate/release callbacks. Physical FIFO
+timing, long codec-callback refill scheduling and target budgets remain separate
+qualification work; software queue tests do not establish those properties.

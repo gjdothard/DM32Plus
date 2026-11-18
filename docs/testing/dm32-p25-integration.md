@@ -76,7 +76,7 @@ UI/CPS schema design can proceed while provider work is being tested.
 - [x] M2.2 (host checked; target build pending): Add coordinated CONFIG switches and source selection; keep product
   activation deferred until the radio core and storage use them. Retain the
   IMBE About-page attribution when the codec is compiled.
-- [ ] M2.3: Port the HR_C7000 air provider and its required DMR-engine ownership
+- [x] M2.3 (host): Port the HR_C7000 air provider and its required DMR-engine ownership
   changes together. Route interrupts and deferred events through the owner;
   release cleanly on failed open, stop, retune and mode change.
 - [x] M2.3a: Import the provider and its simulated register tests from the pinned
@@ -84,14 +84,20 @@ UI/CPS schema design can proceed while provider work is being tested.
 - [x] M2.3b (host): Wire platform ownership, interrupts and deferred work. Protect
   shared queues against DMR/BS calls and scheduler preemption; serialize audio
   gate release with TX completion; reject stale PA-timer keying after close.
-- [ ] M2.3c: Attach board provider pointers and audio-gate callbacks with M2.4.
+- [x] M2.3c (host): Attach board provider pointers and real audio-gate callbacks.
+  Board/radio sources compile with P25 on/off and DMR off using fake CPU services.
 - [ ] M2.4: Port audio scheduling and memory/stack changes required by that
   provider. Preserve FM/DMR/APRS operation and the private AMBE slot.
+- [x] M2.4a (host): PCM gate/release, latest ring request, stale-block rejection,
+  callback scratch storage, and exclusive APRS hold. Test P25/VOX on/off and
+  link the actual PCM gate into the modem lifecycle test.
+- [ ] M2.4b: Qualify/refine FIFO refill across long codec callbacks and measure
+  target stack/RAM/image cost. Hardware-paced refill is not imported yet.
 - [ ] M2.5: Run simulated modem/provider tests and obtain a reproducible C-SKY
   firmware build with measured RAM, stack and image size. Build affected
   switches off before marking M2 complete.
 
-Next task: M2.4/M2.3c, PCM scheduling/isolation and board attachment. Do not
+Next task: M2.4b/M2.5, refill scheduling and a reproducible target build. Do not
 advertise P25 in VERSION, the UI or CPS until the matching integration gates pass.
 
 ## Required test cases to carry through later stages
@@ -121,6 +127,8 @@ advertise P25 in VERSION, the UI or CPS until the matching integration gates pas
 | M2.3b | Real glue/driver lifecycle tests with air and split support independently on/off: 94, 11, 100 and 11 checks passed. Optimized builds checked. Existing DMR, split-DMR and BS-driver regressions passed. DMR-disabled glue compiles in the build matrix. | Simulated IRQ/RTOS services; audio-gate callbacks are fakes. Board attachment, target memory/timing and hardware behavior remain pending. |
 | Combined host Make run | `run-p25`: 13 executable configurations and 5 Python build/attribution tests passed with warnings as errors. Documentation: 155 files, zero broken links; generic-code check passed. | No C-SKY target build, sanitizer run, complete host suite or hardware session yet. |
 | Combined run after M2.3b | `run-p25`: 17 executable configurations and 6 Python build/attribution tests passed, including the optimized handoff tests. Documentation: 155 files, zero broken links; generic-code check passed. | Target builds, full CI, board/audio attachment and hardware qualification are still pending. |
+| M2.3c/M2.4a | PCM/APRS tests: 50/16/50/16 checks for P25/VOX on/off. Modem lifecycle linked to the real PCM gate: 96 checks. Changed board/radio files compile with P25 on/off and DMR off. | Simulated CPU/IRQ/RTOS services; native compiler checks are not a C-SKY image or hardware qualification. |
+| Combined run after PCM attachment | `run-p25`: 22 executable configurations and 7 Python build/attribution tests passed with warnings as errors. Documentation: 155 files, zero broken links; generic-code check passed. | Hardware-paced refill, target resource checks, full CI and radio/CPS channel integration remain pending. |
 | Scope update | Owner requested retaining TX and honoring existing CPS RX-only; permission matrix above replaces the earlier passive-only product scope. | Hardware TX still requires its own authorized test session and --allow-rf. |
 
 Local ignored test output is in `build/p25-host`. Python works outside the

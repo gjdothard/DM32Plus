@@ -34,7 +34,8 @@ in `tests/host/p25.mk`; they add an engine build with trunking enabled as well
 as the conventional build. Later local integration adds default-off protocol
 switches and conditional firmware source selection in `config/p25.mk`, optional
 board provider fields, and conditional IMBE About-page attribution. None of
-these changes connects a working radio channel or enables hardware access.
+these changes connects a working P25 radio channel. Hardware has not been
+accessed during host validation.
 
 The platform ownership wrappers in `platform/hrc7000/dmr_glue.c` are adapted
 from the same upstream revision. Local changes suspend the scheduler during
@@ -44,8 +45,14 @@ serialize gate release with deferred completion. The DMR byte queue is now
 pointer-aligned with `_Alignas`; compile-time assertions check the reused
 storage. The PA timer checks current TX activity before keying. Task wrappers
 use the upstream `.flashfunc` mechanism in the linker. These adaptations are
-covered by `modemGlueTest`; board/audio attachment and target qualification
-remain pending.
+covered by `modemGlueTest`.
+
+Local PCM isolation work connects the board's air provider fields and its
+audio-gate callbacks, centralizes ring-play requests, arbitrates APRS FIFO
+ownership, and rejects stale callback output using a generation check and
+separate scratch storage. Tests use the actual PCM/APRS worker and a modem
+lifecycle linked to the real gate. This adapts the existing PCM driver; it does
+not import upstream's timer-based FIFO refill or claim target qualification.
 
 Future refreshes must compare against this exact revision, preserve the ISC
 notices, and rerun the foundation tests. Imported test results are evidence of

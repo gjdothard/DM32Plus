@@ -881,6 +881,14 @@ switches per burst. As a user it reports both copies of a call (gotchas 14.15).
 
 ## 9. Audio path
 
+P25 integration builds (`CONFIG_AIR`) attach `board.air` and `board.baseband`
+to the shared HR_C7000 providers. The board's `dmr_board` supplies
+`hrc_audio_pcm_air_gate` and `hrc_audio_pcm_air_release`; `ring_play` goes through
+`hrc_audio_pcm_ring`, so a beep cannot reopen ring playback during air TX.
+APRS and air TX refuse conflicting prompt-FIFO ownership. These paths are host
+tested; target FIFO timing, stack/RAM fit and on-radio operation remain
+unqualified. P25 remains default-off and is not yet a working channel mode.
+
 | Element | Detail |
 |---|---|
 | Mic | into the C7000 codec ADC (MIC input 2: CR_MIC2 bit 6 = 1) |

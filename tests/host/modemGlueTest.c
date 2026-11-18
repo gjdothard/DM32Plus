@@ -30,6 +30,14 @@ static void hrc_barrier(void) {}
 static void hrc_timer_ack(uint8_t n) { (void)n; }
 
 #include "../../platform/hrc7000/dmr_glue.c"
+#ifdef MODEM_TEST_PCM
+#include "audio_pcm.h"
+uint32_t audio_host_irq_save(void) { return hrc_irq_save(); }
+void audio_host_irq_restore(uint32_t saved) { hrc_irq_restore(saved); }
+bool audio_host_in_isr(void) { return hrc_in_isr(); }
+void audio_host_barrier(void) { hrc_barrier(); }
+void audio_host_timer_ack(uint8_t timer) { hrc_timer_ack(timer); }
+#endif
 
 uint32_t hrc_micros(void) { return clock_us; }
 void hrc_irq_register(uint8_t n, hrc_irq_fn fn) { handlers[n] = fn; irq_enabled[n] = false; }
@@ -62,8 +70,23 @@ BaseType_t xTaskResumeAll(void)
 static bool rf_tx;
 static void rf_switch(bool on) { rf_tx = on; }
 static void pa_on(void) { pa_calls++; }
-static bool gate(void) { gate_calls++; return gate_allowed; }
-static void release_gate(void) { CHECK(!rf_tx); releases++; }
+static bool gate(void)
+{
+	gate_calls++;
+#ifdef MODEM_TEST_PCM
+	return gate_allowed && hrc_audio_pcm_air_gate();
+#else
+	return gate_allowed;
+#endif
+}
+static void release_gate(void)
+{
+	CHECK(!rf_tx);
+#ifdef MODEM_TEST_PCM
+	hrc_audio_pcm_air_release();
+#endif
+	releases++;
+}
 static void fm_half(void) {}
 static void dmr_event(const dmr_event_t *ev, void *ctx) { (void)ev; (void)ctx; callbacks++; }
 #if CONFIG_AIR
@@ -97,6 +120,10 @@ static hrc7000_t dev;
 int main(void)
 {
 	hrc7000_attach(&dev, regs, buffer);
+#ifdef MODEM_TEST_PCM
+	hrc_audio_pcm_attach(&dev, NULL);
+	hrc_audio_pcm_ring(&dev, true);
+#endif
 	hrc_dmr_board_init(&dev, &legacy);
 	CHECK(task != NULL && !active);
 #if CONFIG_AIR
@@ -182,6 +209,9 @@ int main(void)
 	air_tx_chunk_t chunk = { .nsyms = 144 };
 	CHECK(hrc_air.tx_queue(&chunk));
 	CHECK(hrc_air.tx_begin() && air_tx_gated);
+#ifdef MODEM_TEST_PCM
+	CHECK((dev.audio_ctl & C7_AUDIO_RING_PLAY) == 0);
+#endif
 	CHECK(!hrc_air.tx_begin());
 	in_irq = true; handlers[IRQ_MODEM_RF_TX](); in_irq = false;
 	CHECK(rf_tx && hrc_dmr_tx_active());
@@ -190,6 +220,9 @@ int main(void)
 	CHECK(!hrc_air.tx_begin()); // the queued completion must not ungate a later transmission
 	modem_poll_once();
 	CHECK(callbacks > 0 && !air_tx_gated && releases == 2);
+#ifdef MODEM_TEST_PCM
+	CHECK((dev.audio_ctl & C7_AUDIO_RING_PLAY) != 0);
+#endif
 	CHECK(hrc_air.tx_queue(&chunk) && hrc_air.tx_begin());
 	in_irq = true; handlers[IRQ_MODEM_RF_TX](); in_irq = false;
 	CHECK(rf_tx);

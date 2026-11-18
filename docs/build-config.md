@@ -12,8 +12,8 @@ Set the protocol switches rather than overriding the derived implementation
 switches. Make and `core/config.h` reject inconsistent dependencies.
 
 During integration P25 defaults off. Enabling it compiles the imported engines
-and the IMBE attribution; it does not yet add a working channel mode, CPS
-support, or a board provider owner. Keep production activation deferred until
+and the IMBE attribution; it does not yet add a working channel mode or CPS
+support. Keep production activation deferred until
 those parts are connected. See the [subsystem spec](spec/p25.md).
 
 `CONFIG_P25=n CONFIG_P25_TRUNK=n` excludes the protocol libraries.

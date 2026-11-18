@@ -97,6 +97,10 @@ const board_t board = {
 	.dmr = &hrc_dmr,
 	.audio = &hrc_audio_pcm,
 	.vocoder = &hrc_vocoder,
+#if CONFIG_AIR
+	.air = &hrc_air,
+	.baseband = &hrc_baseband,
+#endif
 #endif
 #if CONFIG_APRS
 	.afsk = &hrc_afsk,

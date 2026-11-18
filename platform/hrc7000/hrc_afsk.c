@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // HR_C7000 APRS AFSK (hrc_afsk.h, hal_afsk.h, docs/spec/aprs.md 5).
 //
 // Transmit: the tones as 8 kHz PCM (afsk_mod, phase continuous) through the prompt FIFO, which feeds the FM modulator
@@ -86,7 +87,8 @@ void hrc_afsk_attach(hrc7000_t *m, const hrc_afsk_board_t *b)
 static bool route(bool on)
 {
 	if (on) {
-		hrc_audio_pcm_hold(true);
+		if (!hrc_audio_pcm_hold(true))
+			return false;
 		routed = hooks->tx_route(true);
 		if (!routed) {
 			hrc_audio_pcm_hold(false);

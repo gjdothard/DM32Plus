@@ -120,6 +120,22 @@ class P25BuildTest(unittest.TestCase):
         subprocess.run(command, check=True, capture_output=True)
         self.assertEqual(output.read_text(encoding="utf-8"), base)
 
+    def test_pcm_and_aprs_feature_off_builds(self):
+        for settings in [("CONFIG_DMR=n", "CONFIG_P25=n"),
+                         ("CONFIG_P25=y", "CONFIG_APRS=n")]:
+            with self.subTest(settings=settings):
+                data = self.probe(*settings)
+                for module in ("pcm", "afsk"):
+                    result = subprocess.run(
+                        shlex.split(OPTIONS.cc) + ["-std=gnu99", "-Wall", "-Wextra", "-Wshadow", "-Werror",
+                                                  "-Icore", "-Ihal", "-Idrivers", "-Iplatform/hrc7000",
+                                                  "-Itests/host/stubs/modem_rtos", "-c"]
+                        + shlex.split(data["DEFS"])
+                        + [str(ROOT / f"tests/host/sim/{module}_platform_sim.c"),
+                           "-o", str(self.work / f"{module}.o")],
+                        cwd=ROOT, text=True, capture_output=True)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
 
 if __name__ == "__main__":
     if not shutil.which(OPTIONS.make):

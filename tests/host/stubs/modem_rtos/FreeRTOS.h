@@ -10,6 +10,8 @@ typedef void *TaskHandle_t;
 #define configMAX_PRIORITIES 8
 #define pdFALSE 0
 #define pdTRUE 1
+#define pdPASS 1
+#define portMAX_DELAY UINT32_MAX
 #define pdMS_TO_TICKS(ms) (ms)
 #define portYIELD_FROM_ISR(woken) ((void)(woken))
 #endif

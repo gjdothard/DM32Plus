@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // HR_C7000 PCM audio (audio_pcm.h): mic samples from the modem's PCM buffer, speaker samples to its prompt FIFO
 // (docs/spec/hardware-dm32.md 9; modem-hrc7000.md 3, 8.1, 8.4).
 //
@@ -49,6 +50,58 @@ static bool spk_routed;		// the last speaker_pcm() state
 static volatile bool fifo_held;	// another user (the board's AFSK) owns the FIFO: speaker PCM waits
 static volatile uint32_t blocks, overruns, underruns;	// underruns: the FIFO does not report them (stays 0)
 static bool isr_registered;
+#if CONFIG_AIR
+static volatile bool air_gated;
+static bool ring_want;
+static uint32_t spk_generation;
+
+static void speaker_drop(void)
+{
+	spk_head = spk_tail = 0;
+	spk_pos = 0;
+	spk_generation++;
+}
+
+static void ring_apply(void)
+{
+	bool on = ring_want && !air_gated;
+	hrc7000_audio_bits(modem, on ? C7_AUDIO_RING_PLAY : 0, on ? 0 : C7_AUDIO_RING_PLAY);
+}
+
+void hrc_audio_pcm_ring(hrc7000_t *m, bool on)
+{
+	uint32_t saved = hrc_irq_save();
+	modem = m;
+	ring_want = on;
+	ring_apply();
+	hrc_irq_restore(saved);
+}
+
+bool hrc_audio_pcm_air_gate(void)
+{
+	uint32_t saved = hrc_irq_save();
+	if (modem == NULL || fifo_held || air_gated) {
+		hrc_irq_restore(saved);
+		return false;
+	}
+	air_gated = true;
+	speaker_drop();
+	ring_apply();
+	hrc_irq_restore(saved);
+	return true;
+}
+
+void hrc_audio_pcm_air_release(void)
+{
+	uint32_t saved = hrc_irq_save();
+	if (air_gated) {
+		speaker_drop();
+		air_gated = false;
+		ring_apply();
+	}
+	hrc_irq_restore(saved);
+}
+#endif
 
 #if CONFIG_VOX
 #define METER_IDLE_BLOCKS	100u	// halves (1 s) without a mic_level() call: the meter stops
@@ -101,6 +154,23 @@ static void isr_pcm_wr(void)
 // 2 ms while the speaker is routed, faster than a chunk (4 ms) plays
 static void fifo_feed(void)
 {
+#if CONFIG_AIR
+	for (;;) {
+		// A gate edge cannot land between checking ownership and pushing a chunk
+		uint32_t saved = hrc_irq_save();
+		if (!spk_routed || fifo_held || air_gated || spk_tail == spk_head
+		    || !hrc7000_prompt_push(modem, &spk_q[spk_tail][spk_pos])) {
+			hrc_irq_restore(saved);
+			return;
+		}
+		spk_pos = (uint8_t)(spk_pos + C7_PROMPT_CHUNK);
+		if (spk_pos >= AUDIO_BLOCK_SAMPLES) {
+			spk_pos = 0;
+			spk_tail = (uint8_t)((spk_tail + 1u) % SPK_BLOCKS);
+		}
+		hrc_irq_restore(saved);
+	}
+#else
 	if (!spk_routed || fifo_held) {
 		return;
 	}
@@ -111,51 +181,89 @@ static void fifo_feed(void)
 			spk_tail = (uint8_t)((spk_tail + 1u) % SPK_BLOCKS);
 		}
 	}
+#endif
+}
+
+static void audio_poll_once(void)
+{
+	static int16_t mic[AUDIO_BLOCK_SAMPLES];
+	fifo_feed();
+	uint32_t s = hrc_irq_save();
+	int8_t idx = mic_ready;
+	if (idx >= 0) {
+		memcpy(mic, mic_blk[idx], sizeof mic);
+		mic_ready = -1;
+	}
+	audio_block_cb_t cb = block_cb;
+#if CONFIG_AIR
+	void *ctx = block_ctx;
+	uint32_t generation = spk_generation;
+#endif
+	hrc_irq_restore(s);
+	if (idx < 0 || !running || cb == NULL) {
+		return;
+	}
+#if CONFIG_AIR
+	// Separate callback storage survives a queue reset or route change during encode
+	static int16_t speaker[AUDIO_BLOCK_SAMPLES];
+	cb(mic, speaker, ctx);
+	s = hrc_irq_save();
+	uint8_t next = (uint8_t)((spk_head + 1u) % SPK_BLOCKS);
+	if (running && block_cb == cb && block_ctx == ctx && generation == spk_generation
+	    && !air_gated && spk_routed && next != spk_tail) {
+		memcpy(spk_q[spk_head], speaker, sizeof speaker);
+		spk_head = next;
+	}
+	hrc_irq_restore(s);
+#else
+	uint8_t next = (uint8_t)((spk_head + 1u) % SPK_BLOCKS);
+	if (next == spk_tail) {
+		static int16_t discard[AUDIO_BLOCK_SAMPLES];
+		cb(mic, discard, block_ctx);	// the speaker side is full (PCM not routed): keep the mic side going
+	} else {
+		cb(mic, spk_q[spk_head], block_ctx);
+		spk_head = next;
+	}
+#endif
+	blocks++;
+	fifo_feed();
 }
 
 static void audio_task(void *arg)
 {
 	(void)arg;
-	static int16_t mic[AUDIO_BLOCK_SAMPLES];
 	for (;;) {
 		ulTaskNotifyTake(pdTRUE, spk_routed ? pdMS_TO_TICKS(2) : portMAX_DELAY);
-		fifo_feed();
-		uint32_t s = hrc_irq_save();
-		int8_t idx = mic_ready;
-		if (idx >= 0) {
-			memcpy(mic, mic_blk[idx], sizeof mic);
-			mic_ready = -1;
-		}
-		hrc_irq_restore(s);
-		audio_block_cb_t cb = block_cb;
-		if (idx < 0 || !running || cb == NULL) {
-			continue;
-		}
-		uint8_t next = (uint8_t)((spk_head + 1u) % SPK_BLOCKS);
-		if (next == spk_tail) {
-			static int16_t discard[AUDIO_BLOCK_SAMPLES];
-			cb(mic, discard, block_ctx);	// the speaker side is full (PCM not routed): keep the mic side going
-		} else {
-			cb(mic, spk_q[spk_head], block_ctx);
-			spk_head = next;
-		}
-		blocks++;
-		fifo_feed();
+		audio_poll_once();
 	}
 }
 
 void hrc_audio_pcm_attach(hrc7000_t *m, void (*speaker_pcm)(bool on))
 {
 	modem = m;
+#if CONFIG_AIR
+	ring_want = (m->audio_ctl & C7_AUDIO_RING_PLAY) != 0;
+#endif
 	speaker_pcm_cb = speaker_pcm;
 	// The meter's interrupt changes AUDIO_CONTROL b4 (isr_pcm_wr): from now on every shadow update, the board's FM
 	// receive, transmit, idle and DMR entry included, runs with interrupts off
 	hrc7000_set_crit(m, hrc_irq_save, hrc_irq_restore);
 }
 
-void hrc_audio_pcm_hold(bool on)
+bool hrc_audio_pcm_hold(bool on)
 {
+#if CONFIG_AIR
+	uint32_t saved = hrc_irq_save();
+	if (on && air_gated) {
+		hrc_irq_restore(saved);
+		return false;
+	}
+#endif
 	fifo_held = on;
+#if CONFIG_AIR
+	hrc_irq_restore(saved);
+#endif
+	return true;
 }
 
 // Once: registering masks the source, so never while the meter or the stream has it on
@@ -178,6 +286,7 @@ static bool start(audio_block_cb_t cb, void *ctx)
 			return false;
 		}
 	}
+	uint32_t saved = hrc_irq_save();
 	block_ctx = ctx;
 	block_cb = cb;
 	mic_fill = 0;
@@ -185,11 +294,15 @@ static bool start(audio_block_cb_t cb, void *ctx)
 	mic_ready = -1;
 	spk_head = spk_tail = 0;
 	spk_pos = 0;
+#if CONFIG_AIR
+	spk_generation++;
+#endif
 	hrc_barrier();
 	running = true;
 	hrc7000_wr(modem, C7_INTERP_CLEAR, C7_INT_PCM_WR);
 	hrc_irq_enable(IRQ_PCM_WR, true);
 	hrc7000_audio_bits(modem, C7_AUDIO_PCM_MIC, 0);	// under the lock set at attach
+	hrc_irq_restore(saved);
 	return true;
 }
 
@@ -198,6 +311,9 @@ static void stop(void)
 	uint32_t s = hrc_irq_save();	// the meter's interrupt decides on the same state
 	running = false;
 	block_cb = NULL;
+#if CONFIG_AIR
+	speaker_drop();
+#endif
 #if CONFIG_VOX
 	bool keep = meter_on;
 #else
@@ -215,7 +331,13 @@ static void stop(void)
 // the route turns on: emptying it on every call threw away the block being queued and the one playing (choppy beeps)
 static void speaker_pcm(bool on)
 {
+	uint32_t saved = hrc_irq_save();	// serialize queue resets with the worker and TX gate
 	if (on != spk_routed) {
+#if CONFIG_AIR
+		// Route-on can be requested inside the callback producing its first block
+		if (!on)
+			spk_generation++;
+#endif
 		spk_head = spk_tail = 0;
 		spk_pos = 0;
 	}
@@ -223,6 +345,7 @@ static void speaker_pcm(bool on)
 	if (speaker_pcm_cb != NULL) {
 		speaker_pcm_cb(on);
 	}
+	hrc_irq_restore(saved);
 }
 
 const hal_audio_t hrc_audio_pcm = {
