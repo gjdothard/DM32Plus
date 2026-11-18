@@ -63,6 +63,13 @@ class P25BuildTest(unittest.TestCase):
                     for name, value in checks.items()) + "int main(void) { return 0; }\n", encoding="utf-8")
                 sources = [str(path) for directory in data["DIRS"].split()
                            for path in sorted((ROOT / directory).glob("*.c"))]
+                # The restored upstream loaders call the firmware's always-present codeplug/storage layer.
+                sources += [str(ROOT / path) for path in (
+                    "core/codeplug/codeplug.c", "core/codeplug/dmr_iddb.c", "core/storage/storage.c",
+                    "core/codeplug/codeplug_talk.c",
+                    "core/codeplug/codeplug_kv.c", "core/codeplug/codeplug_tag.c",
+                    "core/codeplug/codeplug_tagged.c", "core/codeplug/codeplug_records.c",
+                    "tests/host/sim/p25_link_sim.c")]
                 output = self.work / ("probe.exe" if os.name == "nt" else "probe")
                 result = subprocess.run(
                     shlex.split(OPTIONS.cc) + ["-std=gnu99", "-Wall", "-Wextra", "-Wshadow", "-Werror",
@@ -96,7 +103,9 @@ class P25BuildTest(unittest.TestCase):
         for settings in [(), ("CONFIG_DMR=n",), ("CONFIG_P25=y", "CONFIG_P25_TRUNK=n")]:
             with self.subTest(settings=settings):
                 data = self.probe(*settings)
-                for module in ("core/p25/p25_codeplug.c", "core/codeplug/codeplug_kv.c"):
+                for module in ("core/p25/p25_codeplug.c", "core/codeplug/codeplug_kv.c",
+                               "core/codeplug/codeplug_tag.c", "core/codeplug/codeplug_tagged.c",
+                               "core/codeplug/codeplug_records.c"):
                     result = subprocess.run(
                         shlex.split(OPTIONS.cc) + ["-std=gnu99", "-Wall", "-Wextra", "-Wshadow", "-Werror",
                                                   "-Icore", "-Ihal"]

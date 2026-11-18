@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
 // Copyright (c) 2026 Garrett Dothard
-// Parameter codecs from the pinned upstream; storage/tag loaders await their generic backend.
+// P25 channels and systems in the codeplug (p25_codeplug.h, docs/spec/p25-codeplug.md)
 #include <string.h>
 #include "config.h"
-#include "p25_codeplug.h"
+#include "p25/p25_codeplug.h"
+#include "codeplug/codeplug_tag.h"
+#include "codeplug/codeplug_records.h"
+
 #if CONFIG_P25
+
 static uint16_t rd16(const uint8_t *b, int len, int at)
 {
 	return at + 2 <= len ? (uint16_t)(b[at] | (b[at + 1] << 8)) : 0u;
@@ -55,7 +59,98 @@ uint32_t p25_unit_id_decode(const uint8_t *b, int len, uint32_t dmr_id)
 	return id >= 1u && id <= P25_CP_UNIT_MAX ? id : dmr_id;
 }
 
+uint32_t p25_radio_unit_id(uint32_t dmr_id)
+{
+	uint8_t b[8];
+	return p25_unit_id_decode(b, codeplug_mode_settings(CODEPLUG_KIND_P25, b, sizeof b), dmr_id);
+}
+
+// Our unit ID: the channel's (the record's own ID), else own (a system's, 0 = none), else the radio-wide P25 one, else the
+// DMR ID
+static uint32_t unit_id(const channel_t *ch, uint32_t own)
+{
+	if (ch->dmr_id != 0u) {
+		return ch->dmr_id;
+	}
+	if (own >= 1u && own <= P25_CP_UNIT_MAX) {
+		return own;
+	}
+	return p25_radio_unit_id(codeplug_dmr_id());
+}
+
+// The talk target from the record's contact (2): a group, a unit, all call; none = talk group 1
+static void talk_target(const channel_t *ch, uint32_t *target, bool *unit)
+{
+	contact_t c;
+#if CONFIG_DMR
+	uint16_t idx = codeplug_channel_talk_contact(ch);	// the contact, else the RX group list's first group
+#else
+	uint16_t idx = ch->contact;
+#endif
+	*target = P25_CP_TG_DEFAULT;
+	*unit = false;
+	if (idx == 0u || !codeplug_contact(idx, &c)) {
+		return;
+	}
+	if (c.type == CONTACT_ALL_CALL) {
+		*target = P25_CP_TG_ALL;
+	} else if (c.type == CONTACT_PRIVATE) {
+		*target = c.id;
+		*unit = true;
+	} else if (c.id >= 1u && c.id <= 0xFFFFu) {
+		*target = c.id;
+	}
+}
+
+bool p25_conv_params(uint16_t number, const channel_t *ch, p25_conv_t *out)
+{
+	uint8_t b[P25_CP_CONV_LEN + 8u + CODEPLUG_TAG_HEAD_MAX];
+	const int cap = (int)(sizeof b - CODEPLUG_TAG_HEAD_MAX);
+	if (ch->kind != CODEPLUG_KIND_P25) {
+		return false;
+	}
+	int len = codeplug_tag_params(number, ch, b, (uint16_t)cap);
+	if (len < 0) {
+		return false;
+	}
+	p25_conv_decode(b, len < cap ? len : cap, out);
+	return true;
+}
+
+bool p25_conv_load(uint16_t number, const channel_t *ch, p25_conv_cfg_t *out)
+{
+	if (!p25_conv_params(number, ch, &out->conv)) {
+		return false;
+	}
+	out->unit_id = unit_id(ch, 0u);
+	talk_target(ch, &out->target, &out->target_unit);
+	// Talkaround (2): the record's direct mode turns it on; clear, it is on where RX and TX are one frequency
+	out->talkaround = ch->rx_hz == ch->tx_hz || ch->dmo;
+	return true;
+}
+
+bool p25_conv_save(uint16_t number, const channel_t *ch, const p25_conv_t *conv)
+{
+	channel_t c = *ch;
+	uint8_t blk[P25_CP_CONV_LEN];
+	// A channel of the kind already keeps the system it names
+	uint8_t system = ch->kind == CODEPLUG_KIND_P25 ? ch->system : CODEPLUG_SYSTEM_NONE;
+	codeplug_tag_t t = { .kind = CODEPLUG_KIND_P25, .system = system, .flags = ch->rx_only ? 0u : CODEPLUG_TAG_TX };
+	// The safe stand-in: DMR, receive only (the tag carries transmit allowed). Under a tag that says the base record
+	// is a channel of its own, codeplug_set_channel keeps that channel's mode instead
+	c.kind = CODEPLUG_KIND_P25;
+	c.system = system;
+	c.mode = RADIO_MODE_DMR;
+	c.rx_only = true;
+	p25_conv_encode(conv, blk);
+	// A tag of the kind that followed the record keeps its fallback, its other flags and what it stores after this
+	// block (an editor's or a later firmware's); else a new one
+	return codeplug_tagged_set_channel(number, &c) && (codeplug_tag_rewrite(number, c.name, &t, blk, sizeof blk) ||
+						     codeplug_tag_write(number, c.name, &t, blk, sizeof blk));
+}
+
 #if CONFIG_P25_TRUNK
+
 static void wr32(uint8_t *p, uint32_t v) { wr16(p, (uint16_t)v); wr16(p + 2, (uint16_t)(v >> 16)); }
 
 void p25_tsys_decode(const uint8_t *b, int len, p25_tsys_t *out)
@@ -115,5 +210,59 @@ void p25_iden_encode(const p25_iden_t *i, uint8_t out[P25_CP_IDEN_LEN])
 	out[17] = i->type == P25_IDEN_TDMA ? i->slots : 0u;
 }
 
+bool p25_trunk_load(uint16_t number, const channel_t *ch, p25_trunk_cfg_t *out)
+{
+	uint8_t b[24 + CODEPLUG_SYS_HDR];
+	codeplug_system_t sy;
+	codeplug_tag_t t;
+	if (ch->kind != CODEPLUG_KIND_P25_TRUNK || !codeplug_tag_read(number, &t) || t.kind != ch->kind) {
+		return false;
+	}
+	int len = codeplug_system(ch->system, &sy, b, 24);
+	if (len < 0 || sy.type != CODEPLUG_SYSTYPE_P25_TRUNK) {
+		return false;
+	}
+	memset(out, 0, sizeof *out);
+	p25_tsys_decode(b, len < 24 ? len : 24, &out->sys);
+	out->listen_only = (sy.flags & CODEPLUG_SYS_TX) == 0;
+	out->unit_id = unit_id(ch, sy.own_id);
+
+	codeplug_sys_entry_t e;
+	int at = -1;
+	while (out->ctl_count < P25_CP_CTL_MAX &&
+	       codeplug_sys_entry_next(&at, ch->system, CODEPLUG_ENTRY_CHANNEL, &e, b, 24) >= 0) {
+		if ((e.flags & CODEPLUG_ENTRY_CONTROL) != 0) {
+			out->ctl_site[out->ctl_count] = e.group;
+			p25_ctl_decode(b, e.len, &out->ctl[out->ctl_count++]);
+		}
+	}
+	at = -1;
+	while (codeplug_sys_entry_next(&at, ch->system, CODEPLUG_ENTRY_PLAN, &e, b, 24) >= 0) {
+		if (e.group < P25_CP_IDEN_MAX && (out->iden_set & (1u << e.group)) == 0) {
+			out->iden_set |= (uint16_t)(1u << e.group);
+			p25_iden_decode(b, e.len, &out->iden[e.group]);
+		}
+	}
+
+	uint32_t tg;
+	bool unit;
+	talk_target(ch, &tg, &unit);
+	out->talk_group = unit ? (uint16_t)P25_CP_TG_DEFAULT : (uint16_t)tg;
+	uint8_t p[1 + CODEPLUG_TAG_HEAD_MAX];
+	int n = codeplug_tag_params(number, ch, p, 1);
+	out->follow_all = n >= 1 && (p[0] & P25_TCH_FOLLOW_ALL) != 0;
+	if ((t.flags & P25_TAG_NO_FALLBACK) == 0) {
+		bool own = (t.flags & CODEPLUG_TAG_FALLBACK) != 0;
+		uint16_t fb = own ? t.fb_chan : sy.fb_chan;
+		uint16_t check = own ? t.fb_check : sy.fb_check;
+		// the fallback is a plain channel of that name still
+		channel_t f;
+		if (fb != 0u && codeplug_tagged_channel(fb, &f) && f.kind == CODEPLUG_KIND_NONE &&
+		    codeplug_name_check(f.name) == check) {
+			out->fallback = fb;
+		}
+	}
+	return true;
+}
 #endif
 #endif

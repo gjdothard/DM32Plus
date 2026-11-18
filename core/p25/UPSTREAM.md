@@ -73,17 +73,17 @@ hooks. The HR_C7000 adaptation lends its existing encoder-state buffer, excludes
 codec calls while lent and reinitializes both codec states after return. It never
 lends or changes the private codec's executable window or flash slot.
 
-The follow-on `p25_codeplug.[ch]` import reuses the parameter-only sections of
+The initial follow-on `p25_codeplug.[ch]` import reused the parameter-only sections of
 the pinned upstream: conventional, unit-ID, trunk-system, site, control-channel
-and identifier codecs. Function bodies are unchanged. Storage/tag/system loaders
-remain deferred until their generic backend is ported; the header includes
-`config.h` instead of the absent backend model. The alternative local record
+and identifier codecs. Parameter function bodies are unchanged. The full loaders
+and original header dependencies are now restored with the generic backend.
+Conventional save and trunk fallback use the explicit tagged API. The alternative local record
 format was discarded before commit. `p25CodeplugTest.c` isolates upstream's
 vector test, skips unrelated name checks, uses standard C tokenization, and
 checks 28/39 applicable rows. `tests/vectors/p25-codeplug.txt` contains the
 unchanged P25 rows from upstream's `tests/vectors/channel-modes.txt`, with the
 original MIT notice retained. The [integration spec](../../docs/spec/p25-codeplug.md)
-records the backend dependencies and safe stand-in/RX-only adaptation still needed.
+records the backend dependencies and remaining RX-only admission work.
 
 `core/codeplug/codeplug_kv.[ch]` and `tests/host/codeplugKvTest.c` are also from
 the pinned upstream. The backend is initially selected with `CONFIG_P25`.
@@ -96,3 +96,18 @@ and an injected writer at the unlock boundary; removing the outer lock makes
 that test lose the key. The full upstream power-cut/format/cursor suite remains.
 The simulated-flash read counter is adapted from upstream for its walk-cost tests.
 No transfer caller or channel tag is connected by this backend import alone.
+
+`codeplug_tag.[ch]`, `codeplug_records.[ch]`, `codeplug_modes.h`, the full
+`channel-modes.txt` vectors, `codeplugTagTest.c` and `p25StoredTest.c` also come from the same pin.
+The stored test is upstream's full P25 codeplug test with standard C tokenization,
+explicit tagged API calls and additional lifecycle/safe-base checks. Its future
+runtime mode input uses a numeric cast until the P25 HAL owner is introduced.
+The generic tag test uses explicit tagged APIs, checks absent channels through
+the existing reader, and expects unavailable protocol owners to remain disabled.
+The local registry keeps tagged kinds unrunnable and omits unavailable protocol
+dependencies. Tag and record sources are initially gated by `CONFIG_P25`.
+`codeplug_tagged.c` is a local adapter around upstream's lifecycle hooks; it
+leaves the legacy radio reader unchanged, removes obsolete bindings before a
+plain base write and preserves independent-base settings during tagged edits.
+The base-name/copy helpers adapt the fork's existing storage layout. No radio
+dispatch, UI or CPS caller is activated by these configuration APIs.

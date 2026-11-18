@@ -20,16 +20,39 @@ TESTS += pcmGateTest pcmGateTestNoAir pcmGateTestVox pcmGateTestNoAirVox modemGl
 TESTS += vocoderMemoryTest vocoderMemoryTestTrunk vocoderMemoryTestNoP25
 TESTS += p25CodeplugTest p25CodeplugTestTrunk
 TESTS += codeplugKvTest
+TESTS += p25StoredTest p25StoredTestTrunk
+TESTS += codeplugTagTest
+
+P25_STORE_CORE := $(CORE)/codeplug/codeplug.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c \
+	$(CORE)/codeplug/codeplug_talk.c \
+	$(CORE)/codeplug/codeplug_kv.c $(CORE)/codeplug/codeplug_tag.c $(CORE)/codeplug/codeplug_tagged.c \
+	$(CORE)/codeplug/codeplug_records.c
+P25_STORE_HEADERS := $(wildcard $(CORE)/codeplug/*.h)
+
+codeplugTagTest: codeplugTagTest.c $(P25_STORE_CORE) $(P25_STORE_HEADERS) sim/sim_flash.c sim/sim_flash.h ../vectors/channel-modes.txt
+	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ codeplugTagTest.c \
+		$(filter-out $(CORE)/codeplug/codeplug_tag.c $(CORE)/codeplug/codeplug_records.c,$(P25_STORE_CORE)) sim/sim_flash.c
+
+p25StoredTest: p25StoredTest.c $(P25_STORE_CORE) $(P25_STORE_HEADERS) $(CORE)/p25/p25_codeplug.c \
+	$(CORE)/p25/p25_codeplug.h sim/sim_flash.c sim/sim_flash.h ../vectors/channel-modes.txt
+	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ p25StoredTest.c $(CORE)/p25/p25_codeplug.c $(P25_STORE_CORE) sim/sim_flash.c
+p25StoredTestTrunk: p25StoredTest.c $(P25_STORE_CORE) $(P25_STORE_HEADERS) $(CORE)/p25/p25_codeplug.c \
+	$(CORE)/p25/p25_codeplug.h sim/sim_flash.c sim/sim_flash.h ../vectors/channel-modes.txt
+	$(CC) $(CFLAGS) $(P25_FLAGS) -UCONFIG_P25_TRUNK -DCONFIG_P25_TRUNK=1 -o $@ p25StoredTest.c \
+		$(CORE)/p25/p25_codeplug.c $(P25_STORE_CORE) sim/sim_flash.c
 
 codeplugKvTest: codeplugKvTest.c $(CORE)/codeplug/codeplug_kv.c $(CORE)/codeplug/codeplug_kv.h \
 	$(CORE)/codeplug/codeplug.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c sim/sim_flash.c sim/sim_flash.h
 	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ codeplugKvTest.c $(CORE)/codeplug/codeplug_kv.c \
 		$(CORE)/codeplug/codeplug.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c sim/sim_flash.c
 
-p25CodeplugTest: p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c $(CORE)/p25/p25_codeplug.h ../vectors/p25-codeplug.txt
-	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c
-p25CodeplugTestTrunk: p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c $(CORE)/p25/p25_codeplug.h ../vectors/p25-codeplug.txt
-	$(CC) $(CFLAGS) $(P25_FLAGS) -UCONFIG_P25_TRUNK -DCONFIG_P25_TRUNK=1 -o $@ p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c
+p25CodeplugTest: p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c $(P25_STORE_CORE) $(P25_STORE_HEADERS) \
+	sim/p25_link_sim.c $(CORE)/p25/p25_codeplug.h ../vectors/p25-codeplug.txt
+	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c $(P25_STORE_CORE) sim/p25_link_sim.c
+p25CodeplugTestTrunk: p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c $(P25_STORE_CORE) $(P25_STORE_HEADERS) \
+	sim/p25_link_sim.c $(CORE)/p25/p25_codeplug.h ../vectors/p25-codeplug.txt
+	$(CC) $(CFLAGS) $(P25_FLAGS) -UCONFIG_P25_TRUNK -DCONFIG_P25_TRUNK=1 -o $@ p25CodeplugTest.c \
+		$(CORE)/p25/p25_codeplug.c $(P25_STORE_CORE) sim/p25_link_sim.c
 
 P25_MEMORY := vocoderMemoryTest.c $(CORE)/p25/p25_workspace.c
 P25_MEMORY_DEPS := $(ROOT)/platform/hrc7000/vocoder.c $(P25_HEADERS) $(ROOT)/hal/hal_vocoder.h \
@@ -158,6 +181,9 @@ run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 	./p25CodeplugTest
 	./p25CodeplugTestTrunk
 	./codeplugKvTest
+	./p25StoredTest
+	./p25StoredTestTrunk
+	./codeplugTagTest
 	./ambeVoiceTest
 	./vocoderMemoryTest
 	./vocoderMemoryTestTrunk
@@ -169,3 +195,5 @@ run-p25: pcmGateTest pcmGateTestNoAir pcmGateTestVox pcmGateTestNoAirVox modemGl
 run-p25: vocoderMemoryTest vocoderMemoryTestTrunk vocoderMemoryTestNoP25
 run-p25: p25CodeplugTest p25CodeplugTestTrunk
 run-p25: codeplugKvTest
+run-p25: p25StoredTest p25StoredTestTrunk
+run-p25: codeplugTagTest

@@ -14,7 +14,17 @@ bench and interoperability evidence are separate.
 Support conventional and trunked P25 Phase 1 receive and transmit using the
 MIT RadioFoundry implementation. Preserve the existing CPS receive-only option
 and normal transmit protections. Do not turn the whole implementation into a
-receive-only product. No particular trunked system is the acceptance target.
+receive-only product. The owner confirmed VHF/UHF P25 as the hardware target
+after identifying Palmetto 800 around Goose Creek, Summerville and Berkeley
+County as an intended use. Palmetto 800 is outside the documented DM32 RF
+bands and is not an acceptance target for this port. Firmware work does not
+establish 700/800 MHz reception. Control channels and grants must pass the
+board's frequency checks before tuning or TX admission.
+
+Sources for this scope decision: the state's
+[Palmetto 800 overview](https://www.admin.sc.gov/services/technology-services/palmetto-800)
+and the manufacturer's
+[DM-32UV manual, Appendix B](https://baofeng.s3.amazonaws.com/Baofeng_DM-32UV_User_Manual_20250210.pdf).
 
 | Channel | CPS RX-only | System permits TX | Expected behavior |
 |---|---|---|---|
@@ -129,8 +139,18 @@ focused host/configuration tests during pure-codec and format work.
   Adapt local storage guards, preserve unknown data and serialize raw commits.
 - [ ] M3.2b: Port the mode registry, tag layer and system readers. Before any
   channel activation, verify unsupported modes remain parked with features off.
+- [x] M3.2b (configuration backend, host): Import the registry, tag and record
+  readers. Keep every tagged kind unrunnable and use an explicit tagged API;
+  the existing radio reader retains the safe legacy base.
+- [x] M3.2b (generic host suite): Reuse the full upstream tag/record tests,
+  including live/stale bindings, future kinds, full area, rewrites and shared
+  targets/lists/systems. All 241 checks pass through the explicit adapter.
 - [ ] M3.3: Restore upstream P25 storage loaders and adapt the logical channel
   model. Test malformed/missing tags, copies, deletes, saves and CPS round trips.
+- [x] M3.3a (host): Restore full upstream loaders and stored-channel tests.
+  Check logical RX-only edits, safe legacy reads, rename, copy, deletion,
+  restart and stale-name replacement. CPS round trips and lifecycle power-cut
+  coverage remain pending.
 - [ ] M3.4: Prove channel RX-only and system listen-only block PTT and all
   automatic signaling. `NO_REG` is not receive-only permission.
 
@@ -139,6 +159,13 @@ logical P25 permissions from its TX flag. The existing CPS checkbox must edit
 that logical permission through the P25 adapter; reading only the base bit is
 insufficient. Do not activate tagged channels until this mapping is tested.
 See [P25 codeplug integration](../spec/p25-codeplug.md).
+
+Next backend gates: complete generic tag/record edge-case and power-cut tests;
+add strict TX admission around the permissive upstream settings defaults;
+test missing contacts, invalid IDs, future flags and system listen-only.
+Then connect the conventional radio owner and workspace lease. An old CPS
+rewrite must not preserve a logical TX flag after the operator selects RX-only;
+that transfer/capability contract must be resolved before exposing P25 editing.
 
 M4/M5 should adapt upstream `core/radio/radio_p25.[ch]`, including its task
 handoff, retune and queued signaling logic. Replace its simple memory-lending
@@ -272,6 +299,40 @@ The caller must stop AMBE before borrowing and stop P25 audio/air callbacks
 before return. This change does not prove that those mode transitions are wired,
 activate a P25 channel, or establish RF/voice interoperability.
 
+## Tagged configuration backend milestone
+
+The full pinned P25 loaders now use the shared tag/system readers through an
+explicit configuration API. `codeplug_channel` still returns the legacy base;
+the existing radio dispatch never receives a tag's logical TX permission.
+No tagged mode is advertised or runnable. The new fields in `channel_t` do
+not increase linked static RAM in the target configurations checked here.
+
+| Backend-era target configuration | Flash bytes | Main RAM bytes | Static RAM headroom |
+|---|---:|---:|---:|
+| Default, P25 off | 634,992 | 209,208 | 2,248 |
+| Conventional-only P25 | 645,696 | 210,992 | 464 |
+| P25 with trunking | 645,692 | 210,992 | 464 |
+| DMR off, P25 off | 336,352 | 129,152 | 82,304 |
+| Diagnostic retained entry points and loaders | 682,044 | 211,136 | 320 |
+
+The diagnostic link retains the previous voice/engine/follower roots plus
+`p25_conv_load`, `p25_conv_save`, `p25_trunk_load`,
+`codeplug_tagged_delete_channel` and `codeplug_tag_copy`. It has no unresolved
+symbols. It still does not allocate the complete future radio-owner state or
+prove an active channel fits. Normal builds discard unreachable loaders.
+
+These builds use `f2ac5367` plus the backend changes, `GITVERSION=f2ac5367`,
+`GITDIRTY=-dirty` and the fixed timestamp/options recorded above. Host tests
+pass all 32 P25-suite executables and 11 Python build checks, plus both legacy
+codeplug configurations. The imported generic metadata suite passes 241 checks;
+the stored P25 suites pass 116 conventional and 158 trunking-enabled checks.
+Generic lifecycle power-cut tests, strict runtime TX admission, feature-off
+dispatch and CPS transfer behavior remain open.
+All four normal target builds pass with `-Werror`. The P25-enabled static stack
+check passes every task; UI remains the tightest at 40 bytes beyond the required
+context overhead and margin. Logs, maps and the diagnostic ELF are archived in
+`build/p25-target/codeplug-evidence.tar.gz`. No hardware was accessed.
+
 ## Required test cases to carry through later stages
 
 - Conventional: clear calls, NAC/group filtering, encode/decode, PTT start/end,
@@ -309,6 +370,7 @@ activate a P25 channel, or establish RF/voice interoperability.
 | M2.5c memory ownership | 26 `run-p25` executables and 10 Python checks pass; real codec-wrapper/workspace ownership tests pass with P25/trunking independently on/off. Target probe confirms the grouped workspace fits the existing encoder pool, and four firmware configurations build without warnings. | Codec stand-ins validate the wrapper, not proprietary codec behavior on hardware. The real channel owner has not acquired or released a workspace yet. |
 | M3.1 upstream codecs | Exact-source audit: 14 parameter/helper functions and all 39 P25 vectors match the pin. Vector tests: 30 checks without trunking, 42 with it. All 28 `run-p25` executables and 11 Python checks pass with warnings as errors. | Parameter bodies only; generic storage, loaders, RX-only admission and CPS mapping remain pending. Target links are batched with the backend integration. |
 | M3.2a keyed-store reuse | Full imported NOR/power-cut suite plus local guard/interleaving tests: 4,471 checks pass. Removing the raw-commit outer lock reproduces key loss and fails the new regression. All 29 `run-p25` executables, 11 Python checks and both existing codeplug test configurations pass. | Host only; no transfer caller or tagged channel is activated. Target linking/resource checks are batched with the tag/reader integration. |
+| M3.2b/M3.3a metadata and loaders | Full upstream tag/record suite: 241 checks; stored P25: 116/158 checks. All 32 P25-suite executables, 11 Python build checks and both legacy codeplug configurations pass. Four target configurations and the P25 static stack check pass; diagnostic retained-loader link fits. Exact-source audit matches six imported implementation/header/vector files after only documented adaptations. | Explicit configuration API only. Lifecycle power cuts, strict TX admission, radio dispatch and CPS round trips remain open. |
 | Scope update | Owner requested retaining TX and honoring existing CPS RX-only; permission matrix above replaces the earlier passive-only product scope. | Hardware TX still requires its own authorized test session and --allow-rf. |
 
 Local ignored test output is in `build/p25-host`. Python works outside the

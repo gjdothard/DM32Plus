@@ -5,17 +5,17 @@
 # P25 codeplug integration
 
 Status: the parameter codecs and shared vectors are imported from RadioFoundry
-`c34dc440aaf2d3952458bc0bd85b8c56c76f6b23`. The generic keyed store, channel
-tags, system readers and radio-core loaders are not connected yet. The keyed
-store is now imported and tested separately. No P25
-channel can be programmed or activated through this import alone.
+`c34dc440aaf2d3952458bc0bd85b8c56c76f6b23`. The keyed store, channel tags,
+system readers and P25 settings loaders are available through an explicit
+configuration API. Radio dispatch, UI and CPS integration remain pending.
+No operating P25 channel is exposed by this import alone.
 
 ## Reuse boundary
 
 `core/p25/p25_codeplug.[ch]` preserves the upstream parameter functions:
 conventional NAC/squelch, unit-ID inheritance, trunked system parameters,
-site/control-channel bodies and identifier rows. Storage loaders are deferred
-until their generic dependencies are ported. This avoids a separate P25 format.
+site/control-channel bodies and identifier rows. The full upstream storage
+loaders now use the shared tag and system backend. This avoids a separate P25 format.
 The [provenance record](../../core/p25/UPSTREAM.md) identifies local adaptations.
 
 The upstream integration uses these shared layers:
@@ -23,9 +23,9 @@ The upstream integration uses these shared layers:
 | Layer | Purpose | Local status |
 |---|---|---|
 | `codeplug_kv` | Versioned keyed EEPROM sector, CRC, journaled batches and raw-transfer preservation | Imported; host tested; transfer callers pending |
-| `codeplug_tag` | Bind a channel kind and its parameters to a legacy channel | Pending |
-| `codeplug_records` | Radio-wide records, systems, sites, control channels and identifier plans | Pending |
-| `p25_codeplug` loaders | Resolve identity, targets, channel parameters and a trunked system | Pending |
+| `codeplug_tag` | Bind a channel kind and its parameters to a legacy channel | Imported; explicit configuration adapter tested |
+| `codeplug_records` | Radio-wide records, systems, sites, control channels and identifier plans | Imported; exercised by stored P25 tests |
+| `p25_codeplug` loaders | Resolve identity, targets, channel parameters and a trunked system | Restored; simulated-flash tests pass |
 | `radio_p25` | Start/stop engines, follow grants, retune and request permitted TX | Pending |
 
 The tagged design stores a receive-only DMR stand-in in the legacy channel
@@ -33,6 +33,14 @@ record. The tag supplies the logical P25 kind and its TX permission. Older
 firmware sees the stand-in and cannot transmit it. The companion CPS must map
 its existing Receive only control to the logical permission and preserve the
 safe base record. Its current legacy-only decoder is not sufficient.
+
+`codeplug_channel` still returns the legacy base. Configuration code must use
+`codeplug_tagged_channel`, `codeplug_tagged_set_channel` and
+`codeplug_tagged_delete_channel` to resolve or edit tags. Applying logical TX
+permission in the old radio reader would let its DMR path treat a tagged channel
+as transmitting DMR. Dispatch must recognize tagged kinds before that reader
+changes. The registry currently reports every tagged channel kind as unrunnable.
+See [tagged channel records](channel-modes.md) for the shared format.
 
 ## Parameter blocks
 
@@ -64,6 +72,11 @@ and channel RX-only must independently clear every TX path in the owner.
 `p25CodeplugTest` uses all 39 upstream P25 rows, selected unchanged from the
 shared channel-mode vectors. Conventional-only builds run the applicable 28.
 The parser is adapted to standard C tokenization for native host portability.
-Storage/tag loaders and their simulated-flash tests remain to be imported.
-Complete the RX-only permission matrix, copy/delete/restart behavior, power-cut
-checks and CPS preservation before activating P25 records.
+`p25StoredTest` exercises full upstream loaders against simulated NOR flash:
+unit-ID inheritance, contacts, NACs, truncated/default blocks, system entries,
+identifier plans, fallback and system listen-only. Local checks cover logical
+RX-only edits, safe legacy reads, copy/delete/restart and stale-name bindings.
+The imported `codeplugTagTest` adds generic tag/live-binding, unknown-kind,
+full-area, rewrite, target/list and system-record coverage (241 checks).
+Complete the runtime RX-only permission matrix, lifecycle power-cut checks and
+CPS preservation before activating P25 records.

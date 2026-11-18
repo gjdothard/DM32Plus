@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "config.h"
+#include "codeplug/codeplug.h"
 
 #ifndef P25_NAC_DEFAULT
 #define P25_NAC_DEFAULT		0x293
@@ -41,6 +41,29 @@ void p25_conv_decode(const uint8_t *b, int len, p25_conv_t *out);
 void p25_conv_encode(const p25_conv_t *c, uint8_t out[P25_CP_CONV_LEN]);
 // The radio-wide unit ID from the kind's record (len bytes, -1 = none): the DMR ID when unset or out of range
 uint32_t p25_unit_id_decode(const uint8_t *b, int len, uint32_t dmr_id);
+// The radio-wide unit ID as stored (1): the kind's record, else dmr_id
+uint32_t p25_radio_unit_id(uint32_t dmr_id);
+
+// What a conventional call is set up from: the channel's NACs and squelch, our unit ID and the talk target
+typedef struct {
+	p25_conv_t conv;
+	uint32_t unit_id;	// 0: none (PTT is refused)
+	uint32_t target;	// talk group or unit
+	bool target_unit;	// target is a unit (a private contact)
+	bool talkaround;
+} p25_conv_cfg_t;
+// Channel number's set-up from its tag, the radio-wide record and its record ch (read by codeplug_channel); false when
+// it isn't a live P25 conventional channel
+bool p25_conv_load(uint16_t number, const channel_t *ch, p25_conv_cfg_t *out);
+// The parameter block alone, without the contact and the unit ID (a list row, channel info): false as p25_conv_load
+bool p25_conv_params(uint16_t number, const channel_t *ch, p25_conv_t *out);
+// Write ch at number as a P25 conventional channel (channel-modes.md 2.4): the base record in its safe stand-in shape,
+// then the tag with conv's block, transmit allowed unless ch->rx_only. A channel that is P25 already keeps its tag's
+// system, fallback, other flags and what its block holds after conv's (codeplug_tag_rewrite), and under a base-own
+// tag its record's own mode; else the tag is new.
+// Where a P25 channel is made from the radio's own settings (the VFO, a mode changed for now) or its block edited
+bool p25_conv_save(uint16_t number, const channel_t *ch, const p25_conv_t *conv);
+
 #if CONFIG_P25_TRUNK
 // A trunked system's block (3), after the generic header
 #define P25_CP_TSYS_LEN		10u
@@ -84,5 +107,30 @@ void p25_ctl_decode(const uint8_t *b, int len, p25_ctl_t *out);
 void p25_iden_decode(const uint8_t *b, int len, p25_iden_t *out);
 void p25_iden_encode(const p25_iden_t *i, uint8_t out[P25_CP_IDEN_LEN]);
 
+// A trunked channel's parameter block (4)
+#define P25_TCH_FOLLOW_ALL	0x01u
+#define P25_TAG_NO_FALLBACK	0x10u	// tag flag (a kind bit): no fallback on this channel
+
+// What following a system needs: the system, its sites' control channels in hunt order, the plan; the channel's
+// talk group, whether it follows every group, the fallback
+#define P25_CP_CTL_MAX		16u
+#define P25_CP_IDEN_MAX		16u
+typedef struct {
+	p25_tsys_t sys;
+	uint32_t unit_id;
+	bool listen_only;		// the system's transmit side off (channel-modes.md 7.1)
+	uint8_t ctl_count;
+	uint8_t ctl_site[P25_CP_CTL_MAX];	// each control channel's site group
+	p25_ctl_t ctl[P25_CP_CTL_MAX];
+	uint16_t iden_set;		// bit n: identifier n programmed
+	p25_iden_t iden[P25_CP_IDEN_MAX];
+	uint16_t talk_group;
+	bool follow_all;
+	uint16_t fallback;		// channel number, 0 = none
+} p25_trunk_cfg_t;
+// Channel number's set-up from its tag, its system and its record ch; false when it isn't a live P25 trunked channel
+// or its system is missing
+bool p25_trunk_load(uint16_t number, const channel_t *ch, p25_trunk_cfg_t *out);
 #endif
+
 #endif
