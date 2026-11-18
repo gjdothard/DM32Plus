@@ -149,10 +149,20 @@ focused host/configuration tests during pure-codec and format work.
   model. Test malformed/missing tags, copies, deletes, saves and CPS round trips.
 - [x] M3.3a (host): Restore full upstream loaders and stored-channel tests.
   Check logical RX-only edits, safe legacy reads, rename, copy, deletion,
-  restart and stale-name replacement. CPS round trips and lifecycle power-cut
-  coverage remain pending.
+  restart and stale-name replacement. CPS round trips remain pending.
+- [x] M3.3b (sampled host power cuts): Interrupt RX-only save, rename, deletion,
+  plain replacement and RX-only copy. Replay the actual journal; accept the
+  old committed state or a safe new/intermediate state. Preserve the source
+  during copy. This samples writes; it is not exhaustive per-byte qualification.
 - [ ] M3.4: Prove channel RX-only and system listen-only block PTT and all
   automatic signaling. `NO_REG` is not receive-only permission.
+- [x] M3.4a (record policy): Add separate voice/request/registration permission
+  bits. RX-only, listen-only, missing targets, invalid resolved IDs, malformed
+  mode bodies, unknown flags and read failures grant no record permission.
+  Keep tolerant upstream receive defaults. Check the full `NO_REG` matrix.
+- [ ] M3.4b (runtime): Wire the record policy into the real owner and every
+  emission path, invalidate queued work on updates, and check actual grants,
+  frequencies, board capabilities and existing radio protections.
 
 The upstream tag writes the legacy base as receive-only DMR and reconstructs
 logical P25 permissions from its TX flag. The existing CPS checkbox must edit
@@ -160,10 +170,8 @@ that logical permission through the P25 adapter; reading only the base bit is
 insufficient. Do not activate tagged channels until this mapping is tested.
 See [P25 codeplug integration](../spec/p25-codeplug.md).
 
-Next backend gates: complete generic tag/record edge-case and power-cut tests;
-add strict TX admission around the permissive upstream settings defaults;
-test missing contacts, invalid IDs, future flags and system listen-only.
-Then connect the conventional radio owner and workspace lease. An old CPS
+Next task: connect the conventional radio owner and workspace lease, using
+the strict record policy and normal radio protections. An old CPS
 rewrite must not preserve a logical TX flag after the operator selects RX-only;
 that transfer/capability contract must be resolved before exposing P25 editing.
 
@@ -333,6 +341,43 @@ check passes every task; UI remains the tightest at 40 bytes beyond the required
 context overhead and margin. Logs, maps and the diagnostic ELF are archived in
 `build/p25-target/codeplug-evidence.tar.gz`. No hardware was accessed.
 
+## Record permission milestone
+
+Local `p25_admission.[ch]` adds a record policy independently of the imported
+receive loaders. It resolves the base/tag once under the storage lock and
+allocates no permanent state. A strict keyed lookup distinguishes an absent
+optional identity from a read error; the existing tolerant API is unchanged.
+Runtime dispatch still has no P25 channel caller, and the kind registry stays
+unrunnable. This does not complete M3.4's actual emission checks.
+
+Host evidence: all 34 `run-p25` executables and 11 Python checks pass. The new
+conventional/trunking suites pass 10,542/10,676 checks. Each configuration
+samples 2,228 actual power cuts across five edit operations, plus successful
+completion points. Tests inject a failure at each read position of the tested
+conventional/trunked record-policy paths. These simulated reads and flash
+units are not measured physical timing or hardware fault qualification.
+
+| Admission-era target configuration | Flash bytes | Main RAM bytes | Static RAM headroom |
+|---|---:|---:|---:|
+| Conventional-only P25 | 645,700 | 210,992 | 464 |
+| P25 with trunking | 645,692 | 210,992 | 464 |
+| Diagnostic roots, loaders and permission policy | 683,096 | 211,136 | 320 |
+
+Both enabled configurations pass with `-Os -Werror`; host checks also compile
+P25/trunking off and DMR off. The diagnostic retains the previous roots plus
+`p25_codeplug_tx_permissions` and has no unresolved symbols. The gate adds no
+static RAM. It still has no task caller; its eventual full owner call chain
+and complete state require M4 stack/RAM checks. Build inputs are `0e3a4a0d`
+plus this milestone, with the same fixed options/timestamp as above and
+`GITVERSION=0e3a4a0d`. Exported changed-source timestamps are refreshed before
+incremental compilation; target source hashes match the exported inputs.
+Evidence is in `build/p25-target/admission-evidence.tar.gz`.
+
+P25 and trunking now have qualification catalog entries. The feature list uses
+one declaration so the existing catalog reader sees both switches. Linux
+`bringup.py check` reports zero errors; pytest is absent in that build container,
+so it does not check test markers. Owner-authorized hardware checks remain open.
+
 ## Required test cases to carry through later stages
 
 - Conventional: clear calls, NAC/group filtering, encode/decode, PTT start/end,
@@ -371,6 +416,7 @@ context overhead and margin. Logs, maps and the diagnostic ELF are archived in
 | M3.1 upstream codecs | Exact-source audit: 14 parameter/helper functions and all 39 P25 vectors match the pin. Vector tests: 30 checks without trunking, 42 with it. All 28 `run-p25` executables and 11 Python checks pass with warnings as errors. | Parameter bodies only; generic storage, loaders, RX-only admission and CPS mapping remain pending. Target links are batched with the backend integration. |
 | M3.2a keyed-store reuse | Full imported NOR/power-cut suite plus local guard/interleaving tests: 4,471 checks pass. Removing the raw-commit outer lock reproduces key loss and fails the new regression. All 29 `run-p25` executables, 11 Python checks and both existing codeplug test configurations pass. | Host only; no transfer caller or tagged channel is activated. Target linking/resource checks are batched with the tag/reader integration. |
 | M3.2b/M3.3a metadata and loaders | Full upstream tag/record suite: 241 checks; stored P25: 116/158 checks. All 32 P25-suite executables, 11 Python build checks and both legacy codeplug configurations pass. Four target configurations and the P25 static stack check pass; diagnostic retained-loader link fits. Exact-source audit matches six imported implementation/header/vector files after only documented adaptations. | Explicit configuration API only. Lifecycle power cuts, strict TX admission, radio dispatch and CPS round trips remain open. |
+| M3.3b/M3.4a record permissions | Conventional/trunked admission: 10,542/10,676 checks; 2,228 sampled cuts per configuration; per-read fault injection. All 34 P25 executables, 11 Python checks and both legacy codeplug configurations pass. Both enabled target configurations and the retained-permission link fit without added static RAM. Feature catalog: zero errors on Linux. | Record policy only. Actual emission gates, session invalidation, frequency/grant checks, CPS round trips, complete-owner resource checks and hardware qualification remain open. Catalog test markers were not checked because the build container lacks pytest. |
 | Scope update | Owner requested retaining TX and honoring existing CPS RX-only; permission matrix above replaces the earlier passive-only product scope. | Hardware TX still requires its own authorized test session and --allow-rf. |
 
 Local ignored test output is in `build/p25-host`. Python works outside the

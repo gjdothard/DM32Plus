@@ -69,6 +69,47 @@ and channel RX-only must independently clear every TX path in the owner.
 
 ## Checks and remaining gates
 
+### Stored transmit permissions
+
+`p25_codeplug_tx_permissions` checks the stored channel against the active
+channel's P25-relevant fields while holding the storage lock. It returns these
+record permissions, separately from the tolerant receive configuration:
+
+| Record condition | Voice | Voice request | Registration / affiliation |
+|---|---|---|---|
+| Conventional, TX allowed | Yes | No | No |
+| Trunked, channel and system allow TX | Yes | Yes | Yes |
+| Same, with `NO_REG` | Yes | Yes | No |
+| Channel RX-only or system listen-only | No | No | No |
+| Invalid, absent or stale required permission record | No | No | No |
+
+A live binding and explicit TX flag are required. Conventional bodies must
+be exactly five bytes with known squelch and valid encoded NACs. Trunked
+channel bodies must be exactly one byte with known flags. Trunked system
+bodies must be exactly ten bytes, with a five-byte identity declaration,
+known sharing/options, an allowed system index, and the TX flag alone. A
+secret-required or unknown system flag denies all permissions. Unknown tag
+flags and longer future bodies also deny TX while remaining readable for RX.
+
+The resolved unit ID must be 1..0xFFFFFE. A selected radio-wide unit record
+must be exactly four bytes; zero inherits the existing radio identity. An
+absent optional unit record can inherit, but a failed read cannot. Explicit
+group targets must be 1..0xFFFF; private targets must be 1..0xFFFFFE and are
+conventional-only. All call uses the protocol's defined group. A missing
+selected contact/list or an unreadable referenced contact denies TX. With no
+contact or list selected, the defined default talkgroup 1 remains valid.
+Conventional system references are not implemented and deny TX.
+
+These bits are necessary record permissions, not RF authorization. The mode
+owner must also establish board support, valid control/identifier data, the
+current session/grant and actual RX/TX frequencies, and normal radio protections.
+Settings changes must invalidate the session and cancel queued signaling/audio.
+NAC/identity/target overrides and VFO operation need their own validated settings
+path. No current radio owner calls this API; runtime PTT, automatic signaling,
+queued-work cancellation and CPS checkbox enforcement remain integration gates.
+
+### Host validation
+
 `p25CodeplugTest` uses all 39 upstream P25 rows, selected unchanged from the
 shared channel-mode vectors. Conventional-only builds run the applicable 28.
 The parser is adapted to standard C tokenization for native host portability.
@@ -78,5 +119,14 @@ identifier plans, fallback and system listen-only. Local checks cover logical
 RX-only edits, safe legacy reads, copy/delete/restart and stale-name bindings.
 The imported `codeplugTagTest` adds generic tag/live-binding, unknown-kind,
 full-area, rewrite, target/list and system-record coverage (241 checks).
-Complete the runtime RX-only permission matrix, lifecycle power-cut checks and
-CPS preservation before activating P25 records.
+`p25AdmissionTest` checks the record permission matrix, malformed and future
+bodies, identity/target bounds, stale channel fields, CRC/version failures,
+and a failed read at every read position of the tested permission paths.
+Sampled power cuts cover RX-only save, rename, delete, plain replacement and
+RX-only copy, followed by real journal replay. The committed old state can
+survive a failed edit. A recovered RX-only or unbound state never grants P25
+TX; a successfully completed edit has its new permissions. Sampling is not
+an exhaustive cut at every flash byte.
+
+Complete runtime permission enforcement and CPS preservation before activating
+P25 records. Host storage checks do not establish absence of RF emissions.

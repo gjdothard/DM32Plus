@@ -22,12 +22,19 @@ TESTS += p25CodeplugTest p25CodeplugTestTrunk
 TESTS += codeplugKvTest
 TESTS += p25StoredTest p25StoredTestTrunk
 TESTS += codeplugTagTest
+TESTS += p25AdmissionTest p25AdmissionTestTrunk
 
 P25_STORE_CORE := $(CORE)/codeplug/codeplug.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c \
 	$(CORE)/codeplug/codeplug_talk.c \
 	$(CORE)/codeplug/codeplug_kv.c $(CORE)/codeplug/codeplug_tag.c $(CORE)/codeplug/codeplug_tagged.c \
 	$(CORE)/codeplug/codeplug_records.c
 P25_STORE_HEADERS := $(wildcard $(CORE)/codeplug/*.h)
+
+P25_ADMISSION := p25AdmissionTest.c $(CORE)/p25/p25_admission.c $(CORE)/p25/p25_codeplug.c $(P25_STORE_CORE) sim/sim_flash.c
+p25AdmissionTest: $(P25_ADMISSION) $(P25_HEADERS) $(P25_STORE_HEADERS) sim/sim_flash.h
+	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ $(P25_ADMISSION)
+p25AdmissionTestTrunk: $(P25_ADMISSION) $(P25_HEADERS) $(P25_STORE_HEADERS) sim/sim_flash.h
+	$(CC) $(CFLAGS) $(P25_FLAGS) -UCONFIG_P25_TRUNK -DCONFIG_P25_TRUNK=1 -o $@ $(P25_ADMISSION)
 
 codeplugTagTest: codeplugTagTest.c $(P25_STORE_CORE) $(P25_STORE_HEADERS) sim/sim_flash.c sim/sim_flash.h ../vectors/channel-modes.txt
 	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ codeplugTagTest.c \
@@ -184,6 +191,8 @@ run-p25: fecTest airFramerTest p25Test p25EngineTest p25EngineTestTrunk mbeTest 
 	./p25StoredTest
 	./p25StoredTestTrunk
 	./codeplugTagTest
+	./p25AdmissionTest
+	./p25AdmissionTestTrunk
 	./ambeVoiceTest
 	./vocoderMemoryTest
 	./vocoderMemoryTestTrunk
@@ -197,3 +206,4 @@ run-p25: p25CodeplugTest p25CodeplugTestTrunk
 run-p25: codeplugKvTest
 run-p25: p25StoredTest p25StoredTestTrunk
 run-p25: codeplugTagTest
+run-p25: p25AdmissionTest p25AdmissionTestTrunk

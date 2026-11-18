@@ -103,7 +103,7 @@ class P25BuildTest(unittest.TestCase):
         for settings in [(), ("CONFIG_DMR=n",), ("CONFIG_P25=y", "CONFIG_P25_TRUNK=n")]:
             with self.subTest(settings=settings):
                 data = self.probe(*settings)
-                for module in ("core/p25/p25_codeplug.c", "core/codeplug/codeplug_kv.c",
+                for module in ("core/p25/p25_codeplug.c", "core/p25/p25_admission.c", "core/codeplug/codeplug_kv.c",
                                "core/codeplug/codeplug_tag.c", "core/codeplug/codeplug_tagged.c",
                                "core/codeplug/codeplug_records.c"):
                     result = subprocess.run(

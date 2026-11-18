@@ -29,6 +29,14 @@ duplicate key is authoritative. Readers validate the complete data CRC and
 entry bounds before returning a value. Short buffers copy a prefix and return
 the stored length. Cursor walks stop when the checked area changes.
 
+`codeplug_kv_lookup` provides a strict lookup for permission checks: it returns
+true after a complete successful search and reports length -1 for an absent
+key. It returns false for an invalid area, bad arguments or any failed read,
+including an entry or value read after CRC validation. An optional field may
+inherit a default only after a successful search proves it absent. The older
+`codeplug_kv_get` API retains its tolerant absent/error behavior for existing
+readers. Both APIs take the storage lock and use the first duplicate key.
+
 | Key range | Upstream family reserved for integration |
 |---|---|
 | 0x0100..0x01FF | Systems |

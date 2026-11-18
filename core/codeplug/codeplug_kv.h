@@ -61,6 +61,9 @@ typedef enum {
 // The value's length (at most max bytes are copied to buf), or -1 when the key is absent or the area isn't valid. Each
 // call checks the whole area: to read several keys, walk them with codeplug_kv_next
 int codeplug_kv_get(uint16_t key, void *buf, uint16_t max);
+// Strict lookup: true after a complete successful search (length = -1 when absent). False on invalid area, bad
+// arguments or any failed read. Use where a missing optional value may inherit a default but a read error must not.
+bool codeplug_kv_lookup(uint16_t key, void *buf, uint16_t max, int *length);
 // A value that is a DMR ID: false when absent, empty, not a scalar or above CODEPLUG_DMR_ID_MAX (as if absent)
 bool codeplug_kv_get_id(uint16_t key, uint32_t *id);
 

@@ -111,3 +111,12 @@ leaves the legacy radio reader unchanged, removes obsolete bindings before a
 plain base write and preserves independent-base settings during tagged edits.
 The base-name/copy helpers adapt the fork's existing storage layout. No radio
 dispatch, UI or CPS caller is activated by these configuration APIs.
+
+`p25_admission.[ch]` and `p25AdmissionTest.c` are local integration code. They
+add strict stored-record permissions without changing upstream's tolerant
+receive decoders. Tests exercise real stored records, per-read fault injection
+and sampled journal recovery during channel lifecycle edits. The shared store's
+local `codeplug_kv_lookup` distinguishes a missing optional key from an I/O
+failure; existing `codeplug_kv_get` behavior stays unchanged. The radio owner
+must still connect these permissions to actual emissions and cancel queued
+work when settings change.

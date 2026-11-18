@@ -211,6 +211,30 @@ int codeplug_kv_get(uint16_t key, void *buf, uint16_t max)
 	return codeplug_kv_next(&c, &k, buf, max);
 }
 
+bool codeplug_kv_lookup(uint16_t key, void *buf, uint16_t max, int *length)
+{
+	if (length == NULL || (max != 0 && buf == NULL) || key == 0 || key == 0xFFFFu) return false;
+	*length = -1;
+	storage_lock();
+	uint32_t data, crc;
+	uint16_t len, count;
+	bool ok = check_flash(&data, &len, &count, &crc) == CODEPLUG_KV_VALID;
+	for (uint32_t at = 0; ok && at < len;) {
+		uint8_t header_bytes[ENTRY_HDR];
+		ok = board.flash->read(data + at, header_bytes, sizeof header_bytes);
+		if (!ok) break;
+		uint16_t n = get16(header_bytes + 2);
+		if (get16(header_bytes) == key) {
+			ok = max == 0 || board.flash->read(data + at + ENTRY_HDR, buf, n < max ? n : max);
+			if (ok) *length = n;
+			break;
+		}
+		at += ENTRY_HDR + n;
+	}
+	storage_unlock();
+	return ok;
+}
+
 bool codeplug_kv_get_id(uint16_t key, uint32_t *id)
 {
 	uint8_t v[CODEPLUG_KV_SCALAR];
