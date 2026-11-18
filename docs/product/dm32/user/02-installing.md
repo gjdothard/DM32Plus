@@ -75,3 +75,7 @@ Advanced migration and serial-loader procedures are in the [source reference](..
 If you download a manual install kit, extract the entire kit and follow its generated README. Its commands refer to
 the included image, manifest, tools, and any codec source you selected. Keep those files together.
 Use the serial-cable procedure for this radio. Do not substitute the native-USB DFU instructions from another model.
+
+**Use my own firmware build** accepts a locally compiled image and its optional manifest. An uploaded image is used
+as supplied. Changing the selected options discards a prepared or uploaded image; load the matching file again or
+let the service build the new selection.

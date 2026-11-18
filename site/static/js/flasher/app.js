@@ -1207,7 +1207,7 @@ function buildView() {
 		const picker = bundledMode() ? releasePicker(draw, !!busy) : null;
 		const usingPublished = bundledMode() && publishedSelection(sel, S.buildOptions);
 		forward(button(busy ? [spinner(), t("flash.nav.building")] : usingPublished ? t("flash.product.continue") : t(missing ? "flash.nav.choose" : S.firmware || S.sim ? `flash.nav.to_${stepsFor()[S.step + 1]}`
-			: VERSION_REF ? "flash.nav.build_version" : "flash.nav.build", { what: missing?.title.toLowerCase(), ref: VERSION_REF && versionShort() }), go, { primary: true, disabled: busy || !!missing || (bundledMode() && !releaseForRadio()) }), summary);
+			: VERSION_REF ? "flash.nav.build_version" : "flash.nav.build", { what: missing?.title.toLowerCase(), ref: VERSION_REF && versionShort() }), go, { primary: true, disabled: busy || !!missing || (bundledMode() && !S.firmware && !releaseForRadio()) }), summary);
 		// every image, prebuilt choice or not, comes from the build service (or is the user's own)
 		// the image's state, then building it yourself: one line and a fold under the features, not a card of its own
 		const image = h("div", { class: "build-image" },
@@ -1407,7 +1407,8 @@ async function loadOwnImage(f, redraw) {
 		if (backend().ownImage) f = { ...f, data: await backend().ownImage(fb(), S.radio.flash.board, f.data) };
 		const m = S.ownManifest || await forDevBuild(S.board, f.data);
 		const board = await verify(m, f.data, fb(), S.board.id);
-		S.firmware = { manifest: m, image: f.data, source: f.name, origin: "own", board };
+		S.firmware = { manifest: m, image: f.data, source: f.name, origin: "own", board,
+			selection: selectionKey(S.selection) };
 	} catch (e) {
 		const text = errorText(e);
 		alert(reportingActive() && diag.currentError()?.eventId ? `${text}\n\n${t("report.reported_short")}` : text);
