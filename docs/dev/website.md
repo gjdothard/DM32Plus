@@ -388,3 +388,53 @@ Automatic reports go through `diag.scrub()`, which removes callsigns, DMR IDs an
 is pinned with an SRI hash in `report.js`. It loads without breadcrumbs or other default integrations, so it sends only
 what `diag.error` hands it. `?reporting=0` turns sending off, as it does for the flash log. Ad blockers often block
 Sentry; the page then works the same and offers the download only.
+
+## Website deployment after a release
+
+The release workflow calls `website-release.yml` after firmware assets are published. Only final versions
+update production. Development and Testing prereleases remain available through their CPS channels.
+The job checks out the release commit, renders the site with that run's firmware artifact, and verifies
+its product identity, version, image checksum and codec exclusion before packaging it.
+The deployment archive is retained as a workflow artifact.
+
+The `website-production` environment records deployment status. The job uploads
+`website-<version>.tar.gz` to that release, then checks the public `/deployment.json` marker for both
+the version and commit. An old page or an unhealthy deployment cannot produce a successful job.
+`WEBSITE_URL` can override the public URL for another deployment.
+
+The host uses `tools/website/update.py` with outbound HTTPS, so a private host does not need inbound
+SSH from GitHub or a repository deployment secret. The root-owned configuration names the public repository
+and the fixed deployment directory. The updater checks every two minutes. It requires a newer stable release
+with an uploaded website asset and a matching GitHub SHA-256 digest. Missing bundles leave the site running.
+
+An administrator runs `tools/website/install-updater.sh DEPLOYMENT PRODUCT_JSON` once. The installer creates
+a separate system account named `website-updater`, with a locked password, a `nologin` shell, a private state
+directory and no supplementary groups. It installs a system service and timer. It does not enable user lingering.
+The account cannot access the Docker socket or write website deployment files, installed code, or configuration.
+It has one sudo permission: invoke `/usr/local/sbin/website-deploy` without arguments.
+
+The root-owned helper reads the bundle from standard input and independently verifies the latest stable version
+and GitHub asset digest. It rejects archive paths outside the site and explicit server files, links, device files,
+duplicate paths, writable permissions and excessive sizes. It uses a fixed root-owned Compose definition;
+a release cannot supply Docker options, host mounts, an image, a service name or a deployment path to the helper.
+The definition preserves the existing project's ports and public host setting, runs the Python image as an
+unprivileged user, drops all container capabilities and disables privilege escalation. Mounts are read-only.
+The updater can cause deployment of the official newer website release only.
+
+The host needs Python 3.11+, sudo, systemd, `tar`, `sha256sum`, `realpath`, `flock`, and Docker Compose with `--wait`.
+Inspect the timer with `systemctl status website-release.timer` and logs with
+`journalctl -u website-release.service`. The existing proxy and operator Compose files are preserved.
+The root-owned definition is captured at installation; an administrator must review later port or proxy changes.
+Release deployment refreshes content and recreates the existing service. It does not publish a separate image.
+
+`tools/website/deploy.sh` verifies the archive checksum and every bundled file before replacing the site and
+server. It retains a rollback copy in `release.previous.*`, waits for the CPS HTTP health check, and restores
+all previous files if startup fails. Deployments are serialized. The public deployment marker appears only after
+the health check passes. A deployment failure fails the release workflow even though the firmware remains published.
+Rerun the failed workflow job to retry deployment of the same release.
+
+To roll back manually, stop `website-release.timer`, restore the site and server files from the chosen
+`release.previous.*` directory, and recreate the service with the appropriate operator or root-owned Compose file.
+To remove automation, disable and remove both system units, delete the helper's sudoers entry and installed code,
+and remove the dedicated account after preserving any diagnostic files. Retain the running site's files and the
+root-owned Compose definition until the operator Compose mounts have been restored and verified.

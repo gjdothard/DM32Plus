@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The refs a /flash/?version= link may name (version.js), the default build ref of a preview site, the beta opt-in
 // link, how a radio's firmware is named, and which release a radio is offered.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { validRef, refShort, defaultRef, firmwareName, betaLink, releaseKey, updateFor } from "../static/js/flasher/version.js";
 
@@ -41,10 +43,10 @@ test("a beta is offered as a version link on this page, never over one in use", 
 	for (const none of ["", null, undefined, "bad tag"]) assert.equal(betaLink(none, "https://radiofoundry.org/flash/", null), null);
 });
 
-const NAMES = ["v26.11", "v26.1", "v26.11.1", "v26.12b1", "v26.12b2", "v26.12", "v27.3.2b10", "v27.3.2", "v26.11.12"];
+const NAMES = ["v0.1.0", "v1.0.0-beta.2", "v1.0.0-beta.10", "v1.0.0-rc.1", "v1.0.0", "v1.1.0", "v26.11", "v26.1", "v26.11.1", "v26.12b1", "v26.12b2", "v26.12", "v27.3.2b10", "v27.3.2", "v26.11.12"];
 
 test("release names sort as tools/release_version.py sorts them", () => {
-	for (const bad of ["v0.1.0", "v26.011", "v26.13", "v26.11.0", "v26.11b0", "v26.11-rc.1", "v25.12", "", null])
+	for (const bad of ["v01.0.0", "v1.0.0-beta.0", "v1.0.0-rc.01", "v26.011", "v26.13", "v26.11b0", "v26.11-rc.1", "v25.12", "", null])
 		assert.equal(releaseKey(bad), null, String(bad));
 	const cmp = (a, b) => {
 		const x = releaseKey(a), y = releaseKey(b);
@@ -53,7 +55,7 @@ test("release names sort as tools/release_version.py sorts them", () => {
 	};
 	for (const a of NAMES) for (const b of NAMES) {
 		if (a === b) continue;
-		const py = spawnSync("python3", [new URL("../../tools/release_version.py", import.meta.url).pathname, "pick", a, b], { encoding: "utf8" }).stdout.trim();
+		const py = spawnSync(process.env.PYTHON || "python3", [fileURLToPath(new URL("../../tools/release_version.py", import.meta.url)), "pick", a, b], { encoding: "utf8" }).stdout.trim();
 		assert.equal(cmp(a, b) > 0 ? a : b, py, `${a} vs ${b}`);
 	}
 });
@@ -78,4 +80,11 @@ test("a build that isn't a release is offered the newest final release with a ne
 	assert.equal(updateFor(rels, "board-a", "", 2000), null, "the release's own commit");
 	assert.equal(updateFor([{ board: "board-a", version: "v26.11" }], "board-a", "", 1000), null, "a release without git_time");
 	assert.equal(updateFor(rels, "board-a", "v26.10", 9999)?.version, "v26.11", "a release is compared by name");
+});
+
+test("semantic finals upgrade calendar builds without opting stable users into prereleases", () => {
+ const rels = ["v1.0.0-beta.10", "v1.0.0-rc.2", "v1.0.0", "v1.1.0-beta.1"].map(version => ({ board: "sample", version }));
+ assert.equal(updateFor(rels, "sample", "v26.11")?.version, "v1.0.0");
+ assert.equal(updateFor(rels, "sample", "v1.0.0-beta.2")?.version, "v1.1.0-beta.1");
+ assert.equal(updateFor(rels, "sample", "v1.1.0"), null);
 });

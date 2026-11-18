@@ -1,8 +1,9 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Releases
 
-A release is a git tag on main named for its year and month (`v26.11`, below) and a GitHub release that carries,
+A release is a git tag on main named `vMAJOR.MINOR.PATCH` and a GitHub release that carries,
 for each releasable radio, the firmware image **without the AMBE codec**, its manifest, `SHA256SUMS`, the `rfoundry`
 flashing tool as single-file executables for Linux, macOS and Windows, and the user manual as a PDF. Users never
 build firmware: `rfoundry` downloads the image, checks it, and either keeps the codec already in the radio or writes
@@ -10,19 +11,28 @@ the codec from the user's own stock firmware file ([tools/rfoundry/README.md](..
 
 ## Release names
 
-A release is named for the year and month it comes out, so a user sees at a glance how old the firmware is.
-`tools/release_version.py` holds the rule; the Makefile, `tools/release_build.sh`, the release workflow and the site
-all ask it.
+New release tags use these names:
 
-| Name | When |
-|---|---|
-| `vYY.M` | The first release of a month: `v26.11` |
-| `vYY.M.N` | Another release that month: `v26.11.1`, `v26.11.2` |
-| `vYY.MbN` | A pre-release (beta) of that name: `v26.12b1`. The final keeps the name even if it ships the next month |
+| Name | Channel | Example |
+|---|---|---|
+| `vMAJOR.MINOR.PATCH` | Stable | `v1.0.0` |
+| `vMAJOR.MINOR.PATCH-beta.N` | Development | `v1.0.0-beta.1` |
+| `vMAJOR.MINOR.PATCH-rc.N` | Testing | `v1.0.0-rc.1` |
 
-The year has two digits (`26` is 2026) and a beta is a bare `b` and its count, to save room on the radios' small
-displays. The month has no leading zero and the count starts at 1, so `v26.11.3` never reads as March. Main is the
-alpha; there is no release candidate yet. `tools/release_build.sh` and the release workflow refuse any other tag.
+Components have no leading zeros. Major, minor and patch range from 0 to 999999; prerelease counters
+range from 1 to 999999. Other prerelease labels and build metadata are not supported.
+Ordering is numeric, with beta before rc before the final of the same version.
+`tools/release_version.py` and the installer's matching parser enforce these rules.
+
+The board's `product.json` holds the next base `version` without `v`. Branch pushes allocate the next
+counter for their own channel. Retrying a commit reuses its existing channel tag. Once a final tag exists,
+advance the base version before publishing more prereleases. Final tags are created explicitly from the
+reviewed release commit; branch automation does not publish a stable release.
+
+Historical calendar spellings `vYY.M[.N][bN]` remain readable and sort before the new version series,
+so `v1.0.0` upgrades an installation on `v26.11`. Calendar-shaped names are reserved for compatibility
+and recognized first. Existing product-prefixed calendar tags, including `RC-` candidates, remain downloadable.
+New semantic tags have no product prefix.
 
 **On the radio.** A clean build of a commit that carries a release tag gets `RFOUNDRY_RELEASE` (the Makefile reads the
 tag; `make RELEASE=<tag>` sets it, as `tools/release_build.sh` does, and `RELEASE=` leaves it out). The splash screen
@@ -31,7 +41,7 @@ shows the release name in place of the commit, About shows both, and the debug l
 id, the manifests and the CPS id need it. The build service fetches tags, so a custom build of a tagged commit shows
 the release name too.
 
-**Betas.** A tag ending `bN` becomes a GitHub pre-release. GitHub's latest release skips pre-releases, and so does
+**Betas.** A tag ending `-beta.N` or `-rc.N` becomes a GitHub pre-release. GitHub's latest release skips pre-releases, and so does
 the site: the flasher installs the newest release that is not a pre-release by default, and offers a newer beta only as
 an opt-in version link (`?version=<tag>`, [website.md](website.md#flasher-notices)). `?version=main` still builds main.
 
@@ -58,13 +68,18 @@ edit them into a short list of what changed for users.
 9. Tag and push the tag:
 
    ```
-   git tag -a v26.11 -m "RadioFoundry 26.11"
-   git push origin v26.11
+   git tag -a v1.0.0 -m "Release 1.0.0"
+   git push origin v1.0.0
    ```
 
 10. The release workflow builds the firmware and rfoundry and attaches them; the manual workflow attaches the PDF
     ([manual-pdf.md](manual-pdf.md)). Edit the release notes on GitHub (they are the changelog the site links).
 11. The next push to main redeploys the site, which then installs the new release (or offers the new beta).
+
+For a product release, the workflow passes the board metadata name to `--product`. Its full image and
+manifest use `<prefix>-<board>-<version>` and include the product identity expected by the CPS.
+The same build also produces generic `rfoundry-` filenames for the command-line flasher; pass the
+product repository with `--repo` when downloading them.
 
 ## Release artifacts
 

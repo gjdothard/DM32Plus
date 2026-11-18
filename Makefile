@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Garrett Dothard
 # Copyright (c) 2026 The RadioFoundry Authors
 ## Firmware build, one tree for every radio:
 ##
@@ -231,7 +232,7 @@ RFOUNDRY_GIT_TIME := $(if $(filter unknown,$(GITVERSION)),,$(if $(GITDIRTY),$(sh
 RFOUNDRY_GIT_DATE := $(if $(RFOUNDRY_GIT_TIME),$(shell python3 -c 'import sys, time; print(time.strftime("%Y-%m-%d", \
 	time.gmtime(int(sys.argv[1]))))' '$(RFOUNDRY_GIT_TIME)'))
 # The release name the radio shows (splash, About, the debug link's release=): the newest release tag on this commit
-# (tools/release_version.py: vYY.M[.N][bN]), none for a dirty tree or an untagged commit. RELEASE= sets it
+# (tools/release_version.py: vMAJOR.MINOR.PATCH[-beta.N|-rc.N]), none for a dirty tree or an untagged commit. RELEASE= sets it
 # (tools/release_build.sh passes the tag) and RELEASE= alone leaves it out. RFOUNDRY_GIT stays the commit: the crash
 # record, the manifests and the CPS id read it
 ifeq ($(origin RELEASE),undefined)

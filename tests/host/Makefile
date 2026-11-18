@@ -1355,3 +1355,13 @@ run-webctlassets: httpAssetsTestWebctl
 	./httpAssetsTestWebctl out/http_webctl
 	python3 -I $(ROOT)/tools/gen_http_assets.py --check out/http_webctl $(WEBCTL_ASSETS)
 .PHONY: run-webctlassets
+
+.PHONY: run-releaseversion
+run: run-releaseversion
+run-releaseversion:
+	$(PYTHON) -B releaseVersionTest.py
+
+.PHONY: run-websiterelease
+run: run-websiterelease
+run-websiterelease:
+	$(PYTHON) -B websiteReleaseTest.py
