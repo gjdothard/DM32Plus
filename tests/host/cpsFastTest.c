@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The fast codeplug protocol (core/cps/cps_fast.c, docs/spec/cps-fast.md) on a simulated flash with the DM-1701's
 // layout: the LZ4 encoder and streaming decoder against a reference decoder and a second encoder, blank blocks, CRC
 // sums and DIFF, READ windows, the range refusals, direct and staged writes, the session time-out, power cuts all
@@ -11,6 +12,8 @@
 #include "cps/cps_lz4.h"
 #include "cps/cps_openfw.h"
 #include "codeplug/codeplug.h"
+#include "codeplug/codeplug_tag.h"
+#include "codeplug/codeplug_kv.h"
 #include "settings/settings.h"
 #include "storage/storage.h"
 #include "net/tftp_codeplug.h"
@@ -896,6 +899,25 @@ static void test_bad_records(void)
 	printf("# boot records: a changed slot, a protected block, the good one, TFTP leaves ours\n");
 }
 
+static void test_mode_guard(void)
+{
+	boot(&dm1701_map, true);
+	channel_t c = { .name = "Tagged", .mode = RADIO_MODE_FM, .rx_hz = 145500000, .tx_hz = 145500000,
+		.timeslot = 1, .power = CODEPLUG_POWER_DEFAULT };
+	CHECK(codeplug_set_channel(1, &c));
+	codeplug_tag_t tag = { .kind = CODEPLUG_KIND_P25, .system = CODEPLUG_SYSTEM_NONE, .flags = CODEPLUG_TAG_BASE_OWN };
+	CHECK(codeplug_tag_write(1, c.name, &tag, NULL, 0));
+	CHECK(begin(CPSF_MODE_DIRECT) == DL_ST_REFUSED);
+	CHECK(begin(CPSF_MODE_STAGED) == DL_ST_REFUSED);
+	const char *msg = NULL;
+	CHECK(tftp_codeplug_file.open_write(0, &msg) != TFTP_OK);
+	CHECK(codeplug_tag_remove(1));
+	CHECK(begin(CPSF_MODE_DIRECT) == DL_ST_OK);
+	uint8_t blank[BLOCK]; memset(blank, 0xFF, sizeof blank);
+	CHECK(write_block(CODEPLUG_KV_ADDR, blank, 61) == DL_ST_REFUSED);
+	CHECK(op(CPSF_OP_ABORT) == DL_ST_OK);
+}
+
 int main(void)
 {
 	setvbuf(stdout, NULL, _IONBF, 0);	// the lines before a crash
@@ -907,6 +929,7 @@ int main(void)
 	test_staged_write();
 	test_power_cuts();
 	test_bad_records();
+	test_mode_guard();
 	CHECK(sim_flash_violations() == 0);
 	sim_flash_free();
 	printf("# cpsFastTest: %d checks, %s\n", checks, failures ? "FAILED" : "PASSED");

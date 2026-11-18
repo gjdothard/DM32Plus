@@ -7,8 +7,8 @@
 Status: the parameter codecs and shared vectors are imported from RadioFoundry
 `c34dc440aaf2d3952458bc0bd85b8c56c76f6b23`. The keyed store, channel tags,
 system readers and P25 settings loaders are available through an explicit
-configuration API. Radio dispatch, UI and CPS integration remain pending.
-No operating P25 channel is exposed by this import alone.
+configuration API. Stored conventional P25 now uses radio channel/PTT dispatch.
+Trunked dispatch and mode-aware UI/CPS editing remain pending.
 
 ## Reuse boundary
 
@@ -22,11 +22,11 @@ The upstream integration uses these shared layers:
 
 | Layer | Purpose | Local status |
 |---|---|---|
-| `codeplug_kv` | Versioned keyed EEPROM sector, CRC, journaled batches and raw-transfer preservation | Imported; host tested; transfer callers pending |
+| `codeplug_kv` | Versioned keyed EEPROM sector, CRC and journaled batches | Imported; radio admission and legacy-transfer guards connected |
 | `codeplug_tag` | Bind a channel kind and its parameters to a legacy channel | Imported; explicit configuration adapter tested |
 | `codeplug_records` | Radio-wide records, systems, sites, control channels and identifier plans | Imported; exercised by stored P25 tests |
 | `p25_codeplug` loaders | Resolve identity, targets, channel parameters and a trunked system | Restored; simulated-flash tests pass |
-| `radio_p25` | Start/stop engines, follow grants, retune and request permitted TX | Conventional component tested; channel/PTT dispatch and trunked owner pending |
+| `radio_p25` | Start/stop engines and request permitted TX | Conventional channel/PTT connected; trunked owner pending |
 
 The tagged design stores a receive-only DMR stand-in in the legacy channel
 record. The tag supplies the logical P25 kind and its TX permission. Older
@@ -37,9 +37,10 @@ safe base record. Its current legacy-only decoder is not sufficient.
 `codeplug_channel` still returns the legacy base. Configuration code must use
 `codeplug_tagged_channel`, `codeplug_tagged_set_channel` and
 `codeplug_tagged_delete_channel` to resolve or edit tags. Applying logical TX
-permission in the old radio reader would let its DMR path treat a tagged channel
-as transmitting DMR. Dispatch must recognize tagged kinds before that reader
-changes. The registry currently reports every tagged channel kind as unrunnable.
+permission in an unaware radio reader would let its DMR path treat a tagged
+channel as transmitting DMR. The radio uses `codeplug_radio_channel` and
+recognizes tagged kinds before mode dispatch. The registry enables conventional
+P25 with its build switch; other tagged channel kinds remain unrunnable.
 See [tagged channel records](channel-modes.md) for the shared format.
 
 ## Parameter blocks

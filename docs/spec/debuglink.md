@@ -4,6 +4,12 @@
 
 # USB debug link
 
+The core view reports `mode=p25` for selected conventional P25 and
+`mode=unsupported` for parked tagged channels. With `CONFIG_P25`, it also
+reports `p25.active` (the owner acquired its providers and workspace) and
+`p25.rx` (the engine has an active receive call). These are software state,
+not measurements of RF emissions or audio quality.
+
 A small framed protocol on the radio's host port (USB CDC-ACM on radios with USB, a UART otherwise) for bench
 automation: read the
 firmware version, the diagnostics counters and the radio's state, reset counters, take screenshots, press keys, key

@@ -30,6 +30,10 @@
 // Explicit configuration view while the existing radio still consumes the safe legacy base.
 // These do not activate a mode. The radio owner must check kind support and TX admission before RF.
 bool codeplug_tagged_channel(uint16_t number, channel_t *out);
+// Radio admission view: stale/malformed bindings and damaged/newer keyed areas park as kind 0xFF, RX-only.
+bool codeplug_radio_channel(uint16_t number, channel_t *out);
+// Legacy transfers cannot express logical mode permissions; refuse their base writes while tags exist.
+bool codeplug_legacy_write_allowed(void);
 bool codeplug_tagged_set_channel(uint16_t number, const channel_t *ch);
 bool codeplug_tagged_delete_channel(uint16_t number);
 

@@ -17,7 +17,11 @@ static unsigned checks, failures;
 void storage_lock(void) {}
 void storage_unlock(void) {}
 static bool ambe_running;
+#ifndef P25_STATE_TEST
 bool ambeVoiceStreaming(void) { return ambe_running; }
+#else
+#include "sim/dmr_sim_modem.h"
+#endif
 static unsigned sequence, close_at, off_at, stop_at, return_at;
 static bool opened, on, keyed, audio_fail, open_fail, go_fail, return_fail, loaned, edit_on_open;
 static uint32_t fit, now_us, token;
@@ -67,7 +71,21 @@ static void audio_stop(void) { audio_cb = NULL; stop_at = ++sequence; }
 static void speaker(bool on_pcm) { (void)on_pcm; }
 static const hal_audio_t audio = { .start = audio_start, .stop = audio_stop, .speaker_pcm = speaker };
 static void tx_off(void) { keyed = false; off_at = ++sequence; }
-static const hal_radio_t rf = { .tx_off = tx_off };
+static unsigned key_calls;
+static radio_mode_t physical_mode;
+static void set_mode(radio_mode_t mode) { physical_mode = mode; }
+static bool rx(uint32_t hz, radio_bw_t bw, const subtone_t *tone)
+{ (void)bw; (void)tone; return board_in_band(hz, false); }
+static bool tx_rf(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t *tone)
+{ (void)bw; (void)power; (void)tone; key_calls++; keyed = board_in_band(hz, true); return keyed; }
+static void status(radio_status_t *s) { *s = (radio_status_t){ .rssi_dbm = -120, .noise = 255, .tone_ok = true }; }
+static void audio_route(bool open) { (void)open; }
+static const hal_radio_t rf = { .tx_off = tx_off, .set_mode = set_mode, .rx = rx, .tx = tx_rf, .status = status, .audio = audio_route };
+static uint16_t battery(void) { return 8000; }
+static uint8_t percent(void) { return 100; }
+static int8_t volume(void) { return -1; }
+static void led(uint8_t which, bool enabled) { (void)which; (void)enabled; }
+static const hal_power_t power_hal = { .battery_mv = battery, .battery_pct = percent, .volume = volume, .led = led };
 static bool lend(size_t bytes, size_t alignment, hal_vocoder_loan_t *out)
 {
 	lends++;
@@ -83,10 +101,19 @@ static bool reclaim(hal_vocoder_loan_t *in)
 	loaned = false; return_at = ++sequence;
 	return true;
 }
-static const hal_vocoder_t vocoder = { .lend = lend, .reclaim = reclaim };
+static bool codec_present(void) { return !loaned; }
+static void codec_reset(void) {}
+static void codec_encode(const int16_t *in, uint8_t *out) { (void)in; CHECK(!loaned); memset(out, 0, VOCODER_BITS); }
+static void codec_decode(const uint8_t *in, int16_t *out) { (void)in; CHECK(!loaned); memset(out, 0, AUDIO_BLOCK_SAMPLES * sizeof *out); }
+static const hal_vocoder_t vocoder = { .present = codec_present, .reset = codec_reset, .encode = codec_encode,
+	.decode = codec_decode, .lend = lend, .reclaim = reclaim };
 static const band_t bands[] = {{136000000,174000000,true},{400000000,480000000,true},{490000000,491000000,false}};
 const board_t board = { .name = "test", .bands = bands, .band_count = 3, .power_count = 9,
-	.flash = &sim_flash, .air = &air, .audio = &audio, .radio = &rf, .vocoder = &vocoder };
+	.flash = &sim_flash, .air = &air, .audio = &audio, .radio = &rf, .vocoder = &vocoder, .power = &power_hal,
+#ifdef P25_STATE_TEST
+	.dmr = &sim_modem,
+#endif
+};
 static const hal_flash_map_t map = { .settings_addr = 0x11000, .settings_size = 0x8000,
 	.journal_addr = 0x19000, .openfw_eeprom = 0, .openfw_flash = 0x20000, .openfw_end = 0x200000,
 	.calibration_addr = 0x10000, .calibration_size = 0x200 };

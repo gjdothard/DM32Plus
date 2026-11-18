@@ -6,8 +6,10 @@
 
 Status: the generic store and its simulated-flash tests are adapted from
 RadioFoundry `c34dc440aaf2d3952458bc0bd85b8c56c76f6b23`. It is currently
-selected with `CONFIG_P25`; no radio channel, UI or transfer path calls it yet.
-The generic mode layer will use it for channel tags and system records.
+always built for tagged-channel admission and legacy-transfer protection.
+Protocol settings readers remain feature gated. A recognized damaged, newer
+or unreadable store cannot authorize radio operation or legacy codeplug writes.
+Unrelated bytes without RFKV magic remain an ordinary legacy codeplug.
 
 ## Format
 

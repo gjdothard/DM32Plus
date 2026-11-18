@@ -6,7 +6,6 @@
 // the storage's shared buffer and rewrites it through the journal in one step, so a power cut leaves the old area or
 // the new one
 #include "config.h"
-#if CONFIG_P25
 #include <string.h>
 #include "codeplug.h"
 #include "codeplug_kv.h"
@@ -76,9 +75,10 @@ static codeplug_kv_state_t check_flash(uint32_t *data, uint16_t *len, uint16_t *
 	uint32_t a;
 	uint16_t hdr;
 	*count = 0;
-	if (!area_addr(&a) || !board.flash->read(a, b, CODEPLUG_KV_HDR)) {
+	if (!area_addr(&a)) {
 		return CODEPLUG_KV_EMPTY;
 	}
+	if (!board.flash->read(a, b, CODEPLUG_KV_HDR)) return CODEPLUG_KV_BAD;
 	codeplug_kv_state_t s = header(b, &hdr, len, crc);
 	if (s != CODEPLUG_KV_VALID) {
 		return s;
@@ -219,9 +219,9 @@ int codeplug_kv_get(uint16_t key, void *buf, uint16_t max)
 	return codeplug_kv_next(&c, &k, buf, max);
 }
 
-bool codeplug_kv_lookup(uint16_t key, void *buf, uint16_t max, int *length)
+static bool lookup_range(uint16_t lo, uint16_t hi, void *buf, uint16_t max, int *length)
 {
-	if (length == NULL || (max != 0 && buf == NULL) || key == 0 || key == 0xFFFFu) return false;
+	if (length == NULL || (max != 0 && buf == NULL) || lo == 0 || hi == 0xFFFFu || lo > hi) return false;
 	*length = -1;
 	storage_lock();
 	uint32_t data, crc;
@@ -232,7 +232,7 @@ bool codeplug_kv_lookup(uint16_t key, void *buf, uint16_t max, int *length)
 		ok = board.flash->read(data + at, header_bytes, sizeof header_bytes);
 		if (!ok) break;
 		uint16_t n = get16(header_bytes + 2);
-		if (get16(header_bytes) == key) {
+		if (get16(header_bytes) >= lo && get16(header_bytes) <= hi) {
 			ok = max == 0 || board.flash->read(data + at + ENTRY_HDR, buf, n < max ? n : max);
 			if (ok) *length = n;
 			break;
@@ -243,10 +243,44 @@ bool codeplug_kv_lookup(uint16_t key, void *buf, uint16_t max, int *length)
 	return ok;
 }
 
+bool codeplug_kv_lookup(uint16_t key, void *buf, uint16_t max, int *length)
+{
+	return lookup_range(key, key, buf, max, length);
+}
+
+bool codeplug_kv_range_present(uint16_t lo, uint16_t hi, bool *present)
+{
+	if (present == NULL) return false;
+	int length;
+	bool ok = lookup_range(lo, hi, NULL, 0, &length);
+	*present = ok && length >= 0;
+	return ok;
+}
+
 bool codeplug_kv_get_id(uint16_t key, uint32_t *id)
 {
 	uint8_t v[CODEPLUG_KV_SCALAR];
 	return codeplug_kv_id(v, codeplug_kv_get(key, v, sizeof(v)), id);
+}
+
+bool codeplug_kv_radio_valid(bool *present)
+{
+	if (present == NULL) return false;
+	*present = false;
+	storage_lock();
+	uint32_t addr, data, crc;
+	uint16_t len, count;
+	bool ok = true;
+	if (area_addr(&addr)) {
+		uint8_t magic[4];
+		ok = board.flash->read(addr, magic, sizeof magic);
+		if (ok && get32(magic) == CODEPLUG_KV_MAGIC) {
+			*present = true;
+			ok = check_flash(&data, &len, &count, &crc) == CODEPLUG_KV_VALID;
+		}
+	}
+	storage_unlock();
+	return ok;
 }
 
 codeplug_kv_state_t codeplug_kv_info(uint16_t *length, uint16_t *entries)
@@ -457,5 +491,3 @@ bool codeplug_kv_remove(uint16_t key)
 	codeplug_kv_op_t op = { key, CODEPLUG_KV_REMOVE, NULL };
 	return codeplug_kv_write(&op, 1);
 }
-
-#endif // CONFIG_P25

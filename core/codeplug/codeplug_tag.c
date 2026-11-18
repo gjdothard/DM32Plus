@@ -4,7 +4,6 @@
 // Channel tags (codeplug_tag.h, docs/spec/channel-modes.md 2). No kind's fields here: the parameter block is bytes
 // for the kind's mode module
 #include "config.h"
-#if CONFIG_P25
 #include <string.h>
 #include "codeplug/codeplug_tag.h"
 #include "codeplug/codeplug_kv.h"
@@ -221,5 +220,3 @@ bool codeplug_tag_after_write(uint16_t number, const channel_t *ch, uint8_t acti
 	codeplug_kv_op_t op = { tag_key(number), (uint16_t)(CODEPLUG_TAG_HDR | CODEPLUG_KV_HEAD), v };
 	return codeplug_kv_write(&op, 1);
 }
-
-#endif // CONFIG_P25

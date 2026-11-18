@@ -66,6 +66,10 @@ int codeplug_kv_get(uint16_t key, void *buf, uint16_t max);
 bool codeplug_kv_lookup(uint16_t key, void *buf, uint16_t max, int *length);
 // Full-width edit generation for active mode sessions. Compare alongside codeplug_serial(), which covers base edits.
 uint32_t codeplug_kv_generation(void);
+// Radio format guard. Foreign/empty extension bytes are allowed (present=false); an unreadable or damaged RFKV
+// area is refused. A recognized valid RFKV area sets present=true. No writes or formatting.
+bool codeplug_kv_radio_valid(bool *present);
+bool codeplug_kv_range_present(uint16_t lo, uint16_t hi, bool *present);
 // A value that is a DMR ID: false when absent, empty, not a scalar or above CODEPLUG_DMR_ID_MAX (as if absent)
 bool codeplug_kv_get_id(uint16_t key, uint32_t *id);
 

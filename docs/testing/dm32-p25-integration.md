@@ -116,13 +116,14 @@ UI/CPS schema design can proceed while provider work is being tested.
   ownership, preserve codec identity/options and reinitialize AMBE after return.
 - [x] M4.1 (owner component): Connect the sized workspace lease to the conventional
   mode owner and stop its air/audio callbacks before return.
-- [ ] M4 handoff gate: Connect the owner to channel/PTT dispatch and test complete
+- [x] M4 handoff gate (host): Connect the owner to channel/PTT dispatch and test complete
   FM/DMR/P25 transitions through the existing state machine.
 
-Next task: M4 channel/PTT dispatch, using the M3 record policy and tested owner.
+Next task: finish M4 audio/coexistence checks, then M5 trunked ownership using
+the M3 record policy and tested conventional handoff.
 M2's physical FIFO
 and throughput qualification still needs an owner-authorized hardware session. Do not
-advertise P25 in VERSION, the UI or CPS until the matching integration gates pass.
+advertise release-qualified P25 support until the matching integration gates pass.
 
 ## Current work: M3 and reuse strategy
 
@@ -391,11 +392,14 @@ so it does not check test markers. Owner-authorized hardware checks remain open.
   wrap still invalidates the session through the new 32-bit keyed generation.
 - [x] Discard primed symbols after a provider refuses TX start; retry cannot
   send a previous header.
-- [ ] M4.2: Wire existing channel selection and PTT to the owner; recognize and
-  park unsupported tagged kinds with features off. Keep UI/CPS activation gated.
-- [ ] M4.2: Apply existing inhibition, battery, BCL, timeout, power and RF checks.
-  Serialize prepare/check/key/go with storage writers, and coordinate writer-side
-  quiescence when RX-only changes during queued or active TX.
+- [x] M4.2 (host): Wire existing channel selection and PTT to the owner; recognize
+  and park unsupported tagged kinds with features off. Home identifies P25;
+  mode-aware editors and trunked dispatch remain gated.
+- [x] M4.2 (host): Apply existing inhibition, battery, BCL, timeout, power and RF checks.
+  Serialize prepare/check/key/go with storage writers. Legacy writers refuse
+  tagged codeplugs and managed metadata; mode-aware writers remain pending.
+- [ ] M6 writer gate: Quiesce the owner before a future mode-aware writer commits
+  or acknowledges RX-only changes. Internal edits invalidate on the next poll.
 - [ ] M4.2: Test complete FM/DMR/P25 transitions, beeps/audio routing, mic gain,
   snapshots, retune, hotspot/APRS exclusions, callback shutdown and return failure.
   Measure the complete state-machine call chain and its stack/RAM costs.
@@ -403,7 +407,78 @@ so it does not check test markers. Owner-authorized hardware checks remain open.
 All 36 `run-p25` executables and 11 Python checks pass. The owner suite passes
 431 checks both with trunking compiled off and on; these are conventional cases,
 not a trunked owner. Actual codec-wrapper loan tests now pass 91/91/16 checks.
-No radio hardware is involved. The ordinary channel/PTT dispatcher is unchanged.
+No radio hardware is involved. These figures describe the owner-component milestone.
+
+## M4.2 conventional channel and PTT connection
+
+Stored conventional tags now reach the real owner through `radio_sm`. Normal
+PTT keying holds the storage lock across final admission, prepare, RF key and
+modulation start. Release sends the terminator; timeout, failed start, shutdown
+and stale permissions abort and unkey. Failed codec-memory return parks the
+channel and prevents DMR startup; a later successful return permits transition.
+Canceled shutdown reloads P25 receive without keying.
+
+The generic tag/store guard remains built with P25 off. Unsupported tags,
+stale bindings and damaged or unreadable recognized metadata park with no
+FM/DMR transmission or automatic signaling. Unrelated non-RFKV legacy bytes
+remain compatible. Legacy CPS/fast-CPS/TFTP writes refuse tagged codeplugs and
+cannot overwrite managed metadata. Reads are allowed. This is a temporary
+editor limitation, not a completed firmware/CPS round trip.
+
+The complete suite passes 39 executables and 11 Python checks. The real radio
+state-machine integration passes 145 checks, including RX-only, inhibit, critical battery, BCL, TOT,
+graceful release, settings invalidation while keyed, failed modulation start,
+failed memory return, shutdown cancellation, host-stream PTT refusal and FM/DMR/P25 transitions. The
+owner component still passes 431 checks in each trunking build configuration.
+Feature-off dispatch and both enabled/disabled generic tag readers are tested.
+
+Existing radio core/features, feature-off variants, roaming, receive bands,
+APRS and CPS/fast-CPS/TFTP regressions pass. The NAND suite excludes the newly
+reserved metadata sector from legacy writes, verifies refusal, and still
+exercises 169 CPS power cuts including garbage collection. Host warnings are
+errors, with the existing CPS build-date macro warning disabled for Zig.
+
+UI flows pass, and the P25 home page is rendered at all five display classes;
+only the five new P25 PNGs are added. No new translated strings are introduced.
+Debug core view adds `mode=p25|unsupported` and `p25.active` / `p25.rx` when
+compiled in. A read-only HIL check is supplied for a preprogrammed channel.
+No HIL or hardware session was run.
+
+Final target builds use `712d76b0` plus this work, `GITVERSION=712d76b0`,
+`GITDIRTY=-dirty`, `RFOUNDRY_GIT_TIME=1795019138` and `-Os -Werror`.
+The connected owner is reachable in these normal images; no artificial
+entry-point retention is needed.
+
+| Configuration | Flash bytes | RAM bytes | RAM free bytes |
+|---|---:|---:|---:|
+| Default, P25 off | 637,472 | 209,216 | 2,240 |
+| Conventional P25 | 678,680 | 211,208 | 248 |
+| P25 with trunking compiled | 680,276 | 211,208 | 248 |
+| DMR off, P25 off | 338,688 | 129,160 | 82,296 |
+
+The default format guard adds compatibility checks with P25 off. The P25
+protocol and voice costs still require the feature switch. The remaining
+248-byte static headroom is tight; future trunked state must use the loan or
+reduce existing allocations. These builds omit the private codec image.
+
+Default and connected P25 static stack checks pass with the configured
+68-byte port overhead and 128-byte margin. The P25 radio task has 840 bytes
+remaining, audio 1,596 and modem 688; the smallest remainder is UI at 40.
+The analysis reports seven functions without call graphs, each charged 64
+bytes. Runtime stack high-water marks remain a hardware qualification item.
+Source inputs match after line-ending/trailing-whitespace normalization.
+Logs, input hashes, images, maps, ELFs and the source snapshot are retained in
+ignored `build/p25-target/connected-evidence.tar.gz`.
+
+Full CI, hardware PCM/beep/microphone/voice quality and RF qualification remain
+open. The state-machine fixture disables beeps, hotspot, APRS and SFR; existing
+feature regressions and target builds cover their compilation, not P25 hardware
+coexistence. Trunked owner integration, mode-aware editors and synchronous
+external permission-update handling are still required before release.
+The Linux feature catalog check reports zero errors; its pytest-marker scan
+was unavailable because the build container does not have pytest.
+
+### M4.1 target component baseline (historical)
 
 The target ABI reports a 5,416-byte owner without trunking, or 5,880 bytes with
 it compiled in. The latter fits the existing 7,168-byte encoder-state loan with
@@ -467,6 +542,7 @@ stack checks and hardware FIFO/codec qualification remain open.
 | M3.2b/M3.3a metadata and loaders | Full upstream tag/record suite: 241 checks; stored P25: 116/158 checks. All 32 P25-suite executables, 11 Python build checks and both legacy codeplug configurations pass. Four target configurations and the P25 static stack check pass; diagnostic retained-loader link fits. Exact-source audit matches six imported implementation/header/vector files after only documented adaptations. | Explicit configuration API only. Lifecycle power cuts, strict TX admission, radio dispatch and CPS round trips remain open. |
 | M3.3b/M3.4a record permissions | Conventional/trunked admission: 10,542/10,676 checks; 2,228 sampled cuts per configuration; per-read fault injection. All 34 P25 executables, 11 Python checks and both legacy codeplug configurations pass. Both enabled target configurations and the retained-permission link fit without added static RAM. Feature catalog: zero errors on Linux. | Record policy only. Actual emission gates, session invalidation, frequency/grant checks, CPS round trips, complete-owner resource checks and hardware qualification remain open. Catalog test markers were not checked because the build container lacks pytest. |
 | M4.1 conventional owner | Owner: 431 checks with trunking off/on. Complete P25 suite: 36 executables and 11 Python checks. Codec-wrapper loan suites: 91/91/16 checks. Four target configurations and retained-owner link pass; the target owner fits the existing codec pool. | Component integration only; ordinary channel/PTT dispatch, real FM/DMR transitions, writer quiescence, full caller stack/RAM costs and hardware qualification remain open. |
+| M4.2 channel/PTT connection | Real state-machine P25: 145 checks; feature-off parking: 5; tag readers: 254 each with P25 on/off. All 39 P25 executables and 11 Python checks pass. Existing radio/transfer/NAND regressions, UI flows and four target builds pass. | Conventional only. Tight static RAM; complete CI, mode-aware editing, trunked owner and hardware qualification remain pending. Legacy writers refuse tagged codeplugs. |
 | Scope update | Owner requested retaining TX and honoring existing CPS RX-only; permission matrix above replaces the earlier passive-only product scope. | Hardware TX still requires its own authorized test session and --allow-rf. |
 
 Local ignored test output is in `build/p25-host`. Python works outside the

@@ -133,5 +133,15 @@ The keyed store now supplies a full-width generation for session invalidation.
 The shared `air_session_tx_go` locally aborts queued chunks when the provider
 refuses its start. The new owner test reproduces that failure and verifies the
 queue is empty before retry. `radioP25OwnerTest.c` is local integration code
-using real engines/voice with simulated hardware. Channel/PTT dispatch is not
-connected by this owner-component import.
+using real engines/voice with simulated hardware.
+
+The subsequent local state-machine integration connects stored conventional
+P25 selection, PTT and the existing RF safeguards to that owner. It adds no
+upstream radio firmware dependency. Shared tag/store readers now remain built
+with P25 off to park unsupported records. The legacy raw reader stays available
+for unaware configuration clients; the guarded radio reader is separate.
+Legacy CPS/fast-CPS/TFTP writes refuse tagged codeplugs and cannot overwrite
+managed metadata. Mode-aware editing and its synchronous quiescence contract
+remain pending. State-machine tests use the real stored records, DMR stack and
+owner with simulated RF/PCM/air hardware. The home mode label, mic gain and beep
+mixer follow existing product paths. Trunked channel dispatch remains disabled.

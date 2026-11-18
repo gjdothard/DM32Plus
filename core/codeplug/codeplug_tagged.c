@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Garrett Dothard
-// Adapt upstream's tag lifecycle hooks to an explicit API before the radio core understands tagged modes.
+// Adapt upstream's tag lifecycle hooks to explicit configuration and guarded radio readers.
 #include "config.h"
-#if CONFIG_P25
 #include "codeplug_tag.h"
+#include "codeplug_kv.h"
 #include "storage/storage.h"
 
 bool codeplug_tagged_channel(uint16_t number, channel_t *out)
@@ -43,6 +43,8 @@ bool codeplug_tagged_set_channel(uint16_t number, const channel_t *ch)
 		base.bw = old.bw;
 		base.rx_only = old.rx_only;
 	}
+	base.kind = CODEPLUG_KIND_NONE;
+	base.system = CODEPLUG_SYSTEM_NONE;
 	if (ok) ok = codeplug_set_channel(number, &base);
 	if (ok) ok = codeplug_tag_after_write(number, ch, action, &tag);
 	storage_unlock();
@@ -56,4 +58,32 @@ bool codeplug_tagged_delete_channel(uint16_t number)
 	storage_unlock();
 	return ok;
 }
-#endif
+
+bool codeplug_radio_channel(uint16_t number, channel_t *out)
+{
+	storage_lock();
+	bool ok = codeplug_tagged_channel(number, out);
+	if (ok && codeplug_source() == CODEPLUG_OPENFW) {
+		bool present;
+		bool park = !storage_ready() || !codeplug_kv_radio_valid(&present);
+		if (!park && present) {
+			int len;
+			park = !codeplug_kv_lookup((uint16_t)(CODEPLUG_KEY_CH_TAG + number - 1u), NULL, 0, &len) ||
+			       (len >= 0 && out->kind == CODEPLUG_KIND_NONE);
+		}
+		if (park) { out->kind = 0xFFu; out->rx_only = true; }
+	}
+	storage_unlock();
+	return ok;
+}
+
+bool codeplug_legacy_write_allowed(void)
+{
+	storage_lock();
+	bool present, tags;
+	bool ok = storage_ready() && codeplug_kv_radio_valid(&present);
+	if (ok && present) ok = codeplug_kv_range_present(CODEPLUG_KEY_CH_TAG,
+		(uint16_t)(CODEPLUG_KEY_CH_TAG + CODEPLUG_CHANNELS_MAX - 1u), &tags) && !tags;
+	storage_unlock();
+	return ok;
+}

@@ -76,11 +76,9 @@ codeplug_source_t codeplug_source(void);
 uint16_t codeplug_channel_count(void);
 // false if the slot is empty or unreadable
 bool codeplug_channel(uint16_t number, channel_t *out);
-#if CONFIG_P25
 // Raw base helpers for the generic tag layer; no logical tag is applied here.
 bool codeplug_channel_name(uint16_t number, char out[CODEPLUG_NAME_LEN + 1]);
 bool codeplug_base_copy(uint16_t from, uint16_t to);
-#endif
 // Reads of a used channel that failed (flash read or record decode), since start-up
 uint32_t codeplug_channel_errors(void);
 

@@ -982,7 +982,6 @@ bool codeplug_channel(uint16_t number, channel_t *out)
 	return ok;
 }
 
-#if CONFIG_P25
 bool codeplug_channel_name(uint16_t number, char out[CODEPLUG_NAME_LEN + 1])
 {
 	if (out == NULL || number < 1 || number > CH_MAX) return false;
@@ -1020,7 +1019,6 @@ bool codeplug_base_copy(uint16_t from, uint16_t to)
 	storage_unlock();
 	return ok;
 }
-#endif
 
 uint16_t codeplug_zone_count(void)
 {
@@ -1138,7 +1136,7 @@ uint16_t codeplug_free_channel(void)
 bool codeplug_set_channel(uint16_t number, const channel_t *ch)
 {
 	uint8_t r[CH_SIZE];
-	if (number < 1 || number > CH_MAX || ch->rx_hz == 0 || ch->tx_hz == 0 || ch->rx_hz >= 1000000000u ||
+	if (ch->kind != 0 || number < 1 || number > CH_MAX || ch->rx_hz == 0 || ch->tx_hz == 0 || ch->rx_hz >= 1000000000u ||
 	    ch->tx_hz >= 1000000000u || (ch->privacy_slot > 4 && ch->privacy_slot != 255)) {
 		return false;
 	}

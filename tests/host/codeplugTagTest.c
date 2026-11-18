@@ -578,6 +578,28 @@ static void test_systems(void)
 	CHECK(r.fb_check == codeplug_name_check(get(12).name));
 }
 
+static void test_radio_admission(void)
+{
+	fresh();
+	channel_t c = make("Legacy", RADIO_MODE_FM, false), r;
+	CHECK(codeplug_set_channel(1, &c));
+	sim_flash_data[EE + CODEPLUG_KV_ADDR] = 0xAA; // unrelated older extension bytes are not an RFKV area
+	CHECK(codeplug_radio_channel(1, &r) && r.kind == CODEPLUG_KIND_NONE && !r.rx_only);
+	CHECK(codeplug_legacy_write_allowed());
+	sim_flash_data[EE + CODEPLUG_KV_ADDR] = 0xFF;
+	codeplug_tag_t tag = { .kind = TEST_KIND, .system = CODEPLUG_SYSTEM_NONE, .flags = CODEPLUG_TAG_BASE_OWN };
+	CHECK(codeplug_tag_write(1, c.name, &tag, NULL, 0));
+	CHECK(codeplug_radio_channel(1, &r) && r.kind == TEST_KIND && r.rx_only);
+	CHECK(!codeplug_legacy_write_allowed());
+	CHECK(!codeplug_set_channel(1, &r)); // an unaware editor cannot encode a tagged mode as FM
+	CHECK(codeplug_tag_write(1, "Stale", &tag, NULL, 0));
+	CHECK(codeplug_radio_channel(1, &r) && r.kind == 0xFF && r.rx_only);
+	CHECK(codeplug_tag_write(1, c.name, &tag, NULL, 0));
+	sim_flash_data[EE + CODEPLUG_KV_ADDR + 4] = CODEPLUG_KV_VERSION + 1;
+	CHECK(codeplug_radio_channel(1, &r) && r.kind == 0xFF && r.rx_only);
+	CHECK(!codeplug_legacy_write_allowed());
+}
+
 int main(void)
 {
 	test_name_check();
@@ -590,6 +612,7 @@ int main(void)
 	test_full_area();
 	test_records();
 	test_systems();
+	test_radio_admission();
 	sim_flash_free();
 	if (failures) {
 		printf("codeplugTagTest: %d failure(s)\n", failures);

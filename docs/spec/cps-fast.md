@@ -1,7 +1,13 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Fast codeplug protocol
+
+Until a mode-aware transfer is implemented, writes refuse codeplugs containing
+channel tags. The EEPROM block at 0xE000 is managed metadata and is not writable
+through this protocol, including staged boot recovery. Reads remain available.
+See [tagged channel records](channel-modes.md).
 
 A second way to read and write the codeplug, beside the open-firmware CPS (`cps-protocol.md` 2). It moves the same
 bytes: the open-firmware image of `open-firmware-cps.md` 7, as the CPS shows it. It differs in how they travel:

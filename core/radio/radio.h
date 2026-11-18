@@ -232,6 +232,9 @@ typedef struct {
 
 typedef struct {
 	radio_state_t state;
+#if CONFIG_P25
+	bool p25_active, p25_rx;
+#endif
 	uint8_t tx_deny;	// tx_deny_t, while RS_TX_DENIED
 	uint8_t leds;		// RADIO_LED_* bits: what the radio core drives its LEDs to (board.power->led)
 	bool vfo;		// tuning a frequency by hand rather than a channel

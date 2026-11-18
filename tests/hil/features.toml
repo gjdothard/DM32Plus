@@ -29,7 +29,7 @@
 switch = "P25"
 spec = "docs/spec/p25.md"
 source = ["core/p25", "core/air", "core/mbe", "core/radio/radio_p25.c", "core/radio/radio_p25.h", "core/codeplug/codeplug_tag.c", "core/codeplug/codeplug_kv.c", "hal/hal_air.h", "hal/hal_baseband.h"]
-manual = ["After radio-owner integration: qualify conventional receive/transmit and FM/DMR mode transitions with owner-authorized equipment.", "Measure no RF emissions for RX-only during startup, idle, PTT, settings changes and queued-work cancellation."]
+manual = ["Qualify conventional receive/transmit and FM/DMR mode transitions with owner-authorized equipment.", "Measure no RF emissions for RX-only during startup, idle, PTT, settings changes and queued-work cancellation."]
 
 [feature.p25_trunk]
 switch = "P25_TRUNK"

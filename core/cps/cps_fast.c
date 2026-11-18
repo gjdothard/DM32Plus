@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The fast codeplug protocol engine (cps_fast.h, docs/spec/cps-fast.md).
 //
 // Addresses on the wire are image offsets: 0 is the open-firmware EEPROM image (hal_flash_map_t.openfw_eeprom), the
@@ -15,6 +16,8 @@
 // open-firmware CPS's do.
 #include <string.h>
 #include "config.h"
+#include "codeplug/codeplug_tag.h"
+#include "codeplug/codeplug_kv.h"
 #include "board.h"
 #include "cps/cps_fast.h"
 #include "cps/cps_lz4.h"
@@ -404,6 +407,7 @@ static size_t op_begin(const uint8_t *a, uint16_t len, uint8_t *out, uint32_t no
 	if (!storage_ready()) {
 		return refuse(out, CPSF_R_STORAGE);
 	}
+	if (!codeplug_legacy_write_allowed()) return refuse(out, CPSF_R_RANGE);
 	uint32_t cap = 0;
 	if (a[0] == CPSF_MODE_STAGED) {
 		cap = stage_cap();
@@ -451,7 +455,7 @@ static size_t op_block(const uint8_t *a, uint16_t len, uint8_t *out)
 	if (!in_session()) {
 		return refuse(out, CPSF_R_STATE);
 	}
-	if (!block_ok(addr)) {
+	if (!block_ok(addr) || addr == CODEPLUG_KV_ADDR) {
 		return refuse(out, CPSF_R_RANGE);
 	}
 	if (s.mode == CPSF_MODE_STAGED && s.slots >= stage_cap()) {
@@ -466,6 +470,7 @@ static size_t op_block(const uint8_t *a, uint16_t len, uint8_t *out)
 	if (s.buf == NULL && (s.buf = storage_buffer_acquire()) == NULL) {
 		return status_only(out, DL_ST_BUSY);
 	}
+	if (!codeplug_legacy_write_allowed()) { drop_block(); return refuse(out, CPSF_R_RANGE); }
 	s.addr = addr;
 	s.format = format;
 	s.length = (uint16_t)length;
@@ -525,6 +530,7 @@ static bool stage_block(uint32_t blk)
 
 static size_t op_end(uint16_t len, uint8_t *out, uint32_t now_ms)
 {
+	if (!codeplug_legacy_write_allowed()) { drop_block(); return refuse(out, CPSF_R_RANGE); }
 	if (len != 0) {
 		return status_only(out, DL_ST_BAD_ARG);
 	}
@@ -567,6 +573,7 @@ static size_t op_commit(uint16_t len, uint8_t *out)
 	if (s.state != CPSF_ST_OPEN) {
 		return refuse(out, CPSF_R_STATE);
 	}
+	if (!codeplug_legacy_write_allowed()) return refuse(out, CPSF_R_RANGE);
 	if (s.mode == CPSF_MODE_DIRECT || s.slots == 0) {
 		end_session(CPSF_ST_DONE);
 		return status_only(out, DL_ST_OK);
@@ -700,7 +707,8 @@ bool cps_fast_resume(void)
 		     get32(&r[REC_HDR + 2u * count]) == storage_crc32(0, r, REC_HDR + 2u * count) &&
 		     staged_crc(count, &crc) && crc == get32(&r[12]);
 	for (uint32_t k = 0; valid && k < count; k++) {
-		valid = block_ok(get16(&r[REC_HDR + 2u * k]) * CPSF_BLOCK);
+		uint32_t off = get16(&r[REC_HDR + 2u * k]) * CPSF_BLOCK;
+		valid = block_ok(off) && off != CODEPLUG_KV_ADDR;
 	}
 	uint8_t *buf = valid ? storage_buffer_acquire() : NULL;
 	bool done = buf != NULL;

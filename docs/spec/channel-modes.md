@@ -4,8 +4,9 @@
 # Tagged channel records
 
 Status: the shared MIT RadioFoundry format is imported for P25 configuration.
-The existing radio reader still uses the legacy base. No tagged channel kind
-is runnable yet. The backend is selected by `CONFIG_P25` during integration.
+The radio reader applies tags and dispatches conventional P25 when `CONFIG_P25`
+is enabled. Other tagged kinds remain parked. The generic tag/store guard is
+always built so disabled or unsupported kinds cannot enter FM/DMR operation.
 
 ## Channel tags
 
@@ -36,6 +37,13 @@ one. Copying the legacy record alone grants no logical TX permission. The
 copy operation must also copy its live tag. Deletion removes the tag first.
 These operations use the recursive storage lock; separate base/tag writes
 are not a single journal transaction. Power-cut qualification remains pending.
+
+`codeplug_channel` returns the raw legacy record. `codeplug_radio_channel`
+adds logical tags and parks stale bindings or damaged, newer or unreadable
+recognized metadata. An absent store or unrelated non-RFKV bytes retain legacy
+behavior. Raw channel writes reject nonzero kinds; tagged edits use the explicit
+adapter. Legacy transfer writers refuse codeplug changes while tags exist and
+cannot replace the managed metadata sector. Reads remain available.
 
 ## Shared records
 
