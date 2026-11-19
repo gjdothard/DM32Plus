@@ -57,3 +57,33 @@ Check the radio default and each channel's encryption assignment before writing.
 Only one application can use the programming cable at a time. Disconnect CPS before opening the installer or a host program.
 Codeplug conversion runs locally. RadioID lookups require internet access and send an API key to RadioID only when you use that service.
 Error reports include a codeplug only when you choose to attach one.
+
+## P25 programming
+
+The editor offers **P25** and **P25 Trunking** channel modes for Phase 1.
+Conventional channels have RX/TX NAC and squelch fields. Use **Systems** to
+enter trunked-system identity, control channels, optional sites and channel
+plans. Select that system on each trunked channel. The current firmware
+supports eight systems. Phase 2 voice is not supported.
+
+**RX Only** remains the channel transmit permission. On a trunked channel it
+also prevents registration, affiliation and service requests. New trunked
+channels start RX only, and new systems start **Never (listen only)**. To
+transmit, the channel and its system must both permit it, and all normal
+frequency and transmit checks still apply. Listen-only systems never send
+automatic signaling. The **Radio** tab has a P25 unit ID; blank inherits the
+DMR ID. A system may override that ID.
+
+Save P25 codeplugs as binary backups. Channel CSV and qdmr YAML cannot
+represent the permission and system records; the editor refuses these
+operations while those records are present. Other CSV tables remain usable.
+Existing inline DMR talkgroup assignments are migrated to the shared pool
+when P25 is first saved. Unknown occupied storage or insufficient capacity
+is reported instead of overwritten. Keep the original backup.
+
+Writing P25 requires firmware advertising managed staged programming in
+fast-protocol INFO. Older firmware is refused before a write; there is no
+legacy-write fallback. The radio stops active calls before the commit and
+reloads the resulting permissions before resuming. Keep radio identity also
+preserves the radio-wide P25 unit ID. This path is verified with synthetic
+flash and host simulations; radio interoperability remains untested.

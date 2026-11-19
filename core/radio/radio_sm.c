@@ -11,6 +11,32 @@
 #include "radio/tones.h"
 #include "settings/settings.h"
 #include "config.h"
+#include "radio/radio_programming.h"
+#include "codeplug/codeplug_tag.h"
+#if CONFIG_P25
+#include "radio/radio_p25.h"
+#include "codeplug/codeplug_kv.h"
+#include "storage/storage.h"
+#if CONFIG_P25_TRUNK
+#include "hal_time.h"
+#endif
+#endif
+
+static bool read_channel(uint16_t number, channel_t *ch)
+{
+	if (!codeplug_radio_channel(number, ch)) return false;
+	if (ch->kind != CODEPLUG_KIND_NONE) {
+		ch->mode = RADIO_MODE_NONE;
+#if CONFIG_P25
+		if (ch->kind == CODEPLUG_KIND_P25
+#if CONFIG_P25_TRUNK
+		    || ch->kind == CODEPLUG_KIND_P25_TRUNK
+#endif
+		   ) { ch->mode = RADIO_MODE_P25; ch->bw = RADIO_BW_12K5; }
+#endif
+	}
+	return true;
+}
 #include "hal_dtmf.h"
 #if CONFIG_ZONE_WRITE
 #include "codeplug/zone_edit.h"
@@ -154,6 +180,9 @@ static void beep(radio_sm_t *sm, uint8_t b)
 	bool shared = false;
 #if CONFIG_DMR
 	shared = ambeVoiceStreaming();
+#endif
+#if CONFIG_P25
+	shared = shared || p25VoiceStreaming();
 #endif
 	uint8_t level = sm->set.beep_level;
 	if (board.radio != NULL && board.radio->volume != NULL && !board.radio->volume_pcm) {
@@ -363,6 +392,9 @@ static void outputs(radio_sm_t *sm)
 	bool fm = sm->view.ch.mode == RADIO_MODE_FM && !sm->hotspot;
 	bool open = !tx && fm && (sm->view.monitor || sm->view.state == RS_RX);
 	bool green = open;
+#if CONFIG_P25
+	if (sm->view.ch.mode == RADIO_MODE_P25 && sm->view.state == RS_RX) green = true;
+#endif
 #if CONFIG_DMR
 	if (!fm && !tx && sm->view.state == RS_RX && sm->view.dmr.state == RDMR_RX) {
 		green = true;
@@ -492,6 +524,9 @@ static bool listen_band(uint32_t hz)
 	return false;
 }
 
+#if CONFIG_P25_TRUNK
+static bool p25_key(uint32_t hz, bool automatic, void *ctx);
+#endif
 static void tune(radio_sm_t *sm, uint32_t now_ms)
 {
 	// Resolve storage in the task, before its next request or modem tick. PTT stays blocked in the meantime.
@@ -510,7 +545,20 @@ static void tune(radio_sm_t *sm, uint32_t now_ms)
 	cw_cancel(sm);		// the repeater's ID: the board is set up for the channel below
 #endif
 	end_reception(sm, now_ms);
-	if (listen_band(sm->view.ch.rx_hz)) {
+#if CONFIG_P25
+	sm->view.p25_active = sm->view.p25_rx = false;
+#if CONFIG_P25_TRUNK
+	sm->view.p25_trunk_state = sm->view.p25_registration = sm->view.p25_request = 0;
+#endif
+	if (!radio_p25_end()) {
+		sm->view.ch.mode = RADIO_MODE_NONE;
+		outputs(sm);
+		changed(sm);
+		return;
+	}
+	sm->p25_generation = codeplug_kv_generation();
+#endif
+	if (sm->view.ch.kind == CODEPLUG_KIND_NONE && listen_band(sm->view.ch.rx_hz)) {
 		// AM or broadcast there, whatever the channel says; the VFO stays FM when it leaves the band. The channel's
 		// own mode follows, so FM there is not a temporary change (dual watch brings a pane back already FM)
 		sm->view.ch.mode = RADIO_MODE_FM;
@@ -528,10 +576,10 @@ static void tune(radio_sm_t *sm, uint32_t now_ms)
 	sm->save_on = sm->save_asleep = false;	// rx() below wakes the receiver
 	sm->view.rx_sleeping = false;
 #endif
-	radio_mode_t mode = (CONFIG_DMR && sm->view.ch.mode == RADIO_MODE_DMR) ? RADIO_MODE_DMR : RADIO_MODE_FM;
+	radio_mode_t mode = (CONFIG_DMR && (sm->view.ch.mode == RADIO_MODE_DMR || sm->view.ch.mode == RADIO_MODE_P25)) ? RADIO_MODE_DMR : RADIO_MODE_FM;
 	// No sub-audio squelch in DMR, whatever tone the channel or the VFO still holds from its FM settings
 	static const subtone_t no_tone = { TONE_NONE, 0 };
-	if (sm->board_mode == RADIO_MODE_DMR && mode != RADIO_MODE_DMR) {
+	if (sm->board_mode == RADIO_MODE_DMR && (mode != RADIO_MODE_DMR || sm->view.ch.mode != RADIO_MODE_DMR)) {
 		dmr_end(sm);		// the call stack lets go of the modem before the chip leaves DMR
 	}
 	if (mode != sm->board_mode) {
@@ -549,9 +597,17 @@ static void tune(radio_sm_t *sm, uint32_t now_ms)
 	if (!sm->view.am && !sm->view.bcast)
 		board.radio->rx(sm->view.ch.rx_hz, (radio_bw_t)sm->view.ch.bw,
 				mode == RADIO_MODE_DMR ? &no_tone : &sm->view.ch.rx_tone);
-	if (mode == RADIO_MODE_DMR) {
+	if (sm->view.ch.mode == RADIO_MODE_DMR) {
 		dmr_begin(sm);		// after set_mode(DMR): the modem only starts in DMR mode
 	}
+#if CONFIG_P25
+	else if (sm->view.ch.mode == RADIO_MODE_P25) {
+		sm->view.p25_active = radio_p25_begin(&sm->view.ch, sm->view.channel_number);
+#if CONFIG_P25_TRUNK
+		radio_p25_trunk_keyer(p25_key, sm);
+#endif
+	}
+#endif
 	outputs(sm);
 	changed(sm);
 }
@@ -562,7 +618,7 @@ static bool find_channel(const zone_t *z, int start, int dir, uint16_t *pos, cha
 	int n = z->count;
 	for (int i = 0; i < n; i++) {
 		int p = ((start + dir * i) % n + n) % n;
-		if (codeplug_channel(z->channels[p], ch)) {
+		if (read_channel(z->channels[p], ch)) {
 			*pos = (uint16_t)p;
 			return true;
 		}
@@ -712,6 +768,7 @@ radio_vfo_copy_t radio_vfo_copy_check(const channel_t *ch, bool in_vfo)
 // them: the RX group list, the privacy key, roaming, data and emergency settings, the squelch level
 static void vfo_copy(radio_sm_t *sm, uint32_t now_ms)
 {
+	if (sm->view.ch.kind != CODEPLUG_KIND_NONE) return;
 	const channel_t *c = &sm->view.ch;
 	if (radio_vfo_copy_check(c, sm->view.vfo) != VFO_COPY_OK) {
 		return;
@@ -835,9 +892,17 @@ static bool bcl_busy(const radio_sm_t *sm)
 	return carrier && tone_needed(sm) && !sm->view.tone_ok;
 }
 
-static uint8_t tx_check(const radio_sm_t *sm)
+static uint8_t tx_check_at(const radio_sm_t *sm, uint32_t hz)
 {
 	const channel_t *ch = &sm->view.ch;
+	if (ch->mode == RADIO_MODE_NONE || (ch->kind != CODEPLUG_KIND_NONE && ch->mode != RADIO_MODE_P25)) return TXDENY_MODE;
+	if (ch->mode == RADIO_MODE_P25) {
+#if CONFIG_P25
+		if (!radio_p25_running() || sm->host_audio) return TXDENY_MODE;
+#else
+		return TXDENY_MODE;
+#endif
+	}
 	if (ch->mode == RADIO_MODE_DMR) {
 		if (ch->privacy_slot > 4 && ch->privacy_slot != 255)
 			return TXDENY_PRIVACY;
@@ -853,25 +918,25 @@ static uint8_t tx_check(const radio_sm_t *sm)
 		return TXDENY_INHIBIT;
 	}
 #if CONFIG_AM_RX
-	if (sm->view.am || radio_am_tx_refused(ch->tx_hz)) {
+	if (sm->view.am || radio_am_tx_refused(hz)) {
 		return TXDENY_AM;	// the air band is receive only, whatever the codeplug says
 	}
 #endif
 #if CONFIG_BCAST_FM
-	if (sm->view.bcast || radio_bcast_tx_refused(ch->tx_hz)) {
+	if (sm->view.bcast || radio_bcast_tx_refused(hz)) {
 		return TXDENY_BCAST;	// so is the broadcast band
 	}
 #endif
-	if (ch->tx_hz == 0) {
+	if (hz == 0) {
 		return TXDENY_NO_FREQ;
 	}
 	if (ch->rx_only) {
 		return TXDENY_RX_ONLY;
 	}
-	if (ch->mode == RADIO_MODE_DMR ? !CONFIG_DMR : !CONFIG_FM) {
+	if (ch->mode == RADIO_MODE_DMR ? !CONFIG_DMR : ch->mode == RADIO_MODE_P25 ? !CONFIG_P25 : !CONFIG_FM) {
 		return TXDENY_MODE;
 	}
-	if (!board_in_band(ch->tx_hz, true)) {
+	if (!board_in_band(hz, true)) {
 		return TXDENY_BAND;
 	}
 	if (sm->batt.level == BATT_CRITICAL) {
@@ -880,11 +945,30 @@ static uint8_t tx_check(const radio_sm_t *sm)
 	if (bcl_busy(sm)) {
 		return TXDENY_BUSY;
 	}
+#if CONFIG_P25
+	if (ch->mode == RADIO_MODE_P25 && sm->set.bcl != RADIO_BCL_OFF && sm->view.p25_rx && sm->view.state != RS_TX)
+		return TXDENY_BUSY;
+#endif
 	return TXDENY_NONE;
+}
+
+static uint8_t tx_check(const radio_sm_t *sm)
+{
+	uint32_t hz = sm->view.ch.tx_hz;
+#if CONFIG_P25_TRUNK
+	if (sm->view.ch.mode == RADIO_MODE_P25 && radio_p25_trunked()) {
+		hz = radio_p25_tx_frequency();
+		if (hz == 0) hz = sm->view.ch.rx_hz; // preflight only; every actual emission checks its assigned frequency
+	}
+#endif
+	return tx_check_at(sm, hz);
 }
 
 static void deny(radio_sm_t *sm, uint8_t reason)
 {
+#if CONFIG_P25
+	if (sm->view.ch.mode == RADIO_MODE_P25 && radio_p25_tx_state() != AIR_TX_IDLE) radio_p25_tx_abort();
+#endif
 	sm->view.state = RS_TX_DENIED;
 	sm->view.tx_deny = reason;
 	sm->view.tot_warning = false;
@@ -909,6 +993,76 @@ static void tx_timer(radio_sm_t *sm, uint32_t now_ms)
 		beep(sm, BEEP_TOT_WARN);
 	}
 }
+
+#if CONFIG_P25
+#if CONFIG_P25_TRUNK
+static bool p25_key(uint32_t hz, bool automatic, void *ctx)
+{
+	radio_sm_t *sm = ctx;
+	if (sm->power_off_req || sm->view.state == RS_TX_DENIED || tx_check_at(sm, hz) != TXDENY_NONE) return false;
+	static const subtone_t none = { TONE_NONE, 0 };
+	if (!board.radio->tx(hz, RADIO_BW_12K5, sm->view.power, &none)) return false;
+	sm->view.state = RS_TX; sm->view.tx_auto = automatic;
+	sm->view.tx_deny = TXDENY_NONE; sm->view.tx_elapsed_ms = 0;
+	sm->tx_start_ms = hal_millis();
+	sm->view.last_tx_ms = sm->tx_start_ms != 0 ? sm->tx_start_ms : 1;
+	outputs(sm); changed(sm);
+	return true;
+}
+#endif
+static void p25_follow(radio_sm_t *sm, uint32_t now_ms)
+{
+	if (!sm->view.p25_active) return;
+	p25_engine_view_t v;
+	if (!radio_p25_poll(&v)) {
+		sm->view.p25_active = sm->view.p25_rx = false;
+		sm->reload_pending = true;
+		if (sm->view.state == RS_TX || sm->ptt) deny(sm, TXDENY_MODE);
+		else { end_reception(sm, now_ms); outputs(sm); changed(sm); }
+		return;
+	}
+	bool rx = sm->view.p25_rx;
+#if CONFIG_P25_TRUNK
+	uint8_t trunk_state = sm->view.p25_trunk_state, registration = sm->view.p25_registration, request = sm->view.p25_request;
+	radio_p25_trunk_status(&sm->view.p25_trunk_state, &sm->view.p25_registration, &sm->view.p25_request);
+	if (trunk_state != sm->view.p25_trunk_state || registration != sm->view.p25_registration || request != sm->view.p25_request)
+		changed(sm);
+#endif
+	sm->view.p25_rx = v.rx_active;
+#if CONFIG_P25_TRUNK
+	if (radio_p25_trunked() && sm->ptt && sm->view.state != RS_TX && sm->view.state != RS_TX_DENIED) {
+		uint8_t why = tx_check(sm);
+		if (why != TXDENY_NONE || radio_p25_trunk_failed()) {
+			radio_p25_tx_abort(); deny(sm, why != TXDENY_NONE ? why : TXDENY_REJECTED); return;
+		}
+	}
+#endif
+	if (sm->view.state == RS_TX) {
+		tx_timer(sm, now_ms);
+		uint8_t why = tx_check(sm);
+		if (sm->view.tot_s && sm->view.tx_elapsed_ms >= (uint32_t)sm->view.tot_s * 1000u) why = TXDENY_TIMEOUT;
+		if (why != TXDENY_NONE) { radio_p25_tx_abort(); deny(sm, why); return; }
+#if CONFIG_P25_TRUNK
+		if (radio_p25_trunked() && v.tx == AIR_TX_IDLE && !sm->view.tx_auto) {
+			radio_p25_tx_abort(); deny(sm, TXDENY_REJECTED); return;
+		}
+#endif
+		if (v.tx == AIR_TX_DONE || (sm->view.tx_auto && v.tx == AIR_TX_IDLE)) {
+			radio_p25_tx_clear();
+			sm->view.state = RS_IDLE;
+			sm->view.last_tx_ms = now_ms != 0 ? now_ms : 1;
+			outputs(sm); changed(sm);
+		}
+	} else if (sm->view.state != RS_TX_DENIED) {
+		uint8_t state = v.rx_active && v.rx_played ? RS_RX : RS_IDLE;
+		if (sm->view.state != state || rx != sm->view.p25_rx) {
+			sm->view.state = state;
+			if (state == RS_RX) activity(sm, now_ms);
+			outputs(sm); changed(sm);
+		}
+	}
+}
+#endif
 
 // --- DMR: the call stack on DMR channels (core/dmr/call), voice through core/dmr/ambe ---
 #if CONFIG_DMR
@@ -2185,7 +2339,7 @@ static bool scan_usable(uint16_t pos, void *ctx)
 {
 	const radio_sm_t *sm = ctx;
 	channel_t ch;
-	return pos < sm->zone.count && codeplug_channel(sm->zone.channels[pos], &ch) && !ch.scan_skip;
+	return pos < sm->zone.count && read_channel(sm->zone.channels[pos], &ch) && ch.kind == CODEPLUG_KIND_NONE && !ch.scan_skip;
 }
 
 // Dual watch (SCAN_DUAL): the receiver alternates between two channels, dual[0] and dual[1], skip flags ignored. With
@@ -2247,7 +2401,7 @@ static const zone_t *dual_read(const radio_sm_t *sm, const radio_dual_ref_t *r, 
 #else
 	(void)buf;
 #endif
-	return z != NULL && r->pos < z->count && codeplug_channel(z->channels[r->pos], ch) ? z : NULL;
+	return z != NULL && r->pos < z->count && read_channel(z->channels[r->pos], ch) && ch->kind == CODEPLUG_KIND_NONE ? z : NULL;
 }
 
 static bool dual_ok(const radio_sm_t *sm, const radio_dual_ref_t *r)
@@ -2554,7 +2708,7 @@ static void scan_stop(radio_sm_t *sm, bool cancel, uint32_t now_ms)
 			}
 		} else if (sm->view.zone_pos != sc->origin_pos) {
 			channel_t ch;
-			if (codeplug_channel(sm->zone.channels[sc->origin_pos], &ch)) {
+			if (read_channel(sm->zone.channels[sc->origin_pos], &ch)) {
 				set_channel(sm, sc->origin_pos, &ch);
 				tune(sm, now_ms);
 			}
@@ -2584,7 +2738,7 @@ static bool scan_step(radio_sm_t *sm, uint32_t now_ms)
 	} else {
 		int pos = scan_next_pos(sc, sm->zone.count, scan_usable, sm);
 		channel_t ch;
-		if (pos < 0 || !codeplug_channel(sm->zone.channels[pos], &ch)) {
+		if (pos < 0 || !read_channel(sm->zone.channels[pos], &ch)) {
 			scan_stop(sm, false, now_ms);
 			return false;
 		}
@@ -2614,6 +2768,7 @@ static void scan_config(const radio_sm_t *sm, uint8_t kind, scan_cfg_t *cfg)
 
 static void scan_start(radio_sm_t *sm, uint8_t kind, uint32_t lo_hz, uint32_t hi_hz, uint32_t now_ms)
 {
+	if (sm->view.ch.kind != CODEPLUG_KIND_NONE) return;
 	scan_t *sc = &sm->scan;
 	if (scan_on(sc)) {
 		scan_stop(sm, false, now_ms);
@@ -3113,7 +3268,7 @@ static void roam_rebuild(radio_sm_t *sm, uint32_t now_ms, bool user)
 	sm->roam_zone = sm->view.zone_index;
 	sm->roam_channel = sm->view.vfo ? 0 : sm->view.channel_number;
 	if (sm->view.vfo || !sm->have_channels || !roam_zone_flag(sm, sm->view.zone_index) ||
-	    !codeplug_channel(sm->view.channel_number, &here) || !roam_repeater(&here)) {
+	    !read_channel(sm->view.channel_number, &here) || !roam_repeater(&here)) {
 		roam_set_sites(&sm->roam, sites, 0, -1, -1, now_ms);
 		roam_publish(sm, now_ms);
 		return;
@@ -3124,7 +3279,7 @@ static void roam_rebuild(radio_sm_t *sm, uint32_t now_ms, bool user)
 	for (uint16_t p = 0; p < sm->zone.count; p++) {
 		uint32_t id;
 		bool priv;
-		if (!codeplug_channel(sm->zone.channels[p], &ch)) {
+		if (!read_channel(sm->zone.channels[p], &ch)) {
 			continue;
 		}
 		any_flag |= ch.roam;
@@ -3203,7 +3358,7 @@ static bool roam_tune(radio_sm_t *sm, uint8_t idx, bool force, uint32_t now_ms)
 	const roam_site_t *s = &sm->roam.site[idx];
 	channel_t ch;
 	if (idx >= sm->roam.count || s->pos >= sm->zone.count || sm->zone.channels[s->pos] != s->number ||
-	    !codeplug_channel(s->number, &ch)) {
+	    !read_channel(s->number, &ch)) {
 		return false;
 	}
 	sm->roam_channel = s->number;
@@ -3437,6 +3592,7 @@ void radio_sm_shown_view(const radio_sm_t *sm, radio_view_t *v) { (void)sm; (voi
 
 static bool aprs_can_start(const radio_sm_t *sm)
 {
+	if (sm->view.ch.kind != CODEPLUG_KIND_NONE) return false;
 	if (sm->aprs_phase != APRS_RF_OFF || sm->ptt || sm->hotspot || (sm->view.state != RS_IDLE && !(sm->view.state == RS_RX && bcast_listening(sm))) ||
 	    sm->view.monitor || sm->power_off_req || sm->set.tx_inhibit || sm->batt.level == BATT_CRITICAL || board.afsk == NULL ||
 	    board.afsk->tx_start == NULL) {
@@ -3899,6 +4055,33 @@ static void ptt_down(radio_sm_t *sm, uint32_t now_ms)
 		deny(sm, reason);
 		return;
 	}
+#if CONFIG_P25
+	if (sm->view.ch.mode == RADIO_MODE_P25) {
+#if CONFIG_P25_TRUNK
+		if (radio_p25_trunked()) {
+			if (!radio_p25_trunk_ptt(true)) deny(sm, TXDENY_REJECTED);
+			return;
+		}
+#endif
+		storage_lock();
+		reason = tx_check(sm);
+		bool ok = reason == TXDENY_NONE && radio_p25_tx_prepare();
+		static const subtone_t none = {TONE_NONE, 0};
+		if (ok) ok = board.radio->tx(sm->view.ch.tx_hz, RADIO_BW_12K5, sm->view.power, &none);
+		if (ok) ok = radio_p25_tx_go();
+		if (!ok) radio_p25_tx_abort();
+		storage_unlock();
+		if (!ok) { deny(sm, reason != TXDENY_NONE ? reason : TXDENY_REJECTED); return; }
+		sm->view.state = RS_TX;
+		sm->view.tx_auto = false;
+		sm->view.last_tx_ms = now_ms != 0 ? now_ms : 1;
+		sm->view.tx_deny = TXDENY_NONE;
+		sm->view.tx_elapsed_ms = 0;
+		sm->tx_start_ms = now_ms;
+		outputs(sm); changed(sm);
+		return;
+	}
+#endif
 #if CONFIG_DMR
 	if (sm->view.ch.mode == RADIO_MODE_DMR) {
 		dmr_ptt_down(sm, now_ms);
@@ -3944,6 +4127,23 @@ static void ptt_release(radio_sm_t *sm, bool roger, uint32_t now_ms)
 	}
 	sm->ptt = false;
 	activity(sm, now_ms);
+#if CONFIG_P25
+	if (sm->view.ch.mode == RADIO_MODE_P25) {
+#if CONFIG_P25_TRUNK
+		if (radio_p25_trunked()) {
+			radio_p25_trunk_ptt(false);
+			if (sm->view.state == RS_TX && sm->view.tx_auto) return;
+		}
+#endif
+		if (sm->view.state == RS_TX) radio_p25_tx_stop();
+		else {
+			radio_p25_tx_clear();
+			sm->view.state = RS_IDLE; sm->view.tx_deny = TXDENY_NONE;
+			outputs(sm); changed(sm);
+		}
+		return;
+	}
+#endif
 	if (sm->host_audio) {
 		roger = false;		// the host sends its own audio, tones included
 	}
@@ -4215,6 +4415,7 @@ static void cw_service(radio_sm_t *sm, uint32_t now_ms)
 
 static void hotspot_enter(radio_sm_t *sm, uint32_t rx_hz, uint32_t now_ms)
 {
+	if (sm->view.ch.kind != CODEPLUG_KIND_NONE) return;
 	static const subtone_t none = { TONE_NONE, 0 };
 	bool keyed = sm->dmr_keyed;
 #if CONFIG_SFR
@@ -4468,7 +4669,7 @@ static bool select_in_zone(radio_sm_t *sm, uint16_t zi, uint16_t number, uint16_
 		return false;
 	}
 	int at = zone_find(&z, number);
-	if (at >= 0 && codeplug_channel(number, &ch)) {
+	if (at >= 0 && read_channel(number, &ch)) {
 		p = (uint16_t)at;
 	} else if (!find_channel(&z, pos < z.count ? pos : 0, 1, &p, &ch)) {
 		return false;
@@ -4880,8 +5081,53 @@ static const hal_audio_t *pcm_audio(void)
 }
 #endif
 
+#if CONFIG_CPS_FAST
+static bool programming_hold(radio_sm_t *sm, uint32_t now_ms)
+{
+	if (!radio_programming_requested()) {
+		if (sm->view.programming) {
+			sm->view.programming = false;
+			reload(sm, now_ms); // load new permissions before any request or automatic-data tick can resume
+			changed(sm);
+		}
+		return false;
+	}
+#if CONFIG_P25
+	bool released = radio_p25_end();
+	sm->view.p25_active = sm->view.p25_rx = false;
+#else
+	bool released = true;
+#endif
+	if (!sm->view.programming) {
+		aprs_rf_abort(sm, now_ms);
+#if CONFIG_HOTSPOT
+		hotspot_leave(sm, now_ms);
+#endif
+#if CONFIG_SCAN
+		if (scan_on(&sm->scan)) scan_stop(sm, false, now_ms);
+#endif
+#if CONFIG_SFR_CWID
+		cw_cancel(sm);
+#endif
+		dmr_end(sm);
+		sm->ptt = sm->host_audio = false;
+		sm->view.monitor = false;
+		sm->view.state = RS_IDLE;
+		sm->view.tx_auto = false;
+		sm->view.programming = true;
+		outputs(sm); changed(sm);
+	}
+	board.radio->tx_off();
+	if (released) radio_programming_ready();
+	return true;
+}
+#endif
+
 void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 {
+#if CONFIG_P25
+	radio_p25_end();
+#endif
 	settings_t st;
 	settings_read(&st);	// a zone add or delete a power cut interrupted is settled first (radio_core_start)
 
@@ -4951,6 +5197,9 @@ void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 	dmr_call_set_voice(ambeVoiceSink(), ambeVoiceSource());
 #if CONFIG_BEEP
 	ambeVoiceSetMixer(beep_mix);	// beeps while the voice stream owns the PCM audio
+#if CONFIG_P25
+	p25VoiceSetMixer(beep_mix);
+#endif
 #endif
 #if CONFIG_DMR_DATA_CORE
 	data_init(sm);
@@ -4960,6 +5209,9 @@ void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 	// The saved zone and channel; else zone 0 and its first channel; if zone 0 has none, the first zone that has one
 	select_position(sm, st.zone_index, st.channel, st.zone_pos);
 	apply_prefs(sm, &st);
+#if CONFIG_CPS_FAST
+	if (programming_hold(sm, now_ms)) return;
+#endif
 #if CONFIG_DMR
 	sm->hs_power = default_power();
 #endif
@@ -5029,6 +5281,9 @@ static bool retunes(uint8_t type)
 
 void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 {
+#if CONFIG_CPS_FAST
+	if (programming_hold(sm, now_ms)) return;
+#endif
 	// A beep or a vibration is an alert, not the user doing something; the volume changes nothing on air or on the
 	// channel, so it neither gives way to nor cancels anything either
 	bool alert = req->type == RREQ_BEEP || req->type == RREQ_VIBRATE || req->type == RREQ_VOLUME ||
@@ -5098,7 +5353,7 @@ void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 			break;
 		}
 		pos = (uint16_t)req->arg;
-		if (codeplug_channel(sm->zone.channels[pos], &ch)) {
+		if (read_channel(sm->zone.channels[pos], &ch)) {
 			set_channel(sm, pos, &ch);
 			tune(sm, now_ms);
 		}
@@ -5120,6 +5375,7 @@ void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 		break;
 	}
 	case RREQ_VFO:
+		if (sm->view.ch.kind != CODEPLUG_KIND_NONE) break;
 		if (busy || !VFO_AVAILABLE || (req->arg != 0) == sm->view.vfo) {
 			break;
 		}
@@ -5383,6 +5639,7 @@ void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 		dmr_reconfigure(sm);
 		break;
 	case RREQ_MODE:
+		if (sm->view.ch.kind != CODEPLUG_KIND_NONE) break;
 		if (busy || (req->arg != RADIO_MODE_FM && req->arg != RADIO_MODE_DMR) || req->arg == sm->view.ch.mode ||
 				(req->arg == RADIO_MODE_FM && !(sm->view.vfo ? CONFIG_VFO_FM : CONFIG_FM)) ||
 				(req->arg == RADIO_MODE_DMR && (listen_band(sm->view.ch.rx_hz) ||
@@ -5473,13 +5730,25 @@ void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 			// Still running after all (auto power off with the knob on): back to normal, registration kept
 			sm->power_off_req = false;
 			sm->power_off_busy = false;
+#if CONFIG_P25
+			if (sm->view.ch.mode == RADIO_MODE_P25) sm->reload_pending = true;
+#endif
 #if CONFIG_DMR_DATA_CORE
-			dmrDataServicePowerOffCanceled();
+			if (sm->view.ch.kind == CODEPLUG_KIND_NONE) dmrDataServicePowerOffCanceled();
 #endif
 			break;
 		}
 		sm->power_off_req = true;
 		sm->power_off_busy = CONFIG_DMR_DATA_CORE;	// data_tick clears it once the deregistration is out
+		if (sm->view.ch.kind != CODEPLUG_KIND_NONE || sm->view.ch.mode == RADIO_MODE_NONE) {
+#if CONFIG_P25
+			radio_p25_end();
+			sm->view.p25_active = sm->view.p25_rx = false;
+#endif
+			sm->power_off_busy = false;
+			sm->ptt = false; sm->view.state = RS_IDLE;
+			outputs(sm); changed(sm);
+		}
 		break;
 	case RREQ_RELOAD:
 #if CONFIG_APRS
@@ -5493,6 +5762,7 @@ void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 		break;
 #if CONFIG_SCAN
 	case RREQ_SCAN:
+		if (sm->view.ch.kind != CODEPLUG_KIND_NONE) break;
 		scan_request(sm, req, now_ms);
 		break;
 #if CONFIG_DUAL_WATCH
@@ -5824,9 +6094,16 @@ static int16_t rssi_held(radio_sm_t *sm, int16_t rssi_dbm)
 
 void radio_sm_poll(radio_sm_t *sm, uint32_t now_ms)
 {
+#if CONFIG_CPS_FAST
+	if (programming_hold(sm, now_ms)) return;
+#endif
 	radio_status_t st;
 	// codeplug_serial() before zone_edit_busy(): a zone write that moved indexes has its log entry by then
-	if ((sm->reload_pending || codeplug_serial() != sm->codeplug_serial || ZONES_MOVED(sm)) && !ZONE_WRITE_BUSY() &&
+	if ((sm->reload_pending || codeplug_serial() != sm->codeplug_serial || ZONES_MOVED(sm)
+#if CONFIG_P25
+	     || codeplug_kv_generation() != sm->p25_generation
+#endif
+	    ) && !ZONE_WRITE_BUSY() &&
 	    !sm->hotspot && !sm->ptt && sm->view.state != RS_TX) {
 		reload(sm, now_ms);
 		persist(sm, now_ms);
@@ -5837,6 +6114,9 @@ void radio_sm_poll(radio_sm_t *sm, uint32_t now_ms)
 	bool shared = false;
 #if CONFIG_DMR
 	shared = ambeVoiceStreaming();
+#endif
+#if CONFIG_P25
+	shared = shared || p25VoiceStreaming();
 #endif
 	beep_service(shared);
 #endif
@@ -5960,6 +6240,10 @@ void radio_sm_poll(radio_sm_t *sm, uint32_t now_ms)
 #endif
 #endif
 
+	if (sm->view.ch.mode == RADIO_MODE_NONE) { outputs(sm); return; }
+#if CONFIG_P25
+	if (sm->view.ch.mode == RADIO_MODE_P25) { p25_follow(sm, now_ms); return; }
+#endif
 	if (sm->view.state == RS_TX) {
 #if CONFIG_FM_TX_TONES
 		if (sm->roger_ms != 0) {
@@ -6072,6 +6356,13 @@ static void sfr_rpt_tick(radio_sm_t *sm, uint32_t now_ms)
 
 void radio_sm_tick(radio_sm_t *sm, uint32_t now_ms)
 {
+#if CONFIG_CPS_FAST
+	if (programming_hold(sm, now_ms)) return;
+#endif
+#if CONFIG_P25
+	if (sm->view.ch.mode == RADIO_MODE_P25) { p25_follow(sm, now_ms); return; }
+#endif
+	if (sm->view.ch.mode == RADIO_MODE_NONE) return;
 #if RADIO_SM_CW
 	cw_service(sm, now_ms);
 #endif

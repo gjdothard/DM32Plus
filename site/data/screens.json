@@ -928,8 +928,14 @@
     "UI_CARD_MENU",
     "UI_SETTINGS"
    ]
+  },
+  "home_p25": {
+   "group": "home",
+   "needs": [
+    "P25"
+   ]
   }
  },
  "_copyright": "Copyright (c) 2026 Garrett Dothard",
- "_license": "SPDX-License-Identifier: MIT"
+ "_license": "MIT"
 }

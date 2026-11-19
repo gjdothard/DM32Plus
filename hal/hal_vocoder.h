@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // AMBE+2 vocoder as a platform service. The vocoder itself is the radio's own stock-firmware codec, merged on the
 // user's machine and never shipped (README, docs/spec/codec-*.md). Frames here are the 49 voice parameter bits; the
 // AMBE+2 3600x2450 FEC and interleaving to and from the 72-bit air frame are done in core/dmr.
@@ -19,8 +20,15 @@
 #define VOCODER_OPT_AGC			0x04u	// input level control: quiet speech raised, loud speech lowered
 #define VOCODER_OPT_DEFAULT		(VOCODER_OPT_NOISE_REDUCTION | VOCODER_OPT_TONE_FRAMES)
 
+// Initialize to zero. A successful loan owns data until reclaim succeeds; token rejects stale returns.
 typedef struct {
-	// True when the codec is present and matches the board's profile (signature / hash). False: FM only
+	void *data;
+	size_t bytes;
+	uint32_t token;
+} hal_vocoder_loan_t;
+
+typedef struct {
+	// True when the codec is present, matches the board's profile and is available (not parked or lent)
 	bool (*present)(void);
 	void (*reset)(void);	// fresh encoder and decoder state (start of a call)
 	// 49 bits, one per byte (0/1), MSB of the parameter frame first
@@ -40,6 +48,12 @@ typedef struct {
 	// Optional: the codec's own word for the options in force, for the debug link only (its meaning is per codec,
 	// docs/spec/codec-*.md)
 	uint32_t (*encode_flags)(void);
+	// Optional pair: exclusively borrow idle codec scratch state. Nonblocking; false if busy, parked or too small.
+	// Call at task level after stopping the old voice stream. Failure leaves out unchanged. Alignment is a power of 2.
+	bool (*lend)(size_t bytes, size_t alignment, hal_vocoder_loan_t *out);
+	// Stop every borrower callback before returning the exact loan. Success clears it; failure leaves it unchanged.
+	// Codec calls are refused while lent; return invalidates codec state so the next frame starts fresh.
+	bool (*reclaim)(hal_vocoder_loan_t *loan);
 } hal_vocoder_t;
 
 // The codec in flash as VERSION reports it (codec=, docs/spec/debuglink.md 3.1): the profile the board recognized,

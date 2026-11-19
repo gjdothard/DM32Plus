@@ -11,6 +11,9 @@ import { keyboardTabs } from "./navigation.js";
 import { parseFreq, parseTone, mhz } from "../codeplug/fields.js";
 import { LIMITS, POWER_NAMES } from "../codeplug/records.js";
 import { refNumber, listenBand, newContact } from "../codeplug/model.js";
+import { kindRow, kindName, offeredKinds } from "../codeplug/modes.js";
+import { setKind } from "../codeplug/channelmodes.js";
+import { specField } from "./modefields.js";
 import { TALK_GROUP_MAX, validTalkGroups } from "../codeplug/talkgroups.js";
 import { MAX_ASSIGNMENTS, POOL_CAPACITY } from "../codeplug/talkgroup-pool.js";
 
@@ -61,7 +64,40 @@ const rxFreq = (t) => (r, k, v) => {
 const listening = (value) => !!listenBand(parseFreq(value("rxHz")));
 
 // The mode as the radio shows it: an FM channel in the air band is received in AM
-const modeText = (r, t) => (r.mode === "dmr" ? "DMR" : listenBand(r.rxHz) ? t(`editor.mode.${listenBand(r.rxHz)}`) : "FM");
+
+const kindText = (id, t) => {
+	const key = `editor.mode_name.${kindRow(id)?.token}`, s = kindRow(id) ? t(key) : key;
+	return s === key ? kindName(id) : s;
+};
+const modeText = (r, t) => (r.kind ? kindText(r.kind, t) : r.mode === "dmr" ? "DMR" : listenBand(r.rxHz) ? t(`editor.mode.${listenBand(r.rxHz)}`) : "FM");
+
+// A channel's Mode, in its form and in the table: FM, DMR and the kinds offered (modes.js), the channel's own kind too.
+// The value is "fm", "dmr" or "k<kind>"
+function modeColumn(m, t, features) {
+	const kinds = offeredKinds(m, features);
+	return {
+		options: (r) => {
+			const out = [["fm", "FM"], ["dmr", "DMR"], ...kinds.map((k) => [`k${k.id}`, kindText(k.id, t)])];
+			if (r?.kind && !kinds.some((k) => k.id === r.kind)) out.push([`k${r.kind}`, kindText(r.kind, t)]);
+			return out;
+		},
+		get: (r) => (r.kind ? `k${r.kind}` : r.mode),
+		set: (r, v) => {
+			if (v === (r.kind ? `k${r.kind}` : r.mode)) return;
+			if (v.startsWith("k")) setKind(m, r, Number(v.slice(1)));
+			else setKind(m, r, 0, v);
+		},
+	};
+}
+const kindMod = (r) => (r.kind ? kindRow(r.kind)?.module ?? null : null);
+// A channel of a kind keeps the record's fields its module lists (a talk target, a unit ID); the rest of FM and DMR
+// stays as stored and is not shown
+const recordField = (r, key) => !r.kind || !!kindMod(r)?.recordFields?.includes(key);
+// Frequencies of its own: a trunked kind's are its system's
+const ownFreqs = (r) => !r.kind || kindMod(r)?.ownFreqs !== false;
+// Receive only: for a channel of a kind, its tag's transmit allowed turned round (the record is receive only)
+const rxOnlyGet = (r) => (r.kind ? !r.tagTx : r.rxOnly);
+const rxOnlySet = (r, v) => (r.kind ? (r.tagTx = !v) : (r.rxOnly = !!v));
 
 const tone = (t) => (r, k, v) => {
 	const s = parseTone(v);
@@ -153,7 +189,7 @@ export function columns(table, m, t) {
 		return [
 			num,
 			col("name", "editor.col.name", "text", name(LIMITS.name)(t)),
-			col("mode", "editor.col.mode", "select", pick, { options: () => [["fm", "FM"], ["dmr", "DMR"]], format: (v, r) => modeText(r, t) }),
+			col("mode", "editor.col.mode", "select", null, { ...modeColumn(m, t, null), readOnly: false, format: (v, r) => modeText(r, t) }),
 			col("rxHz", "editor.col.rx", "text", (r, k, v) => {
 				// a simplex channel stays simplex: TX follows RX when they were the same
 				const was = r.rxHz;
@@ -171,7 +207,7 @@ export function columns(table, m, t) {
 			only("dmr", col("contact", "editor.col.contact", "select", pick, { options: () => refOptions(m.contacts, t), format: (v) => refLabel(v, t), sortValue: (r) => refLabel(r.contact, t) })),
 			only("dmr", col("rxList", "editor.col.rx_list", "select", pick, { options: () => refOptions(m.rxLists, t), format: (v) => refLabel(v, t), sortValue: (r) => refLabel(r.rxList, t) })),
 			only("dmr", col("privacySlot", "editor.col.encryption", "select", pick, { options: (r) => encryptionOptions(t, r?.privacySlot) })),
-			col("rxOnly", "editor.col.rx_only", "bool", bool),
+			col("rxOnly", "editor.col.rx_only", "bool", null, { get: rxOnlyGet, set: rxOnlySet, readOnly: false }),
 			col("zoneSkip", "editor.col.zone_skip", "bool", bool),
 		];
 	case "zones":
@@ -247,21 +283,51 @@ const sfrField = (key, shift, mask, byte = "sfrA") => ({
 	key,
 });
 
-export function channelForm(m, t, draftContacts = []) {
+// The channels a fallback may name (channel-modes.md 7.3): plain ones, but the record being edited (self, or the
+// form's copy of it); the current one stays listed when it isn't one of them
+export function fallbackOptions(m, t, current, self = null, none = t("editor.modes.fallback_system")) {
+	const list = m.channels.filter((c) => !c.kind && c !== self && !(self?.number && c.number === self.number)).sort((a, b) => a.number - b.number);
+	const out = [[null, none], ...list.map((c) => [c, `${c.number} · ${c.name}`])];
+	if (current != null && !list.includes(current)) out.push([current, typeof current === "number" ? t("editor.missing", { n: current }) : `${current.number} · ${current.name}`]);
+	return out;
+}
+
+// The systems of a type a channel may name; a number as read stays listed
+export function systemOptions(m, t, type, current) {
+	const out = (m.systems ?? []).filter((s) => s.type === type).sort((a, b) => a.number - b.number).map((s) => [s, s.name]);
+	if (current == null) out.unshift([null, t("editor.none")]);
+	else if (typeof current === "number") out.push([current, t("editor.missing", { n: current })]);
+	return out;
+}
+
+export function channelForm(m, t, draftContacts = [], { features = null } = {}) {
 	const sel = (key, label, options, extra = {}) => ({ key, label: t(label), type: "select", options, ...extra });
 	const chk = (key, label) => ({ key, label: t(label), type: "bool" });
 	const txt = (key, label, parse, format) => ({ key, label: t(label), type: "text", parse, format });
 	// the FM and DMR parts show only for a channel of that mode; the other mode's values are kept as they are
-	const fm = (f) => ({ ...f, show: (r) => r.mode === "fm" });
-	const dmr = (f) => ({ ...f, show: (r) => r.mode === "dmr" && (!f.show || f.show(r)) });
+	const fm = (f) => ({ ...f, show: (r) => r.mode === "fm" && !r.kind });
+	const dmr = (f) => ({ ...f, show: (r) => r.mode === "dmr" && recordField(r, f.key) && (!f.show || f.show(r)) });
 	const sfr = (f, label, options) => dmr({ ...sfrField(...f), label: t(label), type: "select", options, show: (r) => r.sfr });
+	const kinds = offeredKinds(m, features);
+	const mode = modeColumn(m, t, features);
+	const kindFields = [];
+	for (const k of kinds) {
+		const mod = k.module, on = (r) => r.kind === k.id;
+		const holder = { on, get: (r) => r.params, put: (r, key, v) => (r.params = { ...r.params, [key]: v }) };
+		if (mod.systemType) kindFields.push({ ...sel("system", "editor.modes.system", (r) => systemOptions(m, t, mod.systemType, r.system)), key: `k${k.id}.system`, get: (r) => r.system, set: (r, v) => on(r) && (r.system = v), show: on });
+		for (const flag of Object.keys(mod.flags ?? {})) kindFields.push({ ...chk(`k${k.id}.${flag}`, `editor.modes.flag.${flag}`), get: (r) => r[flag], set: (r, v) => on(r) && (r[flag] = !!v), show: on });
+		if (mod.fallback) {
+			kindFields.push({ ...sel(`k${k.id}.fallback`, "editor.modes.fallback", (r) => fallbackOptions(m, t, r.fallback, r)), get: (r) => r.fallback, set: (r, v) => on(r) && (r.fallback = v), show: (r) => on(r) && !r.noFallback });
+		}
+		for (const spec of mod.fields()) kindFields.push(specField(spec, t, holder, `k${k.id}`));
+	}
 	return [
 		{ tab: "basics", label: t("editor.form.basics") },
 		txt("name", "editor.col.name", name(LIMITS.name)(t)),
-		sel("mode", "editor.col.mode", () => [["fm", "FM"], ["dmr", "DMR"]]),
+		sel("mode", "editor.col.mode", mode.options, { get: mode.get, set: mode.set }),
 		sel("power", "editor.col.power", () => powerOptions(t)),
 		// in a receive-only band TX follows RX, locked (rxFreq)
-		{ type: "pair", key: "freqs", disabled: (w, value) => listening(value),
+		{ type: "pair", key: "freqs", show: ownFreqs, disabled: (w, value) => listening(value),
 			fields: [txt("rxHz", "editor.col.rx", rxFreq(t), mhz), { ...txt("txHz", "editor.col.tx", freq(t), mhz), disabled: (w, value) => listening(value), follows: "rxHz" }], buttons: [
 			[t("editor.freq.rx_to_tx"), ([rx]) => [rx, rx]],
 			[t("editor.freq.swap"), ([rx, tx]) => [tx, rx]],
@@ -272,7 +338,9 @@ export function channelForm(m, t, draftContacts = []) {
 			return band ? t(`editor.band.${band}`) : "";
 		} },
 		// a receive-only band makes the channel RX only on save (rxFreq): the box shows it as the RX frequency is typed
-		{ ...chk("rxOnly", "editor.col.rx_only"), implied: listening },
+		{ ...chk("rxOnly", "editor.col.rx_only"), implied: listening, get: rxOnlyGet, set: rxOnlySet },
+		{ group: t("editor.form.mode_params"), show: r => !!r.kind },
+		...kindFields,
 		{ tab: "signal", label: t("editor.form.signal") },
 		fm({ group: t("editor.form.analog") }),
 		fm(sel("bw", "editor.col.bw", () => [[12.5, "12.5 kHz"], [25, "25 kHz"]])),
@@ -520,7 +588,8 @@ export function formDialog(title, fields, record, t, onSave, options = {}) {
 		input.setAttribute("aria-describedby", error.id);
 		input.addEventListener("input", () => { error.hidden = true; input.removeAttribute("aria-invalid"); });
 		input.addEventListener("change", () => { error.hidden = true; input.removeAttribute("aria-invalid"); });
-		const row = h("div", { class: "form-row" + (f.type === "bool" ? " form-check" : "") }, label, input, error);
+		const row = h("div", { class: "form-row" + (f.type === "bool" ? " form-check" : "") }, label, input,
+			f.help ? h("span", { class: "small muted" }, f.help) : null, error);
 		rows.push({ f, input, row, label, error, section });
 		return row;
 	};
@@ -548,6 +617,10 @@ export function formDialog(title, fields, record, t, onSave, options = {}) {
 			const row = h("h3", { class: "form-group" }, f.group);
 			rows.push({ f: { key: null, type: "group", show: f.show }, input: null, row });
 			content.append(row);
+		} else if (f.type === "custom") {
+			const row = f.render();
+			rows.push({ f, input: null, row });
+			content.append(row);
 		} else if (f.type === "note") {
 			// a line of text from the inputs as they are typed
 			const row = h("p", { class: "form-note small muted", hidden: true });
@@ -555,7 +628,7 @@ export function formDialog(title, fields, record, t, onSave, options = {}) {
 			content.append(row);
 		} else if (f.type === "pair") {
 			// two fields side by side with small buttons between them that act on both inputs
-			const a = field(f.fields[0]), b = field(f.fields[1]);
+			const a = field({ ...f.fields[0], show: f.show }), b = field({ ...f.fields[1], show: f.show });
 			const [ia, ib] = rows.slice(-2).map((r) => r.input);
 			const tools = f.buttons.map(([name, fn]) => {
 				const btn = h("button", { type: "button", class: "btn pair-btn", title: name, "aria-label": name, onclick: () => {
@@ -566,24 +639,37 @@ export function formDialog(title, fields, record, t, onSave, options = {}) {
 				return btn;
 			});
 			const mid = h("div", { class: "pair-tools" }, ...tools);
-			rows.push({ f: { key: f.key, type: "pair", disabled: f.disabled }, input: null, row: null, tools });
-			content.append(h("div", { class: "form-pair" }, a, b, mid));
+			const row = h("div", { class: "form-pair" }, a, b, mid);
+			rows.push({ f: { key: f.key, type: "pair", disabled: f.disabled, show: f.show }, input: null, row, tools });
+			content.append(row);
 		} else content.append(field(f));
 	}
 	const byKey = (k) => rows.find((r) => r.f.key === k);
 	const value = (k) => byKey(k).input.value;
 	const sync = () => {
+		const mode = byKey("mode"), previous = work.kind;
+		if (mode?.f.set) mode.f.set(work, mode.input._opts[mode.input.selectedIndex]?.[0]);
+		if (previous !== work.kind) {
+			for (const { f, input } of rows) {
+				if (!input || !f.get || f.key === "mode") continue;
+				const v = f.get(work);
+				if (f.type === "bool") input.checked = !!v;
+				else if (f.type === "select") input.selectedIndex = Math.max(0, input._opts.findIndex(([x]) => x === v));
+				else input.value = f.format ? f.format(v ?? "") : v ?? "";
+			}
+		}
 		for (const { f, input, row, label, tools } of rows) {
 			if (f.type === "pair") {
+				row.hidden = f.show ? !f.show(work) : false;
 				for (const b of tools) b.disabled = !!f.disabled?.(work, value);
 				continue;
 			}
-			if (f.type === "group") {
+			if (f.type === "group" || f.type === "custom") {
 				if (f.show) row.hidden = !f.show(work);
 				continue;
 			}
 			if (f.type === "note") {
-				row.textContent = f.text(value);
+				row.textContent = f.text(value, work);
 				row.hidden = !row.textContent;
 				continue;
 			}
@@ -615,8 +701,9 @@ export function formDialog(title, fields, record, t, onSave, options = {}) {
 	keyboardTabs(nav, control => select(sections.find(tab => tab.control === control)));
 	sync();
 	const dlg = h("dialog", { class: "confirm editor-dialog ed-channel-dialog", "aria-labelledby": "channel-edit-title" });
-	const signature = () => JSON.stringify(rows.filter(row => row.input).map(({ f, input }) =>
-		f.read ? f.read(input, work) : input.type === "checkbox" ? input.checked : input.value));
+	const signature = () => JSON.stringify(rows.map(({ f, input, row }) => f.type === "custom" ?
+		[...row.querySelectorAll("input,select")].map(i => i.type === "checkbox" ? i.checked : i.value) :
+		input ? (f.read ? f.read(input, work) : input.type === "checkbox" ? input.checked : input.value) : null));
 	const original = signature();
 	const cancel = guardDialog(dlg, () => signature() !== original, t("editor.dialog.discard"));
 	const save = () => {
@@ -624,6 +711,14 @@ export function formDialog(title, fields, record, t, onSave, options = {}) {
 		let first;
 		for (const row of rows) {
 			const { f, input } = row;
+			if (f.type === "custom") {
+				if (!f.show || f.show(work)) {
+					const errors = f.parse(work) ?? [];
+					bad.push(...errors);
+					if (errors.length) first ??= { ...row, input: row.row };
+				}
+				continue;
+			}
 			if (row.error) { row.error.hidden = true; input.removeAttribute("aria-invalid"); }
 			if (f.show && !f.show(work) && f.key !== options.field) continue;
 			if (f.type === "bool" || f.type === "pair" || f.type === "group" || f.type === "note") continue;
@@ -644,7 +739,7 @@ export function formDialog(title, fields, record, t, onSave, options = {}) {
 		if (bad.length) {
 			errs.hidden = false;
 			errs.textContent = bad.join(" · ");
-			if (first.section && !first.section.control.hidden) select(first.section);
+			if (first?.section && !first.section.control.hidden) select(first.section);
 			(first.input.matches("input, select") ? first.input : first.input.querySelector("input, button"))?.focus();
 			return;
 		}

@@ -24,6 +24,8 @@
 #include "hal_netif.h"
 #include "hal_bcast.h"
 #include "hal_afsk.h"
+#include "hal_air.h"
+#include "hal_baseband.h"
 #include "hal_rx2.h"
 
 typedef struct {
@@ -106,6 +108,10 @@ typedef struct {
 	void (*gps_enable)(bool on);
 	// Optional: a second receiver, so dual watch hears both channels at once (hal_rx2.h); NULL on one-receiver radios
 	const hal_rx2_t *rx2;
+	// Optional: digital modes framed by the core. NULL until the board provides this interface
+	const hal_air_t *air;
+	// Optional: discriminator and modulator sample taps; NULL when the board has none
+	const hal_baseband_t *baseband;
 } board_t;
 
 extern const board_t board;

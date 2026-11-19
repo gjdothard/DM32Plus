@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The open-firmware CPS shim (core/cps) against a simulated flash holding an open-firmware codeplug, driven like qdmr's
 // open-firmware UV380 driver does it: radio info, the session opening, 32-byte block reads of the regions it
 // transfers, prepare / data / commit per sector, close, save and reboot. Plus request assembly from arbitrary chunks,
@@ -9,6 +10,8 @@
 #include <string.h>
 #include "cps/cps_openfw.h"
 #include "codeplug/codeplug.h"
+#include "codeplug/codeplug_tag.h"
+#include "codeplug/codeplug_kv.h"
 #include "settings/settings.h"
 #include "storage/storage.h"
 #include "sim/sim_flash.h"
@@ -665,6 +668,22 @@ static void test_bad_requests(void)
 	CHECK(sim_flash_violations() == 0);
 }
 
+static void test_mode_guard(void)
+{
+	populate();
+	channel_t c;
+	CHECK(codeplug_channel(1, &c));
+	codeplug_tag_t tag = { .kind = CODEPLUG_KIND_P25, .system = CODEPLUG_SYSTEM_NONE, .flags = CODEPLUG_TAG_BASE_OWN };
+	CHECK(codeplug_tag_write(1, c.name, &tag, NULL, 0));
+	CHECK(!x_prepare((EE + 0x3000) / STORAGE_SECTOR));
+	CHECK(!x_prepare((EE + CODEPLUG_KV_ADDR) / STORAGE_SECTOR));
+	uint8_t b[16];
+	CHECK(read_block(1, 0x3780, sizeof b, b));
+	CHECK(codeplug_tag_remove(1));
+	CHECK(x_prepare((EE + 0x3000) / STORAGE_SECTOR));
+	cps_init(&io);
+}
+
 int main(void)
 {
 	populate();
@@ -679,6 +698,7 @@ int main(void)
 	test_session_timeout();
 	test_stray_reboot();
 	test_foreign();
+	test_mode_guard();
 	sim_flash_free();
 	test_no_map();
 	printf("# cpsTest %s (%d failures)\n", failures ? "FAILED" : "PASSED", failures);

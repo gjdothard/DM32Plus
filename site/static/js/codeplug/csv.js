@@ -10,6 +10,7 @@
 import { parseFreq, parseTone, mhz } from "./fields.js";
 import { LIMITS, POWER_NAMES, CALL_TYPES, validDtmf } from "./records.js";
 import { newChannel, newContact, remove, assignNumbers } from "./model.js";
+import { containsModes } from "./modecompat.js";
 import { parseTalkGroups, formatTalkGroups } from "./talkgroups.js";
 
 // --- RFC 4180 ---
@@ -383,6 +384,7 @@ function coordText(x) {
 // --- Export ---
 
 export function exportTable(m, table) {
+	if (table === "channels" && containsModes(m)) throw new Bad("modes_binary");
 	const spec = TABLES[table];
 	return stringify([spec.columns.map((x) => x.header), ...m[table].map((r) => spec.columns.map((x) => x.get(r, m)))]);
 }
@@ -425,6 +427,7 @@ export function detect(text) {
 // Import one table's CSV into m (changed in place). Returns {table, added, updated, removed, problems, unknown}
 // or throws Bad("not_a_table") when no table's columns match.
 export function importTable(m, text, table = detect(text)) {
+	if (table === "channels" && containsModes(m)) throw new Bad("modes_binary");
 	if (!table) throw new Bad("not_a_table");
 	const spec = TABLES[table];
 	const rows = parse(text);
@@ -486,6 +489,7 @@ export function importTable(m, text, table = detect(text)) {
 
 // Several tables (the .zip export): [{name, text}] in dependency order. Files that match no table are listed.
 export function importAll(m, files) {
+	if (containsModes(m) && files.some(f => detect(f.text) === "channels")) throw new Bad("modes_binary");
 	const results = [], skipped = [];
 	const tagged = files.map((f) => ({ ...f, table: detect(f.text) }));
 	for (const table of ORDER) for (const f of tagged.filter((x) => x.table === table)) results.push({ name: f.name, ...importTable(m, f.text, table) });

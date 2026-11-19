@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // HR_C7000 DMR modem glue shared by the boards (dmr_glue.c): the slot engine on the SoC's modem interrupts, the PA
 // one-shot, the deferred event task and the hal_dmr_modem_t over them. A board supplies what differs: how its RF chip
 // switches between receive and transmit for each burst and how its PA is keyed
@@ -20,6 +21,10 @@ typedef struct {
 	void (*pa_on)(void);
 	// Microseconds from the start of a burst to the PA one-shot (a stock "DMR PA" setting, default 28 ms)
 	uint32_t pa_delay_us;
+	// Optional air TX isolation: acquire the audio/modulator gate before TX, release after RF stops.
+	// Without both hooks the air provider advertises receive only. Channel admission remains the core's
+	bool (*air_tx_gate)(void);
+	void (*air_tx_release)(void);
 } hrc_dmr_board_t;
 
 #if CONFIG_DMR
@@ -35,6 +40,16 @@ void hrc_dmr_tx_drop(void);
 bool hrc_dmr_fm_rx_hook(void (*fn)(void));
 
 extern const hal_dmr_modem_t hrc_dmr;
+
+#if CONFIG_AIR
+#include "hal_air.h"
+#include "hal_baseband.h"
+#include "modem/hrc7000/hrc7000_air.h"
+// The caller stops the DMR stack first; open takes its queue memory until close
+extern const hal_air_t hrc_air;
+extern const hal_baseband_t hrc_baseband;
+void hrc_air_stats(hrc7000_air_stats_t *st);
+#endif
 
 // Bring-up counters: lines of at most about 20 characters, and the reset
 #if defined(CONFIG_HOTSPOT_SPLIT) && CONFIG_HOTSPOT_SPLIT

@@ -21,6 +21,9 @@ import { channelKeySlot, encodeChannelKeys } from "./channelkeys.js";
 import { decodeTalkGroups, encodeTalkGroups, validTalkGroups } from "./talkgroups.js";
 import { MAX_ASSIGNMENTS, POOL_CAPACITY, readPool, writePool } from "./talkgroup-pool.js";
 
+import { decodeModes, encodeModes, syncModes, removeModes, validateModes, MODE_LIMITS } from "./channelmodes.js";
+import { prepareModeStorage, modeMagic } from "./modecompat.js";
+
 const REFS = ["contact", "rxList", "aprs"];
 
 export function decode(image) {
@@ -54,10 +57,11 @@ export function decode(image) {
 		if (!channelUsed(b, n)) continue;
 		const c = decodeChannel(b.subarray(channelAddr(n), channelAddr(n) + CH_SIZE));
 		if (c) m.channels.push(linkRefs(m, { number: n, ...c, privacySlot: channelKeySlot(b, n),
-			talkGroups: c.mode === "dmr" && !pool ? decodeTalkGroups(b, n) : [],
+			talkGroups: c.mode === "dmr" && !pool && !(n >= 769 && modeMagic(b)) ? decodeTalkGroups(b, n) : [],
 			talkgroupRefs: c.mode === "dmr" && pool ?
 				(pool.lists.get(n) ?? []).map(ref => find(m.contacts, ref)) : [] }));
 	}
+	decodeModes(m, b);
 	for (const a of VFO) {
 		const c = decodeChannel(b.subarray(a, a + CH_SIZE));
 		m.vfo.push(c ? linkRefs(m, c) : null);
@@ -76,6 +80,17 @@ export function decode(image) {
 
 export function empty() {
 	return decode(CodeplugImage.blank());
+}
+
+// The names of the channels an image stores, by number
+function channelNames(b) {
+	const out = new Map();
+	for (let n = 1; n <= LIMITS.channels; n++) {
+		if (!channelUsed(b, n)) continue;
+		const c = decodeChannel(b.subarray(channelAddr(n), channelAddr(n) + CH_SIZE));
+		if (c) out.set(n, c.name);
+	}
+	return out;
 }
 
 function channelUsed(b, n) {
@@ -121,6 +136,7 @@ export function numberAll(m) {
 	assignNumbers(m.rxLists, LIMITS.rxLists);
 	assignNumbers(m.dtmfContacts, LIMITS.dtmfContacts);
 	assignNumbers(m.aprs, LIMITS.aprs);
+	assignNumbers(m.systems ??= [], MODE_LIMITS.systems);
 }
 
 function same(a, b, keys) {
@@ -147,11 +163,13 @@ function putChannel(r, c) {
 
 // The model written onto a copy of the image it was decoded from: the new image
 export function encode(m) {
+	prepareModeStorage(m);
 	numberAll(m);
 	const img = m.base.clone();
 	const b = img.bytes;
 
 	// Channels: records first, then the in-use bitmaps
+	syncModes(m);
 	const bits = new Uint8Array(LIMITS.channels / 8);
 	for (const c of m.channels) {
 		if (!c.number) continue;
@@ -238,6 +256,7 @@ export function encode(m) {
 
 	encodeGeneral(m.general, b);
 	fixLucz(b, m);
+	encodeModes(m, b, () => channelNames(m.base.bytes));
 	return img;
 }
 
@@ -258,7 +277,7 @@ function fixLucz(b, m) {
 
 export function newChannel(fields = {}) {
 	return {
-		number: null, name: "", rxHz: 446006250, txHz: 446006250, mode: "fm", power: 0, tot: 0, rxTone: "",
+		number: null, kind: 0, name: "", rxHz: 446006250, txHz: 446006250, mode: "fm", power: 0, tot: 0, rxTone: "",
 		txTone: "", bw: 12.5, rxOnly: false, allSkip: false, zoneSkip: false, vox: false, squelch: 0, colorCode: 1,
 		timeslot: 1, contact: null, rxList: null, aprs: null, dmrId: 0, noBeep: false, noEco: false, dmo: false,
 		talkGroups: [], talkgroupRefs: [],
@@ -282,6 +301,7 @@ export function remove(m, table, items) {
 		throw new Error("Remove or replace operating talkgroup assignments before deleting the saved records");
 	const gone = new Set(items);
 	m[table] = m[table].filter((x) => !gone.has(x));
+	removeModes(m, table, gone);
 	if (table === "channels") {
 		for (const z of m.zones) z.channels = z.channels.filter((c) => !gone.has(c));
 	} else if (table === "contacts") {
@@ -309,10 +329,12 @@ export function listenBand(hz) {
 // --- Validation ---
 
 // Problems as {level: "error" | "warning", table, item, field, code, params}; the page words them
-export function validate(m, { bands = null } = {}) {
+export function validate(m, { bands = null, features = null } = {}) {
 	const out = [];
 	const err = (table, item, field, code, params = {}) => out.push({ level: "error", table, item, field, code, params });
 	const warn = (table, item, field, code, params = {}) => out.push({ level: "warning", table, item, field, code, params });
+	try { prepareModeStorage(m, true); }
+	catch (e) { err("systems", null, null, e.code ?? "mode_storage_unrecognized"); }
 	const g = m.general;
 	if (!g.dmrId) warn("general", null, "dmrId", "no_dmr_id");
 	else if (g.dmrId > 0xFFFFFF) err("general", null, "dmrId", "id_range");
@@ -343,7 +365,7 @@ export function validate(m, { bands = null } = {}) {
 		} else if (!m.sharedTalkgroups && !validTalkGroups(c.talkGroups ?? [])) {
 			err("channels", c, "talkGroups", "talkgroups");
 		}
-		if (c.mode === "dmr" && !c.contact && !c.rxOnly) warn("channels", c, "contact", "no_contact");
+		if (c.mode === "dmr" && !c.kind && !c.contact && !c.rxOnly) warn("channels", c, "contact", "no_contact");
 		const band = listenBand(c.rxHz);
 		if (band && c.mode === "dmr") warn("channels", c, "mode", `listen_dmr_${band}`);
 		const txBand = listenBand(c.txHz);
@@ -381,5 +403,6 @@ export function validate(m, { bands = null } = {}) {
 		if (a.name.length > LIMITS.aprsName) err("aprs", a, "name", "too_long", { max: LIMITS.aprsName });
 		if (a.comment.length > LIMITS.aprsComment) err("aprs", a, "comment", "too_long", { max: LIMITS.aprsComment });
 	}
+	validateModes(m, err, warn, { features, baseNames: () => channelNames(m.base.bytes) });
 	return out;
 }

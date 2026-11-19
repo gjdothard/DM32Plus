@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Garrett Dothard */
 /* Copyright (c) 2026 The RadioFoundry Authors */
 /* HR_C7000 (CK803S) application layout with a codec slot, INCLUDEd by each board's memory.ld after its codec symbols
  * and its MEMORY (docs/spec/codec-placement.md).
@@ -25,6 +26,7 @@ SECTIONS
 	{
 		KEEP(*(.entry))	/* crt0: the loader, or the first stage, jumps to the first byte */
 		*(EXCLUDE_FILE(*hrc7000_dmr.o *hrc7000_bs.o *dmr_glue.o) .text EXCLUDE_FILE(*hrc7000_dmr.o *hrc7000_bs.o *dmr_glue.o) .text.*)
+		*(.flashfunc .flashfunc.*) /* task-side glue does not consume interrupt RAM */
 		. = ALIGN(4);
 	} >FLASH
 

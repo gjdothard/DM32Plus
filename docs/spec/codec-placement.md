@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 # Codec placement: moving the stock codec to where RadioFoundry wants it
 
 Status: implemented. Which radios have run the placed codec on the air is in the radios' own codec and hardware pages;
@@ -27,6 +28,41 @@ same offset in the new one. Nothing else in the codec changes.
 
 Which words to rewrite is a property of each stock build, not something to guess on the user's machine. It comes from
 a **codec map**: one per supported stock build, made once by static analysis and kept with the profiles.
+
+## Idle codec state loans
+
+The optional `hal_vocoder_t.lend` / `reclaim` pair lends codec scratch state
+exclusively to another mode. Both hooks must exist. The borrower first stops
+AMBE audio callbacks, then requests a size and power-of-two alignment using a
+zero-initialized `hal_vocoder_loan_t`. A failed request preserves that handle.
+The provider refuses an active codec call, an existing loan, a parked codec,
+or a request beyond its capacity/alignment. It never waits for a call to finish.
+
+With `CONFIG_P25`, the HR_C7000 provider lends its existing encoder-state
+buffer. It does not lend executable code, the flash slot, the decoder-state
+buffer or modem tables. The first request checks the slot identity if needed;
+even an absent AMBE slot can lend firmware-owned state for P25.
+`present()` is false while lent; a recognized flash profile remains available.
+During the loan, reset does nothing and encode/decode return zero output
+without touching the borrowed buffer. Encode options are preserved.
+
+Before return, the borrower must stop all audio/provider callbacks that can
+touch its state. Return validates the pointer, capacity and generation token;
+a stale handle cannot return a later loan. Success clears the handle and
+invalidates both codec states. The next AMBE frame initializes both states
+through the normal reset path before decoding or encoding. No executable
+reload is needed because that window was never lent.
+
+Permanent stub parking still wins admission. A first-use loan interrupted by
+parking fails without publishing a handle. Returning an outstanding loan after
+parking does not unpark the codec. Admission and return use short IRQ critical
+sections; slot validation, bulk copies and codec calls run outside them.
+
+`vocoderMemoryTest` runs the real wrapper with C codec stand-ins, with P25 and
+trunking independently on/off. It checks call exclusion, unchanged borrowed
+bytes, initialization on return, stale/malformed returns, options and identity,
+missing slots, parking and workspace cleanup. These checks do not execute a
+proprietary codec or establish hardware timing.
 
 ## Codec maps
 

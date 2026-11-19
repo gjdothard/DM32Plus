@@ -271,6 +271,8 @@ clock`; ? = not known yet). The `RTC` row lists firmware support ([radio-feature
 | Feature | Switch | Bytes DM-1701 | Bytes MD-380 | Notes |
 |---|---|---:|---:|---|
 | Analog FM receive and transmit | `FM` | 29,296 | 28,056 | Includes its children (tones, VOX, APRS, FM VFO) |
+| P25 Phase 1 conventional voice | `P25` | — | — | Off by default; host-tested, target builds checked, hardware qualification pending ([integration tracker](testing/dm32-p25-integration.md)) |
+| P25 Phase 1 trunking | `P25_TRUNK` | — | — | Requires P25; host-tested acquisition, grant following and subscriber path; hardware qualification pending |
 | Saved operating talkgroup assignments | `DMR_TALKGROUP_ENTRIES` | — | — | Shared saved-contact references per channel ([dmr-voice.md](spec/dmr-voice.md)) |
 | Edit operating talkgroups | `TALKGROUP_EDIT` | — | — | Add, reorder, and remove channel assignments on the radio |
 | CTCSS / DCS encode and decode | `SUBTONE` | 904 | 3,292* | MD-380: software decode (ADC) and PWM encode; CTCSS 100.0 Hz works on air both ways (2026-10-19), DCS not yet checked |

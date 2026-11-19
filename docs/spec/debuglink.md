@@ -3,6 +3,18 @@
 
 # USB debug link
 
+The core view reports `mode=p25` for selected conventional or trunked P25 and
+`mode=unsupported` for parked tagged channels. With `CONFIG_P25`, it also
+reports `p25.active` (the owner acquired its providers and workspace) and
+`p25.rx` (the engine has an active receive call). These are software state,
+not measurements of RF emissions or audio quality.
+With `CONFIG_P25_TRUNK`, `p25.trunk.state`, `p25.trunk.reg` and
+`p25.trunk.req` expose the published follower states. See
+[trunked channel operation](p25-trunking.md) for their meanings.
+With `CONFIG_CPS_FAST`, `programming=1` means the radio task has stopped its
+RF owners for managed programming. Zero means that hold is inactive. This
+software flag does not establish absence of measured emissions.
+
 A small framed protocol on the radio's host port (USB CDC-ACM on radios with USB, a UART otherwise) for bench
 automation: read the
 firmware version, the diagnostics counters and the radio's state, reset counters, take screenshots, press keys, key
