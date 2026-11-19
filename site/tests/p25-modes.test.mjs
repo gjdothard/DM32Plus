@@ -6,15 +6,41 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { empty, newChannel, encode, decode, remove, validate } from "../static/js/codeplug/model.js";
+import { empty, newChannel, newContact, encode, decode, remove, validate } from "../static/js/codeplug/model.js";
 import { setKind, newSystem } from "../static/js/codeplug/channelmodes.js";
 import { decodeArea, putArea, KV_ADDR, getValue } from "../static/js/codeplug/kv.js";
 import { prepareModeStorage } from "../static/js/codeplug/modecompat.js";
-import { columns } from "../static/js/editor/views.js";
+import { columns, channelForm } from "../static/js/editor/views.js";
 import { History } from "../static/js/editor/undo.js";
 import { CpsSerial, keepIdentity, writeRanges } from "../static/js/codeplug/transport.js";
 import { exportTable } from "../static/js/codeplug/csv.js";
 import { exportQdmr } from "../static/js/codeplug/qdmr.js";
+
+test("P25 uses the DMR Talkgroups editor and preserves ordered shared assignments", () => {
+	for (const kind of [2, 3]) {
+		const model = empty();
+		model.sharedTalkgroups = true;
+		const groups = [2, 1234, 65535].map((id, i) => newContact({ number: i + 1, name: `Group ${id}`, id, protocol: "p25" }));
+		model.contacts.push(...groups);
+		if (kind === 3) model.systems.push(newSystem(model, 3, "Test system"));
+		const channel = newChannel({ number: 1, name: "P25 list", rxHz: 453100000, txHz: 453100000, rxOnly: true });
+		model.channels.push(channel);
+		setKind(model, channel, kind);
+		channel.talkgroupRefs = [groups[2], groups[0], groups[1]];
+		const fields = channelForm(model, key => key);
+		assert.equal(fields.find(field => field.tab === "talkgroups").show(channel), true);
+		const editor = fields.find(field => field.key === "talkgroupRefs");
+		assert.equal(editor.show(channel), true);
+		assert.equal(editor.parse(channel, "talkgroupRefs", channel.talkgroupRefs), undefined);
+		const saved = decode(encode(model));
+		assert.deepEqual(saved.channels[0].talkgroupRefs.map(group => group.id), [65535, 2, 1234]);
+		assert.equal(saved.channels[0].tagTx, false);
+		const invalid = newContact({ number: 4, name: "DMR only", id: 70000 });
+		model.contacts.push(invalid);
+		channel.talkgroupRefs = [invalid];
+		assert.ok(validate(model).some(problem => problem.code === "p25_tg_list_range" && problem.level === "error"));
+	}
+});
 
 function conventional() {
 	const m = empty(), c = newChannel({ number: 1, name: "P25 local", rxHz: 155000000, txHz: 155000000 });

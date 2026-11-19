@@ -23,6 +23,7 @@ import { MAX_ASSIGNMENTS, POOL_CAPACITY, readPool, writePool } from "./talkgroup
 
 import { decodeModes, encodeModes, syncModes, removeModes, validateModes, MODE_LIMITS } from "./channelmodes.js";
 import { prepareModeStorage, modeMagic } from "./modecompat.js";
+import { decodeContactProtocols, encodeContactProtocols, contactAllowed } from "./contact-protocol.js";
 
 const REFS = ["contact", "rxList", "aprs"];
 
@@ -62,6 +63,7 @@ export function decode(image) {
 				(pool.lists.get(n) ?? []).map(ref => find(m.contacts, ref)) : [] }));
 	}
 	decodeModes(m, b);
+	decodeContactProtocols(m, b);
 	for (const a of VFO) {
 		const c = decodeChannel(b.subarray(a, a + CH_SIZE));
 		m.vfo.push(c ? linkRefs(m, c) : null);
@@ -257,6 +259,7 @@ export function encode(m) {
 	encodeGeneral(m.general, b);
 	fixLucz(b, m);
 	encodeModes(m, b, () => channelNames(m.base.bytes));
+	encodeContactProtocols(m, b);
 	return img;
 }
 
@@ -287,7 +290,7 @@ export function newChannel(fields = {}) {
 }
 
 export function newContact(fields = {}) {
-	return { number: null, name: "", id: 0, type: "group", timeslot: 0, ...fields };
+	return { number: null, name: "", id: 0, type: "group", timeslot: 0, protocol: "dmr", ...fields };
 }
 
 export function channelsUsingTalkgroups(m, contacts) {
@@ -358,6 +361,8 @@ export function validate(m, { bands = null, features = null } = {}) {
 		if (![0, 1, 2, 3, 4, 255].includes(c.privacySlot ?? 0)) err("channels", c, "privacySlot", "range", { min: 0, max: 4 });
 		if (m.sharedTalkgroups && c.mode === "dmr") {
 			const refs = c.talkgroupRefs ?? [];
+			if (refs.some(ref => ref && typeof ref === "object" && !contactAllowed(ref, c)))
+				err("channels", c, "talkgroupRefs", "talkgroup_protocol");
 			usedTalkgroups += refs.length;
 			if (refs.length > MAX_ASSIGNMENTS || refs.some(ref => !savedGroups.has(ref)) ||
 			    new Set(refs).size !== refs.length)
@@ -386,6 +391,9 @@ export function validate(m, { bands = null, features = null } = {}) {
 		if (!z.channels.length) warn("zones", z, "channels", "empty");
 	}
 	for (const c of m.contacts) {
+		if (c.protocol && !["dmr", "p25", "both"].includes(c.protocol)) err("contacts", c, "protocol", "talkgroup_protocol");
+		if ((c.protocol === "p25" || c.protocol === "both") && c.type === "group" && c.id > 0xFFFF)
+			err("contacts", c, "id", "p25_tg_list_range");
 		if (!c.name) err("contacts", c, "name", "no_name");
 		if (c.name.length > LIMITS.name) err("contacts", c, "name", "too_long", { max: LIMITS.name });
 		if (c.type !== "all" && !(c.id >= 1 && c.id <= 0xFFFFFF)) err("contacts", c, "id", "id_range");

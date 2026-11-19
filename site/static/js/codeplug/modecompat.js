@@ -3,9 +3,10 @@
 // Reserve mode metadata without losing the older inline DMR operating assignments.
 import { decodeArea, KV_ADDR, KV_SIZE } from "./kv.js";
 import { POOL_START, POOL_END, POOL_CAPACITY, readPool } from "./talkgroup-pool.js";
+import { contactAllowed, isP25 } from "./contact-protocol.js";
 
 export const hasModes = m => m.channels.some(c => c.kind) || (m.systems?.length ?? 0) > 0 ||
-	Object.values(m.modeSettings ?? {}).some(s => s.unitId);
+	Object.values(m.modeSettings ?? {}).some(s => s.unitId) || m.contacts.some(contact => contact.protocol === "p25" || contact.protocol === "both");
 export const modeMagic = bytes => [82, 70, 75, 86].every((v, i) => bytes[KV_ADDR + i] === v);
 export const containsModes = m => hasModes(m) || (m.base && modeMagic(m.base.bytes));
 export class ModeStorageError extends Error {
@@ -38,9 +39,10 @@ export function prepareModeStorage(m, dryRun = false) {
 	for (const c of m.channels) {
 		const refs = [];
 		for (const e of c.talkGroups ?? []) {
-			let contact = contacts.find(x => x.type === "group" && x.id === e.id && (x.timeslot || c.timeslot) === e.timeslot);
+			let contact = contacts.find(x => x.type === "group" && x.id === e.id && contactAllowed(x, c) && (x.timeslot || c.timeslot) === e.timeslot);
 			if (!contact) {
-				contact = { number: null, type: "group", id: e.id, timeslot: e.timeslot, name: `TG ${e.id} TS${e.timeslot}` };
+				contact = { number: null, type: "group", id: e.id, timeslot: e.timeslot,
+					protocol: isP25(c) ? "p25" : "dmr", name: isP25(c) ? `TG ${e.id}` : `TG ${e.id} TS${e.timeslot}` };
 				contacts.push(contact); created.push(contact);
 			}
 			refs.push(contact);

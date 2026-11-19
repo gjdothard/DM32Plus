@@ -10,6 +10,32 @@ by this work. Hardware and release qualification remain open.
 
 ## Provenance
 
+### Shared P25 talkgroups (2026-11-19)
+
+The P25 conventional and trunking channel editors expose the same Talkgroups
+tab as DMR. Add existing saved group contacts, create and assign new ones,
+reorder or remove assignments, then save and write the codeplug. Shared lists
+support 63 assignments per channel. P25 IDs must be decimal 1..65535; timeslot
+controls are hidden for P25 and existing DMR contact timeslots are preserved.
+Range validation also covers existing assignments when changing channel mode.
+
+Contacts have a Protocol field: DMR, P25 or both. The channel's available
+talkgroups and TX contacts filter by protocol; creating a group inside the
+channel assigns its protocol. Legacy scopes are inferred from channel usage.
+Explicit P25/both scopes are saved in keyed records 0x2000..0x23FF, one per
+contact slot, as version/mask/name-check-u16/ID-u24 (seven bytes). Missing or
+stale records default to DMR; unknown versions are preserved. The existing
+metadata capacity check includes these records. The paired firmware scopes
+name lookup by protocol. Contact edits in CPS refresh the binding; a contact
+renamed or given a new ID on the radio needs its scope restored in CPS if it
+has no current protocol-specific assignments from which to infer it.
+
+Paired firmware must load shared P25 assignments. Its P25 listening menu opens
+the shared talkgroup picker. Selection changes both receive hold and transmit
+target while preserving Receive Only and system listen-only permissions.
+Recent-call Hold and favorites remain receive-only. Host tests cover editor
+visibility, ordered assignment round trips and invalid P25 group rejection.
+
 The generic settings, mode records, P25 codecs, field descriptions and system
 forms reuse MIT RadioFoundry revision
 `c34dc440aaf2d3952458bc0bd85b8c56c76f6b23`:
