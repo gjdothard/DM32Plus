@@ -2255,5 +2255,13 @@
   "editor.col.protocol": "Protocollo",
   "editor.protocol.both": "DMR e P25",
   "editor.problem.p25_tg_list_range": "I gruppi P25 assegnati devono usare ID di gruppo da 1 a 65535.",
-  "editor.problem.talkgroup_protocol": "Un gruppo assegnato usa un protocollo diverso da quello del canale."
+  "editor.problem.talkgroup_protocol": "Un gruppo assegnato usa un protocollo diverso da quello del canale.",
+  "screen.p25_decode": "Dettagli di decodifica P25",
+  "screen.p25_favorites": "Gruppi preferiti P25",
+  "screen.p25_hold": "Blocco gruppo P25",
+  "screen.p25_listen": "Controlli di ascolto P25",
+  "screen.p25_recent": "Chiamate recenti P25",
+  "screen.p25_selected": "Gruppo di chiamata P25 selezionato",
+  "screen.p25_system": "Dettagli del sistema P25",
+  "screen.p25_talkgroups": "Gruppi di chiamata operativi P25"
 }

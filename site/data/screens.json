@@ -940,6 +940,54 @@
    "needs": [
     "P25_TRUNK"
    ]
+  },
+  "p25_decode": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_favorites": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_hold": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_listen": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_recent": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_selected": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_system": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_talkgroups": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
   }
  },
  "_copyright": "Copyright (c) 2026 Garrett Dothard",

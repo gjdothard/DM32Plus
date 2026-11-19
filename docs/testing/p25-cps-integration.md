@@ -3,10 +3,13 @@
 
 # P25 CPS integration record
 
-Updated: 2026-11-18. CPS branch: `codex/p25-cps-integration`, based on
+Updated: 2026-11-19. CPS branch: `codex/p25-cps-integration`, based on
 `CPS` at `6ad0902a`. Paired firmware: `codex/p25-integration`, with the
-managed programming changes based on `d662773b`. Neither branch is published
-by this work. Hardware and release qualification remain open.
+managed programming changes based on `d662773b`. The shared talkgroup CPS
+changes are now merged into `Testing`, together with the paired firmware.
+The separate Testing website follows successful Testing firmware workflows;
+production remains on its independent stable-release updater. Hardware and
+release qualification remain open.
 
 ## Provenance
 

@@ -13,6 +13,12 @@ bench and interoperability evidence are separate.
 
 ## Current local work: assigned talkgroup knob
 
+Published to `Testing` at `9731fe43` as `v1.1.0-rc.5`; GitHub firmware and
+stack checks pass. The P25 CPS branch is subsequently merged into Testing.
+An independent website updater now polls successful Testing workflows every
+two minutes. It waits for the matching checksummed website bundle before
+switching the separate test container; production deployment is unchanged.
+
 Home's encoder now steps through the selected P25 channel's assigned groups,
 wrapping in both directions. Selection updates the receive hold and transmit
 target through the existing assigned-group command. Channel and zone stay put;

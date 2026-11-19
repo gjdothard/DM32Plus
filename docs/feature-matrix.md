@@ -282,6 +282,7 @@ clock`; ? = not known yet). The `RTC` row lists firmware support ([radio-feature
 | Analog FM receive and transmit | `FM` | 29,296 | 28,056 | Includes its children (tones, VOX, APRS, FM VFO) |
 | P25 Phase 1 conventional voice | `P25` | — | — | Enabled in the full DM-32UV build; host-tested, target builds checked, hardware qualification pending ([integration tracker](testing/dm32-p25-integration.md)) |
 | P25 Phase 1 trunking | `P25_TRUNK` | — | — | Requires P25; host-tested acquisition, grant following and subscriber path; hardware qualification pending |
+| P25 monitoring and talkgroup controls | `P25_UI` | — | — | Shared Home layout, assigned-group knob, listening filters and system details; host-tested and checked on the installed target |
 | Experimental extended receive | `RX_EXTENDED` | — | — | Board-defined receive-only tuning range; enabled for DM-32UV owner testing; sensitivity and lock unverified |
 | Saved operating talkgroup assignments | `DMR_TALKGROUP_ENTRIES` | — | — | Shared saved-contact references per channel ([dmr-voice.md](spec/dmr-voice.md)) |
 | Edit operating talkgroups | `TALKGROUP_EDIT` | — | — | Add, reorder, and remove channel assignments on the radio |

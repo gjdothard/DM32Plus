@@ -73,6 +73,20 @@ class WebsiteReleaseTest(unittest.TestCase):
             self.bundle()
         self.assertFalse(self.archive.exists())
 
+    def test_testing_bundle_has_banner_and_source_identity(self):
+        (self.site / "index.html").write_text("<html><body>Example</body></html>", encoding="utf-8")
+        module.package(self.site, self.product, "v1.0.0", self.archive,
+                       channel="Testing", public_url="https://testing.example.com")
+        with tarfile.open(self.archive) as archive:
+            marker = json.load(archive.extractfile("site/deployment.json"))
+            self.assertEqual(marker["channel"], "Testing")
+            self.assertEqual(marker["site_git"], "a" * 40)
+            self.assertEqual(marker["public_url"], "https://testing.example.com")
+            self.assertIn(b'id="testing-cps-banner"', archive.extractfile("site/index.html").read())
+        with self.assertRaises(ValueError):
+            module.package(self.site, self.product, "v1.0.0", self.archive,
+                           channel="Testing", public_url="http://insecure.example.com")
+
     def test_updater_selects_only_newer_complete_finals(self):
         release = dict(tag_name="v1.0.0", draft=False, prerelease=False, assets=[dict(
             name="website-v1.0.0.tar.gz", state="uploaded", digest="sha256:" + "a" * 64)])

@@ -2255,5 +2255,13 @@
   "editor.col.protocol": "Protocol",
   "editor.protocol.both": "DMR and P25",
   "editor.problem.p25_tg_list_range": "P25 talkgroup assignments must use group IDs from 1 to 65535.",
-  "editor.problem.talkgroup_protocol": "A talkgroup assignment has a different protocol from this channel."
+  "editor.problem.talkgroup_protocol": "A talkgroup assignment has a different protocol from this channel.",
+  "screen.p25_decode": "P25 decoding details",
+  "screen.p25_favorites": "P25 favorite groups",
+  "screen.p25_hold": "P25 group hold",
+  "screen.p25_listen": "P25 listening controls",
+  "screen.p25_recent": "P25 recent calls",
+  "screen.p25_selected": "P25 selected talkgroup",
+  "screen.p25_system": "P25 system details",
+  "screen.p25_talkgroups": "P25 operating talkgroups"
 }
