@@ -21,6 +21,11 @@
 static const band_t bands[] = {
 	{ 136000000, 174000000, true },
 	{ 400000000, 480000000, true },
+#if CONFIG_RX_EXTENDED
+	// Existing synthesizer table starts at 16 MHz; eight BCD digits in 10 Hz units end below 1 GHz.
+	// Tuning permission for owner testing, not a claim of sensitivity or PLL lock across this span.
+	{ 16000000, 999999990, false },
+#endif
 #if CONFIG_AM_RX
 	{ 108000000, 136000000, false },	// the air band, AM receive only (docs/spec/airband-and-broadcast.md 3)
 #endif

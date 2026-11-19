@@ -930,7 +930,7 @@ static uint8_t tx_check_at(const radio_sm_t *sm, uint32_t hz)
 	if (hz == 0) {
 		return TXDENY_NO_FREQ;
 	}
-	if (ch->rx_only) {
+	if (ch->rx_only || board_receive_only(ch->rx_hz)) {
 		return TXDENY_RX_ONLY;
 	}
 	if (ch->mode == RADIO_MODE_DMR ? !CONFIG_DMR : ch->mode == RADIO_MODE_P25 ? !CONFIG_P25 : !CONFIG_FM) {
@@ -4199,7 +4199,8 @@ bool radio_sm_hotspot_freq_ok(uint32_t rx_hz, uint32_t tx_hz)
 		return false;	// nor in the broadcast band
 	}
 #endif
-	return rx_hz != 0 && tx_hz != 0 && board_in_band(rx_hz, false) && board_in_band(tx_hz, true);
+	return rx_hz != 0 && tx_hz != 0 && board_in_band(rx_hz, false) &&
+	       !board_receive_only(rx_hz) && board_in_band(tx_hz, true);
 }
 
 uint8_t radio_sm_hotspot_power(uint8_t rf_level)

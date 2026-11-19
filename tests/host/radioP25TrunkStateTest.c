@@ -36,7 +36,7 @@ static void trunk_setup(bool rx_only, bool listen, bool no_reg)
 		record((uint16_t)(CODEPLUG_KEY_SYS_CHAN + i), raw, sizeof raw);
 	}
 	plan_row(0, 453100000, false);
-	plan_row(1, 900000000, false);
+	plan_row(1, 1100000000, false);
 	plan_row(2, 453100000, true);
 	codeplug_tag_t tag = { .kind = CODEPLUG_KIND_P25_TRUNK, .system = 2, .flags = rx_only ? 0 : CODEPLUG_TAG_TX };
 	uint8_t options = 0;
@@ -218,6 +218,23 @@ int main(void)
 	CHECK(key_calls == after && follow_view().reg == P25_REG_OFF);
 	request(RREQ_PTT, 1); step(20);
 	CHECK(sm.view.state == RS_TX_DENIED && key_calls == after);
+	request(RREQ_PTT, 0); CHECK(radio_p25_end());
+	trunk_setup(false, false, false);
+	// One extended-band control makes the system passive, even when an alternate or TX frequency is ordinary UHF.
+	uint8_t extended[14] = {2, CODEPLUG_ENTRY_CHANNEL, 0, CODEPLUG_ENTRY_CONTROL};
+	uint32_t extended_rx = 850000000, ordinary_tx = 458100000;
+	for (unsigned k = 0; k < 4; k++) {
+		extended[6 + k] = (uint8_t)(extended_rx >> (k * 8));
+		extended[10 + k] = (uint8_t)(ordinary_tx >> (k * 8));
+	}
+	record(CODEPLUG_KEY_SYS_CHAN, extended, sizeof extended);
+	request(RREQ_RELOAD, 0); step(30);
+	CHECK(sm.view.p25_active && last_rx_hz == extended_rx);
+	unsigned passive_keys = key_calls;
+	for (unsigned n = 0; n < 8; n++) { network(); step(400); }
+	CHECK(key_calls == passive_keys && follow_view().reg == P25_REG_OFF && !keyed);
+	request(RREQ_PTT, 1); step(100);
+	CHECK(key_calls == passive_keys && !keyed && !on);
 	request(RREQ_PTT, 0); CHECK(radio_p25_end());
 	printf("radioP25TrunkStateTest: %u checks, %u failed; owner %zu bytes\n", checks, failures, sizeof(radio_p25_mem_t));
 	sim_flash_free();

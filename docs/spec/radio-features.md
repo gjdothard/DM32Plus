@@ -10,6 +10,21 @@ engine, pure), `core/radio/beep.c` (beep patterns and synthesis), `core/radio/vi
 and RADIO ops 20-24 (`docs/spec/debuglink.md` 3.7, 3.8). Host tests: `tests/host/radioFeaturesTest.c`; HIL tests:
 `tests/hil/test_radio_features.py`.
 
+## Receive-only board ranges
+
+`CONFIG_RX_EXTENDED` permits a board to add experimental receive-only band
+rows. `board_receive_only()` is true when RX is permitted and no matching
+row permits TX. Overlapping TX rows take precedence. The radio task rejects
+PTT and hotspot transmission for a receive-only RX frequency regardless of
+the channel's TX frequency or RX-only flag. Conventional P25 applies the
+same admission rule. A trunking system with a receive-only control frequency
+disables registration and all subscriber transmissions, including after a
+grant moves the receiver into a normal band. CPS RX-only permissions remain
+independent and continue to apply in normal bands.
+
+Host coverage: `radioListenBandsTest`, `radioP25OwnerTest` and
+`radioP25TrunkStateTest`. Tuning admission is not RF qualification.
+
 ## 1. Settings
 
 The radio core keeps one `radio_settings_t` (`core/radio/radio.h`). It loads it from the settings store at

@@ -179,6 +179,9 @@ static void test_helpers(void)
 	uint16_t a, b;
 	CHECK(fd6818_band_words(14400000u, &a, &b) && a == 0xAF28 && b == 0x375C);	// 144 MHz: >= 124 MHz row
 	CHECK(fd6818_band_words(43500000u, &a, &b) && a == 0x2F50 && b == 0x39F0);	// 435 MHz: >= 370 MHz row
+	CHECK(fd6818_band_words(73999999u, &a, &b) && a == 0x1F80 && b == 0x3AF0);
+	CHECK(fd6818_band_words(85000000u, &a, &b) && a == 0x1F80 && b == 0x3AF0);
+	CHECK(fd6818_band_words(99999999u, &a, &b) && a == 0x1F80 && b == 0x3AF0);
 	CHECK(fd6818_band_words(18500000u, &a, &b) && a == 0x3F48 && b == 0x38F0);	// 185 MHz
 	CHECK(fd6818_band_words(18499999u, &a, &b) && a == 0x3F48);			// the row's own boundary value
 	CHECK(fd6818_band_words(18499998u, &a, &b) && a == 0xAF28);

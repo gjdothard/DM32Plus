@@ -5,8 +5,8 @@
 
 Status: experimental software integration. `CONFIG_P25_TRUNK` connects the
 stored trunked channel owner to normal channel selection and PTT. Hardware
-interoperability and audio/RF qualification remain open. Build switches default
-off through `CONFIG_P25`. See the [feature matrix](../feature-matrix.md) for
+interoperability and audio/RF qualification remain open. Global build defaults
+are off; full board builds may enable P25 and trunking. See the [feature matrix](../feature-matrix.md) for
 board capabilities and [P25 settings](p25-codeplug.md) for stored records.
 
 ## Receive

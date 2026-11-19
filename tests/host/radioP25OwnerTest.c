@@ -111,8 +111,9 @@ static void codec_encode(const int16_t *in, uint8_t *out) { (void)in; CHECK(!loa
 static void codec_decode(const uint8_t *in, int16_t *out) { (void)in; CHECK(!loaned); memset(out, 0, AUDIO_BLOCK_SAMPLES * sizeof *out); }
 static const hal_vocoder_t vocoder = { .present = codec_present, .reset = codec_reset, .encode = codec_encode,
 	.decode = codec_decode, .lend = lend, .reclaim = reclaim };
-static const band_t bands[] = {{136000000,174000000,true},{400000000,480000000,true},{490000000,491000000,false}};
-const board_t board = { .name = "test", .bands = bands, .band_count = 3, .power_count = 9,
+static const band_t bands[] = {{136000000,174000000,true},{400000000,480000000,true},{490000000,491000000,false},
+	{740000000,999999990,false}};
+const board_t board = { .name = "test", .bands = bands, .band_count = sizeof(bands) / sizeof(bands[0]), .power_count = 9,
 	.flash = &sim_flash, .air = &air, .audio = &audio, .radio = &rf, .vocoder = &vocoder, .power = &power_hal,
 #ifdef P25_STATE_TEST
 	.dmr = &sim_modem,
@@ -301,9 +302,20 @@ static void test_failures(void)
 	CHECK(!radio_p25_poll(NULL) && !loaned); // session generation must not wrap with the UI's low-byte serial
 }
 
+static void test_extended_receive_only(void)
+{
+	fresh(false);
+	channel.rx_hz = 850000000; // even a stale TX-enabled tag and an ordinary TX frequency cannot bypass the RX band
+	CHECK(codeplug_tagged_set_channel(10, &channel));
+	CHECK(radio_p25_begin(&channel, 10));
+	CHECK(!radio_p25_tx_prepare() && !radio_p25_tx_go() && starts == 0 && !keyed);
+	CHECK(radio_p25_end());
+}
+
 int main(void)
 {
 	test_receive(); test_transmit(); test_failures();
+	test_extended_receive_only();
 	CHECK(radio_p25_end());
 	sim_flash_free();
 	printf("radioP25OwnerTest: %u checks, %u failed\n", checks, failures);

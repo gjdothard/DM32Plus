@@ -700,3 +700,45 @@ Published Testing merge `5d06ab28`. Its GitHub firmware workflow stopped at
 version selection before compilation because `v1.0.0` is already published.
 Advanced the feature integration base to `1.1.0`, preserving the guard against
 reusing a released final version. Testing now selects `v1.1.0-rc.N`.
+
+## Full-build defaults and extended receive (2026-11-18)
+
+Work branch: `codex/extended-rx-test`, based on Testing `07e309f1`.
+The full build now enables conventional P25 Phase 1, Phase 1 trunking and
+`CONFIG_RX_EXTENDED`. The board admits experimental RX from 16 MHz to
+999.999990 MHz, the existing synthesizer-table minimum and codeplug format
+maximum. There is no extra 850 or 870 MHz cutoff. Front-end performance,
+PLL lock, audio and over-the-air interoperability remain untested.
+
+Normal TX bands are unchanged. A receive-only RX frequency blocks PTT,
+hotspot and conventional P25 TX even when the stored TX frequency is valid.
+A trunking system with any receive-only control frequency forces passive
+following and blocks registration, affiliation, requests and voice. Normal
+VHF/UHF channel and system permissions, including the CPS Receive only
+option, remain in force.
+
+Completed: 40 P25 host programs and 12 Python configuration checks pass;
+extended receive/PTT admission checks pass (305 assertions); FD6818
+highest-range register checks pass. Trunk owner: 752 assertions, 6600-byte
+host workspace. Initial full target build passes with warnings treated as
+errors: 692688-byte image, 211264 bytes static RAM, 192 bytes remaining.
+Static RAM use is unchanged from the earlier P25/trunking image.
+
+The extended-RX-off build passes (692676 bytes flash, 211264 bytes RAM),
+trunking-off passes (679600/211216), and P25-off passes (638276/209272).
+All target builds treat warnings as errors. A regression check across the
+board registry confirms disabling DMR also disables its default P25
+dependents. The 42 CPS checks, including extended frequency parsing and
+managed simulator programming, pass. Strict site generation has zero
+warnings; documentation links and generic-code checks pass.
+
+The default-optimization task-stack check passes for all ten tasks with
+68-byte context overhead and 128-byte margin: radio free 788 bytes, audio
+1596, UI 40. It links 692684 bytes with the same static RAM use. These tight
+margins still require owner hardware checks. Target evidence is retained
+locally in `build/p25-target/wide-p25-{build,stack}.log`.
+
+Next: publish and verify the Testing candidate for owner reception testing.
+The read-only extended trunking HIL check is provided but was not run.
+No radio or SDR was accessed. Phase 2 and encrypted voice remain outside
+this integration.

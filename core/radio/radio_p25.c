@@ -103,6 +103,14 @@ static bool trunk_send(uint32_t hz, const uint8_t *block, void *ctx)
 }
 static const p25_follow_hooks_t follow_hooks = { .tune = trunk_tune, .send = trunk_send };
 
+static bool trunk_tx_band(void)
+{
+	if (board_receive_only(mem->channel.rx_hz)) return false;
+	for (uint8_t i = 0; i < mem->trunk.cfg.ncc; i++)
+		if (board_receive_only(mem->trunk.cc[i].hz)) return false;
+	return true;
+}
+
 static bool trunk_params(p25_engine_cfg_t *cfg)
 {
 	p25_trunk_cfg_t *l = &mem->work.load;
@@ -121,6 +129,10 @@ static bool trunk_params(p25_engine_cfg_t *cfg)
 	for (uint8_t i = 0; i < c->ncc; i++)
 		t->cc[i] = (p25_follow_cc_t){ l->ctl[i].rx_hz, l->ctl[i].tx_hz, l->ctl[i].chan, l->ctl_site[i] };
 	c->cc = t->cc;
+	if (!trunk_tx_band()) {
+		c->flags &= (uint8_t)~P25_FOLLOW_TX;
+		c->flags |= P25_FOLLOW_NO_REG;
+	}
 	c->iden_set = l->iden_set;
 	for (uint8_t i = 0; i < P25_FOLLOW_IDENS; i++)
 		t->iden[i] = (p25_follow_iden_t){ l->iden[i].base_hz, l->iden[i].spacing_hz, l->iden[i].tx_offset_hz,
@@ -137,7 +149,7 @@ static bool trunk_params(p25_engine_cfg_t *cfg)
 
 static bool trunk_allowed(uint32_t hz, uint8_t permission)
 {
-	return current() && receive_band(hz) && board_in_band(hz, true) &&
+	return current() && trunk_tx_band() && receive_band(hz) && board_in_band(hz, true) &&
 	       (mem->work.engine.session.fit & AIR_FIT_TX) != 0 &&
 	       (p25_codeplug_tx_permissions(mem->number, &mem->channel) & permission) == permission;
 }
@@ -357,7 +369,7 @@ bool radio_p25_poll(p25_engine_view_t *view)
 
 static bool transmit_allowed(void)
 {
-	return current() && (mem->work.engine.session.fit & AIR_FIT_TX) != 0 &&
+	return current() && !board_receive_only(mem->channel.rx_hz) && (mem->work.engine.session.fit & AIR_FIT_TX) != 0 &&
 	       board_in_band(mem->channel.tx_hz, true) && receive_band(mem->channel.tx_hz) &&
 	       (p25_codeplug_tx_permissions(mem->number, &mem->channel) & P25_TX_VOICE) != 0;
 }

@@ -39,6 +39,8 @@ is `tools/bringup.py list --radio <id>`.
 <!-- generated: tools/boards.py docs checked; edit docs/testing/results/<board>/ (tools/bringup.py run) -->
 | Feature | DM-32UV | DM-1701 | DM-1801 Pro | DB25-D PRO | MD-380 | MD-UV380 |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
+| `p25` | not recorded | off | off | off | off | off |
+| `p25_trunk` | not recorded | off | off | off | off | off |
 | `fm` | pass (seed) | pass (seed) | pass (seed) | pass (seed) | pass (seed) | not recorded |
 | `talkgroup_edit` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `dmr_talkgroup_entries` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
@@ -97,6 +99,7 @@ is `tools/bringup.py list --radio <id>`.
 | `task_stacks` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `cps_openfw` | not recorded | pass (seed) | not recorded | pass (seed) | pass (seed) | not recorded |
 | `cps_fast` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
+| `cps_managed` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `stub_entry` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `crash_log` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `crash_screen` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
@@ -140,6 +143,7 @@ is `tools/bringup.py list --radio <id>`.
 | `nand_storage` | ✕ | ✕ | ✕ | not recorded | ✕ | ✕ |
 | `codec_check` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `audio_probe` | not written | off | not written | not written | not written | off |
+| `rx_extended` | not recorded | off | off | off | off | off |
 <!-- end generated -->
 
 What the records don't hold yet: limits and known problems from the bring-up pages.
@@ -262,6 +266,9 @@ clock`; ? = not known yet). The `RTC` row lists firmware support ([radio-feature
 | `CHANNEL_EDIT` | ● | ● | ● | ● | ● | ● |
 | `ZONE_EDIT` | ● | ● | ● | ● | ● | ● |
 | `CONTACT_EDIT` | ● | ● | ● | ● | ● | ● |
+| `P25` | ● | ○ | ○ | ○ | ○ | ○ |
+| `P25_TRUNK` | ● | ○ | ○ | ○ | ○ | ○ |
+| `RX_EXTENDED` | ● | ○ | ○ | ○ | ○ | ○ |
 | Voltage reading (board, no switch) | Battery | Battery | Battery | None | Battery | Battery |
 | Clock kept through power-off (board, no switch) | Yes | ? | Yes | ? | ? | ? |
 <!-- end generated -->
@@ -271,8 +278,9 @@ clock`; ? = not known yet). The `RTC` row lists firmware support ([radio-feature
 | Feature | Switch | Bytes DM-1701 | Bytes MD-380 | Notes |
 |---|---|---:|---:|---|
 | Analog FM receive and transmit | `FM` | 29,296 | 28,056 | Includes its children (tones, VOX, APRS, FM VFO) |
-| P25 Phase 1 conventional voice | `P25` | — | — | Off by default; host-tested, target builds checked, hardware qualification pending ([integration tracker](testing/dm32-p25-integration.md)) |
+| P25 Phase 1 conventional voice | `P25` | — | — | Enabled in the full DM-32UV build; host-tested, target builds checked, hardware qualification pending ([integration tracker](testing/dm32-p25-integration.md)) |
 | P25 Phase 1 trunking | `P25_TRUNK` | — | — | Requires P25; host-tested acquisition, grant following and subscriber path; hardware qualification pending |
+| Experimental extended receive | `RX_EXTENDED` | — | — | Board-defined receive-only tuning range; enabled for DM-32UV owner testing; sensitivity and lock unverified |
 | Saved operating talkgroup assignments | `DMR_TALKGROUP_ENTRIES` | — | — | Shared saved-contact references per channel ([dmr-voice.md](spec/dmr-voice.md)) |
 | Edit operating talkgroups | `TALKGROUP_EDIT` | — | — | Add, reorder, and remove channel assignments on the radio |
 | CTCSS / DCS encode and decode | `SUBTONE` | 904 | 3,292* | MD-380: software decode (ADC) and PWM encode; CTCSS 100.0 Hz works on air both ways (2026-10-19), DCS not yet checked |

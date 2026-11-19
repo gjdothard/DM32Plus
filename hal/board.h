@@ -134,6 +134,12 @@ static inline bool board_in_band(uint32_t hz, bool need_tx)
 	return false;
 }
 
+// Receive-only rows may overlap a normal transmit band; any matching TX row takes precedence.
+static inline bool board_receive_only(uint32_t hz)
+{
+	return board_in_band(hz, false) && !board_in_band(hz, true);
+}
+
 // The transmit band hz is in (an index into board.bands), or -1
 static inline int board_tx_band(uint32_t hz)
 {

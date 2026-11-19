@@ -19,6 +19,9 @@
 #ifndef CONFIG_P25
 #define CONFIG_P25			0
 #endif
+#ifndef CONFIG_RX_EXTENDED
+#define CONFIG_RX_EXTENDED		0
+#endif
 #ifndef CONFIG_P25_TRUNK
 #define CONFIG_P25_TRUNK		CONFIG_P25
 #endif

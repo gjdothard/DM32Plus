@@ -11,16 +11,24 @@ P25 requires `CONFIG_DMR` for shared codeplug contacts; trunking requires P25.
 Set the protocol switches rather than overriding the derived implementation
 switches. Make and `core/config.h` reject inconsistent dependencies.
 
-During integration P25 defaults off. Enabling it compiles the imported engines
-and the IMBE attribution; it does not yet add a working channel mode or CPS
-support. Keep production activation deferred until
-those parts are connected. See the [subsystem spec](spec/p25.md).
+P25 defaults off globally; a board can enable P25 and trunking in its full
+build. Channel mode, CPS programming and the subscriber path are connected.
+Hardware qualification remains pending. See the [subsystem spec](spec/p25.md)
+and [feature matrix](feature-matrix.md) for board defaults and status.
 
 `CONFIG_P25=n CONFIG_P25_TRUNK=n` excludes the protocol libraries.
 `CONFIG_P25=y CONFIG_P25_TRUNK=n` builds conventional P25 without the follower.
 `CONFIG_P25=y` also builds trunking. These are code selection controls;
 transmit permission still comes from channel/system policy and normal radio
 checks. They do not replace the CPS RX-only option.
+
+`CONFIG_RX_EXTENDED` enables a board's experimental receive-only tuning
+range. It defaults off globally. The board supplies the limits; the switch
+does not establish sensitivity or synthesizer lock. Channels received in a
+receive-only range cannot transmit, even with a transmit frequency in a
+normal band. Such a trunking control-channel list forces passive following:
+no registration, affiliation, requests or voice transmission. Overlapping
+normal transmit bands retain their existing permissions.
 
 Features that cost flash, and values that differ per radio, are chosen at build time. Defaults live in
 `config/features.mk`. A platform changes them for every radio on it in `platform/<p>/config.mk`, a board changes them

@@ -19,6 +19,19 @@ OPTIONS, UNITTEST_ARGS = parser.parse_known_args()
 
 
 class P25BuildTest(unittest.TestCase):
+    def test_board_defaults_follow_disabled_parent(self):
+        for board in sorted((ROOT / "boards").iterdir()):
+            if not (board / "board.mk").is_file():
+                continue
+            with self.subTest(board=board.name):
+                result = subprocess.run(
+                    [OPTIONS.make, "--no-print-directory", "-s", f"BOARD={board.name}",
+                     "CONFIG_DMR=n", "print-vars", "VARS=CONFIG_P25 CONFIG_P25_TRUNK"],
+                    cwd=ROOT, text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("CONFIG_P25=n", result.stdout)
+                self.assertIn("CONFIG_P25_TRUNK=n", result.stdout)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="p25-build-")
         self.addCleanup(self.tmp.cleanup)

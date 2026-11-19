@@ -2,6 +2,22 @@
 <!-- Copyright (c) 2026 Garrett Dothard -->
 # Baofeng DM-32UV hardware
 
+## Experimental extended receive
+
+The full build enables `CONFIG_RX_EXTENDED`, `CONFIG_P25` and
+`CONFIG_P25_TRUNK`. Extended RX admits 16 MHz through 999.999990 MHz. The
+lower limit is the existing FD6818 synthesizer table's first range; the
+upper limit is the eight-digit, 10 Hz BCD codeplug representation. The
+existing table includes a range starting near 740 MHz. Neither that table
+nor tuning admission proves PLL lock, sensitivity or usable reception
+through the board's RF front end. These remain untested on hardware.
+
+Transmit bands remain 136–174 and 400–480 MHz. Channels received outside
+those bands are receive-only even when their stored TX frequency is inside
+a normal band. See [radio behavior](radio-features.md#receive-only-board-ranges)
+for trunking and overlapping-range admission rules. No connected radio was
+used to qualify this change.
+
 This page covers what is needed to bring up the DM-32UV: SoC, memory, peripherals, pins, RF chip, audio, flash,
 calibration, GPS and the update paths. The DMR modem inside the SoC is in `modem-hrc7000.md`. The AMBE codec placement
 is in `codec-dm32.md`. The stock AES voice format is in [hardware-dm32-encryption.md](hardware-dm32-encryption.md).

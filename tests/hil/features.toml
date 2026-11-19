@@ -491,3 +491,8 @@ source = ["tools/rfoundry/rfoundry"]
 [feature.audio_probe]
 switch = "AUDIO_PROBE"
 spec = "docs/spec/usb-audio.md"
+
+[feature.rx_extended]
+switch = "RX_EXTENDED"
+spec = "docs/spec/radio-features.md"
+source = ["core/radio/radio_sm.c", "hal/board.h"]
