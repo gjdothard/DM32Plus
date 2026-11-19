@@ -34,6 +34,7 @@
 #define CODEPLUG_KEY_CH_TAG	0x0400u		// channel tags, 0x0400 + channel - 1 (0x0400-0x07FF)
 #define CODEPLUG_KEY_MODE_SET	0x0A00u		// a kind's radio-wide record, key = 0x0A00 + kind (0x0A00-0x0AFF)
 #define CODEPLUG_KEY_TARGET	0x1000u		// call targets the contact record can't hold (0x1000-0x17FF)
+#define CODEPLUG_KEY_CONTACT_PROTOCOL 0x2000u // contact scope/binding, 0x2000-0x23FF
 #define CODEPLUG_KEY_TLIST	0x1800u		// receive lists of call targets (0x1800-0x18FF)
 #define CODEPLUG_KEY_TRAFFIC	0x1900u		// traffic keys, each a system's (0x1900-0x1CFF)
 #define CODEPLUG_KEY_ZONE_TAG	0x1D00u		// reserved: per-zone mode records, 0x1D00 + zone (0x1D00-0x1DFF)

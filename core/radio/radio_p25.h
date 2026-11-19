@@ -8,6 +8,7 @@
 #include "config.h"
 #if CONFIG_P25
 #include "codeplug/codeplug.h"
+#include "p25/p25_codeplug.h"
 #include "p25/p25_workspace.h"
 #if CONFIG_P25_UI
 #include "radio/p25_monitor.h"
@@ -32,6 +33,8 @@ typedef struct {
 #endif
 typedef struct {
 	p25_workspace_t work;
+	uint16_t groups[P25_CP_GROUP_MAX];
+	uint8_t group_count;
 #if CONFIG_P25_UI
 	p25_monitor_t monitor;
 #endif

@@ -93,6 +93,12 @@ the feature is disabled.
 
 ## Integration checklist
 
+The listening menu also opens the existing operating-talkgroup picker. P25
+uses the shared channel assignments, names and ordering; timeslot labels are
+omitted. Selecting an assignment holds that group and changes the transmit
+target. Recent-call Hold and favorites remain receive-only operations. The
+selection does not grant TX permission. See [codeplug integration](p25-codeplug.md).
+
 - [x] Bounded published monitor and receive selection independent of TX.
 - [x] Home, listening menu, recent/favorite list and system details.
 - [x] Journaled per-system favorites and translated text.

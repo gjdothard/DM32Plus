@@ -210,6 +210,10 @@ bool codeplug_delete_listen_list(uint16_t index);
 // The first contact with this ID: group true finds a talkgroup (or all call for 0xFFFFFF), false a private contact.
 // Reads every contact record (24 KB of flash) in the worst case: cache the answer
 bool codeplug_contact_find(uint32_t id, bool group, contact_t *out);
+#if CONFIG_P25
+// Protocol-scoped name lookup: 1 DMR, 2 P25. Legacy contacts default to DMR.
+bool codeplug_contact_find_protocol(uint32_t id, bool group, uint8_t protocol, contact_t *out);
+#endif
 
 // General DMR settings (open-firmware general settings, docs/spec/open-firmware-cps.md 7.3.2)
 typedef struct {

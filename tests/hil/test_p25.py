@@ -27,6 +27,12 @@ def test_p25_monitor_pages(radio):
         radio.go_home()
         press("quick")
         screen("p25-listen")
+        if "DMR_TALKGROUP_POOL" in radio.link.version().get("features", "").split(","):
+            press("8")
+            screen("p25-talkgroups")
+            radio.go_home()
+            press("quick")
+            screen("p25-listen")
         press("6")
         screen("p25-system")
         press("context")

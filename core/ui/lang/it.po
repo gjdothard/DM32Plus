@@ -3304,6 +3304,10 @@ msgstr "Parla a"
 msgid "{PTT once  OK use  Hold OK set|OK use  Hold OK set}"
 msgstr "{PTT una volta  OK usa  Tieni OK imposta|OK usa  Tieni OK imposta}"
 
+#: core/ui/ui_menus.c core/ui/ui_p25.c core/ui/ui_screens.c
+msgid "Talkgroups"
+msgstr "Gruppi"
+
 #: core/ui/ui_menus.c
 msgid "Scan paused"
 msgstr "Scansione in pausa"
@@ -4215,10 +4219,6 @@ msgstr "Liste"
 #: core/ui/ui_screens.c
 msgid "Options"
 msgstr "Opzioni"
-
-#: core/ui/ui_screens.c
-msgid "Talkgroups"
-msgstr "Gruppi"
 
 #: core/ui/ui_screens.c
 msgid "2  Select channel"

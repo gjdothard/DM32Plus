@@ -323,6 +323,41 @@ static void test_extended_receive_only(void)
 
 int main(void)
 {
+	// Equal numeric IDs in different protocols must not borrow each other's names.
+	fresh(true);
+	contact_t named = { .name = "DMR Operations", .id = 1234, .type = CONTACT_GROUP };
+	CHECK(codeplug_set_contact(1, &named));
+	strcpy(named.name, "P25 Operations"); CHECK(codeplug_set_contact(2, &named));
+	uint16_t binding = codeplug_name_check(named.name);
+	uint8_t scope[7] = {1, 2, (uint8_t)binding, (uint8_t)(binding >> 8), 0xD2, 4, 0};
+	CHECK(codeplug_kv_set(CODEPLUG_KEY_CONTACT_PROTOCOL + 1, scope, sizeof scope));
+	contact_t found;
+	CHECK(codeplug_contact_find(1234, true, &found) && strcmp(found.name, "DMR Operations") == 0);
+	CHECK(codeplug_contact_find_protocol(1234, true, 2, &found) && strcmp(found.name, "P25 Operations") == 0);
+	strcpy(named.name, "Reused contact"); CHECK(codeplug_set_contact(2, &named));
+	CHECK(!codeplug_contact_find_protocol(1234, true, 2, &found));
+	// Legacy RX lists remain a receive fallback when no shared operating assignments exist.
+	fresh(true);
+	contact_t group = { .name = "Operations", .type = CONTACT_GROUP, .id = 1234 };
+	CHECK(codeplug_set_contact(1, &group));
+	group.id = 65535; CHECK(codeplug_set_contact(2, &group));
+	group.id = 70000; CHECK(codeplug_set_contact(3, &group));
+	listen_list_t groups = { .name = "P25 groups", .count = 3, .contacts = {1, 2, 3} };
+	CHECK(codeplug_set_listen_list(1, &groups));
+	channel.listen_list = 1;
+	p25_conv_t selective = {0x293, 0x293, P25_SQUELCH_SELECTIVE};
+	CHECK(p25_conv_save(10, &channel, &selective));
+	CHECK(codeplug_tagged_channel(10, &channel));
+	CHECK(radio_p25_begin(&channel, 10));
+	radio_p25_mem_t *owner = (radio_p25_mem_t *)pool;
+	CHECK(owner->group_count == 2 && owner->groups[0] == 1234 && owner->groups[1] == 65535);
+	CHECK(owner->work.engine.cfg.rx_group_count == 2 && owner->work.engine.cfg.tx_lc.tgid == 1234);
+#if CONFIG_P25_UI
+	CHECK(radio_p25_monitor_command(P25_MON_SELECT, 65535));
+	CHECK(owner->work.engine.cfg.tx_lc.tgid == 65535 && owner->work.engine.cfg.rx_tgid == 65535);
+	CHECK(!radio_p25_tx_prepare() && !keyed && starts == 0);
+#endif
+	CHECK(radio_p25_end());
 	test_receive(); test_transmit(); test_failures();
 	test_extended_receive_only();
 	CHECK(radio_p25_end());

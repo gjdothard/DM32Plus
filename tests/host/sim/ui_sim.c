@@ -842,6 +842,12 @@ bool codeplug_contact_find(uint32_t id, bool group, contact_t *out)
 uint8_t codeplug_talkgroup_at(uint16_t channel, uint8_t index, codeplug_talkgroup_t *out)
 {
 	*out = (codeplug_talkgroup_t){0};
+#if CONFIG_P25_UI
+	if (channel == 3 && sim_view()->ch.mode == RADIO_MODE_P25) {
+		if (index < 2) *out = (codeplug_talkgroup_t){ .id = index ? 2456 : 1234 };
+		return 2;
+	}
+#endif
 #if CONFIG_TALKGROUP_EDIT
 	if (sim_tg_pool && channel == 3) {
 		contact_t contact;
@@ -855,6 +861,13 @@ uint8_t codeplug_talkgroup_at(uint16_t channel, uint8_t index, codeplug_talkgrou
 	(void)index;
 	return 0;
 }
+#if CONFIG_P25
+bool codeplug_contact_find_protocol(uint32_t id, bool group, uint8_t protocol, contact_t *out)
+{
+	(void)protocol;
+	return codeplug_contact_find(id, group, out);
+}
+#endif
 #endif
 
 #if CONFIG_CONTACT_EDIT
@@ -953,6 +966,7 @@ bool ui_svc_p25_command(uint16_t channel, uint8_t op, uint16_t tg)
 	case P25_MON_PROGRAMMED: p25_monitor.listen = P25_LISTEN_PROGRAMMED; p25_monitor.held_tg = 0; break;
 	case P25_MON_FAVORITES: if (!p25_monitor.favorite_count) return false; p25_monitor.listen = P25_LISTEN_FAVORITES; break;
 	case P25_MON_HOLD: if (!tg) return false; p25_monitor.listen = P25_LISTEN_HOLD; p25_monitor.held_tg = tg; break;
+	case P25_MON_SELECT: if (!tg) return false; p25_monitor.listen = P25_LISTEN_HOLD; p25_monitor.held_tg = tg; p25_monitor.tx_target = tg; break;
 	case P25_MON_ADD:
 		if (p25_monitor.favorite_count >= P25_MONITOR_FAVORITES) return false;
 		p25_monitor.favorites[p25_monitor.favorite_count++] = tg; break;
@@ -2442,6 +2456,7 @@ static bool check(const char *kv, char *err, size_t len)
 	else if (strcmp(key, "mode") == 0) snprintf(got, sizeof got, "%s", view.ch.mode == RADIO_MODE_P25 ? "p25" : view.ch.mode == RADIO_MODE_DMR ? "dmr" : "fm");
 #if CONFIG_P25_UI
 	else if (strcmp(key, "p25hold") == 0) snprintf(got, sizeof got, "%u", p25_monitor.held_tg);
+	else if (strcmp(key, "p25target") == 0) snprintf(got, sizeof got, "%lu", (unsigned long)p25_monitor.tx_target);
 	else if (strcmp(key, "p25listen") == 0) snprintf(got, sizeof got, "%u", p25_monitor.listen);
 	else if (strcmp(key, "p25favorites") == 0) snprintf(got, sizeof got, "%u", p25_monitor.favorite_count);
 	else if (strcmp(key, "p25card") == 0) snprintf(got, sizeof got, "%u", gfx_get_pixel(6, 96) == UI_CARD_SURFACE);

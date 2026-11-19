@@ -11,6 +11,10 @@
 #include <stdbool.h>
 #include "codeplug/codeplug.h"
 
+// Ordered channel assignments share the operating-talkgroup storage with DMR.
+#define P25_CP_GROUP_MAX		63u
+uint8_t p25_channel_groups(uint16_t number, const channel_t *ch, uint16_t out[P25_CP_GROUP_MAX]);
+
 #ifndef P25_NAC_DEFAULT
 #define P25_NAC_DEFAULT		0x293
 #endif

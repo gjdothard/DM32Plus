@@ -230,7 +230,8 @@ static bool trunk_params(p25_engine_cfg_t *cfg)
 	c->flags = P25_FOLLOW_SKIP_ENC;
 	if (l->sys.options & P25_TSYS_PLAN_ONLY) c->flags |= P25_FOLLOW_PLAN_ONLY;
 	if (l->follow_all) c->flags |= P25_FOLLOW_ALL_GROUPS;
-	c->unit_id = l->unit_id; c->talk_group = l->talk_group;
+	c->unit_id = l->unit_id; c->talk_group = mem->group_count ? mem->groups[0] : l->talk_group;
+	c->groups = mem->groups; c->ngroups = mem->group_count;
 	uint8_t permission = p25_codeplug_tx_permissions(mem->number, &mem->channel);
 	if ((permission & (P25_TX_REQUEST | P25_TX_VOICE)) == (P25_TX_REQUEST | P25_TX_VOICE)) c->flags |= P25_FOLLOW_TX;
 	if (!(permission & P25_TX_REGISTRATION)) c->flags |= P25_FOLLOW_NO_REG;
@@ -372,6 +373,32 @@ void radio_p25_trunk_status(uint8_t *state, uint8_t *registration, uint8_t *requ
 #if CONFIG_P25_UI
 bool radio_p25_monitor_command(uint8_t op, uint16_t tg)
 {
+	if (op == P25_MON_SELECT) {
+		if (!mem || !current() || !tg || p25_engine_tx_state(&mem->work.engine) != AIR_TX_IDLE) return false;
+		bool assigned = false;
+		for (uint8_t i = 0; i < mem->group_count; i++) if (mem->groups[i] == tg) assigned = true;
+		if (!assigned) return false;
+#if CONFIG_P25_TRUNK
+		if (radio_p25_trunked()) {
+			radio_p25_trunk_t *t = &mem->trunk;
+			if (t->ptt || t->tx_kind || !enter(&t->in_radio, &t->in_prov)) return false;
+			p25_follow_end(&mem->work.follower);
+			t->burst_pending = false;
+			t->cfg.talk_group = tg;
+			mem->work.engine.cfg.tx_lc.tgid = tg;
+			mem->monitor.listen = P25_LISTEN_HOLD; mem->monitor.held_tg = tg;
+			p25_follow_begin(&mem->work.follower, &t->cfg, &follow_hooks, t, hal_millis());
+			leave(&t->in_radio);
+			return true;
+		}
+#endif
+		p25_engine_cfg_t cfg = mem->work.engine.cfg;
+		cfg.tx_lc.lcf = P25_LCF_GROUP; cfg.tx_lc.tgid = tg;
+		cfg.rx_tgid = tg; cfg.rx_group_count = 0;
+		p25_engine_set(&mem->work.engine, &cfg);
+		mem->monitor.listen = P25_LISTEN_HOLD; mem->monitor.held_tg = tg;
+		return true;
+	}
 #if CONFIG_P25_TRUNK
 	if (!radio_p25_trunked() || !current() || mem->trunk.ptt || mem->trunk.tx_kind ||
 	    !enter(&mem->trunk.in_radio, &mem->trunk.in_prov)) return false;
@@ -497,6 +524,15 @@ bool radio_p25_begin(const channel_t *ch, uint16_t number)
 		mem = lease.loan.data;
 		mem->channel = stored;
 		mem->number = number;
+		mem->group_count = p25_channel_groups(number, &stored, mem->groups);
+		if (ch->kind == CODEPLUG_KIND_P25 && mem->group_count) {
+			cfg.tx_lc.lcf = P25_LCF_GROUP; cfg.tx_lc.tgid = mem->groups[0];
+			if (cfg.rx_tgid) cfg.rx_tgid = mem->groups[0];
+		}
+		if (ch->kind == CODEPLUG_KIND_P25 && cfg.rx_tgid) {
+			cfg.rx_groups = mem->groups;
+			cfg.rx_group_count = mem->group_count;
+		}
 		mem->base_generation = codeplug_serial();
 		mem->settings_generation = codeplug_kv_generation();
 	}

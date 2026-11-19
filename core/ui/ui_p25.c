@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Garrett Dothard
-// Receive-only monitoring UI. Commands pass through the radio task; drawing never touches the decoder loan.
+// P25 monitoring and assigned-group selection. Drawing never touches the decoder loan.
 #include <string.h>
 #include "ui_p25.h"
 #include "fmt.h"
@@ -83,7 +83,7 @@ static void __attribute__((noinline)) home_standard(const radio_view_t *v, const
 		line(gfx_height() >= 128 ? ui_layout.large : f, &y, text, ui_col.fg);
 		if (!(c->flags & P25_MON_UNIT) && gfx_height() >= 128) {
 			contact_t contact;
-			if (codeplug_contact_find(c->tg, true, &contact) && !ui_name_is_id(contact.name, c->tg, false))
+			if (codeplug_contact_find_protocol(c->tg, true, 2, &contact) && !ui_name_is_id(contact.name, c->tg, false))
 				line(ui_layout.medium, &y, contact.name, ui_col.fg);
 		}
 		if (gfx_height() >= 128) {
@@ -162,11 +162,11 @@ static void __attribute__((noinline)) home_card_body(const radio_view_t *v, cons
 	card_text(ui_layout.large, 10, 119, width - 20, text, ui_col.fg);
 	if (v->state == RS_TX) {
 		contact_t contact;
-		if (codeplug_contact_find(m.tx_target, !(m.flags & P25_MON_TX_UNIT), &contact))
+		if (codeplug_contact_find_protocol(m.tx_target, !(m.flags & P25_MON_TX_UNIT), 2, &contact))
 			card_text(font, 10, 157, width - 20, contact.name, ui_col.fg);
 	} else if (call && call->tg) {
 		contact_t contact;
-		if (codeplug_contact_find(call->tg, true, &contact) && !ui_name_is_id(contact.name, call->tg, false))
+		if (codeplug_contact_find_protocol(call->tg, true, 2, &contact) && !ui_name_is_id(contact.name, call->tg, false))
 			card_text(font, 10, 157, width - 20, contact.name, ui_col.fg);
 	} else if (!call) card_text(meta, 10, 160, width - 20, TR("No calls heard"), ui_col.dim);
 	sb_init(&b, text, sizeof text); sb_str(&b, TR("Radio ID")); sb_chr(&b, ' ');
@@ -219,11 +219,17 @@ static void command(const p25_monitor_t *m, uint8_t op, uint16_t tg)
 	ui_dirty();
 }
 
-static uint16_t listen_count(void) { return 7; }
+static uint16_t listen_count(void) {
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+	return 8;
+#else
+	return 7;
+#endif
+}
 static void listen_item(uint16_t i, ui_item_t *it)
 {
 	static const char *const labels[] = { TRN("Recent calls"), TRN("All talkgroups"), TRN("Favorites only"),
-		TRN("Hold last talkgroup"), TRN("Programmed groups"), TRN("System details"), TRN("Favorite list") };
+		TRN("Hold last talkgroup"), TRN("Programmed groups"), TRN("System details"), TRN("Favorite list"), TRN("Talkgroups") };
 	p25_monitor_t m;
 	bool ok = snapshot(&m);
 	item_num_set(it, i + 1);
@@ -237,6 +243,14 @@ static void listen_select(uint16_t i, bool hold)
 {
 	(void)hold;
 	p25_monitor_t m;
+	if (i == 7) {
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+		ui_push(SCR_P25_TALKGROUPS, 1);
+#else
+		ui_toast(TR("P25 request unavailable"));
+#endif
+		return;
+	}
 	if (i == 0 || i == 6) { ui_push(SCR_P25_RECENT, i == 6); return; }
 	if (i == 5) { ui_push(SCR_P25_SYSTEM, 0); return; }
 	if (!snapshot(&m) || !(m.flags & P25_MON_TRUNK)) { ui_toast(TR("Select a P25 trunked channel")); return; }
@@ -258,7 +272,7 @@ static void recent_item(uint16_t i, ui_item_t *it)
 	if (!snapshot(&m) || i >= (ui_frame()->arg ? m.favorite_count : m.recent_count)) return;
 	uint16_t tg = ui_frame()->arg ? m.favorites[i] : m.recent[i].tg;
 	contact_t contact;
-	if (tg && codeplug_contact_find(tg, true, &contact)) str_copy(it->label, sizeof it->label, contact.name);
+	if (tg && codeplug_contact_find_protocol(tg, true, 2, &contact)) str_copy(it->label, sizeof it->label, contact.name);
 	else if (tg) group_text(it->label, sizeof it->label, tg);
 	else str_copy(it->label, sizeof it->label, TR("Private call"));
 	sbuf_t b;
@@ -325,7 +339,7 @@ static void __attribute__((noinline)) recent_body(int y, bool cards)
 		else sb_str(&b, TR("Private call"));
 		if (favorite(&m, tg)) sb_str(&b, " *");
 		contact_t contact;
-		if (tg && codeplug_contact_find(tg, true, &contact) && !ui_name_is_id(contact.name, tg, false)) {
+		if (tg && codeplug_contact_find_protocol(tg, true, 2, &contact) && !ui_name_is_id(contact.name, tg, false)) {
 			sb_chr(&b, ' '); sb_str(&b, contact.name);
 		}
 		line(font, &y, text, color);

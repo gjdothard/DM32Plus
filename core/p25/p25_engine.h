@@ -35,6 +35,8 @@ typedef struct {
 	// Which calls of our NAC are played: 0 every one (the normal squelch of a conventional channel), or only calls
 	// to this talk group, to everyone (P25_TGID_EVERYONE) and unit to unit calls to unit_id (selective squelch)
 	uint16_t rx_tgid;
+	const uint16_t *rx_groups; // additional selective-squelch groups; immutable while receiving
+	uint8_t rx_group_count;
 	uint32_t unit_id;	// ours: the source of what we send
 	p25_lc_t tx_lc;		// what we call: a talk group or a unit (src is set from unit_id)
 	bool talkaround;	// status symbols say direct (P25_SS_TALKAROUND); else unknown, as to a repeater

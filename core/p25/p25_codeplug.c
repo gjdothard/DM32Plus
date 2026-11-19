@@ -10,6 +10,41 @@
 
 #if CONFIG_P25
 
+uint8_t p25_channel_groups(uint16_t number, const channel_t *ch, uint16_t out[P25_CP_GROUP_MAX])
+{
+	uint8_t count = 0;
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+	codeplug_talkgroup_t entry;
+	uint8_t assigned = codeplug_talkgroup_at(number, 0, &entry);
+	for (uint8_t i = 0; i < assigned && i < P25_CP_GROUP_MAX; i++) {
+		if (i) codeplug_talkgroup_at(number, i, &entry);
+		if (!entry.id || entry.id > 0xFFFFu) continue;
+		bool duplicate = false;
+		for (uint8_t j = 0; j < count; j++) if (out[j] == entry.id) duplicate = true;
+		if (!duplicate) out[count++] = (uint16_t)entry.id;
+	}
+	if (assigned) return count;
+#else
+	(void)number;
+#endif
+#if CONFIG_DMR
+	listen_list_t list;
+	contact_t contact;
+	if (ch->listen_list && codeplug_listen_list(ch->listen_list, &list)) {
+		for (uint8_t i = 0; i < list.count && count < P25_CP_GROUP_MAX; i++) {
+			if (!codeplug_contact(list.contacts[i], &contact) || contact.type != CONTACT_GROUP ||
+			    !contact.id || contact.id > 0xFFFFu) continue;
+			bool duplicate = false;
+			for (uint8_t j = 0; j < count; j++) if (out[j] == contact.id) duplicate = true;
+			if (!duplicate) out[count++] = (uint16_t)contact.id;
+		}
+	}
+#else
+	(void)ch; (void)out;
+#endif
+	return count;
+}
+
 static uint16_t rd16(const uint8_t *b, int len, int at)
 {
 	return at + 2 <= len ? (uint16_t)(b[at] | (b[at + 1] << 8)) : 0u;

@@ -56,6 +56,16 @@ hint; a session must not rely on it after an entire low-byte wrap.
 | 0x1900..0x1CFF | Traffic keys |
 | 0x1D00..0x1DFF | Reserved zone records |
 | 0x1E00..0x1EFF | Per-system P25 receive favorites ([format](p25-ui.md#persistent-favorites)) |
+| 0x2000..0x23FF | Contact protocol scopes, indexed by contact slot minus one |
+
+A contact protocol scope is seven bytes: version 1, a protocol mask (1 DMR,
+2 P25, 3 both), the contact name check u16, and the contact ID u24. The binding
+prevents a reused slot from inheriting another contact's scope. Absent,
+unknown or stale records default to DMR. The CPS infers scopes for legacy P25
+assignments from channel usage and writes them on the next save. Unknown
+record versions are preserved. Contact edits in CPS refresh their binding.
+The radio's name lookup uses the protocol mask so equal numeric IDs do not
+borrow a name from the other protocol. Scopes do not grant TX permission.
 
 Defining a key family does not activate its protocol or encryption support.
 The sector is finite; a batch that cannot fit is refused without writing.

@@ -326,7 +326,9 @@ static void testSquelch(void)
 	p25_engine_view(&r[1].e, &v);
 	CHECK(v.rx_active && !v.rx_played && v.rx.lc.tgid == 77 && r[1].starts == 0 && r[1].nvoice == 0, "another group: active %d played %d heard %u", v.rx_active, v.rx_played, r[1].nvoice);
 	// The operator switches to that group mid-call: the next LDU1 opens the squelch
-	cfg.rx_tgid = 77;
+	uint16_t additional[] = { 12, 77, 65535 };
+	cfg.rx_groups = additional;
+	cfg.rx_group_count = 3;
 	p25_engine_set(&r[1].e, &cfg);
 	for (uint8_t k = 0; k < 20; k++) {
 		encode(&r[0], (uint8_t)(1 + (k & 1)));

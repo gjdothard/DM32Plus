@@ -45,6 +45,29 @@ P25 with its build switch and trunked P25 with `CONFIG_P25_TRUNK`; other tagged
 channel kinds remain unrunnable.
 See [tagged channel records](channel-modes.md) for the shared format.
 
+## Shared operating talkgroups
+
+P25 channels reuse the ordered operating-talkgroup assignments and saved group
+contacts used by DMR. No additional list record is stored. Up to 63 shared
+assignments are resolved into an immutable owner cache before reception starts.
+Only group IDs 1..65535 are usable; duplicate IDs collapse, and missing, private
+or out-of-range contacts are excluded. Timeslot overrides do not apply to P25.
+When no operating assignments exist, the legacy RX group list is the fallback.
+
+The first usable assignment supplies the initial transmit target. Trunked
+programmed reception accepts the configured target and every assigned group;
+Follow all still accepts all groups. Conventional selective squelch accepts
+the assigned groups in addition to its target and protocol all-call behavior.
+Conventional normal squelch continues to hear all calls with the selected NAC.
+
+The monitoring UI can select an assigned group as both the receive hold and
+transmit target. Selection does not alter permissions, write the codeplug or
+transmit by itself. A trunked selection cancels pending signaling and restarts
+control acquisition so any later affiliation uses the new target. RX-only,
+system listen-only and normal admission checks remain authoritative. Selecting
+an unassigned group, a stale channel or a busy transmitter fails. Receive-only
+Recent/Hold and favorite operations continue to leave the transmit target alone.
+
 ## Parameter blocks
 
 All multi-byte values are little endian. These are parameter bodies, not

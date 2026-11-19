@@ -29,7 +29,10 @@ static bool wanted(const p25_engine_t *e, const p25_call_t *c)
 	// Before the link control is in, the header's talk group decides; a late entry waits for its first LDU1
 	if (!c->have_lc && c->late)
 		return false;
-	return c->lc.tgid == e->cfg.rx_tgid || c->lc.tgid == P25_TGID_EVERYONE;
+	if (c->lc.tgid == e->cfg.rx_tgid || c->lc.tgid == P25_TGID_EVERYONE) return true;
+	for (uint8_t i = 0; e->cfg.rx_groups && i < e->cfg.rx_group_count; i++)
+		if (c->lc.tgid == e->cfg.rx_groups[i]) return true;
+	return false;
 }
 
 static void rx_fields(p25_engine_t *e, const p25_call_t *c, bool start)

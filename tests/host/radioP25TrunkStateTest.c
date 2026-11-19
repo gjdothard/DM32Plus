@@ -86,6 +86,48 @@ static void drain(void)
 }
 int main(void)
 {
+	// The shared DMR assignment bank feeds P25 receive groups, without changing TX permissions or target.
+	trunk_setup(true, false, false);
+	CHECK(radio_p25_end());
+	uint8_t *bank = sim_flash_data + map.openfw_flash + 0x14000;
+	memset(bank, 0, 0x4000);
+	memcpy(bank, "RFTP\1\0\0\0", 8); bank[8] = 1;
+	for (unsigned n = 10; n <= CODEPLUG_CHANNELS_MAX; n++) bank[16 + 2 * n] = 63;
+	for (unsigned n = 0; n < 63; n++) {
+		contact_t group = { .id = n + 2, .type = CONTACT_GROUP };
+		snprintf(group.name, sizeof group.name, "Group %u", n + 2);
+		CHECK(codeplug_set_contact((uint16_t)(n + 1), &group));
+		bank[16 + 2 * (CODEPLUG_CHANNELS_MAX + 1) + n * 2] = (uint8_t)(n + 1);
+	}
+	uint32_t crc = storage_crc32(storage_crc32(0, bank + 8, 4), bank + 16, 0x4000 - 16);
+	for (unsigned n = 0; n < 4; n++) bank[12 + n] = (uint8_t)(crc >> (8 * n));
+	CHECK(codeplug_reload() == CODEPLUG_OPENFW);
+	request(RREQ_RELOAD, 0); step(30);
+	radio_p25_mem_t *assigned_owner = (radio_p25_mem_t *)pool;
+	CHECK(assigned_owner->group_count == 63 && assigned_owner->groups[62] == 64);
+	CHECK(assigned_owner->trunk.cfg.ngroups == 63 && assigned_owner->trunk.cfg.talk_group == 2);
+	network(); step(100);
+	p25_tsbk_t assigned_grant = { .kind = P25_TSBK_GRANT, .opcode = P25_OP_GRP_V_GRANT,
+		.u.grant = { .has_svc = true, .ch = 4, .tg = 500, .src = 42 } };
+	signaling(&assigned_grant); step(20);
+	CHECK(follow_view().state == P25_FOLLOW_CONTROL);
+	assigned_grant.u.grant.tg = 64;
+	signaling(&assigned_grant); step(20);
+	CHECK(follow_view().state == P25_FOLLOW_VOICE && key_calls == 0 && starts == 0);
+#if CONFIG_P25_UI
+	CHECK(!radio_p25_monitor_command(P25_MON_SELECT, 500));
+	CHECK(radio_p25_monitor_command(P25_MON_SELECT, 63));
+	CHECK(assigned_owner->trunk.cfg.talk_group == 63 && assigned_owner->work.engine.cfg.tx_lc.tgid == 63);
+	network(); step(100);
+	assigned_grant.u.grant.tg = 64; signaling(&assigned_grant); step(20);
+	CHECK(follow_view().state == P25_FOLLOW_CONTROL);
+	assigned_grant.u.grant.tg = 63; signaling(&assigned_grant); step(20);
+	CHECK(follow_view().state == P25_FOLLOW_VOICE && key_calls == 0 && starts == 0);
+	request(RREQ_PTT, 1); step(30);
+	CHECK(key_calls == 0 && starts == 0 && !keyed);
+	request(RREQ_PTT, 0);
+#endif
+	CHECK(radio_p25_end());
 #if CONFIG_P25_UI
 	trunk_setup(true, false, false);
 	network(); step(100);

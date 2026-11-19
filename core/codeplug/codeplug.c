@@ -8,6 +8,9 @@
 #include <string.h>
 #include "codeplug.h"
 #include "codeplug_kv.h"
+#if CONFIG_P25
+#include "codeplug_tag.h"
+#endif
 #include "board.h"
 #include "storage/storage.h"
 
@@ -1666,7 +1669,7 @@ bool codeplug_delete_listen_list(uint16_t index)
 	return ok;
 }
 
-bool codeplug_contact_find(uint32_t id, bool group, contact_t *out)
+static bool contact_find(uint32_t id, bool group, uint8_t protocol, contact_t *out)
 {
 	enum { PER_READ = 32 };	// records per flash read
 	// Static, used only under the storage lock: on the stack it overflowed the radio task, whose DMR set-up calls
@@ -1691,6 +1694,19 @@ bool codeplug_contact_find(uint32_t id, bool group, contact_t *out)
 			}
 			uint32_t cid = type == CONTACT_ALL_CALL ? 0xFFFFFFu : bcd_id(&c[0x10]);
 			if (cid == id) {
+#if CONFIG_P25
+				uint8_t scope[7];
+				int len = codeplug_kv_get((uint16_t)(CODEPLUG_KEY_CONTACT_PROTOCOL + first + i), scope, sizeof scope);
+				char name[CODEPLUG_NAME_LEN + 1];
+				copy_name(name, c, CODEPLUG_NAME_LEN);
+				uint16_t check = codeplug_name_check(name);
+				bool bound = len == sizeof scope && scope[0] == 1 && scope[1] >= 1 && scope[1] <= 3 &&
+					(scope[2] | (uint16_t)scope[3] << 8) == check &&
+					(scope[4] | (uint32_t)scope[5] << 8 | (uint32_t)scope[6] << 16) == cid;
+				if (!((bound ? scope[1] : 1) & protocol)) continue;
+#else
+				(void)protocol;
+#endif
 				found = codeplug_contact((uint16_t)(first + i + 1u), out);	// the lock is recursive
 				done = true;
 				break;
@@ -1700,6 +1716,17 @@ bool codeplug_contact_find(uint32_t id, bool group, contact_t *out)
 	storage_unlock();
 	return found;
 }
+
+bool codeplug_contact_find(uint32_t id, bool group, contact_t *out)
+{
+	return contact_find(id, group, 1, out);
+}
+#if CONFIG_P25
+bool codeplug_contact_find_protocol(uint32_t id, bool group, uint8_t protocol, contact_t *out)
+{
+	return (protocol == 1 || protocol == 2) && contact_find(id, group, protocol, out);
+}
+#endif
 
 bool codeplug_dmr_settings(codeplug_dmr_settings_t *out)
 {

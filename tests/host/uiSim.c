@@ -41,6 +41,7 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "home_p25_trunk", "branded-home p25-trunk-home" },
 #if CONFIG_P25_UI
 	{ "p25_listen", "branded-home p25-trunk-home quick" },
+	{ "p25_talkgroups", "branded-home p25-trunk-home quick 8" },
 	{ "p25_recent", "branded-home p25-trunk-home ctx" },
 	{ "p25_hold", "branded-home p25-trunk-home quick 4" },
 	{ "p25_favorites", "branded-home p25-trunk-home quick ok ctx back 7" },
