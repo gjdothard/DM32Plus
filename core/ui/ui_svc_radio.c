@@ -18,6 +18,16 @@
 #include "settings/settings.h"
 #include <string.h>
 #include "config.h"
+#if CONFIG_P25_UI
+#include "ui_p25.h"
+#include "radio/p25_monitor.h"
+bool ui_svc_p25_view(p25_monitor_t *out) { return radio_p25_monitor(out); }
+bool ui_svc_p25_command(uint16_t channel, uint8_t op, uint16_t tg)
+{
+	if (op == P25_MON_ADD || op == P25_MON_REMOVE) return ui_svc_p25_favorite(channel, tg, op == P25_MON_REMOVE);
+	return radio_req_p25_monitor(channel, op, tg);
+}
+#endif
 #if CONFIG_APRS
 #include "aprs/aprs.h"
 #endif

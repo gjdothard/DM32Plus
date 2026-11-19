@@ -227,6 +227,8 @@ int main(void)
                 self.assertEqual(b"p25_bytes_follower" in symbols, trunk)
 
     def test_invalid_protocol_dependencies(self):
+        self.assertIn("CONFIG_P25_UI=y needs CONFIG_P25=y",
+                      self.probe("CONFIG_P25=n", "CONFIG_P25_UI=y", fails=True))
         self.assertIn("CONFIG_P25_TRUNK=y needs CONFIG_P25=y",
                       self.probe("CONFIG_P25=n", "CONFIG_P25_TRUNK=y", fails=True))
         self.assertIn("CONFIG_P25=y needs CONFIG_DMR=y",

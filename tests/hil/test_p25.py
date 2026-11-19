@@ -6,6 +6,59 @@ import pytest
 from rfoundry_hil import skip
 
 
+@pytest.mark.feature("p25_ui")
+def test_p25_monitor_pages(radio):
+    """Open every monitoring page without changing filters or stored favorites."""
+    core = radio.link.view(["core"])
+    if core.get("mode") != "p25":
+        skip("state", "select a stored P25 channel before this check")
+    if radio.link.view(["link"]).get("ui.locked") == "1":
+        skip("state", "unlock the keys before checking P25 navigation")
+
+    def press(name):
+        # Longer than the minimum synthetic tap: the live decoder can delay a keypad scan.
+        radio.link.key_hold(name, 250)
+        radio.link.wait_keys_idle()
+
+    def screen(name):
+        radio.wait_for(lambda v: v.get("ui.screen") == name, sections=("link",), what=name)
+
+    try:
+        radio.go_home()
+        press("quick")
+        screen("p25-listen")
+        press("6")
+        screen("p25-system")
+        press("context")
+        radio.wait_for(lambda v: v.get("ui.count") == "4", sections=("link",), what="P25 decode details")
+        radio.go_home()
+        press("context")
+        screen("p25-recent")
+        radio.go_home()
+        press("quick")
+        screen("p25-listen")
+        press("7")
+        screen("p25-recent")
+    finally:
+        radio.go_home()
+
+
+@pytest.mark.feature("p25_ui")
+def test_p25_monitor_snapshot(radio):
+    """Read the published monitoring view without selecting a channel or transmitting."""
+    core = radio.link.view(["core"])
+    if core.get("mode") != "p25":
+        skip("state", "select a stored P25 channel before this read-only check")
+    view = radio.link.view(["p25"])
+    if view.get("p25.ui") != "1":
+        skip("not_built", "P25 monitoring UI is disabled")
+    assert view["p25.active"] == "1", view
+    assert view["p25.channel"] == core["channel_number"], view
+    assert 0 <= int(view["p25.recent"]) <= 4, view
+    assert 0 <= int(view["p25.favorites"]) <= 4, view
+    assert 0 <= int(view["p25.listen"]) <= 3, view
+
+
 @pytest.mark.feature("p25")
 def test_p25_receive_diagnostic_visibility(radio):
     if "DIAG" not in radio.link.version().get("features", "").split(","):

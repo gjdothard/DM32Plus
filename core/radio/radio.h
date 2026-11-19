@@ -458,6 +458,9 @@ typedef enum {
 	RROAM_ZONE_OFF, RROAM_ZONE_ON, RROAM_ZONE_TOGGLE, RROAM_NOW, RROAM_LOCK, RROAM_UNLOCK, RROAM_LOCK_TOGGLE,
 } radio_roam_cmd_t;
 void radio_req_roam(uint8_t cmd);
+#if CONFIG_P25_UI
+bool radio_req_p25_monitor(uint16_t channel, uint8_t op, uint16_t tg);
+#endif
 // A beep (radio/beep.h beep_t) at the settings' level: key beeps only when key_beep is set (CONFIG_BEEP)
 void radio_req_beep(uint8_t beep);
 // A vibration pattern (radio/vibe.h vibe_t) on the board's motor (CONFIG_VIBRATE; nothing on a radio without

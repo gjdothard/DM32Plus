@@ -25,6 +25,9 @@
 #ifndef CONFIG_P25_TRUNK
 #define CONFIG_P25_TRUNK		CONFIG_P25
 #endif
+#ifndef CONFIG_P25_UI
+#define CONFIG_P25_UI			CONFIG_P25
+#endif
 #ifndef CONFIG_AIR
 #define CONFIG_AIR			CONFIG_P25
 #endif
@@ -39,6 +42,9 @@
 #endif
 #if CONFIG_P25_TRUNK && !CONFIG_P25
 #error "CONFIG_P25_TRUNK needs CONFIG_P25"
+#endif
+#if CONFIG_P25_UI && !CONFIG_P25
+#error "CONFIG_P25_UI needs CONFIG_P25"
 #endif
 #if CONFIG_AIR != CONFIG_P25 || CONFIG_IMBE != CONFIG_P25 || CONFIG_MBE != CONFIG_IMBE
 #error "CONFIG_AIR, CONFIG_IMBE and CONFIG_MBE are derived from CONFIG_P25"

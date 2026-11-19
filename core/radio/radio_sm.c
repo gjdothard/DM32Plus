@@ -5327,6 +5327,13 @@ void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 	}
 #endif
 	switch (req->type) {
+#if CONFIG_P25_UI
+	case RREQ_P25_MONITOR:
+		if (!busy && sm->view.ch.mode == RADIO_MODE_P25 &&
+		    sm->view.channel_number == ((uint32_t)req->arg >> 16))
+			radio_p25_monitor_command((uint8_t)req->arg2, (uint16_t)req->arg);
+		break;
+#endif
 	case RREQ_CH_STEP:
 		if (busy || steps == 0) {
 			break;

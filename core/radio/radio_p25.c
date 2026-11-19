@@ -15,12 +15,61 @@
 #include "dmr/ambe/ambeVoice.h"
 #include "radio/radio_am.h"
 #include "radio/radio_bcast.h"
-#if CONFIG_P25_TRUNK
+#if CONFIG_P25_UI && CONFIG_P25_TRUNK
+#include "p25/p25_favorites.h"
+#endif
+#if CONFIG_P25_TRUNK || CONFIG_P25_UI
 #include "hal_time.h"
 #endif
 
 static p25_workspace_lease_t lease;
 static radio_p25_mem_t *mem;
+#if CONFIG_P25_UI
+static p25_monitor_t monitor;
+static volatile uint8_t monitor_seq;
+
+bool radio_p25_monitor(p25_monitor_t *out)
+{
+	if (!out) return false;
+	for (unsigned i = 0; i < 3; i++) {
+		uint8_t seq = monitor_seq;
+		if (seq & 1u) continue;
+		__atomic_signal_fence(__ATOMIC_SEQ_CST);
+		*out = monitor;
+		__atomic_signal_fence(__ATOMIC_SEQ_CST);
+		if (seq == monitor_seq) return (out->flags & P25_MON_ACTIVE) != 0;
+	}
+	memset(out, 0, sizeof *out);
+	return false;
+}
+
+static void monitor_publish(void)
+{
+	monitor_seq++;
+	__atomic_signal_fence(__ATOMIC_SEQ_CST);
+	if (mem) monitor = mem->monitor;
+	else memset(&monitor, 0, sizeof monitor);
+	__atomic_signal_fence(__ATOMIC_SEQ_CST);
+	monitor_seq++;
+}
+
+static void monitor_call(p25_monitor_t *m, uint16_t tg, uint32_t src, uint8_t flags)
+{
+	unsigned at;
+	for (at = 0; at < m->recent_count; at++)
+		if (m->recent[at].tg == tg && ((m->recent[at].flags ^ flags) & P25_MON_UNIT) == 0 &&
+		    (tg || m->recent[at].src == src)) break;
+	if (at >= P25_MONITOR_RECENT) at = P25_MONITOR_RECENT - 1;
+	if (!src && at < m->recent_count && m->recent[at].tg == tg) src = m->recent[at].src;
+	if (at) memmove(&m->recent[1], &m->recent[0], at * sizeof m->recent[0]);
+	if (m->recent_count < P25_MONITOR_RECENT && at == m->recent_count) m->recent_count++;
+	// A grant without a source must not erase a source already decoded on the voice channel.
+	if (at || m->recent[0].tg != tg) m->recent[0].src = src;
+	else if (src) m->recent[0].src = src;
+	m->recent[0].tg = tg; m->recent[0].flags = flags;
+	m->recent[0].hz = m->tuned_hz; m->recent[0].ms = hal_millis();
+}
+#endif
 #if CONFIG_DIAG
 static radio_p25_diag_t diagnostic;
 static volatile uint8_t diagnostic_seq;
@@ -144,7 +193,24 @@ static bool trunk_send(uint32_t hz, const uint8_t *block, void *ctx)
 	t->burst_pending = true;
 	return true;
 }
-static const p25_follow_hooks_t follow_hooks = { .tune = trunk_tune, .send = trunk_send };
+#if CONFIG_P25_UI
+static int8_t trunk_listen(uint16_t tg, void *ctx)
+{
+	(void)ctx;
+	const p25_monitor_t *m = &mem->monitor;
+	if (m->listen == P25_LISTEN_PROGRAMMED) return -1;
+	if (m->listen == P25_LISTEN_ALL) return tg ? 1 : -1;
+	if (!tg) return 0;
+	if (m->listen == P25_LISTEN_HOLD) return tg == m->held_tg;
+	for (unsigned i = 0; i < m->favorite_count; i++) if (m->favorites[i] == tg) return 1;
+	return 0;
+}
+#endif
+static const p25_follow_hooks_t follow_hooks = { .tune = trunk_tune, .send = trunk_send,
+#if CONFIG_P25_UI
+	.listen = trunk_listen,
+#endif
+};
 
 static bool trunk_tx_band(void)
 {
@@ -303,6 +369,75 @@ void radio_p25_trunk_status(uint8_t *state, uint8_t *registration, uint8_t *requ
 }
 #endif
 
+#if CONFIG_P25_UI
+bool radio_p25_monitor_command(uint8_t op, uint16_t tg)
+{
+#if CONFIG_P25_TRUNK
+	if (!radio_p25_trunked() || !current() || mem->trunk.ptt || mem->trunk.tx_kind ||
+	    !enter(&mem->trunk.in_radio, &mem->trunk.in_prov)) return false;
+	p25_monitor_t *m = &mem->monitor;
+	bool ok = true;
+	switch (op) {
+	case P25_MON_PROGRAMMED: m->listen = P25_LISTEN_PROGRAMMED; m->held_tg = 0; break;
+	case P25_MON_ALL: m->listen = P25_LISTEN_ALL; m->held_tg = 0; break;
+	case P25_MON_FAVORITES:
+		if (!m->favorite_count) { ok = false; break; }
+		m->listen = P25_LISTEN_FAVORITES; m->held_tg = 0; break;
+	case P25_MON_HOLD:
+		if (!tg) { ok = false; break; }
+		m->listen = P25_LISTEN_HOLD; m->held_tg = tg; break;
+	// Persistent edits run as housekeeping storage jobs, outside the radio task.
+	default: ok = false; break;
+	}
+	leave(&mem->trunk.in_radio);
+	return ok;
+#else
+	(void)op; (void)tg;
+	return false;
+#endif
+}
+
+static void monitor_update(void)
+{
+	p25_monitor_t *m = &mem->monitor;
+	p25_engine_view_t ev;
+	p25_engine_view(&mem->work.engine, &ev);
+	m->flags = P25_MON_ACTIVE | (ev.rx_active ? P25_MON_RX : 0) |
+		(mem->channel.rx_only || board_receive_only(mem->channel.rx_hz) ? P25_MON_RX_ONLY : 0);
+	m->channel = mem->number; m->tuned_hz = mem->channel.rx_hz;
+	m->tx_target = mem->work.engine.cfg.tx_lc.lcf == P25_LCF_UNIT ? mem->work.engine.cfg.tx_lc.dst : mem->work.engine.cfg.tx_lc.tgid;
+	if (mem->work.engine.cfg.tx_lc.lcf == P25_LCF_UNIT) m->flags |= P25_MON_TX_UNIT;
+	m->nac = ev.rx.nac;
+	m->sysid = 0xFFFF; m->wacn = 0xFFFFFFFF; m->rfss = m->site = 0xFF;
+	uint16_t tg = ev.rx.lc.tgid;
+	uint32_t src = ev.rx.lc.src;
+	if (ev.rx.have_lc && ev.rx.lc.lcf == P25_LCF_UNIT) m->flags |= P25_MON_UNIT;
+	if (ev.rx.have_alg && ev.rx.algid != P25_ALGID_CLEAR) m->flags |= P25_MON_ENC;
+#if CONFIG_P25_TRUNK
+	if (radio_p25_trunked()) {
+		radio_p25_trunk_t *t = &mem->trunk;
+		if (!enter(&t->in_radio, &t->in_prov)) return;
+		const p25_follow_view_t *v = &mem->work.follower.view;
+		m->flags |= P25_MON_TRUNK;
+		if (!(t->cfg.flags & P25_FOLLOW_TX)) m->flags |= P25_MON_RX_ONLY;
+		m->tuned_hz = t->hz; m->cc_hz = v->cc_hz; m->state = v->state;
+		m->nac = v->nac; m->sysid = v->sysid; m->wacn = v->wacn; m->rfss = v->rfss; m->site = v->site;
+		m->blocks = v->blocks; m->crc_fail = v->crc_fail; m->refused = v->refused;
+		if (v->state == P25_FOLLOW_VOICE) {
+			tg = v->unit_call ? 0 : v->tg;
+			if (!ev.rx_active || !ev.rx.have_lc) src = v->src;
+			if (v->unit_call) m->flags |= P25_MON_UNIT;
+			if (v->enc) m->flags |= P25_MON_ENC;
+			monitor_call(m, tg, src, m->flags);
+		}
+		leave(&t->in_radio);
+	} else
+#endif
+	if (ev.rx_active) monitor_call(m, tg, src, m->flags);
+	monitor_publish();
+}
+#endif
+
 bool radio_p25_params(const channel_t *ch, uint16_t number, p25_engine_cfg_t *cfg)
 {
 	p25_conv_cfg_t cc;
@@ -334,6 +469,9 @@ bool radio_p25_end(void)
 	}
 #if CONFIG_DIAG
 	diagnostic_publish();
+#endif
+#if CONFIG_P25_UI
+	monitor_publish();
 #endif
 	return lease.vocoder == NULL || p25_workspace_release(&lease);
 }
@@ -368,6 +506,10 @@ bool radio_p25_begin(const channel_t *ch, uint16_t number)
 		p25_workspace_release(&lease);
 		ok = false;
 	}
+#if CONFIG_P25_UI
+	if (ok && radio_p25_trunked())
+		p25_favorites_read(&mem->channel, mem->monitor.favorites, &mem->monitor.favorite_count);
+#endif
 #endif
 	storage_unlock();
 	if (!ok) return false;
@@ -411,6 +553,9 @@ bool radio_p25_poll(p25_engine_view_t *view)
 #endif
 #if CONFIG_DIAG
 	diagnostic_publish();
+#endif
+#if CONFIG_P25_UI
+	monitor_update();
 #endif
 	storage_unlock();
 	return true;

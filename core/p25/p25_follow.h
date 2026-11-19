@@ -102,6 +102,8 @@ typedef struct {
 	// Send blk (a sealed inbound block) on hz, the control channel's inbound frequency, as soon as it can, then
 	// receive on the control channel again. False: it can't transmit now (counted; the request is sent again later)
 	bool (*send)(uint32_t hz, const uint8_t blk[P25_TSBK_BYTES], void *ctx);
+	// Receive-only override: -1 keeps the programmed filter, 0 rejects, 1 accepts. tg 0 is a private call.
+	int8_t (*listen)(uint16_t tg, void *ctx);
 } p25_follow_hooks_t;
 
 enum { P25_FOLLOW_OFF, P25_FOLLOW_HUNT, P25_FOLLOW_CONTROL, P25_FOLLOW_VOICE };

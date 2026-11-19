@@ -34,6 +34,8 @@ These show the card layout. The chapters also cover the standard Hub and smaller
 7. [Channels, zones and the VFO](07-channels-zones-vfo.md)
 8. [FM](08-fm.md): squelch, monitor, tones, bandwidth, VOX, touch tones
 9. [DMR](09-dmr.md): talk targets, replying, Recent, contacts, timeslot and color code, privacy, roaming
+
+[P25 monitoring](p25.md): talkgroups, Hold, persistent favorites and system details.
 10. [Messages, call alert and radio check](10-messages-and-signaling.md)
 11. [Emergency](11-emergency.md)
 12. [Scan and dual watch](12-scan.md)

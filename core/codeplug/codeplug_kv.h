@@ -37,6 +37,7 @@
 #define CODEPLUG_KEY_TLIST	0x1800u		// receive lists of call targets (0x1800-0x18FF)
 #define CODEPLUG_KEY_TRAFFIC	0x1900u		// traffic keys, each a system's (0x1900-0x1CFF)
 #define CODEPLUG_KEY_ZONE_TAG	0x1D00u		// reserved: per-zone mode records, 0x1D00 + zone (0x1D00-0x1DFF)
+#define CODEPLUG_KEY_P25_FAVORITES 0x1E00u		// per-system receive favorites, 0x1E00-0x1EFF
 
 // How a key's value is encoded (docs/spec/codeplug-settings.md 3.1): the encoding, never a width. A type is never
 // redefined, only grown by appending bytes

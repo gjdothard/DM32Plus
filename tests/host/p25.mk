@@ -29,6 +29,7 @@ TESTS += radioP25TrunkStateTest
 TESTS += radioP25OffTest codeplugTagTestNoP25
 
 P25_STORE_CORE := $(CORE)/codeplug/codeplug.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c \
+	$(CORE)/p25/p25_favorites.c \
 	$(CORE)/codeplug/codeplug_talk.c \
 	$(CORE)/codeplug/codeplug_kv.c $(CORE)/codeplug/codeplug_tag.c $(CORE)/codeplug/codeplug_tagged.c \
 	$(CORE)/codeplug/codeplug_records.c

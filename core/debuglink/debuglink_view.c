@@ -6,6 +6,9 @@
 #include "config.h"
 #include "board.h"
 #include "hal_time.h"
+#if CONFIG_P25_UI
+#include "radio/p25_monitor.h"
+#endif
 #if CONFIG_RTC
 #include "app/wall_clock.h"
 #endif
@@ -490,7 +493,7 @@ static const char *const section_names[DL_VIEW_COUNT] = { "core", "channel", "dm
 						  "link", "features", "dmr_data", "storage", "dmr_ext",
 						  "dmr_data_stats", "roam", "aprs", "aprs_set", "dmr_ip", "net", "snmp", "usrp",
 						  "sfr", "tasks", "crash", "watchdog", "reset", "air", "net_svc",
-						  "net_link" };
+						  "net_link", "p25" };
 
 const char *debuglink_view_name(uint8_t section)
 {
@@ -594,6 +597,26 @@ void debuglink_view_section(uint8_t section, const radio_view_t *v, dl_text_t *t
 		dl_text(t, "usrp.built=0\n");
 #endif
 		break;
+	case DL_VIEW_P25:
+#if CONFIG_P25_UI
+	{
+		p25_monitor_t m;
+		bool active = radio_p25_monitor(&m);
+		dl_text(t, "p25.ui=1\np25.active=%u\np25.channel=%u\np25.flags=%u\np25.listen=%u\np25.held_tg=%u\n",
+			active, m.channel, m.flags, m.listen, m.held_tg);
+		dl_text(t, "p25.tx_target=%u\n", (unsigned)m.tx_target);
+		dl_text(t, "p25.wacn=%u\np25.sysid=%u\np25.rfss=%u\np25.site=%u\np25.nac=%u\np25.refused=%u\n",
+			(unsigned)m.wacn, m.sysid, m.rfss, m.site, m.nac, m.refused);
+		dl_text(t, "p25.cc_hz=%u\np25.voice_hz=%u\np25.blocks=%u\np25.crc_fail=%u\np25.recent=%u\np25.favorites=%u\n",
+			(unsigned)m.cc_hz, (unsigned)m.tuned_hz, (unsigned)m.blocks, (unsigned)m.crc_fail, m.recent_count, m.favorite_count);
+		if (m.recent_count) dl_text(t, "p25.tg=%u\np25.src=%u\np25.last_ms=%u\n", m.recent[0].tg,
+			(unsigned)m.recent[0].src, (unsigned)m.recent[0].ms);
+		break;
+	}
+#else
+		dl_text(t, "p25.ui=0\n");
+		break;
+#endif
 	default:
 		break;
 	}

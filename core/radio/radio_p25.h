@@ -9,6 +9,9 @@
 #if CONFIG_P25
 #include "codeplug/codeplug.h"
 #include "p25/p25_workspace.h"
+#if CONFIG_P25_UI
+#include "radio/p25_monitor.h"
+#endif
 
 // Owner storage, exposed for compile-only resource accounting. Callers must not access a running owner's state.
 #if CONFIG_P25_TRUNK
@@ -29,6 +32,9 @@ typedef struct {
 #endif
 typedef struct {
 	p25_workspace_t work;
+#if CONFIG_P25_UI
+	p25_monitor_t monitor;
+#endif
 	channel_t channel;
 	uint32_t base_generation, settings_generation;
 	uint16_t number;

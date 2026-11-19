@@ -496,3 +496,8 @@ spec = "docs/spec/usb-audio.md"
 switch = "RX_EXTENDED"
 spec = "docs/spec/radio-features.md"
 source = ["core/radio/radio_sm.c", "hal/board.h"]
+
+[feature.p25_ui]
+switch = "P25_UI"
+spec = "docs/spec/p25-ui.md"
+source = ["core/ui/ui_p25.c", "core/radio/radio_p25.c"]

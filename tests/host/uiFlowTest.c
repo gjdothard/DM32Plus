@@ -32,6 +32,20 @@ typedef struct {
 
 static const flow_t flows[] = {
 	{ "P25 conventional home identifies the mode", "p25-home", "", "screen=home shows=P25 hides=No_tone", 0, false },
+#if CONFIG_P25_UI
+	{ "P25 recent opens directly from home", "p25-trunk-home", "ctx", "screen=p25-recent", 1, false },
+	{ "P25 Quick opens protocol controls", "p25-trunk-home", "quick", "screen=p25-listen", 1, false },
+	{ "P25 Quick returns to recent", "p25-trunk-home ctx", "quick back", "screen=p25-recent", 2, false },
+	{ "P25 recent calls opens", "p25-trunk-home quick", "ok", "screen=p25-recent", 1, false },
+	{ "P25 system details opens", "p25-trunk-home quick", "6", "screen=p25-system", 1, false },
+	{ "P25 system decode details opens", "p25-trunk-home quick 6", "ctx", "screen=p25-system", 1, false },
+	{ "P25 receive hold returns home", "p25-trunk-home ctx", "ok", "screen=home p25hold=1234 p25listen=3 tx=0", 1, false },
+	{ "P25 favorites do not write during browsing", "p25-trunk-home quick", "7", "screen=p25-recent", 1, false },
+	{ "P25 favorite selection is receive only", "p25-trunk-home quick ok", "ctx back 3",
+	  "screen=p25-listen p25favorites=1 p25listen=2 tx=0", 3, true },
+	{ "P25 resume all releases the hold", "p25-trunk-home quick 4 quick", "2",
+	  "screen=p25-listen p25hold=0 p25listen=1 tx=0", 1, false },
+#endif
 	{ "1 next channel", "", "up", "pos=4", 1, false },
 	{ "1 channel 12 by number", "", "1 2 ok", "pos=12 screen=home", 3, false },
 	// The status strip's USB word (#58): IP as a network adapter, with the link arrows once the computer has it up,
@@ -1440,7 +1454,11 @@ int main(void)
 		{ "P25 conventional card keeps its actual mode", "branded-home p25-home", "",
 		  "screen=home mode=p25 shows=P25 hides=FM hides=No_tone", 0, false },
 		{ "P25 trunking card keeps its actual mode", "branded-home p25-trunk-home", "",
-		  "screen=home mode=p25 shows=P25 shows=Palmetto_Monitor hides=FM hides=No_tone", 0, false },
+		  "screen=home mode=p25 "
+#if CONFIG_P25_UI && CONFIG_UI_CARD_MENU
+		  "p25card=1 "
+#endif
+		  "shows=P25 shows=Charleston_NSA hides=FM hides=No_tone", 0, false },
 	};
 	for (size_t i = 0; i < sizeof card_p25 / sizeof card_p25[0]; i++)
 		run_flow(&card_p25[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");

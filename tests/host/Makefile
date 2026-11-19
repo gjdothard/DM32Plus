@@ -493,14 +493,14 @@ i18nTestDefault: i18nTest.c $(I18N) $(LANG_H) $(wildcard $(CORE)/ui/*.h $(CORE)/
 # the long-press rules; uiSim renders screens to PNG (make ui-gallery: docs/ux/screens/, contact sheets in
 # docs/ux/screens/sheets/). Built without the __attribute__ override above so the weak service stubs
 # (ui_svc_stub.c) give way to the simulator's.
-UIAPP   := $(UI) $(CORE)/ui/ui_app.c $(CORE)/ui/ui_menus.c $(CORE)/ui/ui_find.c $(CORE)/ui/ui_aprs.c $(CORE)/ui/ui_gps.c $(CORE)/ui/ui_dual.c $(CORE)/radio/tones.c \
+UIAPP   := $(UI) $(CORE)/ui/ui_app.c $(CORE)/ui/ui_menus.c $(CORE)/ui/ui_find.c $(CORE)/ui/ui_aprs.c $(CORE)/ui/ui_gps.c $(CORE)/ui/ui_dual.c $(CORE)/ui/ui_p25.c $(CORE)/radio/tones.c \
            $(CORE)/codeplug/codeplug_talk.c $(CORE)/codeplug/zone_edit.c $(CORE)/codeplug/zone_shift.c $(CORE)/radio/radio_am.c \
            $(CORE)/radio/radio_bcast.c $(CORE)/dmr/call/dmr_lc.c $(CORE)/dmr/fec/dmrFec.c sim/ui_sim.c sim/ui_png.c
 # The About page's data header, as the firmware build makes it (tools/gen_about.py; the STM32F4 list stands in)
 ABOUT_H := out/gen/rfoundry_about.h
 $(shell python3 $(ROOT)/tools/gen_about.py $(ROOT)/AUTHORS $(ROOT)/platform/stm32f4/THIRD_PARTY $(ABOUT_H) >/dev/null)
 UIFLAGS := -std=gnu99 -Wall -Wextra -Wno-unused-parameter -Wshadow -g $(COVFLAGS) $(SANFLAGS) -I$(CORE) -I$(ROOT)/hal -I. -Iout/gen \
-           '-DGFX_FB_BYTES=(320u*320u*2u)' -DGFX_MAX_ROWS=320 -DCONFIG_FONT_XL=1 -DCONFIG_UI_CARD_MENU=1 -DCONFIG_DMR_TALKGROUP_ENTRIES=1 -DFONT_BOTH -DGFX_INDEXED=1 -DGFX_FIT_TRACE
+           '-DGFX_FB_BYTES=(320u*320u*2u)' -DGFX_MAX_ROWS=320 -DCONFIG_FONT_XL=1 -DCONFIG_UI_CARD_MENU=1 -DCONFIG_DMR_TALKGROUP_ENTRIES=1 -DCONFIG_P25=1 -DCONFIG_P25_UI=1 -DFONT_BOTH -DGFX_INDEXED=1 -DGFX_FIT_TRACE
 UIDEPS  := $(UIAPP) $(ABOUT_H) $(LANG_H) $(wildcard $(CORE)/ui/*.h $(CORE)/ui/fonts/*.inc sim/ui_sim.h)
 TESTS   += uiFlowTest uiFlowTestNoColor uiFlowTestHistory uiSim
 

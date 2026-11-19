@@ -14,6 +14,7 @@
 #include "dmr/dmrDataService.h"
 #endif
 #include "config.h"
+#include "ui_p25.h"
 
 ui_layout_t ui_layout;
 static const font_t *font_largest;	// the large text setting's font (large_font)
@@ -1767,6 +1768,12 @@ static void draw_card_home(const radio_view_t *v, const ui_state_t *s);
 
 void ui_draw_home(const radio_view_t *v, const ui_state_t *s)
 {
+#if CONFIG_P25_UI
+	if (v->ch.mode == RADIO_MODE_P25 && !s->entry) {
+		ui_p25_home(v, s);
+		return;
+	}
+#endif
 #if CONFIG_DUAL_WATCH
 	if (ui_card_layout(s)) {
 		draw_card_home(v, s);
@@ -2267,10 +2274,10 @@ static const char *dual_hint(const radio_view_t *v, const ui_state_t *s)
 
 // Card Home on tall color displays. Keep the palette small enough for indexed displays and use the same
 // renderer for Memory and VFO, so changing the selected pane moves the emphasis without swapping A and B.
-#define CARD_INK	RGB565(5, 9, 14)
-#define CARD_SURFACE	RGB565(16, 30, 41)
-#define CARD_SELECTED	RGB565(18, 54, 65)
-#define CARD_EDGE	RGB565(48, 70, 83)
+#define CARD_INK	UI_CARD_INK
+#define CARD_SURFACE	UI_CARD_SURFACE
+#define CARD_SELECTED	UI_CARD_SELECTED
+#define CARD_EDGE	UI_CARD_EDGE
 #define CARD_YELLOW	RGB565(255, 226, 92)
 
 static void card_status(const ui_state_t *s)
@@ -2338,6 +2345,19 @@ static void card_center_title(const char *title, int padding, char *fit, size_t 
 	int width = gfx_width();
 	gfx_text_fit(font, title, width - 2 * padding, fit, len);
 	gfx_text(font, (width - gfx_text_width(font, fit)) / 2, 29, fit, ui_col.focus);
+}
+
+int ui_draw_card_begin(const ui_state_t *s, const char *title)
+{
+	char fit[48];
+	if (title) {
+		card_header(s, 24);
+		card_center_title(title, 6, fit, sizeof fit);
+		return 55;
+	}
+	gfx_clear(CARD_INK);
+	card_status(s);
+	return 30;
 }
 
 static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool tx, bool denied, bool dual)
@@ -3521,6 +3541,12 @@ static void card_page_footer(const ui_state_t *s, int y, const char *hint)
 		*last = 0;
 	}
 	card_list_footer(s, y, left, back, fit, sizeof fit);
+}
+
+void ui_draw_card_footer(const ui_state_t *s, const char *left, const char *right)
+{
+	char fit[40];
+	card_list_footer(s, gfx_height() - 19, left, right, fit, sizeof fit);
 }
 
 static int card_page_text(const font_t *font, const char *text, int y, int end, bool draw, color_t color)

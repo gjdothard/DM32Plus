@@ -9,6 +9,7 @@
 #include "board.h"
 #include "ui_nav.h"
 #include "ui_svc.h"
+#include "ui_p25.h"
 #include "fmt.h"
 #if CONFIG_CONTACT_POSITION || CONFIG_DMR_ARS
 #include "dmr/call/dmr_lc.h"
@@ -7380,6 +7381,10 @@ static const ui_scr_def_t operating_tg_move_screen = {
 #endif
 
 const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
+#if CONFIG_P25_UI
+	[SCR_P25_LISTEN] = &ui_p25_listen_screen, [SCR_P25_RECENT] = &ui_p25_recent_screen,
+	[SCR_P25_SYSTEM] = &ui_p25_system_screen,
+#endif
 	[SCR_HOME] = &home_screen, [SCR_QUICK] = &quick_screen, [SCR_HUB] = &hub_screen,
 #if CONFIG_UI_CARD_MENU
 	[SCR_MENU_SECTION] = &menu_section_screen,

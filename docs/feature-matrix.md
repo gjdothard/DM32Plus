@@ -144,6 +144,7 @@ is `tools/bringup.py list --radio <id>`.
 | `codec_check` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `audio_probe` | not written | off | not written | not written | not written | off |
 | `rx_extended` | not recorded | off | off | off | off | off |
+| `p25_ui` | not recorded | off | off | off | off | off |
 <!-- end generated -->
 
 What the records don't hold yet: limits and known problems from the bring-up pages.
@@ -268,6 +269,7 @@ clock`; ? = not known yet). The `RTC` row lists firmware support ([radio-feature
 | `CONTACT_EDIT` | ● | ● | ● | ● | ● | ● |
 | `P25` | ● | ○ | ○ | ○ | ○ | ○ |
 | `P25_TRUNK` | ● | ○ | ○ | ○ | ○ | ○ |
+| `P25_UI` | ● | ○ | ○ | ○ | ○ | ○ |
 | `RX_EXTENDED` | ● | ○ | ○ | ○ | ○ | ○ |
 | Voltage reading (board, no switch) | Battery | Battery | Battery | None | Battery | Battery |
 | Clock kept through power-off (board, no switch) | Yes | ? | Yes | ? | ? | ? |

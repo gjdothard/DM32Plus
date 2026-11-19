@@ -4,6 +4,7 @@
 #define P25_TRUNK_STATE_TEST 1
 #include "radioP25StateTest.c"
 #include "codeplug/codeplug_records.h"
+#include "p25/p25_favorites.h"
 
 static void record(uint16_t key, const void *value, size_t len)
 { CHECK(codeplug_kv_set(key, value, (uint16_t)len)); }
@@ -85,6 +86,63 @@ static void drain(void)
 }
 int main(void)
 {
+#if CONFIG_P25_UI
+	trunk_setup(true, false, false);
+	network(); step(100);
+	p25_monitor_t monitor;
+	CHECK(radio_p25_monitor(&monitor) && monitor.channel == sm.view.channel_number);
+	CHECK((monitor.flags & (P25_MON_ACTIVE | P25_MON_TRUNK | P25_MON_RX_ONLY)) ==
+	      (P25_MON_ACTIVE | P25_MON_TRUNK | P25_MON_RX_ONLY));
+	CHECK(!radio_p25_monitor_command(P25_MON_HOLD, 0));
+	CHECK(!radio_p25_monitor_command(P25_MON_FAVORITES, 0));
+	CHECK(radio_p25_monitor_command(P25_MON_HOLD, 2));
+	grant(42, 4, 0); step(20);
+	CHECK(follow_view().state == P25_FOLLOW_CONTROL);
+	CHECK(radio_p25_monitor(&monitor) && monitor.held_tg == 2 && monitor.listen == P25_LISTEN_HOLD);
+	CHECK(monitor.tx_target == 1);
+	p25_tsbk_t selected = { .kind = P25_TSBK_GRANT, .opcode = P25_OP_GRP_V_GRANT,
+		.u.grant = { .has_svc = true, .ch = 4, .tg = 2, .src = 42 } };
+	signaling(&selected); step(20);
+	CHECK(follow_view().state == P25_FOLLOW_VOICE && key_calls == 0);
+	CHECK(radio_p25_monitor(&monitor) && monitor.recent_count == 1 && monitor.recent[0].tg == 2);
+	radio_p25_mem_t *owner = (radio_p25_mem_t *)pool;
+	CHECK(owner->trunk.cfg.talk_group == 1 && owner->work.engine.cfg.tx_lc.tgid == 1);
+	CHECK(radio_p25_monitor_command(P25_MON_ALL, 0));
+	CHECK(radio_p25_end());
+	CHECK(!radio_p25_monitor(&monitor) && monitor.flags == 0 && monitor.recent_count == 0);
+	CHECK(!radio_p25_monitor_command(P25_MON_ALL, 0));
+	// Persistent favorites are scoped to the system identity, not a global list of numbers.
+	CHECK(!p25_favorites_edit(&sm.view.ch, 0, false));
+	CHECK(p25_favorites_edit(&sm.view.ch, 2, false));
+	CHECK(p25_favorites_edit(&sm.view.ch, 2, false));
+	CHECK(p25_favorites_edit(&sm.view.ch, 3, false));
+	CHECK(p25_favorites_edit(&sm.view.ch, 4, false));
+	CHECK(p25_favorites_edit(&sm.view.ch, 5, false));
+	CHECK(!p25_favorites_edit(&sm.view.ch, 6, false));
+	uint16_t favorites[P25_MONITOR_FAVORITES]; uint8_t favorites_count;
+	CHECK(p25_favorites_read(&sm.view.ch, favorites, &favorites_count) && favorites_count == 4 && favorites[0] == 2);
+	CHECK(p25_favorites_edit(&sm.view.ch, 3, true));
+	CHECK(radio_p25_begin(&sm.view.ch, sm.view.channel_number));
+	CHECK(radio_p25_poll(NULL));
+	CHECK(radio_p25_monitor(&monitor) && monitor.favorite_count == 3 && monitor.favorites[0] == 2);
+	CHECK(radio_p25_monitor_command(P25_MON_FAVORITES, 0));
+	CHECK(radio_p25_monitor_command(P25_MON_PROGRAMMED, 0));
+	CHECK(key_calls == 0 && starts == 0);
+	CHECK(radio_p25_end());
+	uint8_t future_favorites[17] = {2};
+	CHECK(codeplug_kv_set(CODEPLUG_KEY_P25_FAVORITES + sm.view.ch.system, future_favorites, sizeof future_favorites));
+	CHECK(p25_favorites_read(&sm.view.ch, favorites, &favorites_count) && favorites_count == 0);
+	CHECK(!p25_favorites_edit(&sm.view.ch, 2, false));
+	CHECK(codeplug_kv_remove(CODEPLUG_KEY_P25_FAVORITES + sm.view.ch.system));
+	CHECK(p25_favorites_edit(&sm.view.ch, 2, false));
+	// Changing the declared identity invalidates old favorites even if the system slot is reused.
+	uint8_t renamed[CODEPLUG_SYS_HDR + P25_CP_TSYS_LEN];
+	int renamed_len = codeplug_kv_get(CODEPLUG_KEY_SYSTEM + sm.view.ch.system, renamed, sizeof renamed);
+	CHECK(renamed_len == sizeof renamed);
+	renamed[12] = 'X';
+	CHECK(codeplug_kv_set(CODEPLUG_KEY_SYSTEM + sm.view.ch.system, renamed, sizeof renamed));
+	CHECK(p25_favorites_read(&sm.view.ch, favorites, &favorites_count) && favorites_count == 0);
+#endif
 	trunk_setup(true, false, false);
 	network();
 	CHECK(follow_view().state == P25_FOLLOW_CONTROL);

@@ -37,8 +37,16 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "boot", "splash" },
 	{ "stub_entry", "splash:loader" },	// while the flashing tools have the radio (web flasher)
 	{ "home_dmr", "" },
-	{ "home_p25", "p25-home" },
-	{ "home_p25_trunk", "p25-trunk-home" },
+	{ "home_p25", "branded-home p25-home" },
+	{ "home_p25_trunk", "branded-home p25-trunk-home" },
+#if CONFIG_P25_UI
+	{ "p25_listen", "branded-home p25-trunk-home quick" },
+	{ "p25_recent", "branded-home p25-trunk-home ctx" },
+	{ "p25_hold", "branded-home p25-trunk-home quick 4" },
+	{ "p25_favorites", "branded-home p25-trunk-home quick ok ctx back 7" },
+	{ "p25_system", "branded-home p25-trunk-home quick 6" },
+	{ "p25_decode", "branded-home p25-trunk-home quick 6 ctx" },
+#endif
 	{ "home_dmr_lastheard", "call:3101234,91,g wait:11000" },
 	{ "home_reply", "call:3101234,91,g" },
 	{ "home_fm", "down" },

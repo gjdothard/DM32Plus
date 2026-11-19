@@ -7,6 +7,9 @@
 
 `CONFIG_P25` selects the Phase 1 engines and derives `CONFIG_AIR`, `CONFIG_IMBE`
 and `CONFIG_MBE`. `CONFIG_P25_TRUNK` follows it unless explicitly disabled.
+`CONFIG_P25_UI` also follows P25. Disable it to omit the monitoring Home,
+recent talkgroups, persistent favorites and system pages while keeping the
+protocol engines. See [P25 monitoring](spec/p25-ui.md).
 P25 requires `CONFIG_DMR` for shared codeplug contacts; trunking requires P25.
 Set the protocol switches rather than overriding the derived implementation
 switches. Make and `core/config.h` reject inconsistent dependencies.

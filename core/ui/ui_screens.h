@@ -247,6 +247,17 @@ void ui_draw_home_dual(const radio_view_t *v, const ui_state_t *s);
 #endif
 void ui_draw_quick(const radio_view_t *v, const ui_state_t *s);
 bool ui_card_layout(const ui_state_t *s);
+// Shared card surfaces for protocol pages and the existing Home/menu renderers.
+#define UI_CARD_INK RGB565(5, 9, 14)
+#define UI_CARD_SURFACE RGB565(16, 30, 41)
+#define UI_CARD_SELECTED RGB565(18, 54, 65)
+#define UI_CARD_EDGE RGB565(48, 70, 83)
+#if CONFIG_DUAL_WATCH
+int ui_draw_card_begin(const ui_state_t *s, const char *title);
+#endif
+#if CONFIG_UI_CARD_MENU
+void ui_draw_card_footer(const ui_state_t *s, const char *left, const char *right);
+#endif
 void ui_local_time(char out[6], uint32_t utc_minute);
 #if CONFIG_UI_CARD_MENU
 #if CONFIG_GPS_SKY

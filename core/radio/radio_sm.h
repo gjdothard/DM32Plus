@@ -104,6 +104,9 @@
 
 typedef enum {
 	RREQ_CH_STEP,		// arg: direction
+#if CONFIG_P25_UI
+	RREQ_P25_MONITOR,	// receive selection: arg channel << 16 | tg, arg2 operation
+#endif
 	RREQ_ZONE_POS,		// arg: position in the zone
 	RREQ_ZONE,		// arg: zone index
 	RREQ_VFO,		// arg: 1 on, 0 off

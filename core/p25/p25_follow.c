@@ -231,6 +231,10 @@ static bool group_wanted(const p25_follow_t *f, uint16_t tg, uint32_t now)
 
 	if (!tg)
 		return false;
+	if (f->hooks->listen) {
+		int8_t wanted = f->hooks->listen(tg, f->ctx);
+		if (wanted >= 0) return wanted != 0;
+	}
 	if (f->hold_tg && c->hold_ms && !elapsed(now, f->t_hold, c->hold_ms))
 		return tg == f->hold_tg;
 	if ((c->flags & P25_FOLLOW_ALL_GROUPS) || tg == c->talk_group)
@@ -257,6 +261,7 @@ static bool consider(p25_follow_t *f, uint8_t op, bool unit, uint16_t ch, uint16
 	uint32_t hz;
 
 	if (unit) {
+		if (f->hooks->listen && f->hooks->listen(0, f->ctx) == 0) return false;
 		if ((c->flags & P25_FOLLOW_NO_UNIT) || !c->unit_id || (dst != c->unit_id && src != c->unit_id))
 			return false;
 	} else if (!group_wanted(f, tg, now)) {

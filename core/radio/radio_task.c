@@ -475,6 +475,15 @@ bool radio_get_dual(radio_dual_ref_t ref[2], uint8_t *sel, uint8_t *at)
 void radio_req_beep(uint8_t b) { post(RREQ_BEEP, b, 0); }
 void radio_req_vibrate(uint8_t pattern) { post(RREQ_VIBRATE, pattern, 0); }
 void radio_req_roam(uint8_t cmd) { post(RREQ_ROAM, cmd, 0); }
+#if CONFIG_P25_UI
+bool radio_req_p25_monitor(uint16_t channel, uint8_t op, uint16_t tg)
+{
+	radio_req_t req = { .type = RREQ_P25_MONITOR, .arg = (int32_t)((uint32_t)channel << 16 | tg), .arg2 = op };
+	if (requests != NULL && xQueueSend(requests, &req, 0) == pdTRUE) return true;
+	req_dropped++;
+	return false;
+}
+#endif
 // A lost release would leave the burst keyed until the time-out
 void radio_req_tone_burst(bool on) { post(RREQ_TONE_BURST, on, pdMS_TO_TICKS(50)); }
 

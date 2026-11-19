@@ -25,7 +25,7 @@ bool ambeVoiceStreaming(void) { return ambe_running; }
 static unsigned sequence, close_at, off_at, stop_at, return_at;
 static bool opened, on, keyed, audio_fail, open_fail, go_fail, return_fail, loaned, edit_on_open;
 static uint32_t fit, now_us, token;
-#if CONFIG_P25_TRUNK && !defined(P25_STATE_TEST)
+#if (CONFIG_P25_TRUNK || CONFIG_P25_UI) && !defined(P25_STATE_TEST)
 uint32_t hal_millis(void) { return now_us / 1000u; }
 #endif
 static unsigned queued, starts, lends;

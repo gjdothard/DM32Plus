@@ -55,6 +55,7 @@ hint; a session must not rely on it after an entire low-byte wrap.
 | 0x1800..0x18FF | Target lists |
 | 0x1900..0x1CFF | Traffic keys |
 | 0x1D00..0x1DFF | Reserved zone records |
+| 0x1E00..0x1EFF | Per-system P25 receive favorites ([format](p25-ui.md#persistent-favorites)) |
 
 Defining a key family does not activate its protocol or encryption support.
 The sector is finite; a batch that cannot fit is refused without writing.

@@ -71,8 +71,9 @@ the follower, stopping PCM callbacks and returning the loan.
 The debug core view exposes `p25.trunk.state` (0 off, 1 hunt, 2 control, 3 voice),
 `p25.trunk.reg` and `p25.trunk.req`, using the follower's enums. These values are
 published by the radio task; debug readers never access loaned state directly.
-The home screen identifies P25. Detailed trunking UI and mode-aware CPS editing
-remain pending. Legacy codeplug writers continue refusing tagged codeplugs.
+The [P25 monitoring UI](p25-ui.md) shows talkgroups, source IDs and system
+details, with receive-only listening filters and persistent favorites.
+Legacy codeplug writers continue refusing tagged codeplugs.
 
 `radioP25TrunkStateTest` connects real stored records, state-machine dispatch,
 follower, framing and voice with simulated hardware. It checks passive follow

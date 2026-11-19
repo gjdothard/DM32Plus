@@ -22,6 +22,9 @@ const char build_features[] =
 #if CONFIG_P25_TRUNK
 	"P25_TRUNK,"
 #endif
+#if CONFIG_P25_UI
+	"P25_UI,"
+#endif
 #if CONFIG_RX_EXTENDED
 	"RX_EXTENDED,"
 #endif

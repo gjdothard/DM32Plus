@@ -347,7 +347,7 @@ static void h_tune(uint32_t hz, uint8_t what, uint32_t id, void *ctx)
 	tune_pending = true;
 }
 static void h_fallback(void *ctx) { (void)ctx; nfallback++; }
-static const p25_follow_hooks_t fhooks = { h_tune, h_fallback, NULL };
+static const p25_follow_hooks_t fhooks = { .tune = h_tune, .fallback = h_fallback };
 
 static void mk_net(uint8_t b[P25_TSBK_BYTES], uint32_t wacn, uint16_t sysid)
 {
@@ -701,7 +701,7 @@ static bool h_send(uint32_t hz, const uint8_t blk[P25_TSBK_BYTES], void *ctx)
 	}
 	return true;
 }
-static const p25_follow_hooks_t ahooks = { h_tune, NULL, h_send };
+static const p25_follow_hooks_t ahooks = { .tune = h_tune, .send = h_send };
 
 static p25_isp_t last_isp(void)
 {

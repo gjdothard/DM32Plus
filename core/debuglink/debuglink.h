@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // The USB debug link (docs/spec/debuglink.md): framed commands on the host port, beside the MMDVM hotspot and the CPS
 // protocol (core/hostlink), for bench automation: version, diagnostics and counters, the radio view as key=value
@@ -46,6 +47,7 @@ enum {
 	DL_VIEW_AIR,		// the data TX queue, its guard and zone sharing (debuglink_view_air.c)
 	DL_VIEW_NET_SVC,	// mDNS and TFTP (were in DL_VIEW_NET until view version 4)
 	DL_VIEW_NET_LINK,	// the MTUs and the PPP link (PPP was in DL_VIEW_HOTSPOT until view version 4)
+	DL_VIEW_P25,		// published receive monitor, identity and recent talkgroup
 	DL_VIEW_COUNT
 };
 #define DL_VIEW_VERSION		4	// bumped when a key changes meaning or goes away (new keys don't bump it)
