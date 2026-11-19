@@ -2,6 +2,22 @@
 <!-- Copyright (c) 2026 Garrett Dothard -->
 # Baofeng DM-32UV hardware
 
+## Receive diagnostics
+
+With Diagnostics enabled, the radio task reads FD6818 frequency, band,
+state and power registers at most every 250 ms while awake and receiving.
+The host/UI only reads cached values. `rf t` is snapshot uptime in ms
+(zero: invalid), `f` is frequency-register readback in 10 Hz units, and
+`exp` is the programmed frequency in the same units. `b` contains 0x1A/0x40;
+`s` is 0x30 and `p` is 0x37. A concurrent RF write invalidates the timestamp.
+Register agreement is not a PLL-lock indication.
+
+With the air provider built, `air h` counts copied input halves, `c` counts
+soft-modem chunks, `ov` counts ring overruns, `us` counts processed sample
+duration and `miss` counts interrupts without a valid input half. Stalled
+counters isolate sample-path problems from lack of P25 framing. No audio
+samples are returned. See [the debug link](debuglink.md) for P25 counters.
+
 ## Experimental extended receive
 
 The full build enables `CONFIG_RX_EXTENDED`, `CONFIG_P25` and

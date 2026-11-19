@@ -16,6 +16,12 @@ const char build_preset[] = RFOUNDRY_PRESET;
 const char build_off[] = RFOUNDRY_FEATURES_OFF;
 
 const char build_features[] =
+#if CONFIG_P25
+	"P25,"
+#endif
+#if CONFIG_P25_TRUNK
+	"P25_TRUNK,"
+#endif
 #if CONFIG_RX_EXTENDED
 	"RX_EXTENDED,"
 #endif

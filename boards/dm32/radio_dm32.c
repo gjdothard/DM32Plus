@@ -49,6 +49,10 @@ static volatile bool dmr_keyed;		// DMR transmission on: the PA timer may key th
 static volatile bool tx_uhf;
 static volatile uint16_t tx_drive;	// DAC B value for the transmission
 static uint16_t last_rssi_raw, last_noise_raw;
+#if CONFIG_DIAG
+static fd6818_readback_t readback;
+static uint32_t readback_ms;
+#endif
 static bool pcm_on;		// a beep or DMR voice plays through the codec
 static bool rx_audio;		// the squelch is open (the radio's audio hook)
 static bool rx_am_on;		// the FD6818 plays its AM demodulator (rx_am, the air band)
@@ -429,7 +433,31 @@ static void status(radio_status_t *st)
 	st->noise = fd6818_noise(r65);	// the chip's floor lifted above the core's squelch levels (fd6818.h)
 	st->carrier = false;
 	st->tone_ok = mode != RADIO_MODE_FM || fd6818_rx_tone_ok(&fd, fd_tone(rx_tone.type));
+#if CONFIG_DIAG
+	uint32_t now = hal_millis();
+	if (!transmitting && !asleep && (readback_ms == 0 || now - readback_ms >= 250u)) {
+		uint32_t writes = fd_bus.bus.writes;
+		fd6818_readback(&fd, &readback);
+		readback_ms = writes == fd_bus.bus.writes ? now : 0;
+	}
+#endif
 }
+
+#if CONFIG_DIAG
+uint32_t dm32_radio_readback(uint8_t field)
+{
+	switch (field) {
+	case 0: return readback_ms;
+	case 1: return readback.expected_10hz;
+	case 2: return readback.actual_10hz;
+	case 3: return readback.band_a;
+	case 4: return readback.band_b;
+	case 5: return readback.state;
+	case 6: return readback.power;
+	default: return 0;
+	}
+}
+#endif
 
 // The speaker hears one of two sources (PTB15, checked on the radio): 1 = the FD6818's audio output directly (FM
 // receive), 0 = the HR_C7000's codec output (beeps, DMR voice). PTB15 = 1 also takes the FD6818's audio off the

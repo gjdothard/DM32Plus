@@ -43,6 +43,15 @@ bool radio_p25_begin(const channel_t *channel, uint16_t number);
 // Close air, stop audio, then return the codec loan. False retains a failed return for a later retry.
 bool radio_p25_end(void);
 bool radio_p25_running(void);
+#if CONFIG_DIAG
+typedef struct {
+	uint32_t chunks, symbols, tuned_hz, blocks, crc_fail;
+	uint16_t syncs, locks, rejects, frames;
+	bool active, tuned;
+} radio_p25_diag_t;
+// Radio-task-published snapshot; no owner workspace is dereferenced by the caller.
+bool radio_p25_diag(radio_p25_diag_t *out);
+#endif
 bool radio_p25_params(const channel_t *channel, uint16_t number, p25_engine_cfg_t *cfg);
 // Tick on the owner task. A changed stored configuration closes the session; false means it is no longer running.
 bool radio_p25_poll(p25_engine_view_t *view);

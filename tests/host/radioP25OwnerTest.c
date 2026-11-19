@@ -184,12 +184,21 @@ static void test_receive(void)
 	CHECK(p25_call_tx_done(&tx));
 	p25_engine_view_t view;
 	CHECK(radio_p25_poll(&view) && view.rx_calls == 1 && view.rx.lc.src == 42 && view.rx.lc.tgid == 1);
+#if CONFIG_DIAG
+	radio_p25_diag_t d;
+	CHECK(radio_p25_diag(&d) && d.active && d.chunks > 0 && d.symbols > 0);
+	CHECK(d.syncs > 0 && d.frames > 0 && d.tuned_hz == channel.rx_hz && d.tuned);
+#endif
 	p25_voice_stats_t stats;
 	p25VoiceGetStats(&stats);
 	CHECK(stats.rx_in == 18 && stats.rx_frames > 0 && audio_cb != NULL);
 	CHECK(radio_p25_end());
 	CHECK(close_at < off_at && off_at < stop_at && stop_at < return_at && !loaned);
 	CHECK(!radio_p25_running() && !radio_p25_tx_prepare() && radio_p25_end());
+#if CONFIG_DIAG
+	CHECK(radio_p25_diag(&d) && !d.active && d.chunks == 0 && d.frames == 0);
+	CHECK(!radio_p25_diag(NULL));
+#endif
 }
 
 static void test_transmit(void)

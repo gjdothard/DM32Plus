@@ -3,6 +3,15 @@
 
 # USB debug link
 
+With `CONFIG_P25` and `CONFIG_DIAG`, the core view adds `p25.tuned_hz`
+and `p25.tuned` (requested frequency and tune admission), `p25.chunks`,
+`p25.symbols`, `p25.syncs`, `p25.locks`, `p25.rejects`, `p25.frames`,
+`p25.blocks` and `p25.crc_fail`. The radio task publishes a snapshot without
+exposing its loaned workspace to the host. Counters describe the software
+path; frames are framer deliveries, not proof of valid control data. Trunk
+blocks count accepted blocks; control state 2 also requires system identity
+acceptance. Counters can wrap or reset with a new session.
+
 The core view reports `mode=p25` for selected conventional or trunked P25 and
 `mode=unsupported` for parked tagged channels. With `CONFIG_P25`, it also
 reports `p25.active` (the owner acquired its providers and workspace) and

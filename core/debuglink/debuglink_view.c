@@ -18,6 +18,9 @@
 #include "codeplug/zone_edit.h"
 #include "settings/settings.h"
 #include "radio/ref_trim.h"
+#if CONFIG_P25 && CONFIG_DIAG
+#include "radio/radio_p25.h"
+#endif
 #include "storage/storage.h"
 #if CONFIG_APRS
 #include "aprs/aprs.h"
@@ -83,6 +86,15 @@ static void core_section(const radio_view_t *v, dl_text_t *t)
 	dl_text(t, "mode=%s\n", v->ch.mode == RADIO_MODE_P25 ? "p25" : v->ch.mode == RADIO_MODE_NONE ? "unsupported" : v->ch.mode == RADIO_MODE_DMR ? "dmr" : "fm");
 #if CONFIG_P25
 	dl_text(t, "p25.active=%u\np25.rx=%u\n", v->p25_active, v->p25_rx);
+#if CONFIG_DIAG
+	radio_p25_diag_t pd;
+	if (radio_p25_diag(&pd)) {
+		dl_text(t, "p25.tuned_hz=%u\np25.tuned=%u\np25.chunks=%u\np25.symbols=%u\n",
+			(unsigned)pd.tuned_hz, pd.tuned, (unsigned)pd.chunks, (unsigned)pd.symbols);
+		dl_text(t, "p25.syncs=%u\np25.locks=%u\np25.rejects=%u\np25.frames=%u\np25.blocks=%u\np25.crc_fail=%u\n",
+			pd.syncs, pd.locks, pd.rejects, pd.frames, (unsigned)pd.blocks, (unsigned)pd.crc_fail);
+	}
+#endif
 #if CONFIG_P25_TRUNK
 	dl_text(t, "p25.trunk.state=%u\np25.trunk.reg=%u\np25.trunk.req=%u\n", v->p25_trunk_state, v->p25_registration, v->p25_request);
 #endif
@@ -120,7 +132,7 @@ static void channel_section(const radio_view_t *v, dl_text_t *t)
 
 	dl_text_kv_str(t, "ch.name", c->name);
 	dl_text(t, "ch.rx_hz=%u\nch.tx_hz=%u\n", (unsigned)c->rx_hz, (unsigned)c->tx_hz);
-	dl_text(t, "ch.mode=%s\n", c->mode == RADIO_MODE_DMR ? "dmr" : "fm");
+	dl_text(t, "ch.mode=%s\n", c->mode == RADIO_MODE_P25 ? "p25" : c->mode == RADIO_MODE_NONE ? "unsupported" : c->mode == RADIO_MODE_DMR ? "dmr" : "fm");
 	dl_text(t, "ch.bw=%s\n", c->bw == RADIO_BW_25K ? "25k" : "12k5");
 	tone(t, "ch.rx_tone", &c->rx_tone);
 	tone(t, "ch.tx_tone", &c->tx_tone);

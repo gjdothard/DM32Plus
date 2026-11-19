@@ -595,6 +595,20 @@ HRC_FLASHFUNC void hrc_air_stats(hrc7000_air_stats_t *st)
 		memset(st, 0, sizeof(*st));
 	}
 }
+#if CONFIG_DIAG
+HRC_FLASHFUNC uint32_t hrc_air_rx_count(uint8_t field)
+{
+	if (!air_on) return 0;
+	switch (field) {
+	case 0: return AIR->st.halves;
+	case 1: return AIR->st.chunks;
+	case 2: return AIR->st.overruns;
+	case 3: return AIR->st.no_half;
+	case 4: return AIR->st.modem_span_us;
+	default: return 0;
+	}
+}
+#endif
 #endif
 
 // --- Bring-up counters (the board's diagnostics page shows these lines first) ---

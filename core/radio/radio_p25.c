@@ -21,6 +21,49 @@
 
 static p25_workspace_lease_t lease;
 static radio_p25_mem_t *mem;
+#if CONFIG_DIAG
+static radio_p25_diag_t diagnostic;
+static volatile uint8_t diagnostic_seq;
+
+static void diagnostic_publish(void)
+{
+	diagnostic_seq++;
+	__atomic_signal_fence(__ATOMIC_SEQ_CST);
+	memset(&diagnostic, 0, sizeof diagnostic);
+	if (mem != NULL) {
+		const air_session_t *s = &mem->work.engine.session;
+		diagnostic.active = true;
+		diagnostic.chunks = s->stats.rx_chunks; diagnostic.symbols = s->stats.rx_syms;
+		diagnostic.syncs = s->fr.stats.syncs; diagnostic.locks = s->fr.stats.locks;
+		diagnostic.rejects = s->fr.stats.rejects; diagnostic.frames = s->fr.stats.frames;
+		diagnostic.tuned_hz = mem->channel.rx_hz; diagnostic.tuned = true;
+#if CONFIG_P25_TRUNK
+		if (mem->channel.kind == CODEPLUG_KIND_P25_TRUNK) {
+			diagnostic.tuned_hz = mem->trunk.hz; diagnostic.tuned = mem->trunk.tuned;
+			diagnostic.blocks = mem->work.follower.view.blocks;
+			diagnostic.crc_fail = mem->work.follower.view.crc_fail;
+		}
+#endif
+	}
+	__atomic_signal_fence(__ATOMIC_SEQ_CST);
+	diagnostic_seq++;
+}
+
+bool radio_p25_diag(radio_p25_diag_t *out)
+{
+	if (out == NULL) return false;
+	for (unsigned i = 0; i < 3; i++) {
+		uint8_t seq = diagnostic_seq;
+		if (seq & 1u) continue;
+		__atomic_signal_fence(__ATOMIC_SEQ_CST);
+		*out = diagnostic;
+		__atomic_signal_fence(__ATOMIC_SEQ_CST);
+		if (seq == diagnostic_seq) return true;
+	}
+	memset(out, 0, sizeof *out);
+	return false;
+}
+#endif
 _Static_assert(_Alignof(radio_p25_mem_t) <= _Alignof(p25_workspace_t), "owner loan alignment");
 
 static bool current(void)
@@ -289,6 +332,9 @@ bool radio_p25_end(void)
 		p25VoiceEnd();
 		mem = NULL;
 	}
+#if CONFIG_DIAG
+	diagnostic_publish();
+#endif
 	return lease.vocoder == NULL || p25_workspace_release(&lease);
 }
 
@@ -362,6 +408,9 @@ bool radio_p25_poll(p25_engine_view_t *view)
 	if (view != NULL) p25_engine_view(&mem->work.engine, view);
 #if CONFIG_P25_TRUNK
 	if (view != NULL && radio_p25_trunked() && !trunk_playing()) view->rx_active = view->rx_played = false;
+#endif
+#if CONFIG_DIAG
+	diagnostic_publish();
 #endif
 	storage_unlock();
 	return true;

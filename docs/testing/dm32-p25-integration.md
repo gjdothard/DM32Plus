@@ -793,3 +793,48 @@ with unchanged static RAM (211264 bytes, 192 remaining).
 Next: finish UI configurations, gallery, target and task-stack checks;
 publish and refresh the separate Testing CPS. Hardware reception remains
 unverified. No radio or SDR was accessed.
+
+## Local receiver diagnostic build (2026-11-18)
+
+Owner authorized read-only diagnostics and then direct local installation
+of an experimental image, bypassing GitHub releases and website deployment.
+rc.4 samples confirm P25 active, RX-only, continuously searching, median
+-131 dBm both with and without the antenna (12 samples each). No control
+channel was acquired. The 440 MHz baseline was about -106 dBm. Evidence is
+retained locally in `build/radio-diag`; no audio or private dumps were taken.
+
+Add read-only frequency/band/state/power register snapshots under DIAG,
+sampled on the radio task at 250 ms intervals. Add provider input-half and
+chunk counters, and radio-task-published P25 symbol/sync/frame/block counts.
+Correct the remaining FM diagnostic labels and missing VERSION capability
+tokens. No tuning table or transmit permission changes are included.
+Driver tests verify readback causes no RF writes and exposes disagreement;
+owner tests verify counters after receive and zeroed snapshots after close.
+Next: local build, stack/configuration checks, application-only upload,
+then owner-authorized receive diagnostics. Do not publish this image.
+
+Local validation passes: all 40 P25 programs, 13 configuration tests,
+FD6818 readback tests and both owner variants (446 assertions each).
+Changed production units pass target syntax checks with DIAG, P25 and
+P25_TRUNK individually off. Full target: 693960 bytes flash, 211328 bytes
+static RAM (128 remaining). All ten task stacks fit; minimum UI margin
+remains 40 bytes. Documentation and generic-code checks pass.
+
+Installed locally on COM3 using the existing RAM updater, application only:
+170 sectors written and verified by CRC, then reset successfully. Local
+version `7e866b73-rxdiag1-dirty`; SHA-256
+`ffbd80068d793c9f091fc31b97a7ce586cacb464b4f8094ef7e6caa401b639a8`.
+The write ends at 0xB56C8, below the 0xE8000 codec slot. Codec 048 remains
+recognized; Palmetto Monitor and RX-only persist. No GitHub release, branch
+push, site deployment or transmit command was performed.
+
+Live new diagnostics: frequency readback equals programmed 77365625
+(10 Hz units), bands 1F80/3AF0, receive state BFF1, power 1F1F. With the
+owner-confirmed large antenna connected, the median is -130 dBm. Across
+about 9.2 seconds, symbols increase by 43929, while syncs, frames and trunk
+blocks remain zero and state remains hunt. Input halves and processed
+duration advance without overruns or missing halves. All core keys,
+including the last keys, remain readable. No PLL lock or useful RF signal
+is established by register agreement or sample delivery. Evidence and
+upload log remain in `build/radio-diag`. Next: isolate RF/PLL/front-end or
+waveform/decoder mismatch with a known signal or validated hardware data.

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Internal interfaces between the DM-32UV board files
 #ifndef DM32_H
 #define DM32_H
@@ -53,6 +54,9 @@ typedef struct {
 	uint32_t fd_writes;
 } dm32_radio_diag_t;
 void dm32_radio_diag(dm32_radio_diag_t *d);
+#if CONFIG_DIAG
+uint32_t dm32_radio_readback(uint8_t field);
+#endif
 bool dm32_diag_line(uint8_t i, char *buf, uint8_t len);
 void dm32_diag_reset(void);
 

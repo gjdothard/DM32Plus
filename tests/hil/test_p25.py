@@ -7,6 +7,18 @@ from rfoundry_hil import skip
 
 
 @pytest.mark.feature("p25")
+def test_p25_receive_diagnostic_visibility(radio):
+    if "DIAG" not in radio.link.version().get("features", "").split(","):
+        skip("not_built", "receive diagnostics are disabled")
+    view = radio.link.view(["core"])
+    if view.get("mode") != "p25":
+        skip("state", "select a stored P25 channel before this read-only check")
+    for key in ("p25.tuned_hz", "p25.chunks", "p25.symbols", "p25.syncs", "p25.locks",
+                "p25.rejects", "p25.frames", "p25.blocks", "p25.crc_fail", "ch_read_errors", "serial"):
+        assert key in view and int(view[key]) >= 0, (key, view)
+
+
+@pytest.mark.feature("p25")
 def test_p25_selected_owner(radio):
     view = radio.link.view(["core"])
     if "p25.active" not in view:

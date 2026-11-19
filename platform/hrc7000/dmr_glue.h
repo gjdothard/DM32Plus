@@ -49,6 +49,9 @@ extern const hal_dmr_modem_t hrc_dmr;
 extern const hal_air_t hrc_air;
 extern const hal_baseband_t hrc_baseband;
 void hrc_air_stats(hrc7000_air_stats_t *st);
+#if CONFIG_DIAG
+uint32_t hrc_air_rx_count(uint8_t field);
+#endif
 #endif
 
 // Bring-up counters: lines of at most about 20 characters, and the reset
