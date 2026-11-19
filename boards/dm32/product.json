@@ -11,5 +11,5 @@
   "build_required": ["HOSTLINK", "DEBUGLINK", "CPS_OPENFW", "CPS_FAST", "STUB_ENTRY"],
   "brand": "DM32",
   "accent": "+",
-  "version": "1.0.0"
+  "version": "1.1.0"
 }

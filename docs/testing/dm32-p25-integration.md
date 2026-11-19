@@ -693,3 +693,10 @@ Documentation: 177 files, zero broken links; generic-code check passes.
 Core firmware, configuration, HAL and platform sources still match the
 verified Development build. No radio or SDR was accessed. This merge is
 local; remote Testing and release workflows are not changed by this action.
+
+## Testing release build follow-up (2026-11-18)
+
+Published Testing merge `5d06ab28`. Its GitHub firmware workflow stopped at
+version selection before compilation because `v1.0.0` is already published.
+Advanced the feature integration base to `1.1.0`, preserving the guard against
+reusing a released final version. Testing now selects `v1.1.0-rc.N`.
