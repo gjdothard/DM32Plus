@@ -273,10 +273,18 @@ CONFIG_APRS_IGATE ?= $(if $(and $(filter y,$(CONFIG_APRS_RX)),$(filter y,$(CONFI
 # core/ui/ui_gps.c, docs/spec/aprs.md 7.1). Needs GPS and APRS; off, Tools > Position is a page of text
 CONFIG_GPS_SKY ?= $(if $(and $(filter y,$(CONFIG_GPS)),$(filter y,$(CONFIG_APRS))),y,n)
 
+# Integration-stage P25 engines. Off until the board/radio/codeplug glue is ready
+CONFIG_P25 ?= n
+CONFIG_P25_TRUNK ?= $(CONFIG_P25)
+# Shared implementation details: set the protocol switches, not these
+$(foreach f,AIR IMBE MBE,$(if $(filter undefined,$(origin CONFIG_$(f))),,$(error CONFIG_$(f) is derived; set CONFIG_P25 instead)))
+CONFIG_AIR := $(CONFIG_P25)
+CONFIG_IMBE := $(CONFIG_P25)
+CONFIG_MBE := $(CONFIG_IMBE)
 
 FEATURES := FM SUBTONE DMR DMR_PRIVACY DMR_AES256 DMR_TALKER_ALIAS DMR_GPS DMR_SMS MESSAGE_JOURNAL DMR_TMS DMR_ARS DMR_LRRP DMR_TALKGROUP_ENTRIES TALKGROUP_EDIT CONTACT_POSITION DMR_SIGNALING DMR_EMERGENCY DMR_ROAMING DMR_IP_GATEWAY ZONE_SHARE DMR_UDP_COMPRESS DMR_CONFIRMED NET_TCP NET_KISS NET_HTTP NET_HTTP_GZIP NET_WEBCTL NET_RIGCTL NET_APRSIS NET_USRP MDNS TFTP TFTP_IDDB IDDB_COMPACT DMR_CONTROL_STATION SNMP SFR SFR_DUALPATH_RX SFR_CWID TASK_STACKS \
 	USB HOSTLINK USB_NETWORK NET_PPP HOTSPOT HOTSPOT_SPLIT DEBUGLINK CPS_OPENFW CPS_FAST VFO VFO_FM VFO_DMR DIAG FONT_XL FONT_AA FONT_BIG LANG_ES LANG_IT LANG_DEFAULT_ES LANG_DEFAULT_IT UI_COLOR UI_SETTINGS SCAN DUAL_WATCH UI_CARD_MENU BEEP FM_TX_TONES DTMF \
-	VOX REF_TRIM BATTERY_SAVE VIBRATE GPS RTC AUDIO_PROBE STUB_ENTRY NAND_STORAGE CRASH_LOG CRASH_SCREEN CRASH_REPORT WATCHDOG FAULT_TRACE AM_RX BCAST_FM APRS APRS_RX APRS_IGATE GPS_SKY KEY_ASSIGN CHANNEL_LIST CHANNEL_EDIT ZONE_EDIT CONTACT_EDIT
+	VOX REF_TRIM BATTERY_SAVE VIBRATE GPS RTC AUDIO_PROBE STUB_ENTRY NAND_STORAGE CRASH_LOG CRASH_SCREEN CRASH_REPORT WATCHDOG FAULT_TRACE AM_RX BCAST_FM APRS APRS_RX APRS_IGATE GPS_SKY KEY_ASSIGN CHANNEL_LIST CHANNEL_EDIT ZONE_EDIT CONTACT_EDIT P25 P25_TRUNK
 
 # Dependencies
 ifeq ($(CONFIG_DMR_AES256),y)
@@ -285,6 +293,8 @@ $(error CONFIG_DMR_AES256=y needs CONFIG_DMR_PRIVACY=y)
 endif
 endif
 feature_on = $(filter y,$(CONFIG_$(1)))
+$(if $(and $(call feature_on,P25),$(if $(call feature_on,DMR),,x)),$(error CONFIG_P25=y needs CONFIG_DMR=y (codeplug contacts)))
+$(if $(and $(call feature_on,P25_TRUNK),$(if $(call feature_on,P25),,x)),$(error CONFIG_P25_TRUNK=y needs CONFIG_P25=y))
 ifneq ($(call feature_on,SUBTONE),)
   ifeq ($(call feature_on,FM),)
     $(error CONFIG_SUBTONE=y needs CONFIG_FM=y)
@@ -470,7 +480,7 @@ endif
 # Derived: the shared packet data / CSBK code is built when any data feature is on (the emergency alarm is a CSBK)
 CONFIG_DMR_DATA_CORE := $(if $(strip $(foreach f,DMR_SMS DMR_ARS DMR_LRRP DMR_SIGNALING DMR_EMERGENCY DMR_IP_GATEWAY ZONE_SHARE CRASH_REPORT,$(call feature_on,$(f)))),y,n)
 
-FEATURE_DEFS := $(foreach f,$(FEATURES) DMR_DATA_CORE,-DCONFIG_$(f)=$(if $(call feature_on,$(f)),1,0))
+FEATURE_DEFS := $(foreach f,$(FEATURES) DMR_DATA_CORE AIR IMBE MBE,-DCONFIG_$(f)=$(if $(call feature_on,$(f)),1,0))
 
 ## Numeric build values (board config.mk sets the defaults; the command line overrides)
 # Display safe area in pixels: edges hidden by the bezel or lens. CONFIG_DISPLAY_INSET sets all four

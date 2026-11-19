@@ -4,10 +4,10 @@
 	<div class="wrap hero-grid">
 		<div class="hero-text">
 			<p class="eyebrow">{{t home.product}}</p>
-			<h1>DM32<span class="home-plus">+</span></h1>
+			<h1>{{product_brand}}<span class="home-plus">{{product_accent}}</span></h1>
 			<p class="lead">{{t home.lead}}</p>
 			<div class="actions">
-				<a class="btn btn-primary" href="{{home}}flash/index.html#radio=dm32">{{t flash.dm32plus.install}}</a>
+				<a class="btn btn-primary" href="{{home}}flash/index.html#radio={{flagship_id}}">{{t flash.product.install}}</a>
 				<a class="btn" href="{{home}}codeplug/index.html">{{t home.cta_cps}}</a>
 				<a href="{{home}}docs/user/index.html">{{t home.cta_manual}} →</a>
 			</div>
@@ -20,7 +20,7 @@
 			</dl>
 		</div>
 		<figure class="hero-device">
-			<img src="{{root}}static/img/radios/dm32plus-home.svg" alt="{{ flagship_name }}">
+			<img src="{{root}}static/img/radios/product-home.svg" alt="{{ flagship_name }}">
 			<figcaption class="small muted">{{t home.product}}</figcaption>
 		</figure>
 	</div>
@@ -48,7 +48,7 @@
 <section class="wrap section">
 	<h2>{{t home.start_title}}</h2>
 	<div class="cards">
-		<article class="card"><h3>{{t home.install_title}}</h3><p>{{t home.install_text}}</p><a href="{{home}}flash/index.html#radio=dm32">{{t flash.dm32plus.install}} →</a></article>
+		<article class="card"><h3>{{t home.install_title}}</h3><p>{{t home.install_text}}</p><a href="{{home}}flash/index.html#radio={{flagship_id}}">{{t flash.product.install}} →</a></article>
 		<article class="card"><h3>{{t home.program_title}}</h3><p>{{t home.program_text}}</p><a href="{{home}}codeplug/index.html">{{t home.cta_cps}} →</a></article>
 		<article class="card"><h3>{{t home.learn_title}}</h3><p>{{t home.learn_text}}</p><a href="{{home}}docs/user/index.html">{{t home.cta_manual}} →</a></article>
 	</div>
@@ -58,7 +58,7 @@
 	<h2>{{t home.releases_title}}</h2>
 	<p>{{t home.releases_text}}</p>
 	<dl class="feature-rows">
-		<div><dt>{{t flash.dm32plus.channel_stable}}</dt><dd>{{t home.stable_text}}</dd></div>
+		<div><dt>{{t flash.product.channel_stable}}</dt><dd>{{t home.stable_text}}</dd></div>
 		<div><dt>{{t home.testing}}</dt><dd>{{t home.testing_text}}</dd></div>
 		<div><dt>{{t home.development}}</dt><dd>{{t home.development_text}}</dd></div>
 	</dl>

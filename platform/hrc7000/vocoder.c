@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // HR_C7000 vocoder: the radio's own stock AMBE+2 codec, run from RAM in the board's codec window
 // (docs/spec/codec-placement.md, "HR_C7000 radios"; the codec itself: docs/spec/codec-dm32.md, "C. Codec state init
 // tables"). Shared by the HR_C7000 radios that carry this codec build; what differs between them (the slot, the windows)
@@ -15,6 +16,8 @@
 //
 // Not reentrant: one task (the audio task, through the audio block callback) makes all calls. The codec runs on the
 // caller's stack.
+// With CONFIG_P25, the idle encoder state can be lent exclusively. Calls refuse while it is lent; reclaim marks both
+// encoder and decoder state for reinitialization. The executable codec window and its flash slot are never lent.
 #include <string.h>
 #include "config.h"
 #include "vocoder.h"
@@ -56,11 +59,15 @@ typedef int (*decode_t)(int16_t *out, int n, int16_t *bits, int r3, int flags, i
 typedef int (*encode_t)(int16_t *bits, int r1, const int16_t *in, int n, int flags, int half, int s8, void *e);
 
 static const codec_slot_t *slot;
-static uint32_t code_ram;
+static uintptr_t code_ram;
 static int8_t presence = -1;	// the slot's check: -1 not run yet, 1 valid, 0 not
 static volatile bool parked;	// stopped for a stub upload: the calls return at once, the slot's check still holds
 static bool ready;
 static uint32_t enc_flags = AMBE2_ENC_DEFAULT;	// set_options (VOCODER_OPT_DEFAULT until then)
+#if CONFIG_P25
+static volatile uint32_t loan_token;
+static uint32_t loan_generation;
+#endif
 
 static int16_t *h16(void *state, uint32_t off)
 {
@@ -97,6 +104,10 @@ static volatile bool busy;	// a call is running the codec (hrc_vocoder_park wait
 
 static bool present(void)
 {
+#if CONFIG_P25
+	if (loan_token != 0)
+		return false;
+#endif
 	if (presence < 0) {
 		presence = load() ? 1 : 0;
 	}
@@ -186,9 +197,77 @@ static void decode_run(const uint8_t bits[VOCODER_BITS], int16_t pcm[VOCODER_FRA
 }
 
 // The calls mark themselves busy, so a park can wait for the one running
+#if CONFIG_P25
+static bool codec_enter(void)
+{
+	uint32_t saved = hrc_irq_save();
+	if (parked || loan_token != 0 || busy) {
+		hrc_irq_restore(saved);
+		return false;
+	}
+	busy = true;
+	hrc_irq_restore(saved);
+	return true;
+}
+
+static bool lend(size_t bytes, size_t alignment, hal_vocoder_loan_t *out)
+{
+	if (out == NULL || out->data != NULL || out->bytes != 0 || out->token != 0
+	    || bytes == 0 || bytes > sizeof enc_state || alignment == 0
+	    || (alignment & (alignment - 1u)) != 0 || alignment > __alignof__(enc_state))
+		return false;
+	uint32_t saved = hrc_irq_save();
+	if (busy || parked || loan_token != 0) {
+		hrc_irq_restore(saved);
+		return false;
+	}
+	if (++loan_generation == 0)
+		++loan_generation;
+	loan_token = loan_generation;
+	busy = true; // park must wait for a first-use slot check before loading its stub
+	hrc_irq_restore(saved);
+	// Keep the flash identity available during the loan, even if AMBE has never run.
+	if (presence < 0)
+		presence = load() ? 1 : 0;
+	saved = hrc_irq_save();
+	ready = false;
+	if (parked) {
+		loan_token = 0;
+		busy = false;
+		hrc_irq_restore(saved);
+		return false;
+	}
+	*out = (hal_vocoder_loan_t){ .data = enc_state, .bytes = sizeof enc_state, .token = loan_token };
+	busy = false;
+	hrc_irq_restore(saved);
+	return true;
+}
+
+static bool reclaim(hal_vocoder_loan_t *loan)
+{
+	uint32_t saved = hrc_irq_save();
+	if (loan == NULL || loan_token == 0 || loan->token != loan_token
+	    || loan->data != enc_state || loan->bytes != sizeof enc_state || busy) {
+		hrc_irq_restore(saved);
+		return false;
+	}
+	ready = false;	// the returned state contains another protocol's data
+	hrc_barrier();
+	loan_token = 0;
+	*loan = (hal_vocoder_loan_t){0};
+	hrc_irq_restore(saved);
+	return true;
+}
+#endif
+
 static void reset(void)
 {
+#if CONFIG_P25
+	if (!codec_enter())
+		return;
+#else
 	busy = true;
+#endif
 	hrc_barrier();		// set before present() reads parked: a park sees one or the other
 	reset_run();
 	busy = false;
@@ -196,7 +275,14 @@ static void reset(void)
 
 static void encode(const int16_t pcm[VOCODER_FRAME_SAMPLES], uint8_t bits[VOCODER_BITS])
 {
+#if CONFIG_P25
+	if (!codec_enter()) {
+		memset(bits, 0, VOCODER_BITS);
+		return;
+	}
+#else
 	busy = true;
+#endif
 	hrc_barrier();
 	encode_run(pcm, bits);
 	busy = false;
@@ -204,7 +290,14 @@ static void encode(const int16_t pcm[VOCODER_FRAME_SAMPLES], uint8_t bits[VOCODE
 
 static void decode(const uint8_t bits[VOCODER_BITS], int16_t pcm[VOCODER_FRAME_SAMPLES])
 {
+#if CONFIG_P25
+	if (!codec_enter()) {
+		memset(pcm, 0, VOCODER_FRAME_SAMPLES * sizeof(int16_t));
+		return;
+	}
+#else
 	busy = true;
+#endif
 	hrc_barrier();
 	decode_run(bits, pcm);
 	busy = false;
@@ -215,8 +308,14 @@ static void decode(const uint8_t bits[VOCODER_BITS], int16_t pcm[VOCODER_FRAME_S
 void hrc_vocoder_park(void)
 {
 	(void)present();
+#if CONFIG_P25
+	uint32_t saved = hrc_irq_save();
+#endif
 	parked = true;		// every later call returns at once (silence, zero bits)
 	hrc_barrier();
+#if CONFIG_P25
+	hrc_irq_restore(saved);
+#endif
 	while (busy) {
 		vTaskDelay(1);
 	}
@@ -274,6 +373,9 @@ static uint32_t encode_flags(void)
 const hal_vocoder_t hrc_vocoder = {
 	.present = present, .reset = reset, .encode = encode, .decode = decode, .profile = profile,
 	.options = options, .set_options = set_options, .encode_flags = encode_flags,
+#if CONFIG_P25
+	.lend = lend, .reclaim = reclaim,
+#endif
 };
 
 uint16_t hrc_vocoder_tag(void)

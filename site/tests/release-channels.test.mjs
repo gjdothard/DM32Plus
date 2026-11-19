@@ -3,27 +3,30 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createHash } from "node:crypto";
-import { bundledRelease, loadBundledRelease, lookupRelease, newestRelease } from "../static/js/flasher/dm32plus-release.js";
+import { bundledRelease, loadBundledRelease, lookupRelease, newestRelease } from "../static/js/flasher/release-channels.js";
+
+import product from "../static/js/product.js";
+const BOARD = product.board;
 
 const bytes = Uint8Array.of(72, 3, 26, 1);
 const sha256 = createHash("sha256").update(bytes).digest("hex");
-const name = "dm32plus-dm32-v26.11b1";
+const name = `${product.prefix}-${BOARD}-v26.11b1`;
 const release = {
-	board: "dm32", variant: "full", product: "DM32Plus", version: "v26.11b1",
-	image: `firmware/dm32/${name}.bin`, manifest: `firmware/dm32/${name}.json`, sha256,
+	board: BOARD, variant: "full", product: product.name, version: "v26.11b1",
+	image: `firmware/${BOARD}/${name}.bin`, manifest: `firmware/${BOARD}/${name}.json`, sha256,
 };
-const board = { id: "dm32", name: "DM-32UV", app_base: 0x300c000, flash_end: 0x3100000,
+const board = { id: BOARD, name: "Product radio", app_base: 0x300c000, flash_end: 0x3100000,
 	protected: [[0x3000000, 0x300c000]], sectors: [], codec: { id: "ambe", windows: [[0x30e8000, 0x18000]] } };
-const fb = { manifest_format: "rfoundry-release/1", magic: "STOCK", boards: { dm32: board } };
+const fb = { manifest_format: "rfoundry-release/1", magic: "STOCK", boards: { [BOARD]: board } };
 const manifest = {
 	format: fb.manifest_format, board: board.id, variant: "full", product: release.product, version: release.version,
 	image: { file: name + ".bin", size: bytes.length, sha256 },
 	codec: { profile: "ambe", included: false }, ranges: [{ addr: board.app_base, size: bytes.length }],
 };
 
-test("selects only the bundled DM32Plus release for the supported board", () => {
-	assert.equal(bundledRelease([release, { ...release, product: "RadioFoundry" }], "dm32"), release);
-	assert.equal(bundledRelease([release], "dm1701"), null);
+test("selects only the bundled product release for the supported board", () => {
+	assert.equal(bundledRelease([release, { ...release, product: "RadioFoundry" }], BOARD), release);
+	assert.equal(bundledRelease([release], "other-board"), null);
 });
 
 test("loads only local assets and validates the board, checksum and codec status", async () => {
@@ -43,9 +46,9 @@ test("loads only local assets and validates the board, checksum and codec status
 });
 
 const published = (version, prerelease, draft = false) => ({
-	tag_name: "dm32plus-" + version, prerelease, draft,
+	tag_name: product.prefix + "-" + version, prerelease, draft,
 	assets: ["bin", "json"].map((ext) => ({
-		name: `dm32plus-dm32-${version}.${ext}`, state: "uploaded", digest: "sha256:" + sha256,
+		name: `${product.prefix}-${BOARD}-${version}.${ext}`, state: "uploaded", digest: "sha256:" + sha256,
 	})),
 });
 
@@ -75,12 +78,12 @@ test("checks all release pages and uses only the fixed local asset endpoint", as
 		return new Response(url.endsWith(".json") ? JSON.stringify(manifest) : bytes);
 	});
 	assert.equal(fw.origin, "github");
-	assert.deepEqual(requested, [`../_dm32plus_release/${name}.json`, `../_dm32plus_release/${name}.bin`]);
+	assert.deepEqual(requested, [`../_${product.prefix}_release/${name}.json`, `../_${product.prefix}_release/${name}.bin`]);
 	await assert.rejects(lookupRelease("stable", async () => new Response("", { status: 502 })), /unavailable/);
 });
 
 test("Testing selects only RC prereleases and checks the unchanged firmware manifest", async () => {
-	const candidate = (version) => ({ ...published(version, true), tag_name: "RC-dm32plus-" + version });
+	const candidate = (version) => ({ ...published(version, true), tag_name: "RC-" + product.prefix + "-" + version });
 	const releases = [published("v26.12b4", true), candidate("v26.11b1"), candidate("v26.10b9")];
 	assert.equal(newestRelease(releases, "development").version, "v26.12b4");
 	assert.equal(newestRelease(releases, "stable"), null);
@@ -91,6 +94,26 @@ test("Testing selects only RC prereleases and checks the unchanged firmware mani
 		requested.push(url);
 		return new Response(url.endsWith(".json") ? JSON.stringify(manifest) : bytes);
 	});
-	assert.equal(fw.source, "RC DM32Plus v26.11b1");
-	assert.deepEqual(requested, [`../_dm32plus_release/RC/${name}.json`, `../_dm32plus_release/RC/${name}.bin`]);
+	assert.equal(fw.source, `RC ${product.name} v26.11b1`);
+	assert.deepEqual(requested, [`../_${product.prefix}_release/RC/${name}.json`, `../_${product.prefix}_release/RC/${name}.bin`]);
+});
+
+const semantic = (version) => ({ ...published(version, version.includes("-")), tag_name: version });
+test("canonical semantic channels supersede calendar versions and stay separate", () => {
+ const releases = [published("v99.12", false), published("v99.12b9", true),
+  ...["v1.0.0-beta.2", "v1.0.0-beta.10", "v1.0.0-rc.2", "v1.0.0-rc.10", "v1.0.0"].map(semantic)];
+ assert.equal(newestRelease(releases, "stable").version, "v1.0.0");
+ assert.equal(newestRelease(releases, "development").version, "v1.0.0-beta.10");
+ assert.equal(newestRelease(releases, "testing").version, "v1.0.0-rc.10");
+ assert.equal(newestRelease([{ ...semantic("v1.0.0-rc.1"), prerelease: false }], "testing"), null);
+});
+test("canonical candidates use the canonical tag endpoint and verify the manifest", async () => {
+ const selected = newestRelease([semantic("v1.0.0-rc.1")], "testing"), requested = [];
+ const filename = `${product.prefix}-${BOARD}-${selected.version}`;
+ const candidateManifest = { ...manifest, version: selected.version, image: { ...manifest.image, file: filename + ".bin" } };
+ await loadBundledRelease(selected, "../", fb, async url => {
+  requested.push(url);
+  return new Response(url.endsWith(".json") ? JSON.stringify(candidateManifest) : bytes);
+ });
+ assert.deepEqual(requested, ["json", "bin"].map(ext => `../_${product.prefix}_release/${filename}.${ext}`));
 });

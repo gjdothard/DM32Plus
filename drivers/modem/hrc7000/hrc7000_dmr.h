@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // HR_C7000 in DMR: burst status decode, burst framing codes and the slot engine behind hal_dmr_modem.h
 // (docs/spec/modem-hrc7000.md 2-7; docs/spec/dmr-modem.md 6; docs/spec/gotchas.md 2).
 //
@@ -171,7 +172,8 @@ typedef struct {
 	bool tx_listen;		// the other slot is received while we send (an SFR's inbound slot)
 	bool listen_voice;	// a voice call was heard on that slot: receive it with the voice-access flag
 	uint8_t send_sync;	// dmr_sync_family_t in SEND_DATA_SYNC now, DMR_SYNC_NONE = not known
-	dmr_tx_burst_t txq[HRC7000_DMR_TXQ_DEPTH];
+	// A halted engine lends this storage to pointer-bearing air-interface state
+	_Alignas(void *) dmr_tx_burst_t txq[HRC7000_DMR_TXQ_DEPTH];
 	volatile uint8_t txq_head, txq_tail;
 	dmr_tx_burst_t last_hdr;
 	uint8_t last_kind;

@@ -7,6 +7,7 @@
 // Edits rewrite records through the sector journal (core/storage) and keep every byte the model doesn't own.
 #include <string.h>
 #include "codeplug.h"
+#include "codeplug_kv.h"
 #include "board.h"
 #include "storage/storage.h"
 
@@ -594,6 +595,10 @@ static bool talkgroup_has_overflow(void)
 
 static uint8_t read_talkgroups(uint16_t number, codeplug_talkgroup_t out[CODEPLUG_TALKGROUP_MAX])
 {
+	if (talkgroup_address(number) >= EE(CODEPLUG_KV_ADDR) && talkgroup_address(number) < EE(CODEPLUG_KV_ADDR + STORAGE_SECTOR)) {
+		uint8_t magic[4];
+		if (!flash_read(EE(CODEPLUG_KV_ADDR), magic, sizeof magic) || !memcmp(magic, "RFKV", sizeof magic)) return 0;
+	}
 	uint8_t bytes[TALKGROUP_RECORD_SIZE];
 	if (!flash_read(talkgroup_address(number), bytes, sizeof bytes)) {
 		return 0;
@@ -982,6 +987,44 @@ bool codeplug_channel(uint16_t number, channel_t *out)
 	return ok;
 }
 
+bool codeplug_channel_name(uint16_t number, char out[CODEPLUG_NAME_LEN + 1])
+{
+	if (out == NULL || number < 1 || number > CH_MAX) return false;
+	storage_lock();
+	bool ok = false;
+	if (source == CODEPLUG_BUILTIN && number <= builtin_count) {
+		strncpy(out, builtin[builtin_map[number - 1u]].name, CODEPLUG_NAME_LEN);
+		out[CODEPLUG_NAME_LEN] = '\0';
+		ok = true;
+	} else if (source == CODEPLUG_OPENFW && is_used(number)) {
+		uint8_t raw[CODEPLUG_NAME_LEN];
+		ok = flash_read(channel_addr(number) + CH_NAME, raw, sizeof raw);
+		if (ok) copy_name(out, raw, CODEPLUG_NAME_LEN);
+	}
+	if (!ok) out[0] = '\0';
+	storage_unlock();
+	return ok;
+}
+
+bool codeplug_base_copy(uint16_t from, uint16_t to)
+{
+	if (from < 1 || from > CH_MAX || to < 1 || to > CH_MAX) return false;
+	storage_lock();
+	uint8_t src[CH_SIZE], dst[CH_SIZE];
+	bool ok = source == CODEPLUG_OPENFW && is_used(from) && is_used(to)
+		&& flash_read(channel_addr(from), src, sizeof src) && src[CH_MODE] <= 1
+		&& flash_read(channel_addr(to), dst, sizeof dst);
+	if (ok) {
+		dst[CH_MODE] = src[CH_MODE];
+		const uint8_t mask = FLAG4_RX_ONLY | FLAG4_25K;
+		dst[CH_FLAG4] = (uint8_t)((dst[CH_FLAG4] & ~mask) | (src[CH_FLAG4] & mask));
+		ok = flash_write(channel_addr(to), dst, sizeof dst);
+		if (ok) serial++;
+	}
+	storage_unlock();
+	return ok;
+}
+
 uint16_t codeplug_zone_count(void)
 {
 	if (source == CODEPLUG_NONE) {
@@ -1098,7 +1141,7 @@ uint16_t codeplug_free_channel(void)
 bool codeplug_set_channel(uint16_t number, const channel_t *ch)
 {
 	uint8_t r[CH_SIZE];
-	if (number < 1 || number > CH_MAX || ch->rx_hz == 0 || ch->tx_hz == 0 || ch->rx_hz >= 1000000000u ||
+	if (ch->kind != 0 || number < 1 || number > CH_MAX || ch->rx_hz == 0 || ch->tx_hz == 0 || ch->rx_hz >= 1000000000u ||
 	    ch->tx_hz >= 1000000000u || (ch->privacy_slot > 4 && ch->privacy_slot != 255)) {
 		return false;
 	}

@@ -2628,6 +2628,15 @@ static bool run_token(char *t, char *err, size_t len)
 		advance(arg != NULL ? (uint32_t)atoi(arg) : 1000u);
 		return true;
 	}
+	if (strcmp(t, "p25-home") == 0) {
+		view.ch.mode = RADIO_MODE_P25;
+		view.ch.bw = RADIO_BW_12K5;
+		strcpy(view.ch.name, "P25 Ops");
+		view.ch.rx_only = true;
+		serial++;
+		advance(200);
+		return true;
+	}
 #if CONFIG_TALKGROUP_EDIT
 	if (strcmp(t, "talkgroup-pool") == 0) {
 		sim_tg_pool = true;

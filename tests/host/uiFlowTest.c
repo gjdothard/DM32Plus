@@ -31,6 +31,7 @@ typedef struct {
 #define TALK_BACK	"ok 7 3 down down down down down down down down down ok long:back quick:dual ctx 3 5 ok "	// on, and A 3 / B 5
 
 static const flow_t flows[] = {
+	{ "P25 conventional home identifies the mode", "p25-home", "", "screen=home shows=P25 hides=No_tone", 0, false },
 	{ "1 next channel", "", "up", "pos=4", 1, false },
 	{ "1 channel 12 by number", "", "1 2 ok", "pos=12 screen=home", 3, false },
 	// The status strip's USB word (#58): IP as a network adapter, with the link arrows once the computer has it up,

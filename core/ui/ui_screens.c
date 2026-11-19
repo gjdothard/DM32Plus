@@ -290,6 +290,8 @@ static uint8_t rssi_bars(int16_t dbm)
 // The mode word: AM where an FM channel or the VFO is received in AM (the air band)
 static const char *mode_word(const radio_view_t *v)
 {
+	if (v->ch.mode == RADIO_MODE_P25) return "P25";
+	if (v->ch.mode == RADIO_MODE_NONE) return "?";
 	return v->ch.mode == RADIO_MODE_DMR ? "DMR" : v->am ? "AM" : "FM";
 }
 
@@ -1002,6 +1004,10 @@ static void draw_talk(const radio_view_t *v)
 static void draw_chips(const radio_view_t *v, const ui_state_t *s)
 {
 	const ui_layout_t *L = &ui_layout;
+	if (v->ch.mode == RADIO_MODE_P25 || v->ch.mode == RADIO_MODE_NONE) {
+		gfx_text(L->small, 0, L->chips_y, mode_word(v), ui_col.fg);
+		return;
+	}
 	const font_t *f = L->small;
 	int w = gfx_width();
 	char buf[48];
@@ -3849,6 +3855,7 @@ void ui_draw_data_dashboard(const radio_view_t *v, const ui_state_t *s, const ui
 	}
 	row_text(font, 5, 159, width - 10, TR("Refresh interval"), value, ui_col.dim, ui_col.fg, false);
 	dashboard_control(l, DATA_SERVER, 1, 171, width - 2, CONFIG_DMR_ARS);
+#if CONFIG_DMR
 	if (v->dmr.active) {
 		char id[16];
 		sb_init(&b, id, sizeof id);
@@ -3863,6 +3870,7 @@ void ui_draw_data_dashboard(const radio_view_t *v, const ui_state_t *s, const ui
 		sb_u32(&b, v->dmr.cc, 1);
 		row_text(font, 5, 191, width - 10, value, id, ui_col.fg, ui_col.dim, false);
 	}
+#endif
 	dashboard_subscriptions(s, &data, width, footer);
 	card_list_footer(s, footer, TR("OK Select"), TR("Back"), fit, sizeof fit);
 }

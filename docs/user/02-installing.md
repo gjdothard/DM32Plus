@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Installing
 
@@ -348,3 +349,11 @@ Factory Update Mode"), and Restore uses it too.
 3. Write your codeplug backup with the manufacturer's CPS. The stock firmware can't read the codeplug RadioFoundry used.
 
 Your radio's section in the [Radio reference](23-radios.md) says which way applies.
+
+## Release versions
+
+Stable releases use names such as `v1.0.0`. Development builds use `v1.0.0-beta.1`; Testing candidates
+use `v1.0.0-rc.1`. Select Development or Testing explicitly in the CPS to install those builds.
+For the same base version, beta comes before rc and the final comes last. Counters compare numerically.
+A stable installation is offered final updates only. Older calendar releases remain supported for upgrading
+to the new version series.

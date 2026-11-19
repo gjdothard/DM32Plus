@@ -7,19 +7,19 @@
 // under the model (base, which holds the DMR ID database) is kept by reference: a change to it puts a new image in
 // place, never edits the old one.
 
-const TABLES = ["channels", "zones", "contacts", "rxLists", "dtmfContacts", "aprs"];
+const TABLES = ["channels", "zones", "contacts", "rxLists", "dtmfContacts", "aprs", "systems"];
 const LIMIT = 100;
 
 function snapshot(m) {
 	const objects = new Map();
 	const tables = {};
 	for (const t of TABLES) {
-		tables[t] = m[t].slice();
-		for (const r of m[t]) objects.set(r, copy(r));
+		tables[t] = (m[t] ?? []).slice();
+		for (const r of m[t] ?? []) objects.set(r, copy(r));
 	}
 	for (const v of m.vfo) if (v) objects.set(v, copy(v));
 	return { tables, objects, general: { ...m.general }, base: m.base, iddb: m.iddb,
-		vfo: m.vfo.slice(), sharedTalkgroups: m.sharedTalkgroups };
+		vfo: m.vfo.slice(), sharedTalkgroups: m.sharedTalkgroups, modeSettings: { ...m.modeSettings }, orphanEntries: m.orphanEntries?.slice() };
 }
 
 function copy(r) {
@@ -39,6 +39,8 @@ function restore(m, s) {
 	m.iddb = s.iddb;
 	m.vfo = s.vfo.slice();
 	m.sharedTalkgroups = s.sharedTalkgroups;
+	m.modeSettings = { ...s.modeSettings };
+	m.orphanEntries = s.orphanEntries?.slice();
 }
 
 export class History {

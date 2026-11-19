@@ -81,7 +81,7 @@ that still allows CPS writes there.
 
 The [message journal engine](../spec/message-journal.md) mounts read-only and keeps a spare erase
 sector for rollover. The deferred append job borrows the shared sector buffer. It requires
-an activation marker written only into an erased reserve. The DM32Plus build enables the journal
+an activation marker written only into an erased reserve. The product build enables the journal
 by default and initializes eligible blank storage at startup. Rollover uses the shared sector journal to recover after
 power loss and continues to refuse unknown contents. The activation control lives under
 Settings → Advanced → Message history on boards with a usable reserve and the feature enabled.

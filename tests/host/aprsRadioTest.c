@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // APRS through the radio core (docs/spec/aprs.md 6, 7, 9): the engine (core/aprs/aprs.c) and radio_sm.c's APRS block
 // in an FM-only build, against a fake board with an AFSK transmitter whose tones are decoded back to AX.25 frames.
@@ -9,6 +10,7 @@
 #include <string.h>
 #include "board.h"
 #include "radio/radio_sm.h"
+#include "sim/radio_task.h"
 #include "settings/settings.h"
 #include "aprs/aprs.h"
 #include "aprs/aprs_host.h"
@@ -297,7 +299,9 @@ static void wait_idle(void)
 static void req(uint8_t type, int32_t arg)
 {
 	radio_req_t r = { type, arg, 0 };
+	sim_radio_resolve_default(&sm);
 	radio_sm_request(&sm, &r, now);
+	sim_radio_resolve_default(&sm);
 }
 
 static void reset(void)

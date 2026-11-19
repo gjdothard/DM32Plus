@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // DM-32UV radio: FD6818 RF transceiver (bit-banged), the HR_C7000 baseband for FM and DMR, LNA / PA selects and the
 // PA drive on DAC channel B (docs/spec/hardware-dm32.md 3.8, 8, 9, 11.3; modem-hrc7000.md 4, 5.1, 8).
 //
@@ -182,6 +183,9 @@ static void dmr_pa_on(void)
 
 static const hrc_dmr_board_t dmr_board = {
 	.rf_switch = dmr_rf_switch, .pa_on = dmr_pa_on, .pa_delay_us = DMR_PA_DELAY_US,
+#if CONFIG_AIR
+	.air_tx_gate = hrc_audio_pcm_air_gate, .air_tx_release = hrc_audio_pcm_air_release,
+#endif
 };
 
 #if CONFIG_APRS
@@ -497,9 +501,13 @@ static void audio(bool on)
 static void ring_play(void)
 {
 	bool on = (pcm_on && !transmitting) || afsk_tx;
+#if CONFIG_AIR
+	hrc_audio_pcm_ring(&modem, on);
+#else
 	uint32_t s = hrc_irq_save();	// the AUDIO_CONTROL shadow is shared with the audio task
 	hrc7000_audio_bits(&modem, on ? C7_AUDIO_RING_PLAY : 0, on ? 0 : C7_AUDIO_RING_PLAY);
 	hrc_irq_restore(s);
+#endif
 }
 
 // Speaker PCM (a beep, DMR voice): the codec plays the CPU's samples from the prompt FIFO, the speaker listens to the

@@ -11,7 +11,7 @@ import { SerialStream, serialSupported, RFOUNDRY_USB, browserErrorKey, knownRadi
 import { CodeplugImage, IDDB_HEADER, REGIONS } from "../codeplug/image.js";
 import { channelsUsingTalkgroups, decode, encode, empty, remove, validate, newChannel, newContact, numberAll, assignNumbers } from "../codeplug/model.js";
 import { LIMITS, decodeGeneral } from "../codeplug/records.js";
-import { CpsSerial, TransportError, estimate, keepIdentity, IDENTITY, iddbRanges } from "../codeplug/transport.js";
+import { CpsSerial, TransportError, estimate, keepIdentity, iddbRanges } from "../codeplug/transport.js";
 import { FastError } from "../codeplug/fastlink.js";
 import { convert as convertDb, readHeader as dbHeader } from "../codeplug/iddb.js";
 import { convertIddb, iddbEnd } from "../codeplug/sources/output.js";
@@ -29,9 +29,10 @@ import * as diag from "../diag.js";
 import { initReporting, reportedLine } from "../report.js";
 import { updateFor } from "../flasher/version.js";
 import { encryptionTab } from "./encryption.js";
+import { systemsTab, systemDialog, modeSettingsPart } from "./modesview.js";
 
 const CABLES = [0x0403, 0x1A86, 0x10C4, 0x067B].map((usbVendorId) => ({ usbVendorId }));
-const TABS = ["radio", "encryption", "channels", "zones", "contacts", "rxLists", "dtmfContacts", "aprs", "iddb", "problems"];
+const TABS = ["radio", "encryption", "channels", "systems", "zones", "contacts", "rxLists", "dtmfContacts", "aprs", "iddb", "problems"];
 const TABLE_MAX = { channels: LIMITS.channels, zones: LIMITS.zones, contacts: LIMITS.contacts, rxLists: LIMITS.rxLists, dtmfContacts: LIMITS.dtmfContacts, aprs: LIMITS.aprs };
 
 const S = {
@@ -159,7 +160,7 @@ function say(text, kind = "info", { report = null } = {}) {
 // --- Rendering ---
 
 function problems() {
-	return validate(S.model, { bands: S.conn?.radio?.bands_hz || null });
+	return validate(S.model, { bands: S.conn?.radio?.bands_hz || null, features: S.conn?.probe?.features ?? null });
 }
 
 function refresh() {
@@ -269,6 +270,7 @@ function renderView(p) {
 		}
 		return;
 	}
+	if (tab === "systems") return view.replaceChildren(systemsTab(api(), S.conn?.probe?.features ?? null));
 	if (tab === "iddb") return view.replaceChildren(extensions.iddbTab(api()));
 	if (tab === "problems") return view.replaceChildren(problemsTab(p));
 	// a table: keep the grid (focus, sort, selection) when only its rows changed
@@ -508,6 +510,7 @@ function problemText(problem) {
 
 function openRecord(tab, record, { creating = false, problem = null } = {}) {
 	const model = S.model;
+	if (tab === "systems") return systemDialog(api(), record, creating);
 	const title = creating ? t("editor.record.create", { name: record.name }) : t("editor.record.edit", { name: record.name });
 	const options = {
 		field: problem?.field, error: problem ? problemText(problem) : null,
@@ -533,7 +536,7 @@ function openRecord(tab, record, { creating = false, problem = null } = {}) {
 	};
 	if (tab === "channels") {
 		const draftContacts = [];
-		formDialog(title, channelForm(model, t, draftContacts), record, t, work => {
+		formDialog(title, channelForm(model, t, draftContacts, { features: S.conn?.probe?.features ?? null }), record, t, work => {
 			const created = work.mode !== "dmr" ? [] : draftContacts.filter(contact => model.sharedTalkgroups ?
 				work.talkgroupRefs.includes(contact) : work.talkGroups.some(entry => entry.id === contact.id));
 			commit(work, created);
@@ -586,8 +589,10 @@ function radioTab() {
 			field("privateHang", t("editor.general.private_hang"), 3, t("editor.general.hang_help"), num(0, 255))),
 	];
 	const connected = h("div");
-	const panel = h("div", {}, ...parts, connected);
+	const modeParts = modeSettingsPart(api(), S.conn?.probe?.features ?? null);
+	const panel = h("div", {}, ...parts, ...modeParts, connected);
 	panel.update = () => {
+		for (const part of modeParts) part.update?.();
 		for (const [key, field] of fields) {
 			if (field.input !== document.activeElement && !field.err.textContent) field.input.value = S.model.general[key] ?? "";
 		}
@@ -1051,7 +1056,7 @@ async function planWrite() {
 		// (compared byte for byte: two plans can send the same number of bytes. The second is planned only when there
 		// is something to keep: each plan is a pass over every block's CRC)
 		const kept = keepIdentity(file, c.image);
-		const differs = IDENTITY.some(([a, b]) => kept.bytes.subarray(a, b).some((x, i) => x !== file.bytes[a + i]));
+		const differs = kept.bytes.some((x, i) => x !== file.bytes[i]);
 		const plans = { file: await c.transport.plan(file, c.image, { iddb }) };
 		plans.kept = differs ? await c.transport.plan(kept, c.image, { iddb }) : plans.file;
 		let keep = keepPref() && differs;

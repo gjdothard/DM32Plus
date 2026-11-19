@@ -12,7 +12,7 @@ For Windows 10/11, 64-bit Intel or AMD PCs.
 No Python installation, administrator access, or internet connection is needed to start the CPS.
 If the browser does not open, use Edge or Chrome to visit **http://localhost:8765/codeplug/**.
 
-The DM32Plus installer remembers the selected release channel. **Bundled (offline)** uses the image in
+The product installer remembers the selected release channel. **Bundled (offline)** uses the image in
 the package. **Stable** uses the newest published stable release, and **Development** uses the newest
 published prerelease. The online channels require internet access. The installer displays the target
 version before proceeding.

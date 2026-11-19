@@ -25,6 +25,18 @@
 
 # ── Radio and voice ──
 
+[feature.p25]
+switch = "P25"
+spec = "docs/spec/p25.md"
+source = ["core/p25", "core/air", "core/mbe", "core/radio/radio_p25.c", "core/radio/radio_p25.h", "core/codeplug/codeplug_tag.c", "core/codeplug/codeplug_kv.c", "hal/hal_air.h", "hal/hal_baseband.h"]
+manual = ["Qualify conventional receive/transmit and FM/DMR mode transitions with owner-authorized equipment.", "Measure no RF emissions for RX-only during startup, idle, PTT, settings changes and queued-work cancellation."]
+
+[feature.p25_trunk]
+switch = "P25_TRUNK"
+spec = "docs/spec/p25-trunking.md"
+source = ["core/p25", "core/radio/radio_p25.c", "core/radio/radio_p25.h", "core/codeplug/codeplug_records.c", "core/codeplug/codeplug_tag.c", "core/codeplug/codeplug_kv.c"]
+manual = ["Qualify hunt, follow, return and permitted signaling against authorized test equipment.", "Measure no RF emissions for channel RX-only or system listen-only during acquisition, idle, PTT, grants and permission revocation."]
+
 [feature.fm]
 switch = "FM"
 spec = "docs/spec/radio-features.md"
@@ -34,6 +46,18 @@ source = ["core/radio", "drivers/rf", "hal/hal_radio.h", "hal/hal_audio.h"]
 switch = "TALKGROUP_EDIT"
 spec = "docs/spec/dmr-voice.md"
 source = ["core/ui/ui_menus.c", "core/ui/ui_svc_storage.c", "core/codeplug/codeplug.c"]
+
+[feature.dmr_talkgroup_entries]
+switch = "DMR_TALKGROUP_ENTRIES"
+spec = "docs/spec/dmr-voice.md"
+
+[feature.message_journal]
+switch = "MESSAGE_JOURNAL"
+spec = "docs/spec/message-journal.md"
+
+[feature.ui_card_menu]
+switch = "UI_CARD_MENU"
+spec = "docs/spec/ui.md"
 
 [feature.ref_trim]
 switch = "REF_TRIM"
@@ -279,6 +303,11 @@ spec = "docs/spec/cps-protocol.md"
 switch = "CPS_FAST"
 spec = "docs/spec/cps-fast.md"
 
+[feature.cps_managed]
+switch = "CPS_FAST"
+spec = "docs/spec/cps-fast.md"
+source = ["core/cps", "core/radio/radio_programming.c"]
+
 [feature.stub_entry]
 switch = "STUB_ENTRY"
 spec = "docs/spec/stub-stm32f4.md"
@@ -443,10 +472,6 @@ spec = "docs/spec/ui.md"
 [feature.radio_controls]
 spec = "docs/spec/radio-features.md"
 source = ["core/radio"]
-
-[feature.dmr_aes_channels]
-switch = "DMR_AES256"
-spec = "docs/spec/dmr-voice.md"
 
 [feature.settings_store]
 spec = "docs/spec/settings-store.md"

@@ -3,6 +3,15 @@
 
 # Programming the Radio
 
+Experimental P25 builds can operate preconfigured conventional and Phase 1
+trunked P25 channels within the radio's supported bands.
+The home screen shows P25. P25 settings editors are still being integrated.
+Codeplugs containing tagged channels currently allow reads and backups, but
+refuse legacy CPS and raw codeplug writes to protect mode-specific permissions.
+Keep a backup before using experimental codeplugs. Channel Receive only and
+system listen-only also block automatic trunked signaling. Hardware qualification
+and mode-aware editing remain pending.
+
 The codeplug holds the channels, zones, contacts, RX group lists, the DMR ID database and your DMR ID. Edit it with the
 **Codeplug Editor** on the project's web site, [radiofoundry.org](https://radiofoundry.org/codeplug/index.html). It runs
 in a Chromium-based browser (Chrome, Edge, Opera), needs nothing installed, and works with every RadioFoundry radio,
@@ -237,3 +246,33 @@ To carry a stock codeplug over while you install, see [Moving from the stock fir
 - Writes are refused while the radio's settings area holds another firmware's data. See "Settings are not kept" in
   [Troubleshooting](20-troubleshooting.md#settings-are-not-kept).
 - The calibration area accepts writes only to its own bytes. Don't edit calibration with a CPS.
+
+## P25 programming
+
+The editor offers **P25** and **P25 Trunking** channel modes for Phase 1.
+Conventional channels have RX/TX NAC and squelch fields. Use **Systems** to
+enter trunked-system identity, control channels, optional sites and channel
+plans. Select that system on each trunked channel. The current firmware
+supports eight systems. Phase 2 voice is not supported.
+
+**RX Only** remains the channel transmit permission. On a trunked channel it
+also prevents registration, affiliation and service requests. New trunked
+channels start RX only, and new systems start **Never (listen only)**. To
+transmit, the channel and its system must both permit it, and all normal
+frequency and transmit checks still apply. Listen-only systems never send
+automatic signaling. The **Radio** tab has a P25 unit ID; blank inherits the
+DMR ID. A system may override that ID.
+
+Save P25 codeplugs as binary backups. Channel CSV and qdmr YAML cannot
+represent the permission and system records; the editor refuses these
+operations while those records are present. Other CSV tables remain usable.
+Existing inline DMR talkgroup assignments are migrated to the shared pool
+when P25 is first saved. Unknown occupied storage or insufficient capacity
+is reported instead of overwritten. Keep the original backup.
+
+Writing P25 requires firmware advertising managed staged programming in
+fast-protocol INFO. Older firmware is refused before a write; there is no
+legacy-write fallback. The radio stops active calls before the commit and
+reloads the resulting permissions before resuming. Keep radio identity also
+preserves the radio-wide P25 unit ID. This path is verified with synthetic
+flash and host simulations; radio interoperability remains untested.

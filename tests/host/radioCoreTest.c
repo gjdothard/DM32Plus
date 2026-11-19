@@ -7,6 +7,7 @@
 #include <string.h>
 #include "board.h"
 #include "radio/radio_sm.h"
+#include "sim/radio_task.h"
 #include "radio/radio_sfr.h"
 #include "radio/tones.h"
 #include "dmr/call/dmr_call.h"
@@ -131,7 +132,7 @@ static struct {
 static bool a_start(audio_block_cb_t cb, void *ctx) { aud.cb = cb; aud.ctx = ctx; aud.started = true; aud.starts++; return true; }
 static void a_stop(void) { aud.started = false; aud.stops++; }
 static void a_pcm(bool on) { aud.pcm = on; }
-static const hal_audio_t fake_audio = { a_start, a_stop, a_pcm };
+static const hal_audio_t fake_audio = { .start = a_start, .stop = a_stop, .speaker_pcm = a_pcm };
 
 static bool codec_present;
 static bool v_present(void) { return codec_present; }
@@ -140,8 +141,8 @@ static void v_encode(const int16_t *pcm, uint8_t *bits) { (void)pcm; memset(bits
 static void v_decode(const uint8_t *bits, int16_t *pcm) { (void)bits; memset(pcm, 0, VOCODER_FRAME_SAMPLES * 2); }
 static uint32_t v_options(void) { return VOCODER_OPT_NOISE_REDUCTION | VOCODER_OPT_TONE_FRAMES | VOCODER_OPT_AGC; }
 static void v_set_options(uint32_t opts) { (void)opts; }
-static const hal_vocoder_t fake_vocoder = { v_present, v_reset, v_encode, v_decode, NULL, v_options, v_set_options,
-					    NULL };
+static const hal_vocoder_t fake_vocoder = { .present = v_present, .reset = v_reset, .encode = v_encode, .decode = v_decode,
+	.options = v_options, .set_options = v_set_options };
 static const char *codec_profile;
 static const char *v_profile(void) { return codec_profile; }
 static uint8_t p_mic(void) { return 0; }
@@ -217,6 +218,25 @@ uint32_t codeplug_serial(void) { return cp_serial; }
 uint16_t codeplug_channel_count(void) { return NCH; }
 #if CONFIG_DMR_TALKGROUP_ENTRIES
 static bool have_talkgroups;
+static uint16_t talkgroup_refs[CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL];
+static uint8_t talkgroup_ref_count;
+bool codeplug_talkgroup_refs(uint16_t number, uint16_t *refs, uint8_t *count)
+{
+	if (number < 1 || number > NCH || !used[number])
+		return false;
+	memcpy(refs, talkgroup_refs, talkgroup_ref_count * sizeof refs[0]);
+	*count = talkgroup_ref_count;
+	return true;
+}
+bool codeplug_set_talkgroup_refs(uint16_t number, const uint16_t *refs, uint8_t count)
+{
+	if (number < 1 || number > NCH || !used[number] || count > CODEPLUG_TALKGROUP_POOL_MAX_PER_CHANNEL)
+		return false;
+	memcpy(talkgroup_refs, refs, count * sizeof refs[0]);
+	talkgroup_ref_count = count;
+	cp_serial++;
+	return true;
+}
 uint8_t codeplug_talkgroups(uint16_t number, codeplug_talkgroup_t out[CODEPLUG_TALKGROUP_MAX])
 {
 	if (number != 4 || !have_talkgroups)
@@ -348,6 +368,9 @@ static void add(uint16_t n, const char *name, uint32_t hz, uint8_t mode, bool rx
 
 static void setup_codeplug(void)
 {
+#if CONFIG_DMR_TALKGROUP_ENTRIES
+	talkgroup_ref_count = 0;
+#endif
 	memset(used, 0, sizeof(used));
 	add(1, "Simplex", 146520000, RADIO_MODE_FM, false, CODEPLUG_POWER_DEFAULT);
 	add(2, "Weather", 162550000, RADIO_MODE_FM, true, CODEPLUG_POWER_DEFAULT);
@@ -390,10 +413,7 @@ static radio_sm_t sm;
 // The task normally resolves storage between requests. This fake board has no saved radio default.
 static void resolve_default(void)
 {
-#if CONFIG_DMR_AES256
-	if (sm.aes_pending && sm.view.ch.mode == RADIO_MODE_DMR && sm.view.ch.privacy_slot == 0)
-		radio_sm_aes_resolved(&sm, NULL, 0, 0, true);
-#endif
+	sim_radio_resolve_default(&sm);
 }
 
 static void req(uint8_t type, int32_t arg)
@@ -2976,6 +2996,41 @@ static void test_dual_two_vfos(void)
 }
 #endif
 
+#if CONFIG_TALKGROUP_EDIT
+static void test_ui_talkgroup_edits(void)
+{
+	dmr_start(true);
+	uint32_t serial = cp_serial;
+	CHECK(!ui_svc_edit_talkgroups(0, 1, UI_TG_ADD));
+	CHECK(!ui_svc_edit_talkgroups(4, 0, UI_TG_ADD));
+	CHECK(ui_svc_edit_talkgroups(4, 1, UI_TG_ADD));
+	CHECK(storage_job_busy() && talkgroup_ref_count == 0);
+	CHECK(!ui_svc_edit_talkgroups(4, 3, UI_TG_ADD));
+	storage_job_poll();
+	CHECK(last_ev.kind == UI_EV_TALKGROUPS_SAVED && talkgroup_ref_count == 1 && talkgroup_refs[0] == 1);
+	CHECK(cp_serial == serial + 1);
+	CHECK(ui_svc_edit_talkgroups(4, 1, UI_TG_ADD));
+	storage_job_poll();
+	CHECK(talkgroup_ref_count == 1 && cp_serial == serial + 1);
+	CHECK(ui_svc_edit_talkgroups(4, 3, UI_TG_ADD));
+	storage_job_poll();
+	CHECK(talkgroup_ref_count == 2 && talkgroup_refs[1] == 3);
+	CHECK(ui_svc_edit_talkgroups(4, 3, UI_TG_UP));
+	storage_job_poll();
+	CHECK(talkgroup_refs[0] == 3 && talkgroup_refs[1] == 1);
+	CHECK(ui_svc_edit_talkgroups(4, 3, UI_TG_DOWN));
+	storage_job_poll();
+	CHECK(talkgroup_refs[0] == 1 && talkgroup_refs[1] == 3);
+	CHECK(ui_svc_edit_talkgroups(4, 1, UI_TG_REMOVE));
+	storage_job_poll();
+	CHECK(talkgroup_ref_count == 1 && talkgroup_refs[0] == 3);
+	serial = cp_serial;
+	CHECK(ui_svc_edit_talkgroups(1, 1, UI_TG_ADD)); // FM channels cannot have operating talkgroups.
+	storage_job_poll();
+	CHECK(cp_serial == serial && talkgroup_ref_count == 1);
+}
+#endif
+
 static void test_ui_glue(void)
 {
 	const radio_dmr_view_t *d = &sm.view.dmr;
@@ -3762,7 +3817,7 @@ static void test_soft_volume(void)
 	CHECK(debuglink_is_feature_op(DL_OP_VOLUME));	// the dispatcher routes it here
 	// VERSION's codec=: a codec stopped for a stub upload (present() false) still reports its profile from flash
 	{
-		const hal_vocoder_t pv = { v_present, v_reset, v_encode, v_decode, v_profile, NULL, NULL, NULL };
+		const hal_vocoder_t pv = { .present = v_present, .reset = v_reset, .encode = v_encode, .decode = v_decode, .profile = v_profile };
 		bool was = codec_present;
 		CHECK(strcmp(debuglink_codec_id(NULL), "none") == 0);
 		codec_present = false;
@@ -4705,6 +4760,9 @@ int main(void)
 	test_dmr_contact_added();
 	test_ui_requests();
 	test_ui_glue();
+#if CONFIG_TALKGROUP_EDIT
+	test_ui_talkgroup_edits();
+#endif
 #if CONFIG_DUAL_WATCH
 	test_ui_dual();
 	test_dual_two_vfos();

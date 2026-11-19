@@ -4,6 +4,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { guardDialog } from "../static/js/editor/unsaved.js";
 
+// Node's generic Event has a read-only boolean returnValue. Browsers provide
+// a writable string on BeforeUnloadEvent for the navigation warning.
+function beforeUnload() {
+	const event = new Event("beforeunload", { cancelable: true });
+	Object.defineProperty(event, "returnValue", { value: "", writable: true });
+	return event;
+}
+
 function setup(t, { dirty = true, accept = false } = {}) {
 	const previousWindow = globalThis.window, previousConfirm = globalThis.confirm;
 	const window = new EventTarget(), dialog = new EventTarget();
@@ -41,11 +49,12 @@ test("unchanged dialogs close without a discard prompt", t => {
 
 test("unsaved dialog work blocks navigation until the dialog closes", t => {
 	const form = setup(t);
-	const leaving = new Event("beforeunload", { cancelable: true });
+	const leaving = beforeUnload();
 	form.window.dispatchEvent(leaving);
 	assert.equal(leaving.defaultPrevented, true);
+	assert.equal(leaving.returnValue, "");
 	form.dialog.close();
-	const after = new Event("beforeunload", { cancelable: true });
+	const after = beforeUnload();
 	form.window.dispatchEvent(after);
 	assert.equal(after.defaultPrevented, false);
 });

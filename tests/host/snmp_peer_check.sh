@@ -1,6 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 # The agent (snmpPeer) against independent managers: tools/rfoundry_snmp.py always, and the system's SNMP command line
 # tools (snmpget, snmpwalk, snmpbulkwalk, snmpset) when they are installed (used as external programs only).
 set -e
@@ -8,10 +9,18 @@ cd "$(dirname "$0")"
 PY="python3 -I ../../tools/rfoundry_snmp.py"
 PORT=$((20000 + $$ % 20000))
 TPORT=$((PORT + 1))
+PEER="" LISTEN=""
+cleanup() {
+	for child in "$PEER" "$LISTEN"; do
+		[ -z "$child" ] || kill "$child" 2>/dev/null || true
+	done
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
 
 ./snmpPeer $PORT > snmpPeer.out &
 PEER=$!
-fail() { echo "snmp_peer_check: $*"; kill $PEER 2>/dev/null; exit 1; }
+fail() { echo "snmp_peer_check: $*"; exit 1; }
 # Up when it answers (a loaded -j build can take seconds to start it), at most about 5 s
 i=0
 until $PY -p $PORT -t 0.2 get 127.0.0.1 sysName.0 > /dev/null 2>&1; do
@@ -67,15 +76,35 @@ else
 	echo "# system SNMP tools not installed: skipped"
 fi
 wait $PEER || fail "the agent reported parse errors: $(cat snmpPeer.out)"
+PEER=""
 
 # Notifications: two traps to the listener
-$PY -p $TPORT traps -n 2 > snmpPeer.traps &
+rm -f snmpPeer.ready
+# Bind before declaring readiness; a fixed sleep can lose both UDP packets on
+# a loaded runner. A missing packet must fail instead of waiting indefinitely.
+python3 -I - "$TPORT" "$PWD" > snmpPeer.traps <<'PY' &
+import pathlib
+import sys
+sys.path.insert(0, str(pathlib.Path(sys.argv[2]).parents[1] / "tools"))
+from rfoundry_snmp import listen, show
+notifications = listen(int(sys.argv[1]), count=2, timeout=10)
+pathlib.Path("snmpPeer.ready").write_text("ready\n")
+for addr, bindings in notifications:
+    print(f"from {addr[0]}: " + ", ".join(show(*vb) for vb in bindings), flush=True)
+PY
 LISTEN=$!
-sleep 0.5
+i=0
+until [ -f snmpPeer.ready ]; do
+	i=$((i + 1))
+	[ $i -lt 100 ] || fail "trap listener didn't become ready"
+	kill -0 "$LISTEN" 2>/dev/null || fail "trap listener exited"
+	sleep 0.05
+done
 ./snmpPeer --trap $TPORT
 wait $LISTEN || fail "no traps"
+LISTEN=""
 grep -q "snmpTrapOID.0 = 1.3.6.1.4.1.32473.2.0.1" snmpPeer.traps || fail "traps: $(cat snmpPeer.traps)"
 grep -q "rfoundryEventSource.0 = 3100002" snmpPeer.traps || fail "trap bindings: $(cat snmpPeer.traps)"
 grep -q "snmpTrapOID.0 = 1.3.6.1.6.3.1.1.5.1" snmpPeer.traps || fail "coldStart: $(cat snmpPeer.traps)"
 echo "# notifications: rfoundryCallStart and coldStart decoded"
-rm -f snmpPeer.mwalk snmpPeer.merr snmpPeer.out snmpPeer.get snmpPeer.walk snmpPeer.err snmpPeer.nwalk snmpPeer.bwalk snmpPeer.nget snmpPeer.traps
+rm -f snmpPeer.mwalk snmpPeer.merr snmpPeer.out snmpPeer.get snmpPeer.walk snmpPeer.err snmpPeer.nwalk snmpPeer.bwalk snmpPeer.nget snmpPeer.traps snmpPeer.ready

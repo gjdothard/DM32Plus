@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // DMR repeater roaming (docs/spec/dmr-roaming.md): the engine (core/radio/roam.c) on its own, then through the radio
 // core (radio_sm.c) against a fake board whose repeaters sit on frequencies: each one, while up, sends idle bursts
@@ -8,6 +9,7 @@
 #include <string.h>
 #include "board.h"
 #include "radio/radio_sm.h"
+#include "sim/radio_task.h"
 #include "radio/roam.h"
 #include "dmr/call/dmr_call.h"
 #include "dmr/call/dmr_lc.h"
@@ -684,13 +686,13 @@ static struct {
 static bool a_start(audio_block_cb_t cb, void *ctx) { (void)ctx; aud.cb = cb; aud.streaming = true; return true; }
 static void a_stop(void) { aud.streaming = false; aud.cb = NULL; }
 static void a_pcm(bool on) { (void)on; }
-static const hal_audio_t fake_audio = { a_start, a_stop, a_pcm };
+static const hal_audio_t fake_audio = { .start = a_start, .stop = a_stop, .speaker_pcm = a_pcm };
 
 static bool v_present(void) { return true; }
 static void v_reset(void) {}
 static void v_encode(const int16_t *pcm, uint8_t *bits) { (void)pcm; memset(bits, 0, VOCODER_BITS); }
 static void v_decode(const uint8_t *bits, int16_t *pcm) { (void)bits; memset(pcm, 0, VOCODER_FRAME_SAMPLES * 2); }
-static const hal_vocoder_t fake_vocoder = { v_present, v_reset, v_encode, v_decode, NULL, NULL, NULL, NULL };
+static const hal_vocoder_t fake_vocoder = { .present = v_present, .reset = v_reset, .encode = v_encode, .decode = v_decode };
 
 static const band_t bands[] = {
 	{ 136000000, 174000000, true },
@@ -839,7 +841,9 @@ static radio_sm_t sm;
 static void req2(uint8_t type, int32_t arg, uint32_t arg2)
 {
 	radio_req_t r = { type, arg, arg2 };
+	sim_radio_resolve_default(&sm);
 	radio_sm_request(&sm, &r, now);
+	sim_radio_resolve_default(&sm);
 }
 static void req(uint8_t type, int32_t arg) { req2(type, arg, 0); }
 
@@ -886,6 +890,7 @@ static void run(uint32_t ms)
 			air_step();
 		}
 		if (now % RADIO_TICK_MS == 0) {
+			sim_radio_resolve_default(&sm);
 			radio_sm_tick(&sm, now);
 		}
 		if (now % RADIO_POLL_MS == 0) {

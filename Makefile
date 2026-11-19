@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Garrett Dothard
 # Copyright (c) 2026 The RadioFoundry Authors
 ## Firmware build, one tree for every radio:
 ##
@@ -70,6 +71,7 @@ BUILD := build/$(BOARD)$(if $(VARIANT),-$(VARIANT))$(OPTION_SUFFIX)
 TARGET := $(BUILD)/rfoundry_$(BOARD)$(OPTION_SUFFIX)
 
 CORE_DIRS := core/app core/radio core/ui core/input core/codeplug core/settings core/storage
+include config/p25.mk
 ifeq ($(CONFIG_DMR),y)
 CORE_DIRS += core/dmr/call core/dmr/ambe core/dmr/fec
 endif
@@ -231,7 +233,7 @@ RFOUNDRY_GIT_TIME := $(if $(filter unknown,$(GITVERSION)),,$(if $(GITDIRTY),$(sh
 RFOUNDRY_GIT_DATE := $(if $(RFOUNDRY_GIT_TIME),$(shell python3 -c 'import sys, time; print(time.strftime("%Y-%m-%d", \
 	time.gmtime(int(sys.argv[1]))))' '$(RFOUNDRY_GIT_TIME)'))
 # The release name the radio shows (splash, About, the debug link's release=): the newest release tag on this commit
-# (tools/release_version.py: vYY.M[.N][bN]), none for a dirty tree or an untagged commit. RELEASE= sets it
+# (tools/release_version.py: vMAJOR.MINOR.PATCH[-beta.N|-rc.N]), none for a dirty tree or an untagged commit. RELEASE= sets it
 # (tools/release_build.sh passes the tag) and RELEASE= alone leaves it out. RFOUNDRY_GIT stays the commit: the crash
 # record, the manifests and the CPS id read it
 ifeq ($(origin RELEASE),undefined)
@@ -319,7 +321,7 @@ $(shell echo '$(RFOUNDRY_PRESET) $(RFOUNDRY_OFF)' | cmp -s - $(BUILD)/build_info
 	rm -f $(BUILD)/core/hostlink/build_info.o; })
 # The About page's authors and third-party list (tools/gen_about.py), and the objects that include it when it changed
 ABOUT_OBJ := $(patsubst %.c,$(BUILD)/%.o,$(shell grep -l rfoundry_about.h $(APP_SRC) 2>/dev/null))
-$(shell python3 tools/gen_about.py AUTHORS platform/$(PLATFORM)/THIRD_PARTY $(BUILD)/gen/rfoundry_about.h | grep -q changed \
+$(shell python3 tools/gen_about.py AUTHORS platform/$(PLATFORM)/THIRD_PARTY $(BUILD)/gen/rfoundry_about.h $(ABOUT_MORE) | grep -q changed \
 	&& rm -f $(ABOUT_OBJ))
 # The language tables (tools/i18n.py, core/ui/lang/*.po); i18n.o is rebuilt when they changed. A failure stops the
 # build: the old tables would link without a word
@@ -382,6 +384,14 @@ $(BUILD)/%.o: %.S
 
 size: $(TARGET).elf
 	$(SIZE) -A $< | grep -E '^\.(isr_vector|text|rodata|data|bss|ccmram)'
+
+# Target ABI sizes, without allocating these diagnostic markers in the image
+.PHONY: p25-resources
+p25-resources: tools/p25_resource_probe.c
+	@mkdir -p $(BUILD)/tools
+	$(CC) $(CFLAGS_APP) -c $< -o $(BUILD)/tools/p25_resource_probe.o
+	$(CROSS)nm --print-size --size-sort --radix=d $(BUILD)/tools/p25_resource_probe.o > $(BUILD)/tools/p25_resource_probe.sizes
+	@grep 'p25_bytes_' $(BUILD)/tools/p25_resource_probe.sizes || test '$(CONFIG_P25)' != y
 
 test: $(REGISTRY_JSON)
 	$(MAKE) -C tests/host

@@ -129,6 +129,11 @@ default) sets the deviation around the board's nominal (about 3 kHz peak at 25 k
 gives, the mark / space flatness and the TX delay (section 13). Each board's tone path is on its hardware page (the table in
 section 1).
 
+On a shared prompt path, transmit first acquires the audio FIFO hold. It refuses
+without changing the board route when a core-framed digital transmission owns
+the PCM gate. The digital gate likewise refuses an APRS-owned FIFO. A failed
+board route releases the hold. See the [air-interface contract](air-interface.md).
+
 ### 5.3 Receive
 
 Received FM audio comes from one of two places (`aprs.c`, `rx_service`):

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // drivers/flash/nand_sectors on a simulated NAND region, and core/storage + core/settings on top of it.
 //
 // The simulated NAND: 2 KB pages with 64 spare bytes, erase sets a block to 0xFF, a page takes one program and only
@@ -1110,9 +1111,9 @@ static void image_sector(uint8_t *b, uint32_t sector, uint32_t pass)
 
 static bool cps_sector_is_image(uint32_t sector)
 {
-	// The EEPROM image sectors but the one holding the VFO records (the shim overlays the live VFO there), and the
+	// Exclude live VFO records and managed mode metadata from legacy writes; include the
 	// whole open-firmware flash image
-	return (sector < 16u && sector != 7u) || (sector >= 0x20u && sector < 0x120u);
+	return (sector < 16u && sector != 7u && sector != 14u) || (sector >= 0x20u && sector < 0x120u);
 }
 
 static void test_cps(void)
@@ -1163,8 +1164,9 @@ static void test_cps(void)
 		       (unsigned)(e1 - e0));
 		CHECK(nand.programs - p0 <= 2u * w + 2u * 64u);	// two pages a sector; a little more for the copies garbage collection makes
 	}
-	CHECK(sectors == 15u + 256u);
+	CHECK(sectors == 14u + 256u);
 	CHECK(cps_ctl(5, 0));
+	CHECK(!cps_write_sector(0xE000u, img));
 	// Read back through the CPS, then again after a power cycle
 	for (unsigned round = 0; round < 2; round++) {
 		for (uint32_t s = 0; s < BIG_SECTORS; s++) {
@@ -1227,7 +1229,7 @@ static void test_cps(void)
 			CHECK(boot_big());
 			// Churn first: a different number of rewrites each time puts the stream at another spot in its block, so
 			// some commits run garbage collection
-			for (uint32_t i = 0; i < 31u * t + 7u * mode; i++) {
+			for (uint32_t i = 0; i < 32u * t + 7u * mode; i++) {
 				uint32_t cs = 0x20u + (i * 37u + t) % 0x100u;
 				image_sector(img, cs, 300u + i);
 				CHECK(cps_write_sector(cs * STORAGE_SECTOR, img));

@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Contributing
 
@@ -61,7 +62,7 @@ subject: `<Area>: <what changed>`, in the present tense, no trailing period.
   the tests. A change the host tests can't reach (a register write, a board's wiring) says so, covers the logic
   around it with a host test, and adds a HIL test when one can be scripted. Pull requests that change only
   documentation are the only exception.
-- `JOBS=8 tools/ci.sh` ending with "all checks passed".
+- `JOBS=8 tools/ci.sh --board <product-board-id>` ending with "all checks passed".
 - One topic. Split unrelated changes into separate pull requests.
 - The filled-in template (`.github/PULL_REQUEST_TEMPLATE.md`).
 
@@ -146,8 +147,10 @@ on the radio; a catalog key on the site), and the code works when its translatio
 ## Before you open a pull request
 
 ```
-JOBS=8 tools/ci.sh
+JOBS=8 tools/ci.sh --board <product-board-id>
 ```
+
+Use the product board selected in the workflow's `board_file`. Shared host tests still run.
 
 It must end with "all checks passed". Skips (a missing compiler, `reuse` not installed) are reported; install what you
 can. CI runs the quick part on every push and the feature matrix nightly ([CI](ci.md)); run the whole gate before you

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The radio core's everyday features (docs/spec/radio-features.md): the scan, beep and battery modules on their own,
 // then scan, TX time-out warning, busy channel lockout, roger beep, 1750 Hz burst, VOX, battery monitor, receiver
 // battery saving and the DMR beeps through radio_sm.c, against a fake board whose receiver hears signals per frequency
@@ -10,6 +11,7 @@
 #include "board.h"
 #undef board
 #include "radio/radio_sm.h"
+#include "sim/radio_task.h"
 #include "radio/scan.h"
 #include "radio/beep.h"
 #include "radio/vibe.h"
@@ -215,7 +217,7 @@ static bool a_start(audio_block_cb_t cb, void *ctx)
 }
 static void a_stop(void) { aud.streaming = false; aud.cb = NULL; aud.stops++; }
 static void a_pcm(bool on) { aud.pcm = on; }
-static const hal_audio_t fake_audio = { a_start, a_stop, a_pcm };
+static const hal_audio_t fake_audio = { .start = a_start, .stop = a_stop, .speaker_pcm = a_pcm };
 
 // FM transmit audio from the MCU (hal_audio_tap_t.fm_tx_inject): what the radio core asked for
 static struct {
@@ -239,7 +241,7 @@ static bool v_present(void) { return true; }
 static void v_reset(void) {}
 static void v_encode(const int16_t *pcm, uint8_t *bits) { (void)pcm; memset(bits, 0, VOCODER_BITS); }
 static void v_decode(const uint8_t *bits, int16_t *pcm) { (void)bits; memset(pcm, 0, VOCODER_FRAME_SAMPLES * 2); }
-static const hal_vocoder_t fake_vocoder = { v_present, v_reset, v_encode, v_decode, NULL, NULL, NULL, NULL };
+static const hal_vocoder_t fake_vocoder = { .present = v_present, .reset = v_reset, .encode = v_encode, .decode = v_decode };
 
 static const band_t bands[] = {
 	{ 136000000, 174000000, true },
@@ -362,10 +364,18 @@ static void setup_codeplug(void)
 
 static radio_sm_t sm;
 
+// The task resolves the saved encryption policy between requests. This fake
+// board has no flash and therefore no saved default key.
+static void resolve_default(void)
+{
+	sim_radio_resolve_default(&sm);
+}
+
 static void req2(uint8_t type, int32_t arg, uint32_t arg2)
 {
 	radio_req_t r = { type, arg, arg2 };
 	radio_sm_request(&sm, &r, now);
+	resolve_default();
 }
 static void req(uint8_t type, int32_t arg) { req2(type, arg, 0); }
 

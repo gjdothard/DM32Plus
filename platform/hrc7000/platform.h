@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // HR_C7000 (Dahua DH4570) SoC with a C-SKY CK803S core: register map and platform services for boards built on it
 // (docs/spec/hardware-dm32.md 1-4). The modem / baseband registers are the driver's (drivers/modem/hrc7000).
 #ifndef PLATFORM_HRC7000_H
@@ -10,6 +11,9 @@
 #include "hal_system.h"
 #include "hal_flash.h"
 #include "hal_input.h"
+
+// Task-side functions in a translation unit whose interrupt handlers live in RAM
+#define HRC_FLASHFUNC __attribute__((section(".flashfunc"), noinline))
 
 #define REG32(a)		(*(volatile uint32_t *)(uintptr_t)(a))
 
@@ -78,12 +82,13 @@
 #define TMR_CTRL_INT_MASK	0x04u	// 1 = interrupt masked
 
 // Timer allocation: 1 = RTOS tick, 2 = free-running microsecond clock (no interrupt), 3 = DMR PA one-shot (as
-// stock; hardware-dm32.md 8.6), 4 = AFSK, 5 = the board's own, 6 free
+// stock; hardware-dm32.md 8.6), 4 = AFSK, 5 = the board's own, 6 = air-mode PCM refill
 #define TIMER_TICK		1
 #define TIMER_CLOCK		2
 #define TIMER_PA		3
 #define TIMER_AFSK		4	// APRS AFSK transmit: tops up the prompt FIFO (hrc_afsk.c)
 #define TIMER_BOARD		5	// a board's one-shot (e.g. the waits of a board's own DMR burst sequence)
+#define TIMER_PCM_REFILL	6	// air-mode PCM: prompt FIFO refill independent of codec callbacks
 
 // --- PIC: source s is CPU vector s + 32 (hardware-dm32.md 4) ---
 #define PIC_MODE		REG32(PIC_BASE + 0x00)

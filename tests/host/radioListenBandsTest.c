@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Garrett Dothard
 // Copyright (c) 2026 The RadioFoundry Authors
 // The receive-only bands in the radio core (docs/spec/airband-and-broadcast.md): air band AM (3, CONFIG_AM_RX) and
 // broadcast FM (4, CONFIG_BCAST_FM). Which channels are received in AM or on the broadcast receiver, both are receive
@@ -9,6 +10,7 @@
 #include <string.h>
 #include "board.h"
 #include "radio/radio_sm.h"
+#include "sim/radio_task.h"
 #include "radio/radio_am.h"
 #include "radio/radio_bcast.h"
 #include "dmr/ambe/ambeVoice.h"
@@ -136,12 +138,12 @@ static const hal_power_t fake_power = { .led = p_led, .battery_mv = p_battery_mv
 static bool a_start(audio_block_cb_t cb, void *ctx) { (void)cb; (void)ctx; return true; }
 static void a_stop(void) {}
 static void a_pcm(bool on) { (void)on; }
-static const hal_audio_t fake_audio = { a_start, a_stop, a_pcm };
+static const hal_audio_t fake_audio = { .start = a_start, .stop = a_stop, .speaker_pcm = a_pcm };
 static bool v_present(void) { return true; }
 static void v_reset(void) {}
 static void v_encode(const int16_t *pcm, uint8_t *bits) { (void)pcm; memset(bits, 0, VOCODER_BITS); }
 static void v_decode(const uint8_t *bits, int16_t *pcm) { (void)bits; memset(pcm, 0, VOCODER_FRAME_SAMPLES * 2); }
-static const hal_vocoder_t fake_vocoder = { v_present, v_reset, v_encode, v_decode, NULL, NULL, NULL, NULL };
+static const hal_vocoder_t fake_vocoder = { .present = v_present, .reset = v_reset, .encode = v_encode, .decode = v_decode };
 
 // A band table with the air band and the broadcast band: RX-only bands below the VHF transmit band
 static const band_t bands[] = {
@@ -250,7 +252,9 @@ static radio_sm_t sm;
 static void req(uint8_t type, int32_t arg)
 {
 	radio_req_t r = { type, arg, 0 };
+	sim_radio_resolve_default(&sm);
 	radio_sm_request(&sm, &r, now);
+	sim_radio_resolve_default(&sm);
 }
 
 static void run(uint32_t ms)
@@ -261,6 +265,7 @@ static void run(uint32_t ms)
 			sim_slot();
 		}
 		if (now % RADIO_TICK_MS == 0) {
+			sim_radio_resolve_default(&sm);
 			radio_sm_tick(&sm, now);
 		}
 		if (now % RADIO_POLL_MS == 0) {
@@ -428,7 +433,9 @@ static void test_fm_and_dmr(void)
 	// Dual watch back and forth with AirDMR: it comes back FM each time, never a temporary change
 	const radio_dual_ref_t a = { false, 0, 3 }, b = { false, 0, 2 };
 	radio_req_t r = { RREQ_DUAL, (int32_t)radio_dual_arg(&a, true), radio_dual_arg(&b, false) };
+	sim_radio_resolve_default(&sm);
 	radio_sm_request(&sm, &r, now);
+	sim_radio_resolve_default(&sm);
 	int visits = 0;
 	for (int i = 0; i < 300; i++) {
 		run(10);
@@ -439,7 +446,9 @@ static void test_fm_and_dmr(void)
 	}
 	CHECK(visits > 10);
 	r = (radio_req_t){ RREQ_DUAL, 0, 0 };
+	sim_radio_resolve_default(&sm);
 	radio_sm_request(&sm, &r, now);
+	sim_radio_resolve_default(&sm);
 	run(50);
 #endif
 

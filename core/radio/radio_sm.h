@@ -326,6 +326,9 @@ typedef struct {
 	uint32_t save_ms;		// start of the current sleep / wake
 #endif
 	uint32_t codeplug_serial;	// codeplug_serial() when the zone and channel were last read
+#if CONFIG_P25
+	uint32_t p25_generation;
+#endif
 #if CONFIG_ZONE_WRITE
 	uint32_t zone_shifts;		// zone_edit_shifts() when the zone indexes below were last followed (zone_edit.h)
 #endif

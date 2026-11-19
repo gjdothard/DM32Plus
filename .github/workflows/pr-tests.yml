@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 #
 # CI on every pull request (docs/dev/ci.md "Pull request checks"). The jobs are ci.yml's and the manual check, run on
 # the pull request's merge commit; `changes` skips the ones its files don't touch, except `checks` (Python and license
@@ -109,8 +110,7 @@ jobs:
           if-no-files-found: ignore
 
   firmware:
-    # one job per toolchain, not per radio or platform: one checkout and one compiler for every board built with it
-    # (tools/ci.sh --toolchain takes them from the registry, so a new radio joins with no edit here); 4 cores each
+    # Build the selected product board; shared host tests remain in the unit-tests job.
     name: firmware (${{ matrix.name }})
     needs: changes
     if: needs.changes.outputs.src == 'true' || needs.changes.outputs.release == 'true'   # the packaging step: this file too
@@ -119,11 +119,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # the [toolchain] ids of platform/*/platform.toml, with their names; a new platform on a toolchain listed here
-        # needs no edit, a new toolchain gets an entry here and its set-up in .github/actions/toolchain
+        # The product board file defines the firmware scope of this fork.
         include:
-          - { toolchain: arm, name: Arm }
-          - { toolchain: csky, name: C-SKY }
+          - { toolchain: csky, name: C-SKY, board_file: boards/dm32/board.toml }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
         with:
@@ -141,25 +139,27 @@ jobs:
         env:
           RUN: ${{ steps.tc.outputs.run }}   # empty, or the csky-elf image's run.sh
           TOOLCHAIN: ${{ matrix.toolchain }}
+          BOARD_FILE: ${{ matrix.board_file }}
         run: |
           set -u
           rc=0
-          $RUN tools/ci.sh --quick --steps firmware --toolchain "$TOOLCHAIN" || rc=$?
+          $RUN tools/ci.sh --quick --steps firmware --board "$(basename "$(dirname "$BOARD_FILE")")" || rc=$?
           if [ "$rc" = 3 ]; then
             echo "::notice::$TOOLCHAIN builds skipped: the image ${RFOUNDRY_CSKY_IMAGE:-} isn't available on this runner (docs/dev/ci.md)"
             exit 0
           fi
           [ -f build/ci/size-report.md ] && cat build/ci/size-report.md >> "$GITHUB_STEP_SUMMARY"
           exit "$rc"
-      - name: Release packaging (every stable board, as a tag would; publishes nothing)
+      - name: Release packaging (selected board; publishes nothing)
         if: needs.changes.outputs.release == 'true'
         env:
           RUN: ${{ steps.tc.outputs.run }}
           TOOLCHAIN: ${{ matrix.toolchain }}
+          BOARD_FILE: ${{ matrix.board_file }}
         run: |
           set -u
           rc=0
-          $RUN tools/release_build.sh --toolchain "$TOOLCHAIN" --version "dev-${GITHUB_SHA::8}" --out build/dist || rc=$?
+          $RUN tools/release_build.sh --toolchain "$TOOLCHAIN" --board "$(basename "$(dirname "$BOARD_FILE")")" --version "dev-${GITHUB_SHA::8}" --out build/dist || rc=$?
           if [ "$rc" = 3 ]; then
             echo "::notice::$TOOLCHAIN packaging skipped: the image ${RFOUNDRY_CSKY_IMAGE:-} isn't available on this runner (docs/dev/ci.md)"
             exit 0

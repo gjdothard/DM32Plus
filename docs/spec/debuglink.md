@@ -3,6 +3,18 @@
 
 # USB debug link
 
+The core view reports `mode=p25` for selected conventional or trunked P25 and
+`mode=unsupported` for parked tagged channels. With `CONFIG_P25`, it also
+reports `p25.active` (the owner acquired its providers and workspace) and
+`p25.rx` (the engine has an active receive call). These are software state,
+not measurements of RF emissions or audio quality.
+With `CONFIG_P25_TRUNK`, `p25.trunk.state`, `p25.trunk.reg` and
+`p25.trunk.req` expose the published follower states. See
+[trunked channel operation](p25-trunking.md) for their meanings.
+With `CONFIG_CPS_FAST`, `programming=1` means the radio task has stopped its
+RF owners for managed programming. Zero means that hold is inactive. This
+software flag does not establish absence of measured emissions.
+
 A small framed protocol on the radio's host port (USB CDC-ACM on radios with USB, a UART otherwise) for bench
 automation: read the
 firmware version, the diagnostics counters and the radio's state, reset counters, take screenshots, press keys, key
@@ -122,7 +134,7 @@ proto=1                 protocol version (this document)
 view=4                  GET_VIEW record version (3.7)
 git=5277f73a            firmware git hash
 git_time=1761840000     the commit's time (a dirty build's: the build's), Unix seconds; absent without git
-release=v26.11          release name; only in a build of a release tag
+release=v1.0.0          release name; only in a build of a release tag
 board=XR-100UV
 features=FM,SUBTONE,DMR,DMR_PRIVACY,...,USB,HOSTLINK,DEBUGLINK
 codec=<profile>-s11  the codec profile found in flash (below)
@@ -850,3 +862,12 @@ it; a test that resets, waits a moment and then starts its traffic is not affect
 Add the number to `debuglink_proto.h`, a handler in `core/debuglink/debuglink.c` (short, non-blocking, reply at most
 1024 bytes), a row here, and a method in `tools/rfoundry_debug.py`. New view keys need only the renderer and the table
 in 3.7.
+
+## Release comparison
+
+The `release=` value accepts `vMAJOR.MINOR.PATCH`, `-beta.N` and `-rc.N` suffixes, and historical
+calendar names. Components compare numerically; beta precedes rc, which precedes the final.
+The semantic series follows all historical calendar versions. Stable installations receive final
+updates only. A prerelease installation can receive newer prereleases or finals. Developer builds
+without a release name compare commit times and receive finals only. Updates must match the board
+and full variant. See [release names](../dev/release.md#release-names).

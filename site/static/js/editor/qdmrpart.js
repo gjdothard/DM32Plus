@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // qdmr YAML in the Codeplug Editor: Save offers the codeplug as a qdmr YAML file, and Open File takes one. An import
 // replaces the channels, zones, contacts, lists and APRS configurations as one undoable change; what neither side can
 // hold is listed afterwards.
 
 import { register } from "./extensions.js";
 import { importQdmr, exportQdmr, QdmrError } from "../codeplug/qdmr.js";
+import { containsModes } from "../codeplug/modecompat.js";
 
 register({
 	saveItems(api) {
@@ -20,6 +22,7 @@ register({
 });
 
 function save(api) {
+	if (containsModes(api.model)) return api.say(api.t("editor.qdmr.err.modes_binary"), "warn");
 	const { text, notes } = exportQdmr(api.model);
 	api.download(`${api.fileName || "codeplug"}.yaml`, new TextEncoder().encode(text));
 	if (notes.length) report(api, api.t("editor.qdmr.saved_title"), api.t("editor.qdmr.saved_notes"), notes);

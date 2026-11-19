@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Radio: what the core asks of the RF side, whatever chips the board has.
 // The board composes its RF chip, modem / audio chip, band and PA switching and calibration behind this.
 #ifndef HAL_RADIO_H
@@ -8,7 +9,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef enum { RADIO_MODE_FM, RADIO_MODE_DMR } radio_mode_t;
+// P25 is a core mode: the board is configured as digital (DMR). NONE parks an unsupported stored kind.
+typedef enum { RADIO_MODE_FM, RADIO_MODE_DMR, RADIO_MODE_P25, RADIO_MODE_NONE = 255 } radio_mode_t;
 typedef enum { RADIO_BW_12K5, RADIO_BW_25K } radio_bw_t;
 
 typedef enum { TONE_NONE, TONE_CTCSS, TONE_DCS, TONE_DCS_INV } tone_type_t;

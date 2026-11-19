@@ -1,0 +1,101 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Garrett Dothard
+name: Release website
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing stable release tag to rebuild and verify
+        type: string
+        required: true
+        default: v1.0.0
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: website-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment:
+      name: website-production
+      url: https://cps.pplan.net/
+    timeout-minutes: 20
+    env:
+      PRODUCT_FILE: boards/dm32/product.json
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.version }}
+          persist-credentials: false
+      - name: Record the released firmware commit
+        run: echo "RELEASE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          pattern: firmware-*
+          merge-multiple: true
+          path: build/website-firmware
+      - name: Download the existing release firmware for a manual retry
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 tools/release_version.py check "$VERSION"
+          if python3 tools/release_version.py prerelease "$VERSION"; then exit 1; fi
+          prefix=$(jq -er .prefix "$PRODUCT_FILE")
+          board=$(jq -er .board "$PRODUCT_FILE")
+          gh release download "$VERSION" --dir build/website-firmware \
+            --pattern "$prefix-$board-$VERSION.bin" --pattern "$prefix-$board-$VERSION.json"
+      - name: Build the website with this release's firmware
+        run: |
+          set -euo pipefail
+          python3 tools/release_version.py check "$VERSION"
+          if python3 tools/release_version.py prerelease "$VERSION"; then exit 1; fi
+          python3 -m pip install -r site/requirements.txt
+          python3 site/build.py --strict --out build/website --firmware build/website-firmware --ref "$RELEASE_COMMIT"
+          python3 tools/website/package.py --site build/website --product "$PRODUCT_FILE" --version "$VERSION" --out "build/website-$VERSION.tar.gz"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: website-${{ inputs.version }}
+          path: build/website-*.tar.gz
+          if-no-files-found: error
+      - name: Publish the website bundle for the host updater
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$VERSION" "build/website-$VERSION.tar.gz" --clobber
+      - name: Verify the deployed public version
+        env:
+          WEBSITE_URL: ${{ vars.WEBSITE_URL || 'https://cps.pplan.net' }}
+        run: |
+          python3 - <<'PY'
+          import json, os, time, urllib.error, urllib.request
+          url = os.environ["WEBSITE_URL"].rstrip("/") + "/deployment.json"
+          for attempt in range(36):
+              try:
+                  request = urllib.request.Request(url + "?release=" + os.environ["RELEASE_COMMIT"], headers={"Cache-Control": "no-cache", "Accept": "application/json", "User-Agent": "website-release-check/1.0"})
+                  with urllib.request.urlopen(request, timeout=10) as response:
+                      marker = json.load(response)
+                  if marker.get("version") == os.environ["VERSION"] and marker.get("git") == os.environ["RELEASE_COMMIT"]:
+                      print("Website deployed:", marker["version"], marker["git"])
+                      break
+              except (OSError, ValueError) as error:
+                  print("Waiting for the public deployment:", error, flush=True)
+              time.sleep(10)
+          else:
+              raise SystemExit("Website did not deploy this release; check the host updater and container health")
+          PY
