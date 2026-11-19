@@ -66,6 +66,14 @@ protocol around follower mutation. A provider that preempts the radio task
 skips follower work; it never waits. Teardown closes the provider before ending
 the follower, stopping PCM callbacks and returning the loan.
 
+The radio task samples its follower clock only after acquiring that exclusion.
+Otherwise a provider can preempt after the clock read and refresh `t_good` with
+a later timestamp; unsigned elapsed-time arithmetic then falsely reports a
+control or voice timeout. After a receiver retune completes, the task samples
+the clock again before acknowledging the retune. Time spent in the RF provider
+does not consume the new channel's receive window. Genuine receive-loss
+timeouts retain their existing durations.
+
 ## Visibility and checks
 
 The debug core view exposes `p25.trunk.state` (0 off, 1 hunt, 2 control, 3 voice),
@@ -79,6 +87,9 @@ Legacy codeplug writers continue refusing tagged codeplugs.
 follower, framing and voice with simulated hardware. It checks passive follow
 and return, allowed subscriber signaling and granted voice, cancellation,
 permission revocation, invalid frequencies, encrypted/TDMA grants, failed start
-and normal inhibition. Existing pure follower tests cover noisy symbol streams,
+and normal inhibition. The owner tests also inject decoder callbacks between
+clock sampling and task resumption, and simulate a slow RF retune. They check
+that both channel types remain held without false loss and that genuine voice
+silence still times out. Existing pure follower tests cover noisy symbol streams,
 queued/denied requests and access timers. Read-only HIL visibility is supplied
 in `tests/hil/test_p25.py`; running it does not qualify RF or audio.

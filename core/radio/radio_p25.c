@@ -277,8 +277,9 @@ static void trunk_service(void)
 {
 	radio_p25_trunk_t *t = &mem->trunk;
 	p25_follow_t *f = &mem->work.follower;
-	uint32_t now = hal_millis();
 	if (!enter(&t->in_radio, &t->in_prov)) return;
+	// A preempting provider can refresh follower timers before we own them.
+	uint32_t now = hal_millis();
 	if (t->tx_kind == 1 && p25_engine_tx_state(&mem->work.engine) == AIR_TX_DONE) {
 		board.radio->tx_off(); p25_engine_tx_clear(&mem->work.engine);
 		t->tx_kind = 0; t->tx_hz = 0;
@@ -293,6 +294,7 @@ static void trunk_service(void)
 		cfg.rx_tgid = t->what == P25_FOLLOW_TUNE_GROUP || t->what == P25_FOLLOW_TUNE_TALK ? (uint16_t)t->id : 0;
 		p25_engine_set(&mem->work.engine, &cfg);
 		p25_engine_retuned(&mem->work.engine);
+		now = hal_millis();
 		p25_follow_retuned(f, now);
 		if (!t->tuned && t->what == P25_FOLLOW_TUNE_TALK) {
 			t->ptt = false;

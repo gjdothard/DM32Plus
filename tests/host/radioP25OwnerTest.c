@@ -77,9 +77,15 @@ static void tx_off(void) { keyed = false; off_at = ++sequence; }
 static unsigned key_calls;
 static radio_mode_t physical_mode;
 static uint32_t last_rx_hz, last_tx_hz;
+static uint32_t rx_delay_us;
 static void set_mode(radio_mode_t mode) { physical_mode = mode; }
 static bool rx(uint32_t hz, radio_bw_t bw, const subtone_t *tone)
-{ (void)bw; (void)tone; last_rx_hz = hz; return board_in_band(hz, false); }
+{
+	(void)bw; (void)tone;
+	last_rx_hz = hz;
+	now_us += rx_delay_us; rx_delay_us = 0;
+	return board_in_band(hz, false);
+}
 static bool tx_rf(uint32_t hz, radio_bw_t bw, uint8_t power, const subtone_t *tone)
 { (void)bw; (void)power; (void)tone; last_tx_hz = hz; key_calls++; keyed = board_in_band(hz, true); return keyed; }
 static void status(radio_status_t *s) { *s = (radio_status_t){ .rssi_dbm = -120, .noise = 255, .tone_ok = true }; }
@@ -126,6 +132,7 @@ static channel_t channel;
 
 static void fresh(bool rx_only)
 {
+	rx_delay_us = 0;
 	return_fail = false;
 	CHECK(radio_p25_end());
 	CHECK(!loaned);

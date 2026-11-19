@@ -9,7 +9,17 @@
 #include "settings/settings.h"
 #include "radio/radio_programming.h"
 
-uint32_t hal_millis(void) { return now_us / 1000u; }
+static void (*clock_read_hook)(void);
+uint32_t hal_millis(void)
+{
+	uint32_t now = now_us / 1000u;
+	if (clock_read_hook) {
+		void (*hook)(void) = clock_read_hook;
+		clock_read_hook = NULL;
+		hook();
+	}
+	return now;
+}
 void storage_quick_lock(void) {}
 void storage_quick_unlock(void) {}
 static radio_sm_t sm;

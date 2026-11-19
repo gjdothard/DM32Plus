@@ -84,8 +84,80 @@ static void drain(void)
 		step(10);
 	}
 }
+
+static uint8_t interrupt_unit[P25_UNIT_BYTES_MAX];
+static uint16_t interrupt_symbols;
+static void provider_after_clock_read(void)
+{
+	// A decoder task preempts after the clock value was sampled, before the caller resumes.
+	now_us += 1000;
+	for (uint16_t at = 0; at < interrupt_symbols;) {
+		uint8_t packed[144 / 4] = {0};
+		uint16_t take = interrupt_symbols - at > 144 ? 144 : (uint16_t)(interrupt_symbols - at);
+		for (uint16_t i = 0; i < take; i++) air_sym_put(packed, i, air_sym_get(interrupt_unit, at + i));
+		air_chunk_t chunk = { .t_us = now_us, .nsyms = take, .sync_at = -1, .hard = packed };
+		event(AIR_EV_RX, &chunk);
+		now_us += (uint32_t)take * 208u;
+		at += take;
+	}
+}
+
+static void test_follower_clock(void)
+{
+	trunk_setup(true, false, false);
+	network(); step(100);
+	p25_follow_view_t before = follow_view();
+	uint8_t block[P25_TSBK_BYTES];
+	p25_tsbk_t net = { .kind = P25_TSBK_NET, .last = true,
+		.u.net = { .wacn = 0x12345, .sysid = 0x123, .ch = 1 } };
+	p25_tsbk_make(&net, block);
+	interrupt_symbols = p25_isp_unit(interrupt_unit, 0x293, block);
+	clock_read_hook = provider_after_clock_read;
+	CHECK(radio_p25_poll(NULL));
+	CHECK(clock_read_hook == NULL);
+	CHECK(follow_view().state == P25_FOLLOW_CONTROL && follow_view().cc_lost == before.cc_lost &&
+	      follow_view().hunts == before.hunts);
+	network();
+	CHECK(follow_view().blocks > before.blocks);
+
+	grant(42, 4, 0); step(50);
+	CHECK(follow_view().state == P25_FOLLOW_VOICE);
+	p25_call_tx_t call;
+	p25_lc_t lc = { .lcf = P25_LCF_GROUP, .tgid = 1, .src = 42 };
+	p25_call_tx_begin(&call, 0x293, &lc, P25_SS_UNKNOWN);
+	uint16_t first;
+	interrupt_symbols = p25_call_tx_ready(&call, &first);
+	// The first unit starts at symbol zero; the real framer and owner callbacks run in the injected provider.
+	CHECK(first == 0);
+	memcpy(interrupt_unit, call.unit, sizeof interrupt_unit);
+	before = follow_view();
+	clock_read_hook = provider_after_clock_read;
+	CHECK(radio_p25_poll(NULL));
+	CHECK(follow_view().state == P25_FOLLOW_VOICE && follow_view().voice_lost == before.voice_lost);
+	CHECK(key_calls == 0 && starts == 0 && !keyed);
+	CHECK(radio_p25_end());
+
+	// A retune's elapsed time must not consume the new channel's receive window.
+	trunk_setup(true, false, false);
+	network();
+	rx_delay_us = 1500000;
+	grant(42, 4, 0);
+	CHECK(follow_view().state == P25_FOLLOW_VOICE && follow_view().voice_lost == 0);
+	step(200);
+	CHECK(follow_view().state == P25_FOLLOW_VOICE && follow_view().voice_lost == 0);
+	rx_delay_us = 1500000;
+	step(P25_FOLLOW_VOICE_LOST_MS + 20); step(20);
+	CHECK(follow_view().state == P25_FOLLOW_CONTROL && follow_view().voice_lost == 1 && follow_view().cc_lost == 0);
+	step(200);
+	CHECK(follow_view().state == P25_FOLLOW_CONTROL && follow_view().cc_lost == 0);
+	step(P25_FOLLOW_CC_LOST_MS + 20);
+	CHECK(follow_view().state == P25_FOLLOW_HUNT && follow_view().cc_lost == 1);
+	CHECK(key_calls == 0 && starts == 0 && !keyed);
+	CHECK(radio_p25_end());
+}
 int main(void)
 {
+	test_follower_clock();
 	// The shared DMR assignment bank feeds P25 receive groups, without changing TX permissions or target.
 	trunk_setup(true, false, false);
 	CHECK(radio_p25_end());

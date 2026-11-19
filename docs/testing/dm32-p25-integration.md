@@ -3,11 +3,62 @@
 
 # P25 integration tracker
 
-Updated: 2026-11-18. Branch: `Testing` (merged through `Development` from `codex/p25-integration`).
+Updated: 2026-11-19. Published integration: `Testing` (merged through `Development`
+from `codex/p25-integration`). Local timing work: `codex/p25-timing-fix`.
 This is the working plan and progress record. Update it in every integration
 commit: completed task IDs, evidence, remaining work, and the next task. Mark a
 milestone complete only after its acceptance checks pass. Host, target-build,
 bench and interoperability evidence are separate.
+
+## Current local work: receive timing
+
+The owner reported incomplete conversations on the 380.075 MHz control channel.
+Read-only observation captured five control-loss/reacquisition events in three
+minutes at sampled signal strengths of -78 to -72 dBm. The same interval decoded
+10 calls and 1436 good voice frames, concealed four bad frames, and recorded no
+audio underruns, queue overflows or voice-loss timeouts. Encrypted grant skips
+are expected and remain enabled. These observations identify a reception concern;
+they do not prove that every loss event had the same cause.
+
+A host reproduction confirms a timing race: a provider can refresh the follower's
+receive timestamp between the radio task's clock read and ownership acquisition.
+The resulting unsigned time difference falsely triggers control or voice loss.
+The local fix samples the clock after acquisition and refreshes it after a retune
+finishes. A slow RF retune no longer consumes the new channel's receive window.
+
+- [x] Reproduce both false control loss and false voice loss through real owner callbacks.
+- [x] Verify delayed voice/control retunes receive their full timeout windows.
+- [x] Verify genuine control and voice silence still trigger loss recovery.
+- [x] Pass 1010 trunked-owner checks, conventional owner/state checks and 237 follower checks.
+- [x] Finish full target stack and trunking-disabled build checks.
+- [x] Install the local test image when the owner reconnects the radio.
+- [x] Compare control-loss counters and call continuity under live receive conditions.
+- [ ] Owner listening check with USB disconnected.
+
+Installed locally after the owner reconnected the radio: 706180 bytes, 173
+application sectors, CRC verified. Version `2234a79d-dirty`; SHA-256
+`cd010a3d3ee9856716a219e63e30a9e6672042dc067de80607ecbd26457081bc`.
+Full build uses 211440 bytes of static RAM, unchanged. Every task passes the
+128-byte stack margin, with 780 bytes remaining beyond that margin for the radio
+task and 40 for UI. Full and trunking-disabled builds have zero warnings.
+
+The owner's JBC/NWS channel and codeplug were preserved. Its channel Receive
+Only checkbox is off; the system's listen-only setting keeps reception passive.
+No timing-fix branch or image has been published.
+
+Post-install read-only comparison: 300.2 seconds, 599 samples, 22 decoded calls,
+1556 good voice frames and 19 concealed frames. Control losses, voice-loss
+timeouts, audio underruns and queue overflows all remained zero. P25 transmit
+frame/encoder counters and the last-TX timestamp remained zero. Effective
+listen-only stayed enabled throughout. All ten runtime tasks were tracked;
+minimum free heap was 7672 bytes. No serial requests timed out.
+
+This compares zero control losses in five minutes after the fix with five in
+three minutes before it. Traffic was live rather than controlled; the earlier
+UI All-groups override was replaced by the owner's programmed selection after
+reboot. The clock race is reproduced by host tests, while this sample supports
+improved live following. It does not establish audible conversation continuity.
+Serial monitoring is closed. Next: owner listening with USB disconnected.
 
 ## Scope agreed with the owner
 
