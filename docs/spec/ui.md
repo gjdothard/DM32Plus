@@ -23,9 +23,12 @@ its detail row. Single-channel operation shows one card. Entry and large-text vi
 
 The card mode badge and dual-watch status strip use the same mode labels as
 the standard Home screen. A P25 channel displays `P25`; an unavailable mode
-displays `?`. The P25 single-channel card omits analog tone details. These
-labels identify the selected mode, not control-channel acquisition or voice
-decoding. Site, lock and live P25 talkgroup indicators are not yet displayed.
+displays `?`. The P25 single-channel card omits analog tone details and shares
+the [P25 monitoring UI](p25-ui.md), including acquisition, decoded groups and
+system details. On Home, the encoder steps configured P25 groups in order and
+wraps at either end. Arrow keys retain channel navigation. With no configured
+groups, the encoder retains channel navigation too. An idle receive hold shows
+the selected group prominently instead of the last heard group.
 
 On the same tall dark display, Quick Controls uses a 3×3 card grid with numbered tiles and a separate
 value row. Cyan indicates focus and amber indicates an open editor. The DMR and FM Memory grids keep

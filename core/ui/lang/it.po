@@ -3397,6 +3397,10 @@ msgid "Remove talkgroup"
 msgstr "Rimuovi gruppo"
 
 #: core/ui/ui_p25.c
+msgid "P25 request unavailable"
+msgstr "Richiesta P25 non disponibile"
+
+#: core/ui/ui_p25.c
 msgid "P25 unavailable"
 msgstr "P25 non disponibile"
 
@@ -3495,10 +3499,6 @@ msgstr "* P25"
 #: core/ui/ui_p25.c
 msgid "# Recent"
 msgstr "# Recenti"
-
-#: core/ui/ui_p25.c
-msgid "P25 request unavailable"
-msgstr "Richiesta P25 non disponibile"
 
 #: core/ui/ui_p25.c
 msgid "Recent calls"

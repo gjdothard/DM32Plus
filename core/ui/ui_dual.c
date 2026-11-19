@@ -11,6 +11,9 @@
 #include <string.h>
 #include "ui_nav.h"
 #include "ui_svc.h"
+#if CONFIG_P25_UI
+#include "ui_p25.h"
+#endif
 #include "fmt.h"
 #include "font.h"
 #include "gfx.h"
@@ -720,6 +723,10 @@ bool ui_dual_home_key(const input_event_t *ev)
 			return false;
 #if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
 		if (ui_view()->talkgroup_count) {
+#if CONFIG_P25_UI
+			if (ui_view()->ch.mode == RADIO_MODE_P25) ui_p25_talkgroup_step(ev->value);
+			else
+#endif
 			radio_req_dmr_talkgroup_step(ev->value);
 			return true;
 		}

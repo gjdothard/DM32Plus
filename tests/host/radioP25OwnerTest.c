@@ -362,6 +362,8 @@ int main(void)
 #if CONFIG_P25_UI
 	CHECK(radio_p25_monitor_command(P25_MON_SELECT, 65535));
 	CHECK(owner->work.engine.cfg.tx_lc.tgid == 65535 && owner->work.engine.cfg.rx_tgid == 65535);
+	CHECK(radio_p25_monitor_command(P25_MON_STEP, 1));
+	CHECK(owner->work.engine.cfg.tx_lc.tgid == 1234 && owner->work.engine.cfg.rx_tgid == 1234);
 	CHECK(!radio_p25_tx_prepare() && !keyed && starts == 0);
 #endif
 	CHECK(radio_p25_end());

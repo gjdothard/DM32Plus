@@ -4,13 +4,57 @@
 # P25 integration tracker
 
 Updated: 2026-11-19. Published integration: `Testing` (merged through `Development`
-from `codex/p25-integration`). Local timing work: `codex/p25-timing-fix`.
+from `codex/p25-integration`). Local knob work: `codex/p25-talkgroup-knob`,
+based on the receive timing fix in `codex/p25-timing-fix`.
 This is the working plan and progress record. Update it in every integration
 commit: completed task IDs, evidence, remaining work, and the next task. Mark a
 milestone complete only after its acceptance checks pass. Host, target-build,
 bench and interoperability evidence are separate.
 
-## Current local work: receive timing
+## Current local work: assigned talkgroup knob
+
+Home's encoder now steps through the selected P25 channel's assigned groups,
+wrapping in both directions. Selection updates the receive hold and transmit
+target through the existing assigned-group command. Channel and zone stay put;
+arrow keys retain channel navigation. Channels without groups retain encoder
+channel navigation. PTT-held and transmitting states reject target changes.
+Channel Receive Only and system listen-only permissions remain authoritative.
+
+Idle Home displays the selected group and programmed name using the existing
+standard or card layout, without a stale source radio ID. The published radio
+view reuses its group count/index fields; no static RAM is added. Debug-link
+P25 keys expose that count and index for a reversible passive hardware test.
+
+- [x] Pass 1020 trunked-owner assertions, both conventional/trunked owner variants
+  (481 each), and 175 state assertions, including signed wraparound, stale-channel
+  rejection, PTT-held rejection and receive-only behavior.
+- [x] Pass UI flows with color, monochrome, cards disabled and P25 UI disabled.
+- [x] Render and inspect the selected-group scene; add five display gallery images.
+- [x] Build with P25 UI, assigned talkgroups and trunking individually disabled;
+  every configuration has zero warnings.
+- [x] Finish the final full-image stack check and install locally.
+- [x] Check the real encoder request path, unchanged channel and no transmit;
+  restore the owner's target and listening mode.
+
+The full image builds at 706724 bytes with 211440 bytes of static RAM,
+unchanged from the timing image. Documentation links, generic-code checks and
+translation catalogs pass. Every task fits with the existing 128-byte margin;
+the least remaining margin is UI at 40 bytes. This local update does not
+require CPS changes.
+
+Installed locally on COM3: 173 application sectors, verified by CRC, version
+`ea713f42-dirty`; SHA-256
+`400001df92266f7bff88aee3e3ae8240f36ef058a589bf5584f878e70745baac`.
+The timing fix remains included. The live knob test passes with ten assigned
+groups, advances the receive hold and transmit target together, keeps channel 1,
+and restores target 882 with All listening. Effective system listen-only remains
+enabled, and the last-TX timestamp stays zero. No PTT or RF test was requested.
+All six applicable passive P25 hardware tests pass, including monitoring-page
+navigation and the published group snapshot. The extended-band test skips
+because the selected channel is UHF. Serial monitoring is closed. Next: owner
+checks the physical knob and listening behavior with USB disconnected.
+
+## Receive timing fix
 
 The owner reported incomplete conversations on the 380.075 MHz control channel.
 Read-only observation captured five control-loss/reacquisition events in three

@@ -364,7 +364,7 @@ short. Each request takes a fresh snapshot
 | 26 | `net_link` | the host link's MTUs ([usb-network.md](usb-network.md) 3.2), with the IP gateway: `net.mtu` (the link's, DHCP option 26) `net.air_mtu` (one transmission's) and the drops `net.air_too_big net.frag_needed net.up_too_big`; `CONFIG_NET_PPP` builds `ppp.running ppp.ip_up ppp.lcp ppp.ipcp` (RFC 1661 state numbers, 9 = opened) `ppp.rx_frames ppp.tx_frames ppp.rx_errors ppp.mru ppp.peer_mru` ([ppp.md](ppp.md)); `net_link.built=0` without either |
 
 Section 27, `p25`, contains the bounded [P25 monitoring view](p25-ui.md):
-`p25.ui active channel flags listen held_tg tx_target`, decoded `wacn sysid rfss site nac`,
+`p25.ui active channel flags listen held_tg tx_target groups group_index`, decoded `wacn sysid rfss site nac`,
 `refused cc_hz voice_hz blocks crc_fail recent favorites`, and the newest
 `tg src last_ms` when history is nonempty. `voice_hz` is the actual tuned
 frequency, including when on control. `p25.ui=0` means monitoring is disabled.

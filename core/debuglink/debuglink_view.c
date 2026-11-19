@@ -605,6 +605,11 @@ void debuglink_view_section(uint8_t section, const radio_view_t *v, dl_text_t *t
 		dl_text(t, "p25.ui=1\np25.active=%u\np25.channel=%u\np25.flags=%u\np25.listen=%u\np25.held_tg=%u\n",
 			active, m.channel, m.flags, m.listen, m.held_tg);
 		dl_text(t, "p25.tx_target=%u\n", (unsigned)m.tx_target);
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+		dl_text(t, "p25.groups=%u\np25.group_index=%u\n", active ? v->talkgroup_count : 0, active ? v->talkgroup_index : 0);
+#else
+		dl_text(t, "p25.groups=0\np25.group_index=0\n");
+#endif
 		dl_text(t, "p25.wacn=%u\np25.sysid=%u\np25.rfss=%u\np25.site=%u\np25.nac=%u\np25.refused=%u\n",
 			(unsigned)m.wacn, m.sysid, m.rfss, m.site, m.nac, m.refused);
 		dl_text(t, "p25.cc_hz=%u\np25.voice_hz=%u\np25.blocks=%u\np25.crc_fail=%u\np25.recent=%u\np25.favorites=%u\n",

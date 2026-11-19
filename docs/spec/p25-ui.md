@@ -93,6 +93,16 @@ the feature is disabled.
 
 ## Integration checklist
 
+The Home encoder steps configured P25 groups using a signed detent count. The
+radio task resolves each step against its current cached target, so queued
+steps cannot overwrite one another using a stale UI index. Selection wraps in
+both directions and uses the assigned-group selection command, changing receive
+hold and transmit target together. PTT, active TX and stale channel bindings
+refuse selection. Existing Receive Only and system permissions remain in force.
+The current count/index reuse the shared published radio view; the UI does not
+read the decoder loan. The selected idle group and name use the shared Home
+card and standard layouts. No configured groups means ordinary channel stepping.
+
 The listening menu also opens the existing operating-talkgroup picker. P25
 uses the shared channel assignments, names and ordering; timeslot labels are
 omitted. Selecting an assignment holds that group and changes the transmit

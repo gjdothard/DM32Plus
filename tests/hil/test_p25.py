@@ -1,9 +1,52 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Garrett Dothard
-"""Read-only visibility checks for preprogrammed P25 channels."""
+"""Passive P25 visibility and reversible monitoring controls."""
 import pytest
 
 from rfoundry_hil import skip
+from rfoundry_debug import DOWN
+
+
+@pytest.mark.feature("p25_ui")
+def test_p25_talkgroup_knob(radio):
+    initial = radio.link.view(["core", "p25", "link"])
+    if initial.get("mode") != "p25" or not int(initial.get("p25.flags", "0")) & 16:
+        skip("state", "select an effectively receive-only P25 channel for the knob check")
+    count = int(initial.get("p25.groups", "0"))
+    if count < 2 or initial.get("p25.listen") not in ("0", "1"):
+        skip("state", "configure at least two groups and use Programmed or All listening")
+    if initial.get("ui.locked") == "1" or "input.enc_steps" not in initial:
+        skip("state", "unlock an encoder-equipped radio before checking the knob")
+    index = int(initial["p25.group_index"])
+    channel = initial["channel_number"]
+    try:
+        radio.go_home()
+        radio.link.key("enc", DOWN, 1)
+        current = radio.wait_for(lambda v: int(v.get("p25.group_index", "-1")) == (index + 1) % count,
+                                 sections=("core", "p25"), what="next P25 group")
+        assert current["channel_number"] == channel
+        assert current["p25.tx_target"] != initial["p25.tx_target"]
+        assert current["p25.held_tg"] == current["p25.tx_target"]
+        assert current["p25.listen"] == "3"
+        assert int(current["p25.flags"]) & 16
+        assert current["last_tx_ms"] == initial["last_tx_ms"]
+    finally:
+        current = radio.link.view(["p25"])
+        if current.get("p25.tx_target") != initial["p25.tx_target"]:
+            delta = (index - int(current["p25.group_index"])) % count
+            if delta > count // 2:
+                delta -= count
+            radio.link.key("enc", DOWN, delta)
+            radio.wait_for(lambda v: v.get("p25.tx_target") == initial["p25.tx_target"],
+                           sections=("p25",), what="original P25 target")
+        radio.link.key_hold("quick", 250)
+        radio.link.wait_keys_idle()
+        radio.wait_for(lambda v: v.get("ui.screen") == "p25-listen", sections=("link",), what="P25 controls")
+        radio.link.key_hold("5" if initial["p25.listen"] == "0" else "2", 250)
+        radio.link.wait_keys_idle()
+        radio.wait_for(lambda v: v.get("p25.listen") == initial["p25.listen"],
+                       sections=("p25",), what="original P25 listening mode")
+        radio.go_home()
 
 
 @pytest.mark.feature("p25_ui")
@@ -63,6 +106,8 @@ def test_p25_monitor_snapshot(radio):
     assert 0 <= int(view["p25.recent"]) <= 4, view
     assert 0 <= int(view["p25.favorites"]) <= 4, view
     assert 0 <= int(view["p25.listen"]) <= 3, view
+    assert 0 <= int(view["p25.groups"]) <= 63, view
+    assert 0 <= int(view["p25.group_index"]) < max(1, int(view["p25.groups"])), view
 
 
 @pytest.mark.feature("p25")

@@ -1022,6 +1022,13 @@ static void p25_follow(radio_sm_t *sm, uint32_t now_ms)
 		return;
 	}
 	bool rx = sm->view.p25_rx;
+#if CONFIG_P25_UI && CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+	uint8_t index, count = radio_p25_talkgroups(&index);
+	if (count != sm->view.talkgroup_count || index != sm->view.talkgroup_index) {
+		sm->view.talkgroup_count = count; sm->view.talkgroup_index = index;
+		changed(sm);
+	}
+#endif
 #if CONFIG_P25_TRUNK
 	uint8_t trunk_state = sm->view.p25_trunk_state, registration = sm->view.p25_registration, request = sm->view.p25_request;
 	radio_p25_trunk_status(&sm->view.p25_trunk_state, &sm->view.p25_registration, &sm->view.p25_request);
@@ -5330,8 +5337,10 @@ void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 #if CONFIG_P25_UI
 	case RREQ_P25_MONITOR:
 		if (!busy && sm->view.ch.mode == RADIO_MODE_P25 &&
-		    sm->view.channel_number == ((uint32_t)req->arg >> 16))
-			radio_p25_monitor_command((uint8_t)req->arg2, (uint16_t)req->arg);
+		    (!(req->arg2 == P25_MON_SELECT || req->arg2 == P25_MON_STEP) || !sm->ptt) &&
+		    sm->view.channel_number == ((uint32_t)req->arg >> 16) &&
+		    radio_p25_monitor_command((uint8_t)req->arg2, (uint16_t)req->arg))
+			changed(sm);
 		break;
 #endif
 	case RREQ_CH_STEP:

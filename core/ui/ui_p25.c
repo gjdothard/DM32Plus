@@ -13,6 +13,12 @@ __attribute__((weak)) bool ui_svc_p25_command(uint16_t channel, uint8_t op, uint
 __attribute__((weak)) bool ui_svc_p25_favorite(uint16_t channel, uint16_t tg, bool remove)
 { (void)channel; (void)tg; (void)remove; return false; }
 
+void ui_p25_talkgroup_step(int16_t steps)
+{
+	if (!ui_svc_p25_command(ui_view()->channel_number, P25_MON_STEP, (uint16_t)steps))
+		ui_toast(TR("P25 request unavailable"));
+}
+
 static bool snapshot(p25_monitor_t *m)
 {
 	return ui_svc_p25_view(m) && m->channel == ui_view()->channel_number && ui_view()->ch.mode == RADIO_MODE_P25;
@@ -32,6 +38,12 @@ static bool favorite(const p25_monitor_t *m, uint16_t tg)
 {
 	for (unsigned i = 0; i < m->favorite_count; i++) if (m->favorites[i] == tg) return true;
 	return false;
+}
+
+static uint16_t selected_group(const p25_monitor_t *m)
+{
+	return m->listen == P25_LISTEN_HOLD && !(m->flags & P25_MON_RX) &&
+		!((m->flags & P25_MON_TRUNK) && m->state == 3) ? m->held_tg : 0;
 }
 
 static void group_text(char *text, size_t len, uint16_t tg)
@@ -75,20 +87,23 @@ static void __attribute__((noinline)) home_standard(const radio_view_t *v, const
 		return;
 	}
 	if (gfx_height() >= 128) y += 4;
-	if (m.recent_count) {
-		const p25_monitor_call_t *c = &m.recent[0];
-		if (gfx_height() >= 200) line(f, &y, m.flags & P25_MON_RX ? TR("Talkgroup") : TR("Last heard"), ui_col.dim);
-		if (c->flags & P25_MON_UNIT) str_copy(text, sizeof text, TR("Private call"));
-		else group_text(text, sizeof text, c->tg);
+	uint16_t selected = selected_group(&m);
+	if (m.recent_count || selected) {
+		const p25_monitor_call_t *c = !selected && m.recent_count ? &m.recent[0] : NULL;
+		uint16_t tg = selected ? selected : c->tg;
+		bool unit = c && (c->flags & P25_MON_UNIT);
+		if (gfx_height() >= 200) line(f, &y, selected || (m.flags & P25_MON_RX) ? TR("Talkgroup") : TR("Last heard"), ui_col.dim);
+		if (unit) str_copy(text, sizeof text, TR("Private call"));
+		else group_text(text, sizeof text, tg);
 		line(gfx_height() >= 128 ? ui_layout.large : f, &y, text, ui_col.fg);
-		if (!(c->flags & P25_MON_UNIT) && gfx_height() >= 128) {
+		if (!unit && gfx_height() >= 128) {
 			contact_t contact;
-			if (codeplug_contact_find_protocol(c->tg, true, 2, &contact) && !ui_name_is_id(contact.name, c->tg, false))
+			if (codeplug_contact_find_protocol(tg, true, 2, &contact) && !ui_name_is_id(contact.name, tg, false))
 				line(ui_layout.medium, &y, contact.name, ui_col.fg);
 		}
 		if (gfx_height() >= 128) {
 			sb_init(&b, text, sizeof text); sb_str(&b, TR("Radio ID")); sb_chr(&b, ' ');
-			if (c->src) sb_u32(&b, c->src, 1); else sb_str(&b, "--");
+			if (c && c->src) sb_u32(&b, c->src, 1); else sb_str(&b, "--");
 			line(f, &y, text, ui_col.dim);
 		}
 	} else line(f, &y, TR("No calls heard"), ui_col.dim);
@@ -152,10 +167,12 @@ static void __attribute__((noinline)) home_card_body(const radio_view_t *v, cons
 	// The call card uses the same surfaces and typography as the other card pages.
 	gfx_round_fill(2, 94, width - 4, 108, UI_CARD_SURFACE);
 	bool current = (m.flags & P25_MON_RX) || ((m.flags & P25_MON_TRUNK) && m.state == 3);
+	uint16_t selected = selected_group(&m);
 	card_text(meta, 10, 101, width - 20, v->state == RS_TX ? TR("Transmit target") :
-		current ? TR("Talkgroup") : TR("Last heard"), ui_col.dim);
-	const p25_monitor_call_t *call = m.recent_count ? &m.recent[0] : NULL;
+		current || selected ? TR("Talkgroup") : TR("Last heard"), ui_col.dim);
+	const p25_monitor_call_t *call = !selected && m.recent_count ? &m.recent[0] : NULL;
 	if (v->state == RS_TX) tx_text(text, sizeof text, &m);
+	else if (selected) group_text(text, sizeof text, selected);
 	else if (call && (call->flags & P25_MON_UNIT)) str_copy(text, sizeof text, TR("Private call"));
 	else if (call) group_text(text, sizeof text, call->tg);
 	else str_copy(text, sizeof text, "--");
@@ -164,11 +181,12 @@ static void __attribute__((noinline)) home_card_body(const radio_view_t *v, cons
 		contact_t contact;
 		if (codeplug_contact_find_protocol(m.tx_target, !(m.flags & P25_MON_TX_UNIT), 2, &contact))
 			card_text(font, 10, 157, width - 20, contact.name, ui_col.fg);
-	} else if (call && call->tg) {
+	} else if (selected || (call && call->tg)) {
 		contact_t contact;
-		if (codeplug_contact_find_protocol(call->tg, true, 2, &contact) && !ui_name_is_id(contact.name, call->tg, false))
+		uint16_t tg = selected ? selected : call->tg;
+		if (codeplug_contact_find_protocol(tg, true, 2, &contact) && !ui_name_is_id(contact.name, tg, false))
 			card_text(font, 10, 157, width - 20, contact.name, ui_col.fg);
-	} else if (!call) card_text(meta, 10, 160, width - 20, TR("No calls heard"), ui_col.dim);
+	} else if (!call && !selected) card_text(meta, 10, 160, width - 20, TR("No calls heard"), ui_col.dim);
 	sb_init(&b, text, sizeof text); sb_str(&b, TR("Radio ID")); sb_chr(&b, ' ');
 	if (call && call->src) sb_u32(&b, call->src, 1); else sb_str(&b, "--");
 	if (call && (call->flags & P25_MON_ENC)) { sb_str(&b, "  "); sb_str(&b, TR("Encrypted call")); }

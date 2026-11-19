@@ -809,6 +809,18 @@ static const flow_t flows_mono[] = {
 
 // DM-1701 key map only: the top side key, long waits
 static const flow_t flows_k[] = {
+#if CONFIG_P25_UI
+	{ "P25 knob selects the next assigned group", "p25-trunk-home", "enc+",
+	  "screen=home pos=3 p25hold=2456 p25target=2456 shows=2456 tx=0", 1, false },
+	{ "P25 knob wraps backward", "p25-trunk-home", "enc-",
+	  "screen=home pos=3 p25hold=2456 p25target=2456 tx=0", 1, false },
+	{ "P25 knob wraps forward", "p25-trunk-home enc+", "enc+",
+	  "screen=home pos=3 p25hold=1234 p25target=1234 tx=0", 1, false },
+	{ "P25 knob without configured groups changes channel", "p25-trunk-home p25-no-groups", "enc+",
+	  "screen=home pos=4 tx=0", 1, false },
+	{ "P25 conventional knob selects the next group", "p25-home", "enc+",
+	  "screen=home pos=3 p25hold=2456 p25target=2456 tx=0", 1, false },
+#endif
 	// Dual watch on the side keys: SK2 is A/B pressed, Dual watch held; P1 / P2 (zones) and the knob act on the
 	// selected channel
 	{ "11 dual watch: SK2 pressed is A/B", "quick 7 ctx 3 5 ok", "sk2", "dual=1 sel=B", 1, false },
@@ -1462,6 +1474,10 @@ int main(void)
 		  "p25card=1 "
 #endif
 		  "shows=P25 shows=Charleston_NSA hides=FM hides=No_tone", 0, false },
+#if CONFIG_P25_UI
+		{ "P25 knob card shows its selected group and clears the stale caller", "branded-home p25-trunk-home", "enc+",
+		  "screen=home shows=2456 shows=Security hides=567890 p25target=2456 tx=0", 1, false },
+#endif
 	};
 	for (size_t i = 0; i < sizeof card_p25 / sizeof card_p25[0]; i++)
 		run_flow(&card_p25[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");

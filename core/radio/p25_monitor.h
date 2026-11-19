@@ -9,7 +9,7 @@
 #define P25_MONITOR_RECENT 4
 #define P25_MONITOR_FAVORITES 4
 enum { P25_LISTEN_PROGRAMMED, P25_LISTEN_ALL, P25_LISTEN_FAVORITES, P25_LISTEN_HOLD };
-enum { P25_MON_ALL, P25_MON_FAVORITES, P25_MON_HOLD, P25_MON_ADD, P25_MON_REMOVE, P25_MON_PROGRAMMED, P25_MON_SELECT };
+enum { P25_MON_ALL, P25_MON_FAVORITES, P25_MON_HOLD, P25_MON_ADD, P25_MON_REMOVE, P25_MON_PROGRAMMED, P25_MON_SELECT, P25_MON_STEP };
 #define P25_MON_ACTIVE 1u
 #define P25_MON_TRUNK 2u
 #define P25_MON_RX 4u
@@ -36,4 +36,6 @@ typedef struct {
 bool radio_p25_monitor(p25_monitor_t *out);
 // Radio-task only. SELECT changes the target to an assigned group; monitoring commands never change TX.
 bool radio_p25_monitor_command(uint8_t op, uint16_t tg);
+// Radio-task only: assigned group count and the current target's position.
+uint8_t radio_p25_talkgroups(uint8_t *index);
 #endif

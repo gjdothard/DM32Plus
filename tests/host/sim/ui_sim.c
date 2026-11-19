@@ -960,13 +960,30 @@ static p25_monitor_t p25_monitor;
 bool ui_svc_p25_view(p25_monitor_t *out) { *out = p25_monitor; return (out->flags & P25_MON_ACTIVE) != 0; }
 bool ui_svc_p25_command(uint16_t channel, uint8_t op, uint16_t tg)
 {
-	if (channel != view.channel_number || !(p25_monitor.flags & P25_MON_TRUNK)) return false;
+	if (channel != view.channel_number || !(p25_monitor.flags & P25_MON_ACTIVE)) return false;
+	if (op == P25_MON_STEP) {
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+		if (!view.talkgroup_count || !(int16_t)tg) return false;
+		int count = view.talkgroup_count;
+		view.talkgroup_index = (uint8_t)((view.talkgroup_index + (int16_t)tg % count + count) % count);
+		tg = view.talkgroup_index ? 2456 : 1234;
+		op = P25_MON_SELECT;
+#else
+		return false;
+#endif
+	}
 	switch (op) {
 	case P25_MON_ALL: p25_monitor.listen = P25_LISTEN_ALL; p25_monitor.held_tg = 0; break;
 	case P25_MON_PROGRAMMED: p25_monitor.listen = P25_LISTEN_PROGRAMMED; p25_monitor.held_tg = 0; break;
 	case P25_MON_FAVORITES: if (!p25_monitor.favorite_count) return false; p25_monitor.listen = P25_LISTEN_FAVORITES; break;
 	case P25_MON_HOLD: if (!tg) return false; p25_monitor.listen = P25_LISTEN_HOLD; p25_monitor.held_tg = tg; break;
-	case P25_MON_SELECT: if (!tg) return false; p25_monitor.listen = P25_LISTEN_HOLD; p25_monitor.held_tg = tg; p25_monitor.tx_target = tg; break;
+	case P25_MON_SELECT:
+		if (!tg) return false;
+		p25_monitor.listen = P25_LISTEN_HOLD; p25_monitor.held_tg = tg; p25_monitor.tx_target = tg;
+		p25_monitor.flags &= (uint8_t)~(P25_MON_RX | P25_MON_ENC);
+		p25_monitor.state = 2; p25_monitor.tuned_hz = p25_monitor.cc_hz;
+		view.state = RS_IDLE; view.p25_rx = false;
+		break;
 	case P25_MON_ADD:
 		if (p25_monitor.favorite_count >= P25_MONITOR_FAVORITES) return false;
 		p25_monitor.favorites[p25_monitor.favorite_count++] = tg; break;
@@ -2685,6 +2702,12 @@ static bool run_token(char *t, char *err, size_t len)
 		advance(arg != NULL ? (uint32_t)atoi(arg) : 1000u);
 		return true;
 	}
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+	if (strcmp(t, "p25-no-groups") == 0) {
+		view.talkgroup_count = 0;
+		return true;
+	}
+#endif
 	if (strcmp(t, "p25-home") == 0 || strcmp(t, "p25-trunk-home") == 0) {
 		view.ch.mode = RADIO_MODE_P25;
 		view.ch.bw = RADIO_BW_12K5;
@@ -2695,6 +2718,10 @@ static bool run_token(char *t, char *err, size_t len)
 #if CONFIG_P25_UI
 		memset(&p25_monitor, 0, sizeof p25_monitor);
 		p25_monitor.channel = view.channel_number;
+		p25_monitor.tx_target = 1234;
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+		view.talkgroup_count = 2; view.talkgroup_index = 0;
+#endif
 		p25_monitor.flags = P25_MON_ACTIVE | P25_MON_RX_ONLY;
 		p25_monitor.nac = 0x293; p25_monitor.sysid = 0xFFFF; p25_monitor.wacn = 0xFFFFFFFF;
 		p25_monitor.rfss = p25_monitor.site = 0xFF;

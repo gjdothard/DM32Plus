@@ -50,6 +50,13 @@ static void trunk_setup(bool rx_only, bool listen, bool no_reg)
 }
 static p25_follow_view_t follow_view(void)
 { p25_follow_view_t v; radio_p25_trunk_view(&v); return v; }
+#if CONFIG_P25_UI
+static void group_step(int16_t steps, uint16_t number)
+{
+	radio_req_t req = { .type = RREQ_P25_MONITOR, .arg = (int32_t)((uint32_t)number << 16 | (uint16_t)steps), .arg2 = P25_MON_STEP };
+	radio_sm_request(&sm, &req, hal_millis());
+}
+#endif
 static void signaling(const p25_tsbk_t *message)
 {
 	uint8_t block[P25_TSBK_BYTES], unit[P25_UNIT_BYTES_MAX];
@@ -190,6 +197,25 @@ int main(void)
 	CHECK(!radio_p25_monitor_command(P25_MON_SELECT, 500));
 	CHECK(radio_p25_monitor_command(P25_MON_SELECT, 63));
 	CHECK(assigned_owner->trunk.cfg.talk_group == 63 && assigned_owner->work.engine.cfg.tx_lc.tgid == 63);
+	step(20);
+	CHECK(sm.view.talkgroup_count == 63 && sm.view.talkgroup_index == 61);
+	group_step(1, sm.view.channel_number); step(20);
+	CHECK(assigned_owner->trunk.cfg.talk_group == 64 && sm.view.talkgroup_index == 62);
+	group_step(1, sm.view.channel_number); step(20);
+	CHECK(assigned_owner->trunk.cfg.talk_group == 2 && sm.view.talkgroup_index == 0);
+	group_step(-1, sm.view.channel_number);
+	group_step(130, sm.view.channel_number);
+	CHECK(assigned_owner->trunk.cfg.talk_group == 5);
+	group_step(INT16_MIN, sm.view.channel_number); step(20);
+	CHECK(assigned_owner->trunk.cfg.talk_group == 60 && sm.view.talkgroup_index == 58);
+	group_step(1, (uint16_t)(sm.view.channel_number + 1));
+	CHECK(assigned_owner->trunk.cfg.talk_group == 60);
+	CHECK(!radio_p25_monitor_command(P25_MON_STEP, 0));
+	request(RREQ_PTT, 1);
+	group_step(1, sm.view.channel_number); step(20);
+	CHECK(assigned_owner->trunk.cfg.talk_group == 60 && key_calls == 0 && starts == 0);
+	request(RREQ_PTT, 0);
+	CHECK(radio_p25_monitor_command(P25_MON_SELECT, 63));
 	network(); step(100);
 	assigned_grant.u.grant.tg = 64; signaling(&assigned_grant); step(20);
 	CHECK(follow_view().state == P25_FOLLOW_CONTROL);
@@ -208,6 +234,7 @@ int main(void)
 	CHECK((monitor.flags & (P25_MON_ACTIVE | P25_MON_TRUNK | P25_MON_RX_ONLY)) ==
 	      (P25_MON_ACTIVE | P25_MON_TRUNK | P25_MON_RX_ONLY));
 	CHECK(!radio_p25_monitor_command(P25_MON_HOLD, 0));
+	CHECK(!radio_p25_monitor_command(P25_MON_STEP, 1));
 	CHECK(!radio_p25_monitor_command(P25_MON_FAVORITES, 0));
 	CHECK(radio_p25_monitor_command(P25_MON_HOLD, 2));
 	grant(42, 4, 0); step(20);

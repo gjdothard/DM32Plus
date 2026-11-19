@@ -373,8 +373,25 @@ void radio_p25_trunk_status(uint8_t *state, uint8_t *registration, uint8_t *requ
 #endif
 
 #if CONFIG_P25_UI
+uint8_t radio_p25_talkgroups(uint8_t *index)
+{
+	*index = 0;
+	if (!mem) return 0;
+	uint16_t target = mem->work.engine.cfg.tx_lc.tgid;
+	for (uint8_t i = 0; i < mem->group_count; i++)
+		if (mem->groups[i] == target) { *index = i; break; }
+	return mem->group_count;
+}
+
 bool radio_p25_monitor_command(uint8_t op, uint16_t tg)
 {
+	if (op == P25_MON_STEP) {
+		uint8_t index;
+		int count = radio_p25_talkgroups(&index), steps = (int16_t)tg;
+		if (!count || !steps) return false;
+		tg = mem->groups[(index + steps % count + count) % count];
+		op = P25_MON_SELECT;
+	}
 	if (op == P25_MON_SELECT) {
 		if (!mem || !current() || !tg || p25_engine_tx_state(&mem->work.engine) != AIR_TX_IDLE) return false;
 		bool assigned = false;

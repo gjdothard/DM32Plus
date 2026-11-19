@@ -18,6 +18,9 @@
 #include "ui_app.h"
 #include "ui_nav.h"
 #include "ui_svc.h"
+#if CONFIG_P25_UI
+#include "ui_p25.h"
+#endif
 #include "fmt.h"
 #include "i18n.h"
 #include "input/input.h"
@@ -1099,12 +1102,17 @@ bool ui_home_key(const input_event_t *ev)
 		if (ui_st.entry)
 			entry_cancel();
 		// Settings > Keys > Up/Down on Home: the channel (default), the zone, or the talk target (DMR channels). The
-		// arrow keys only: the channel knob always steps the channel, so the two can do different jobs (#25)
+		// Arrow keys keep channel navigation when the knob selects assigned talkgroups.
 		bool arrows = ev->action != ACT_ENC_STEP;
 #if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
-		if (!view->vfo && view->ch.mode == RADIO_MODE_DMR && view->talkgroup_count) {
-			if (!arrows)
-				radio_req_dmr_talkgroup_step(ev->value);
+		if (!view->vfo && (view->ch.mode == RADIO_MODE_DMR || (CONFIG_P25_UI && view->ch.mode == RADIO_MODE_P25)) && view->talkgroup_count) {
+			if (!arrows) {
+#if CONFIG_P25_UI
+				if (view->ch.mode == RADIO_MODE_P25) ui_p25_talkgroup_step(ev->value);
+				else
+#endif
+					radio_req_dmr_talkgroup_step(ev->value);
+			}
 			else
 				for (int i = steps(ev); i > 0; i--)
 					radio_req_channel_step(nav_dir(ev));
