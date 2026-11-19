@@ -76,6 +76,9 @@ static void core_section(const radio_view_t *v, dl_text_t *t)
 
 	dl_text(t, "view=%u\n", DL_VIEW_VERSION);
 	dl_text(t, "state=%s\n", state_key((uint8_t)v->state));
+#if CONFIG_CPS_FAST
+	dl_text(t, "programming=%u\n", v->programming);
+#endif
 	dl_text(t, "tx_deny=%s\n", deny_key(v->tx_deny));
 	dl_text(t, "mode=%s\n", v->ch.mode == RADIO_MODE_P25 ? "p25" : v->ch.mode == RADIO_MODE_NONE ? "unsupported" : v->ch.mode == RADIO_MODE_DMR ? "dmr" : "fm");
 #if CONFIG_P25

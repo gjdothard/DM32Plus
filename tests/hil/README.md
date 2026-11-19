@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Hardware-in-the-loop tests
 
@@ -217,6 +218,7 @@ Used by `_over()` (`test_dmr_tx_talker_alias`, `test_dmr_privacy_tx`), `test_dmr
 
 | Module | What | Needs |
 |---|---|---|
+| `test_cps_managed.py` | Read-only managed staged-programming capability and radio hold visibility; starts no session and changes no storage | owner-authorized radio session; a flash map with staging |
 | `test_health.py` | Any radio's health: display geometry and build features, data flash JEDEC ID and factory calibration, battery reading, a receiver that reads alive, DMR timeslot interrupts, the stock codec, GPS sentences. Each board's numbers come from its `board.toml` `[hil]` table (keys in `rfoundry_hil.HIL_KEYS`, read through `tools/boards.py`); a check the board has no expectation for skips `other_board`, one whose diagnostics line the firmware doesn't print skips `not_built` | radio only; a radio without USB on its programming cable: `--radio-port /dev/cu.usbserial-...` |
 | `test_board_hil.py` | The board data the HIL tests read, without a radio: every board's VERSION name maps back to it, the expectations use known keys, the health checks pass, fail and skip on a fake radio as they should, and a board's own test runs only on its radio | nothing |
 | `boards/<id>/hil/test_*.py` | A board's own checks, which no other radio has a use for (for example `boards/md380/hil/test_md380_rfbus.py`: the bit-banged RF bus reads back and the synthesizer locks). A run of `tests/hil` runs them too; on another radio they skip `other_board` | radio |

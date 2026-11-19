@@ -205,6 +205,20 @@ int main(void)
 	request(RREQ_PTT, 0);
 	CHECK(radio_p25_end());
 
+	trunk_setup(false, false, true);
+	network(); request(RREQ_PTT, 1); step(350); drain(); grant(1234567, 4, 0);
+	CHECK(keyed && !sm.view.tx_auto);
+	CHECK(!radio_programming_acquire()); step(10);
+	CHECK(radio_programming_acquire() && sm.view.programming && !keyed && !on && !loaned);
+	system_config(true, true);
+	radio_programming_release(); step(10);
+	CHECK(!sm.view.programming && sm.view.p25_active && !keyed);
+	unsigned after = key_calls;
+	for (unsigned n = 0; n < 12; n++) { network(); step(400); }
+	CHECK(key_calls == after && follow_view().reg == P25_REG_OFF);
+	request(RREQ_PTT, 1); step(20);
+	CHECK(sm.view.state == RS_TX_DENIED && key_calls == after);
+	request(RREQ_PTT, 0); CHECK(radio_p25_end());
 	printf("radioP25TrunkStateTest: %u checks, %u failed; owner %zu bytes\n", checks, failures, sizeof(radio_p25_mem_t));
 	sim_flash_free();
 	return failures != 0;

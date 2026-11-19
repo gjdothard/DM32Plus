@@ -7,6 +7,7 @@
 #include "radio/radio_sm.h"
 #include "sim/radio_task.h"
 #include "settings/settings.h"
+#include "radio/radio_programming.h"
 
 uint32_t hal_millis(void) { return now_us / 1000u; }
 void storage_quick_lock(void) {}
@@ -175,6 +176,24 @@ int main(void)
 	setup(false);
 	request(RREQ_PTT, 1);
 	CHECK(sm.view.state == RS_TX && keyed && on && key_calls == 1 && starts == 1);
+	CHECK(!radio_programming_acquire());
+	step(10);
+	CHECK(radio_programming_acquire() && sm.view.programming && !keyed && !opened && !loaned && audio_cb == NULL);
+	request(RREQ_PTT, 1);
+	CHECK(!keyed && !sm.ptt);
+	channel.rx_only = true;
+	CHECK(codeplug_tagged_set_channel(10, &channel));
+	radio_programming_release();
+	step(10);
+	CHECK(!sm.view.programming && sm.view.ch.rx_only && sm.view.p25_active);
+	key_calls = 0;
+	request(RREQ_PTT, 1);
+	CHECK(sm.view.tx_deny == TXDENY_RX_ONLY && !keyed && key_calls == 0);
+	request(RREQ_PTT, 0);
+	CHECK(radio_p25_end());
+
+	setup(false);
+	request(RREQ_PTT, 1);
 	channel.rx_only = true;
 	CHECK(codeplug_tagged_set_channel(10, &channel));
 	step(10);

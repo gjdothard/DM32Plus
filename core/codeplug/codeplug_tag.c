@@ -153,12 +153,12 @@ bool codeplug_tag_remove(uint16_t number)
 
 // Whether the area holds any tag, found once per change of codeplug_kv_serial(): a codeplug without tags pays no
 // lookup per channel read. Under storage_lock
-static uint8_t seen_serial;
+static uint32_t seen_serial;
 static uint8_t any_state;	// 0 not looked, 1 none, 2 some
 
 static bool any_tag(void)
 {
-	uint8_t s = codeplug_kv_serial();
+	uint32_t s = codeplug_kv_generation();
 	if (any_state == 0u || s != seen_serial) {
 		codeplug_kv_cursor_t c;
 		uint16_t key;

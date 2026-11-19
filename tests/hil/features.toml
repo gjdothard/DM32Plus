@@ -303,6 +303,11 @@ spec = "docs/spec/cps-protocol.md"
 switch = "CPS_FAST"
 spec = "docs/spec/cps-fast.md"
 
+[feature.cps_managed]
+switch = "CPS_FAST"
+spec = "docs/spec/cps-fast.md"
+source = ["core/cps", "core/radio/radio_programming.c"]
+
 [feature.stub_entry]
 switch = "STUB_ENTRY"
 spec = "docs/spec/stub-stm32f4.md"

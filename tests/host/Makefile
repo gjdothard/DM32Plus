@@ -199,7 +199,7 @@ RFEAT   := $(CORE)/radio/scan.c $(CORE)/radio/beep.c $(CORE)/radio/battery.c $(C
            $(CORE)/radio/vibe.c $(CORE)/radio/mic_gain.c $(CORE)/radio/ref_trim.c $(CORE)/codeplug/codeplug_talk.c $(CORE)/codeplug/zone_shift.c \
            $(CORE)/codeplug/zone_settle.c \
            $(CORE)/radio/radio_sfr.c $(CORE)/radio/radio_cwid.c
-RFEAT += sim/codeplug_modes_sim.c
+RFEAT += sim/codeplug_modes_sim.c $(CORE)/radio/radio_programming.c
 CPGUARD := $(CORE)/codeplug/codeplug_kv.c $(CORE)/codeplug/codeplug_tag.c $(CORE)/codeplug/codeplug_tagged.c
 RCORE   := radioCoreTest.c $(CORE)/radio/radio_sm.c $(CORE)/radio/tones.c $(RFEAT) $(CORE)/dmr/call/dmr_call.c \
            $(CORE)/dmr/call/dmr_lc.c $(CORE)/dmr/fec/dmrFec.c $(CORE)/dmr/ambe/ambeVoice.c $(CORE)/dmr/ambe/ambeFec.c \
@@ -268,7 +268,7 @@ APRSRT  := aprsRadioTest.c $(CORE)/radio/radio_sm.c $(CORE)/radio/tones.c $(CORE
            $(CORE)/radio/vibe.c $(CORE)/codeplug/codeplug_talk.c $(CORE)/codeplug/zone_shift.c $(CORE)/codeplug/zone_settle.c \
            $(CORE)/radio/battery.c $(CORE)/radio/morse.c $(CORE)/settings/settings.c $(CORE)/storage/storage.c \
            $(CORE)/radio/radio_am.c $(CORE)/radio/radio_bcast.c $(CORE)/aprs/aprs.c $(CORE)/aprs/aprs_dmr.c $(CORE)/aprs/aprs_host.c $(APRSLIB) \
-           $(CORE)/usbaudio/audio_mux.c $(CORE)/usbaudio/pcm_slip.c sim/codeplug_modes_sim.c
+           $(CORE)/usbaudio/audio_mux.c $(CORE)/usbaudio/pcm_slip.c sim/codeplug_modes_sim.c $(CORE)/radio/radio_programming.c
 
 aprsRadioTest: $(APRSRT) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/aprs/*.h)
 	$(CC) $(CFLAGS) $(CORE_HAL) -I. $(FMONLY) -o $@ $(APRSRT) -lm
@@ -1151,7 +1151,7 @@ run-cps: cpsTest
 
 # The fast codeplug protocol (core/cps/cps_fast.c, docs/spec/cps-fast.md): LZ4 both ways, blank blocks, CRC compare,
 # range refusals, direct and staged writes, power cuts all through a commit, the staging area shared with TFTP
-CPSF    := $(CORE)/cps/cps_fast.c $(CORE)/cps/cps_lz4.c
+CPSF    := $(CORE)/cps/cps_fast.c $(CORE)/cps/cps_lz4.c $(CORE)/radio/radio_programming.c
 TESTS   += cpsFastTest
 
 cpsFastTest: cpsFastTest.c $(CPS) $(CPSF) $(CORE)/net/tftp_codeplug.c $(wildcard $(CORE)/cps/*.h $(CORE)/net/tftp*.h $(CORE)/storage/*.h)

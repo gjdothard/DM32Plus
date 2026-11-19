@@ -11,6 +11,7 @@
 #include "radio/tones.h"
 #include "settings/settings.h"
 #include "config.h"
+#include "radio/radio_programming.h"
 #include "codeplug/codeplug_tag.h"
 #if CONFIG_P25
 #include "radio/radio_p25.h"
@@ -5080,6 +5081,48 @@ static const hal_audio_t *pcm_audio(void)
 }
 #endif
 
+#if CONFIG_CPS_FAST
+static bool programming_hold(radio_sm_t *sm, uint32_t now_ms)
+{
+	if (!radio_programming_requested()) {
+		if (sm->view.programming) {
+			sm->view.programming = false;
+			reload(sm, now_ms); // load new permissions before any request or automatic-data tick can resume
+			changed(sm);
+		}
+		return false;
+	}
+#if CONFIG_P25
+	bool released = radio_p25_end();
+	sm->view.p25_active = sm->view.p25_rx = false;
+#else
+	bool released = true;
+#endif
+	if (!sm->view.programming) {
+		aprs_rf_abort(sm, now_ms);
+#if CONFIG_HOTSPOT
+		hotspot_leave(sm, now_ms);
+#endif
+#if CONFIG_SCAN
+		if (scan_on(&sm->scan)) scan_stop(sm, false, now_ms);
+#endif
+#if CONFIG_SFR_CWID
+		cw_cancel(sm);
+#endif
+		dmr_end(sm);
+		sm->ptt = sm->host_audio = false;
+		sm->view.monitor = false;
+		sm->view.state = RS_IDLE;
+		sm->view.tx_auto = false;
+		sm->view.programming = true;
+		outputs(sm); changed(sm);
+	}
+	board.radio->tx_off();
+	if (released) radio_programming_ready();
+	return true;
+}
+#endif
+
 void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 {
 #if CONFIG_P25
@@ -5166,6 +5209,9 @@ void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 	// The saved zone and channel; else zone 0 and its first channel; if zone 0 has none, the first zone that has one
 	select_position(sm, st.zone_index, st.channel, st.zone_pos);
 	apply_prefs(sm, &st);
+#if CONFIG_CPS_FAST
+	if (programming_hold(sm, now_ms)) return;
+#endif
 #if CONFIG_DMR
 	sm->hs_power = default_power();
 #endif
@@ -5235,6 +5281,9 @@ static bool retunes(uint8_t type)
 
 void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 {
+#if CONFIG_CPS_FAST
+	if (programming_hold(sm, now_ms)) return;
+#endif
 	// A beep or a vibration is an alert, not the user doing something; the volume changes nothing on air or on the
 	// channel, so it neither gives way to nor cancels anything either
 	bool alert = req->type == RREQ_BEEP || req->type == RREQ_VIBRATE || req->type == RREQ_VOLUME ||
@@ -6045,6 +6094,9 @@ static int16_t rssi_held(radio_sm_t *sm, int16_t rssi_dbm)
 
 void radio_sm_poll(radio_sm_t *sm, uint32_t now_ms)
 {
+#if CONFIG_CPS_FAST
+	if (programming_hold(sm, now_ms)) return;
+#endif
 	radio_status_t st;
 	// codeplug_serial() before zone_edit_busy(): a zone write that moved indexes has its log entry by then
 	if ((sm->reload_pending || codeplug_serial() != sm->codeplug_serial || ZONES_MOVED(sm)
@@ -6304,6 +6356,9 @@ static void sfr_rpt_tick(radio_sm_t *sm, uint32_t now_ms)
 
 void radio_sm_tick(radio_sm_t *sm, uint32_t now_ms)
 {
+#if CONFIG_CPS_FAST
+	if (programming_hold(sm, now_ms)) return;
+#endif
 #if CONFIG_P25
 	if (sm->view.ch.mode == RADIO_MODE_P25) { p25_follow(sm, now_ms); return; }
 #endif

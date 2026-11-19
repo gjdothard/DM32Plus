@@ -25,6 +25,7 @@
 #include "codeplug/codeplug.h"
 #include "storage/storage.h"
 #include "debuglink/debuglink_proto.h"
+#include "radio/radio_programming.h"
 #if CONFIG_TFTP
 #include "net/tftp_codeplug.h"
 #endif
@@ -42,6 +43,7 @@ static struct {
 	uint8_t mode;		// CPSF_MODE_*
 	uint32_t last_ms;	// the session's last request
 	bool written;		// direct: a block went in this session (the codeplug is re-read at its end)
+	bool aware;
 	uint16_t blocks;	// blocks ended this session
 	// The block in progress
 	uint32_t addr;
@@ -211,7 +213,7 @@ static uint32_t make_record(uint8_t *r, uint32_t data_crc)
 {
 	uint32_t n = REC_HDR + 2u * s.slots;
 	put32(&r[0], STORAGE_STAGE_MAGIC_CPSF);
-	put32(&r[4], REC_VERSION);
+	put32(&r[4], s.aware ? 2u : REC_VERSION);
 	put32(&r[8], s.slots);
 	put32(&r[12], data_crc);
 	for (unsigned k = 0; k < s.slots; k++) {
@@ -249,7 +251,9 @@ static bool copy_slot(uint32_t k, uint32_t blk, uint8_t *buf, bool vfo, uint32_t
 	if (vfo) {
 		cps_openfw_vfo_written(p, buf, now_ms);
 	}
-	return storage_sector_write(p, buf);
+	bool ok = storage_sector_write(p, buf);
+	if (ok && blk * CPSF_BLOCK == CODEPLUG_KV_ADDR) codeplug_kv_changed();
+	return ok;
 }
 
 // --- replies ---
@@ -292,6 +296,8 @@ static void end_session(uint8_t state)
 	s.written = false;
 	s.slots = 0;
 	s.state = state;
+	if (s.aware) radio_programming_release();
+	s.aware = false;
 }
 
 static bool in_session(void)
@@ -307,7 +313,7 @@ static size_t op_info(uint8_t *out)
 	uint32_t cap = stage_cap();
 	out[0] = DL_ST_OK;
 	out[1] = CPSF_VERSION;
-	out[2] = (uint8_t)((cap != 0 ? 1u : 0u) | (storage_ready() ? 2u : 0u));
+	out[2] = (uint8_t)((cap != 0 ? 5u : 0u) | (storage_ready() ? 2u : 0u));
 	put16(&out[3], CPSF_BLOCK);
 	out[5] = CPSF_SUMS_MAX;
 	out[6] = CPSF_DATA_MAX;
@@ -395,7 +401,7 @@ static size_t op_read(const uint8_t *a, uint16_t len, uint8_t *out, size_t cap)
 
 static size_t op_begin(const uint8_t *a, uint16_t len, uint8_t *out, uint32_t now_ms)
 {
-	if (len != 1 || a[0] > CPSF_MODE_STAGED) {
+	if (len != 1 || (a[0] != CPSF_MODE_DIRECT && a[0] != CPSF_MODE_STAGED && a[0] != (CPSF_MODE_STAGED | CPSF_MODE_AWARE))) {
 		return status_only(out, DL_ST_BAD_ARG);
 	}
 	if (s.state == CPSF_ST_COMMITTING) {
@@ -407,9 +413,10 @@ static size_t op_begin(const uint8_t *a, uint16_t len, uint8_t *out, uint32_t no
 	if (!storage_ready()) {
 		return refuse(out, CPSF_R_STORAGE);
 	}
-	if (!codeplug_legacy_write_allowed()) return refuse(out, CPSF_R_RANGE);
+	bool aware = (a[0] & CPSF_MODE_AWARE) != 0;
+	if (!aware && !codeplug_legacy_write_allowed()) return refuse(out, CPSF_R_RANGE);
 	uint32_t cap = 0;
-	if (a[0] == CPSF_MODE_STAGED) {
+	if ((a[0] & ~CPSF_MODE_AWARE) == CPSF_MODE_STAGED) {
 		cap = stage_cap();
 		if (cap == 0) {
 			return refuse(out, CPSF_R_NO_STAGING);
@@ -430,7 +437,8 @@ static size_t op_begin(const uint8_t *a, uint16_t len, uint8_t *out, uint32_t no
 		}
 	}
 	s.state = CPSF_ST_OPEN;
-	s.mode = a[0];
+	s.mode = (uint8_t)(a[0] & ~CPSF_MODE_AWARE);
+	s.aware = aware;
 	s.written = false;
 	s.blocks = 0;
 	s.slots = 0;
@@ -455,7 +463,7 @@ static size_t op_block(const uint8_t *a, uint16_t len, uint8_t *out)
 	if (!in_session()) {
 		return refuse(out, CPSF_R_STATE);
 	}
-	if (!block_ok(addr) || addr == CODEPLUG_KV_ADDR) {
+	if (!block_ok(addr) || (!s.aware && addr == CODEPLUG_KV_ADDR)) {
 		return refuse(out, CPSF_R_RANGE);
 	}
 	if (s.mode == CPSF_MODE_STAGED && s.slots >= stage_cap()) {
@@ -470,7 +478,7 @@ static size_t op_block(const uint8_t *a, uint16_t len, uint8_t *out)
 	if (s.buf == NULL && (s.buf = storage_buffer_acquire()) == NULL) {
 		return status_only(out, DL_ST_BUSY);
 	}
-	if (!codeplug_legacy_write_allowed()) { drop_block(); return refuse(out, CPSF_R_RANGE); }
+	if (!s.aware && !codeplug_legacy_write_allowed()) { drop_block(); return refuse(out, CPSF_R_RANGE); }
 	s.addr = addr;
 	s.format = format;
 	s.length = (uint16_t)length;
@@ -530,7 +538,7 @@ static bool stage_block(uint32_t blk)
 
 static size_t op_end(uint16_t len, uint8_t *out, uint32_t now_ms)
 {
-	if (!codeplug_legacy_write_allowed()) { drop_block(); return refuse(out, CPSF_R_RANGE); }
+	if (!s.aware && !codeplug_legacy_write_allowed()) { drop_block(); return refuse(out, CPSF_R_RANGE); }
 	if (len != 0) {
 		return status_only(out, DL_ST_BAD_ARG);
 	}
@@ -573,7 +581,8 @@ static size_t op_commit(uint16_t len, uint8_t *out)
 	if (s.state != CPSF_ST_OPEN) {
 		return refuse(out, CPSF_R_STATE);
 	}
-	if (!codeplug_legacy_write_allowed()) return refuse(out, CPSF_R_RANGE);
+	if (!s.aware && !codeplug_legacy_write_allowed()) return refuse(out, CPSF_R_RANGE);
+	if (s.aware && s.slots != 0 && !radio_programming_acquire()) return status_only(out, DL_ST_BUSY);
 	if (s.mode == CPSF_MODE_DIRECT || s.slots == 0) {
 		end_session(CPSF_ST_DONE);
 		return status_only(out, DL_ST_OK);
@@ -675,11 +684,17 @@ void cps_fast_tick(uint32_t now_ms)
 		s.copied++;
 		return;
 	}
-	ferase(map()->staging_addr);
+	if (!ferase(map()->staging_addr)) {
+		stats.reason = CPSF_R_FLASH;
+		s.state = CPSF_ST_FAILED;
+		return;
+	}
 	s.slots = 0;
 	s.state = CPSF_ST_DONE;
 	stats.commits++;
 	codeplug_reload();
+	if (s.aware) radio_programming_release();
+	s.aware = false;
 }
 
 bool cps_fast_staging_busy(void)
@@ -696,20 +711,29 @@ bool cps_fast_resume(void)
 	uint32_t cap = stage_cap(), crc;
 
 	memset(&s, 0, sizeof(s));
-	if (cap == 0 || !storage_ready() || !fread_(map()->staging_addr, r, sizeof(r))) {
+	radio_programming_release();
+	if (cap == 0) return false;
+	bool readable = fread_(map()->staging_addr, r, sizeof(r));
+	if (!readable || !storage_ready()) {
+		if (!readable || (get32(r) == STORAGE_STAGE_MAGIC_CPSF && get32(r + 4) == 2u))
+			(void)radio_programming_acquire();
 		return false;
 	}
 	uint32_t magic = get32(r), count = get32(&r[8]);
 	if (magic == 0xFFFFFFFFu || magic == STORAGE_STAGE_MAGIC_TFTP) {
 		return false;		// nothing, or the TFTP server's record (tftp_codeplug_resume)
 	}
-	bool valid = magic == STORAGE_STAGE_MAGIC_CPSF && get32(&r[4]) == REC_VERSION && count != 0 && count <= cap &&
+	bool aware = magic == STORAGE_STAGE_MAGIC_CPSF && get32(&r[4]) == 2u;
+	if (aware) (void)radio_programming_acquire(); // a damaged managed commit may already have copied destinations
+	bool valid = magic == STORAGE_STAGE_MAGIC_CPSF && (aware || get32(&r[4]) == REC_VERSION) && count != 0 && count <= cap &&
 		     get32(&r[REC_HDR + 2u * count]) == storage_crc32(0, r, REC_HDR + 2u * count) &&
 		     staged_crc(count, &crc) && crc == get32(&r[12]);
 	for (uint32_t k = 0; valid && k < count; k++) {
 		uint32_t off = get16(&r[REC_HDR + 2u * k]) * CPSF_BLOCK;
-		valid = block_ok(off) && off != CODEPLUG_KV_ADDR;
+		valid = block_ok(off) && (aware || off != CODEPLUG_KV_ADDR);
 	}
+	if (valid && !aware && !codeplug_legacy_write_allowed()) valid = false;
+	if (aware && !valid) return false; // retain the record and RF hold for explicit recovery
 	uint8_t *buf = valid ? storage_buffer_acquire() : NULL;
 	bool done = buf != NULL;
 	for (uint32_t k = 0; done && k < count; k++) {
@@ -718,9 +742,9 @@ bool cps_fast_resume(void)
 	if (buf != NULL) {
 		storage_buffer_release();
 	}
-	if (done || !valid) {
-		ferase(map()->staging_addr);	// finished, or a torn record of a commit that never started
-	}
+	if (done) done = ferase(map()->staging_addr);
+	else if (!valid) ferase(map()->staging_addr); // legacy torn record of a commit that never started
+	if (done) radio_programming_release(); // failed managed recovery keeps the radio parked
 	return done;
 }
 

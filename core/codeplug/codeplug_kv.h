@@ -66,6 +66,8 @@ int codeplug_kv_get(uint16_t key, void *buf, uint16_t max);
 bool codeplug_kv_lookup(uint16_t key, void *buf, uint16_t max, int *length);
 // Full-width edit generation for active mode sessions. Compare alongside codeplug_serial(), which covers base edits.
 uint32_t codeplug_kv_generation(void);
+// A managed raw transfer replaced the sector; invalidate cursors/caches before allowing radio operation.
+void codeplug_kv_changed(void);
 // Radio format guard. Foreign/empty extension bytes are allowed (present=false); an unreadable or damaged RFKV
 // area is refused. A recognized valid RFKV area sets present=true. No writes or formatting.
 bool codeplug_kv_radio_valid(bool *present);

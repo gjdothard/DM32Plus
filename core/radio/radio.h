@@ -232,6 +232,9 @@ typedef struct {
 
 typedef struct {
 	radio_state_t state;
+#if CONFIG_CPS_FAST
+	bool programming;
+#endif
 #if CONFIG_P25
 	bool p25_active, p25_rx;
 #if CONFIG_P25_TRUNK

@@ -7,6 +7,7 @@
 // Edits rewrite records through the sector journal (core/storage) and keep every byte the model doesn't own.
 #include <string.h>
 #include "codeplug.h"
+#include "codeplug_kv.h"
 #include "board.h"
 #include "storage/storage.h"
 
@@ -594,6 +595,10 @@ static bool talkgroup_has_overflow(void)
 
 static uint8_t read_talkgroups(uint16_t number, codeplug_talkgroup_t out[CODEPLUG_TALKGROUP_MAX])
 {
+	if (talkgroup_address(number) >= EE(CODEPLUG_KV_ADDR) && talkgroup_address(number) < EE(CODEPLUG_KV_ADDR + STORAGE_SECTOR)) {
+		uint8_t magic[4];
+		if (!flash_read(EE(CODEPLUG_KV_ADDR), magic, sizeof magic) || !memcmp(magic, "RFKV", sizeof magic)) return 0;
+	}
 	uint8_t bytes[TALKGROUP_RECORD_SIZE];
 	if (!flash_read(talkgroup_address(number), bytes, sizeof bytes)) {
 		return 0;

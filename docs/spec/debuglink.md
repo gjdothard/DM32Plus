@@ -12,6 +12,9 @@ not measurements of RF emissions or audio quality.
 With `CONFIG_P25_TRUNK`, `p25.trunk.state`, `p25.trunk.reg` and
 `p25.trunk.req` expose the published follower states. See
 [trunked channel operation](p25-trunking.md) for their meanings.
+With `CONFIG_CPS_FAST`, `programming=1` means the radio task has stopped its
+RF owners for managed programming. Zero means that hold is inactive. This
+software flag does not establish absence of measured emissions.
 
 A small framed protocol on the radio's host port (USB CDC-ACM on radios with USB, a UART otherwise) for bench
 automation: read the

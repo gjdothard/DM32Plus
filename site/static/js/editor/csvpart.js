@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // CSV in the Codeplug Editor: Save offers the open table as a CSV file and every table as a .zip of CSV files; Open
 // File takes either back. An import is one undoable change, and its problems are listed by row and column.
 
 import { register } from "./extensions.js";
 import { exportTable, exportAll, importTable, importAll, TABLES, CsvError } from "../codeplug/csv.js";
 import { zip } from "../flasher/zip.js";
+import { containsModes } from "../codeplug/modecompat.js";
 
 const TABLE_TABS = Object.keys(TABLES);
 
@@ -40,11 +42,13 @@ register({
 const base = (api) => api.fileName || "codeplug";
 
 function saveTable(api, table) {
+	if (table === "channels" && containsModes(api.model)) return api.say(api.t("editor.csv.err.modes_binary"), "warn");
 	// a byte order mark, so spreadsheet programs read the names as UTF-8
 	api.download(`${base(api)}-${TABLES[table].file}`, new TextEncoder().encode("﻿" + exportTable(api.model, table)));
 }
 
 async function saveAll(api) {
+	if (containsModes(api.model)) return api.say(api.t("editor.csv.err.modes_binary"), "warn");
 	api.download(`${base(api)}-csv.zip`, await zip(exportAll(api.model)));
 }
 

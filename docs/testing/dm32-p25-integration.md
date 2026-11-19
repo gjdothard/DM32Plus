@@ -69,7 +69,7 @@ preserve DM32Plus history, product identity, custom UI and release configuration
 | M3 | In progress | Upstream tagged channel/system records and RX-only admission. | Existing records preserved; real record decoder passes the permission matrix above. |
 | M4 | In progress | Conventional P25 radio-core receive and transmit. | Stored-channel RX/TX, startup/failure cleanup, RX-only PTT refusal and FM/DMR transitions pass host integration tests. |
 | M5 | Complete (host integration and target build) | Trunked acquisition, grant following and active subscriber path. | Hunt/hold/follow/return and allowed TX pass simulated-site tests; RX-only blocks every signaling path. Hardware qualification remains M8. |
-| M6 | Queued | Product UI and companion CPS. | Mode/settings editing, capability/version checks and firmware/CPS round trips work; translations and gallery reviewed. |
+| M6 | Complete (CPS/host integration; hardware untested) | Product UI and companion CPS. | Mode/settings editing, capability/version checks and firmware/CPS round trips work; translations and gallery reviewed. |
 | M7 | Queued | Full regression, configuration matrix and packaging. | Host/sanitizer suite, zero-warning firmware matrix, stack/RAM limits and codec-free package checks pass. |
 | M8 | Needs owner-authorized hardware session | Qualification against independent equipment and representative systems. | RX, conventional TX and trunking behavior measured; RX-only has no emissions; qualification limits recorded. |
 
@@ -173,9 +173,10 @@ insufficient. Legacy transfers now refuse tagged codeplugs; do not expose
 mode-aware editing until this mapping is tested.
 See [P25 codeplug integration](../spec/p25-codeplug.md).
 
-Next task: implement the M6 editor/capability contract. An old CPS
-rewrite must not preserve a logical TX flag after the operator selects RX-only;
-that transfer/capability contract must be resolved before exposing P25 editing.
+M6 editor/capability contract is implemented and checked. The logical RX-only
+checkbox edits the tag permission. Legacy writers remain refused. See the
+[CPS integration record](p25-cps-integration.md). Next: M7 full regression and
+packaging, followed by the owner-authorized M8 hardware session.
 
 M4/M5 adapt upstream `core/radio/radio_p25.[ch]`, including its task handoff,
 retune and queued signaling logic. Its simple memory lending is replaced with
@@ -397,8 +398,9 @@ so it does not check test markers. Owner-authorized hardware checks remain open.
 - [x] M4.2 (host): Apply existing inhibition, battery, BCL, timeout, power and RF checks.
   Serialize prepare/check/key/go with storage writers. Legacy writers refuse
   tagged codeplugs and managed metadata; mode-aware writers remain pending.
-- [ ] M6 writer gate: Quiesce the owner before a future mode-aware writer commits
-  or acknowledges RX-only changes. Internal edits invalidate on the next poll.
+- [x] M6 writer gate: Managed staged programming waits for radio-task quiescence
+  before copying. Completion reloads permissions before resuming. Failed managed
+  recovery keeps RF held; host and paired CPS round trips pass.
 - [ ] M4.2: Test complete FM/DMR/P25 transitions, beeps/audio routing, mic gain,
   snapshots, retune, hotspot/APRS exclusions, callback shutdown and return failure.
   Measure the complete state-machine call chain and its stack/RAM costs.
@@ -626,3 +628,25 @@ Do not equate a pruned firmware link with active-mode memory fit.
 No branch push, deployment, CPS/radio session or hardware test has been performed.
 Keep this record current as those facts change; remove temporary CI build trees
 after successful runs as required by AGENTS.md.
+
+## M6 CPS and managed programming (2026-11-18)
+
+The companion CPS and bundled editor now edit conventional P25 NAC/squelch,
+trunked systems/control channels/plans, per-system transmit permission and
+radio-wide P25 unit ID. Logical channel RX-only is independent of the safe
+legacy DMR stand-in bit. New trunked channels and systems are listen only.
+Binary backups, drafts, rename, undo and transfer preserve these permissions.
+Legacy inline DMR assignments are migrated before RFKV uses their tail sector.
+
+The managed transfer contract quiesces the real radio task before any commit
+copy. Failed or damaged managed recovery keeps RF held. See the
+[CPS integration record](p25-cps-integration.md) for provenance and checks.
+Full CI, release packaging and all RF/interoperability qualification remain
+open. No connected radio or SDR was accessed.
+
+M6 target checks: default/P25-off, conventional-only, trunking, DMR/P25-off
+and fast-CPS-off builds pass. Final trunked image: 692452 bytes flash,
+211264 bytes static RAM, 192 bytes RAM remaining. Static task stacks still
+fit; UI retains 40 bytes after the context and required margin. Evidence
+hashes and all target sizes are in the CPS integration record. These tight
+margins are not a hardware qualification.
