@@ -1031,6 +1031,24 @@ The reserve may still contain bytes from an older ID database. Initialize it onl
 migration. Older firmware and CPS versions can write through this region, so verify rollback behavior
 before storing conversations there. The native codeplug and AES journal remain above the reserve.
 
+### Managed codeplug transfer staging
+
+The board reserves `0xF00000–0xF3FFFF` (256 KiB) for staged codeplug
+transfers: one commit-record sector and 63 data slots. This range was part
+of the unused future-native-format reserve. The native reserve now starts
+at `0xF40000` with size `0x0BF000`; its end remains `0xFFF000`.
+The private AES journal remains at `0xFFD000–0xFFEFFF`, and the final stock
+metadata sector remains excluded. Message storage, settings, calibration,
+the existing codeplug and ID database retain their addresses and limits.
+
+Earlier P25 integration builds omitted the staging assignment, so INFO
+reported no managed-write support and CPS refused P25 programming even
+with the correct firmware version installed. The real-map host test now
+checks INFO, staging capacity, a 33-block managed transfer and boot recovery
+while preserving key-bank and message-region sentinel bytes. Hardware
+programming qualification remains pending. This assignment does not
+implement the future native format; see [the storage plan](codeplug-native.md).
+
 ---
 
 ## 11. Factory calibration

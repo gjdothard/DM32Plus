@@ -742,3 +742,28 @@ Next: publish and verify the Testing candidate for owner reception testing.
 The read-only extended trunking HIL check is provided but was not run.
 No radio or SDR was accessed. Phase 2 and encrypted voice remain outside
 this integration.
+
+## Managed programming board-map correction (2026-11-18)
+
+Owner report: `v1.1.0-rc.2` identifies correctly but CPS refuses managed P25
+writes. Root cause: the board's flash map has no staging area, so the real
+INFO response lacks managed support. Protocol tests and the CPS simulator
+used maps with staging and did not cover the production board map.
+
+Reserve 256 KiB at `0xF00000` from the unused future-native-format prefix.
+Move the native reserve's start to `0xF40000` and reduce its size equally,
+preserving its end, the AES key journal and final stock metadata sector.
+No existing codeplug, settings, ID database or message area moves. The
+20 KiB gap after the settings journal would provide only four slots and
+cannot hold an entire changed codeplug atomically.
+
+Regression: discover full P25/CPS builds from the board registry and compile
+their actual map initializer into the production CPS/storage host harness.
+INFO must advertise usable managed staging with at least 33 slots. Stage
+33 blocks without changing destinations, commit under the RF hold, then
+recover on restart. All 111 assertions pass, including message and key-bank
+preservation. All 13 P25 build checks pass. The CPS capability guard remains.
+
+Next: target build, publish the corrected Testing firmware and refresh the
+separate Testing CPS. Owner programming/reception checks remain pending;
+no connected radio or SDR was accessed.

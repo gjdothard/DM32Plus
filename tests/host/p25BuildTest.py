@@ -3,6 +3,7 @@
 """Exercise the actual P25 Make selection, C configuration and About generator."""
 import argparse
 import os
+import re
 from pathlib import Path
 import shlex
 import shutil
@@ -19,6 +20,82 @@ OPTIONS, UNITTEST_ARGS = parser.parse_known_args()
 
 
 class P25BuildTest(unittest.TestCase):
+    def test_full_board_managed_transfer(self):
+        """Exercise production board maps, rather than the protocol simulator's map."""
+        for board in sorted((ROOT / "boards").iterdir()):
+            if not (board / "board.mk").is_file():
+                continue
+            selected = subprocess.run(
+                [OPTIONS.make, "--no-print-directory", "-s", f"BOARD={board.name}",
+                 "print-vars", "VARS=CONFIG_P25 CONFIG_CPS_FAST"],
+                cwd=ROOT, text=True, capture_output=True, check=True).stdout
+            if "CONFIG_P25=y" not in selected or "CONFIG_CPS_FAST=y" not in selected:
+                continue
+            with self.subTest(board=board.name):
+                maps = [m for path in board.glob("*.c") for m in re.findall(
+                    r"\bhal_flash_map_t\s+\w+\s*=\s*(\{.*?\});", path.read_text(encoding="utf-8"), re.S)]
+                self.assertEqual(len(maps), 1)
+                base = re.search(r"\.openfw_eeprom\s*=\s*(0x[0-9a-fA-F]+)", maps[0])[1]
+                flash = re.search(r"\.openfw_flash\s*=\s*(0x[0-9a-fA-F]+)", maps[0])[1]
+                source = self.work / "board_transfer.c"
+                source.write_text(
+                    '// SPDX-License-Identifier: MIT\n// Copyright (c) 2026 Garrett Dothard\n'
+                    '#define main protocol_suite_main\n#include "cpsFastTest.c"\n#undef main\n'
+                    'static const hal_flash_map_t selected_map = ' + maps[0] + ';\n' + r'''
+int main(void)
+{
+    static uint8_t data[BLOCK];
+    const hal_flash_map_t *m = &selected_map;
+    sim_flash_create(0x1000000u, m);
+    boot(m, false);
+    CHECK(op(CPSF_OP_INFO) == DL_ST_OK && (rep[2] & 5u) == 5u);
+    CHECK(g16(&rep[25]) >= 33);
+    CHECK(storage_staging_size() >= 34u * BLOCK);
+    uint32_t keys = m->native_addr + m->native_size - 2u * BLOCK;
+    sim_flash_data[keys] = 0x36;
+    sim_flash_data[keys + BLOCK] = 0x79;
+    sim_flash_data[m->message_addr] = 0xA6;
+    CHECK(begin(CPSF_MODE_STAGED | CPSF_MODE_AWARE) == DL_ST_OK);
+    uint32_t offset = m->openfw_flash - m->openfw_eeprom;
+    for (unsigned i = 0; i < 33; i++) {
+        memset(data, i + 1, sizeof(data));
+        CHECK(write_block(offset + i * BLOCK, data, 61) == DL_ST_OK);
+        CHECK(sim_flash_data[m->openfw_flash + i * BLOCK] == 0xFF);
+    }
+    CHECK(op(CPSF_OP_COMMIT) == DL_ST_BUSY && radio_programming_requested());
+    radio_programming_ready();
+    CHECK(op(CPSF_OP_COMMIT) == DL_ST_OK);
+    CHECK(g32(sim_flash_data + m->staging_addr + 4) == 2);
+    // Restart after the commit record: recover the entire transfer under the RF hold.
+    storage_buffer_release();
+    CHECK(storage_init() && cps_fast_resume());
+    CHECK(!radio_programming_requested());
+    for (unsigned i = 0; i < 33; i++) {
+        memset(data, i + 1, sizeof(data));
+        CHECK(!memcmp(data, sim_flash_data + m->openfw_flash + i * BLOCK, BLOCK));
+    }
+    CHECK(sim_flash_data[keys] == 0x36 && sim_flash_data[keys + BLOCK] == 0x79);
+    CHECK(sim_flash_data[m->message_addr] == 0xA6);
+    CHECK(sim_flash_violations() == 0);
+    sim_flash_free();
+    printf("board managed transfer: %d checks, %d failures\n", checks, failures);
+    return failures != 0;
+}
+''', encoding="utf-8")
+                output = self.work / "board_transfer.exe"
+                sources = ["core/cps/cps_openfw.c", "core/codeplug/codeplug.c", "core/settings/settings.c",
+                           "core/storage/storage.c", "tests/host/sim/sim_flash.c", "core/codeplug/codeplug_tag.c",
+                           "core/codeplug/codeplug_kv.c", "core/codeplug/codeplug_tagged.c", "core/codeplug/codeplug_records.c",
+                           "core/codeplug/codeplug_talk.c", "core/cps/cps_fast.c", "core/cps/cps_lz4.c",
+                           "core/radio/radio_programming.c", "core/net/tftp_codeplug.c"]
+                result = subprocess.run(shlex.split(OPTIONS.cc) + [
+                    "-std=gnu99", "-O2", "-Wall", "-Wextra", "-Wshadow", "-Werror", "-Wno-unused-parameter", "-Wno-date-time",
+                    "-Icore", "-Ihal", "-Idrivers", "-Itests/host", "-DCONFIG_TFTP_IDDB=0",
+                    f"-DCODEPLUG_OPENFW_EEPROM_BASE={base}", f"-DCODEPLUG_OPENFW_FLASH_BASE={flash}",
+                    str(source)] + sources + ["-o", str(output)], cwd=ROOT, text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                subprocess.run([str(output)], cwd=ROOT, check=True)
+
     def test_board_defaults_follow_disabled_parent(self):
         for board in sorted((ROOT / "boards").iterdir()):
             if not (board / "board.mk").is_file():

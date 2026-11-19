@@ -87,3 +87,9 @@ legacy-write fallback. The radio stops active calls before the commit and
 reloads the resulting permissions before resuming. Keep radio identity also
 preserves the radio-wide P25 unit ID. This path is verified with synthetic
 flash and host simulations; radio interoperability remains untested.
+
+If CPS reports that managed P25 transfers are unavailable after an update,
+disconnect and reconnect to refresh the capability check. The initial
+1.1.0 RC builds omitted the required board staging reserve; those builds
+need a corrected firmware image even though they display the P25 modes.
+Save the edited codeplug as a binary file before updating the firmware.
