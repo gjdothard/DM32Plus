@@ -22,6 +22,8 @@ import { crc32, sleep } from "../flasher/bytes.js";
 import { encodeBlock } from "../flasher/lz4.js";
 import { FastLink, FastError, BLOCK, REASON } from "./fastlink.js";
 import { note } from "../diag.js";
+import { modeMagic } from "./modecompat.js";
+import { KV_ADDR, KV_SIZE, decodeArea, getValue, setValue, deleteValue, putArea } from "./kv.js";
 
 export class TransportError extends Error {
 	constructor(code, params = {}) {
@@ -49,6 +51,11 @@ export function keepIdentity(want, have) {
 		out.ensure(b);
 		out.bytes.set(have.bytes.subarray(a, b), a);
 	}
+	const area = decodeArea(out.bytes), radio = decodeArea(have.bytes);
+	if (area.state === "valid" && (radio.state === "valid" || radio.state === "empty")) {
+		const unit = getValue(radio.entries, 0x0A02);
+		putArea(out.bytes, unit ? setValue(area.entries, 0x0A02, unit) : deleteValue(area.entries, 0x0A02));
+	}
 	return out;
 }
 
@@ -63,7 +70,10 @@ export function writeRanges(want = null) {
 			}
 			continue;
 		}
-		if (want?.sharedTalkgroups && a === TALK_GROUP_START && b === TALK_GROUP_END) continue;
+		if (want?.sharedTalkgroups && a === TALK_GROUP_START && b === TALK_GROUP_END) {
+			if (modeMagic(want.bytes)) out.push([KV_ADDR, KV_ADDR + KV_SIZE]);
+			continue;
+		}
 		let s = a;
 		for (const [ka, kb] of KEEP_OUT) {
 			if (ka >= s && ka < b) {
@@ -351,6 +361,8 @@ export class CpsSerial {
 
 	// Write the plan; throws when the radio refuses a sector
 	async write(want, have, { iddb = false, progress = () => {}, signal } = {}) {
+		if ((modeMagic(want.bytes) || (have && modeMagic(have.bytes))) && !this.fast?.managed)
+			throw new TransportError("modes_firmware");
 		const features = String(this.probe?.features || "").split(",");
 		const image = await this.prepareTalkgroupWrite(want, have);
 		const largest = image.sharedTalkgroups ? 0 :
@@ -362,8 +374,9 @@ export class CpsSerial {
 			Array.from({ length: 1024 }, (_, i) => channelKeySlot(want.bytes, i + 1)).some((s) => s !== 0))
 			throw new TransportError("channel_keys_firmware");
 		if (iddb && idDbEnd(want.bytes) > this.end) throw new TransportError("iddb_too_big");
-		const result = await this.fastOr(() => this.fastWrite(image, have, { iddb, progress, signal }),
-			() => this.cpsWrite(image, have, { iddb, progress, signal }));
+		const result = this.fast?.managed ? await this.fastWrite(image, have, { iddb, progress, signal }) :
+			await this.fastOr(() => this.fastWrite(image, have, { iddb, progress, signal }),
+				() => this.cpsWrite(image, have, { iddb, progress, signal }));
 		return { ...result, image };
 	}
 
@@ -493,6 +506,7 @@ export class CpsSerial {
 	}
 
 	async fastWrite(want, have, { iddb, progress, signal }) {
+		const managed = !!this.fast.managed;
 		const { plan, bytes } = await this.fastPlan(want, have, { iddb });
 		const codeplug = plan.slice(0, plan.codeplug), ids = plan.slice(plan.codeplug);
 		let done = 0;
@@ -501,14 +515,20 @@ export class CpsSerial {
 		const refused = [];
 		if (codeplug.length) {
 			const staged = this.fast.staging && codeplug.length <= this.fast.stageMax;
-			await this.fastSession(staged, codeplug, { signal, step, refused });
+			if (managed && !staged) throw new TransportError("modes_stage_full");
+			await this.fastSession(staged, codeplug, { signal, step, refused: managed ? null : refused, managed });
 		}
 		if (ids.length) {
 			// header block first with the header erased, the rest, then the header block as it should be
 			const head = ids.find(([a]) => a === AREA1), first = head[1].slice();
 			first.fill(0xFF, 0, 32);
 			const order = [[AREA1, first], ...ids.filter(([a]) => a !== AREA1), head];
-			await this.fastSession(false, order, { signal, step, refused: null });
+			if (managed) {
+				await this.fastSession(true, order.slice(0, 1), { signal, step, refused: null, managed });
+				for (let at = 1; at < order.length - 1; at += this.fast.stageMax)
+					await this.fastSession(true, order.slice(at, Math.min(at + this.fast.stageMax, order.length - 1)), { signal, step, refused: null, managed });
+				await this.fastSession(true, order.slice(-1), { signal, step, refused: null, managed });
+			} else await this.fastSession(false, order, { signal, step, refused: null });
 		}
 		// a block the fast protocol refuses (outside what it serves on this radio) goes through the CPS
 		for (const a of refused) {
@@ -519,8 +539,8 @@ export class CpsSerial {
 		return { bytes, sectors: plan.length, plan };
 	}
 
-	async fastSession(staged, blocks, { signal, step, refused }) {
-		await this.fl.begin(staged);
+	async fastSession(staged, blocks, { signal, step, refused, managed = false }) {
+		await this.fl.begin(staged, managed);
 		try {
 			for (const [a, b] of blocks) {
 				if (signal?.aborted) throw new TransportError("stopped");

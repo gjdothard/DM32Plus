@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 <!-- Copyright (c) 2026 The RadioFoundry Authors -->
 
 # Fast codeplug protocol
@@ -79,7 +80,7 @@ the bytes after it.
 | 0 | INFO | none | the layout and limits (3.1) |
 | 1 | SUMS | addr u32, count u8 (1 to 16) | addr u32, count u8, blank mask u16, CRC-32 u32 x count |
 | 2 | READ | addr u32, offset u16 | addr u32, format u8, length u16, CRC-32 u32, offset u16, a reserved byte (0), up to 1000 stream bytes |
-| 3 | BEGIN | mode u8: 0 direct, 1 staged | stage_max u16 (0 for direct) |
+| 3 | BEGIN | mode u8: 0 direct, 1 staged, 0x81 managed staged | stage_max u16 (0 for direct) |
 | 4 | BLOCK | addr u32, format u8, length u16, CRC-32 u32 | none |
 | 5 | DATA | offset u16, 1 to 61 stream bytes | received u16 |
 | 6 | END | none | none |
@@ -95,7 +96,7 @@ offered: an LZ4 stream of incompressible data is 0.4 % longer than the data, and
 | Offset | Size | Field |
 |---|---|---|
 | 0 | 1 | protocol version: 1 |
-| 1 | 1 | flags: bit 0 staged writes available, bit 1 the flash can be written (`storage_ready`) |
+| 1 | 1 | flags: bit 0 staged writes available, bit 1 the flash can be written (`storage_ready`), bit 2 managed staged writes |
 | 2 | 2 | block size: 4096 |
 | 4 | 1 | blocks per SUMS: 16 |
 | 5 | 1 | stream bytes per DATA: 61 |
@@ -409,3 +410,32 @@ The stub stays the tool for firmware and whole-flash work.
   written once the owner flashes a build with the switch. The web editor speaks the protocol
   (`site/static/js/codeplug/fastlink.js`) and is tested against the host simulator only; it keeps the CPS for
   radios that don't list `CPS_FAST`.
+
+## Managed mode-aware programming
+
+INFO flags bit 2 advertises managed staged programming. BEGIN mode `0x81`
+requests it; `0x80` without staging is invalid. The host must stage the whole
+changed codeplug, including its RFKV metadata sector, in one session. If
+that exceeds `stage_max`, refuse the write. Do not fall back to a permission-
+blind writer. Existing modes 0 and 1 continue to refuse tagged codeplugs and
+metadata writes. Managed writes retain all other protected-range checks.
+
+COMMIT requests a radio-task hold and returns BUSY until that task has
+stopped every RF owner, unkeyed and returned codec workspace. No destination
+copy starts before that acknowledgment. The commit record uses version 2
+with the existing layout; version 1 remains the legacy format. The copy
+invalidates the keyed-store generation when replacing metadata. Successful
+completion erases the commit record and releases the hold. The radio reloads
+permissions before processing a request or an automatic signaling tick.
+
+Abort or timeout before copying releases the hold. A copy failure or failed
+commit-record erase keeps it until recovery. At boot, valid version 2
+records recover under the hold. Failed storage recovery, unreadable commit
+records or failed managed copying leave RF held. Legacy records cannot
+resume over an already tagged codeplug. ID database writes use separate
+managed batches within capacity: invalid header first, valid header last.
+
+The RFKV sector overlaps the last 256 older inline DMR talkgroup records.
+The CPS validates and migrates those assignments into the existing shared
+pool before using that sector. The legacy reader does not interpret RFKV
+bytes as inline talkgroups. Unknown occupied areas are never auto-formatted.

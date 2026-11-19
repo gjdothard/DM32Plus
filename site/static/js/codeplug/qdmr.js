@@ -8,6 +8,7 @@
 
 import { parse, stringify, flow, Tag } from "./yaml.js";
 import { LIMITS } from "./records.js";
+import { containsModes } from "./modecompat.js";
 import { parseTone } from "./fields.js";
 
 export class QdmrError extends Error {
@@ -155,6 +156,7 @@ function element(x) {
 
 // The model built from a qdmr YAML file, written into m: {counts, notes}. Throws QdmrError
 export function importQdmr(m, yamlText) {
+	if (containsModes(m)) throw new QdmrError("modes_binary");
 	let doc;
 	try {
 		doc = parse(yamlText);
@@ -372,6 +374,7 @@ export function importQdmr(m, yamlText) {
 
 // qdmr YAML for the model: {text, notes}
 export function exportQdmr(m) {
+	if (containsModes(m)) throw new QdmrError("modes_binary");
 	const notes = new Map();
 	const note = (code, n = 1) => notes.set(code, (notes.get(code) || 0) + n);
 	const g = m.general;
