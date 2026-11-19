@@ -2403,7 +2403,7 @@ static bool check(const char *kv, char *err, size_t len)
 	else if (strcmp(key, "vfo") == 0) snprintf(got, sizeof got, "%u", view.vfo);
 	else if (strcmp(key, "freq") == 0) snprintf(got, sizeof got, "%u", (unsigned)view.ch.rx_hz);
 	else if (strcmp(key, "txfreq") == 0) snprintf(got, sizeof got, "%u", (unsigned)view.ch.tx_hz);
-	else if (strcmp(key, "mode") == 0) snprintf(got, sizeof got, "%s", view.ch.mode == RADIO_MODE_DMR ? "dmr" : "fm");
+	else if (strcmp(key, "mode") == 0) snprintf(got, sizeof got, "%s", view.ch.mode == RADIO_MODE_P25 ? "p25" : view.ch.mode == RADIO_MODE_DMR ? "dmr" : "fm");
 	else if (strcmp(key, "tx") == 0) snprintf(got, sizeof got, "%u", (unsigned)sim_rec.tx_count);
 	else if (strcmp(key, "txid") == 0) snprintf(got, sizeof got, "%u", (unsigned)sim_rec.tx_id);
 	else if (strcmp(key, "txpriv") == 0) snprintf(got, sizeof got, "%u", sim_rec.tx_private);
@@ -2628,10 +2628,12 @@ static bool run_token(char *t, char *err, size_t len)
 		advance(arg != NULL ? (uint32_t)atoi(arg) : 1000u);
 		return true;
 	}
-	if (strcmp(t, "p25-home") == 0) {
+	if (strcmp(t, "p25-home") == 0 || strcmp(t, "p25-trunk-home") == 0) {
 		view.ch.mode = RADIO_MODE_P25;
 		view.ch.bw = RADIO_BW_12K5;
-		strcpy(view.ch.name, "P25 Ops");
+		strcpy(view.ch.name, strcmp(t, "p25-home") == 0 ? "P25 Ops" : "Palmetto Monitor");
+		if (strcmp(t, "p25-trunk-home") == 0)
+			view.ch.rx_hz = 773656250;
 		view.ch.rx_only = true;
 		serial++;
 		advance(200);

@@ -767,3 +767,29 @@ preservation. All 13 P25 build checks pass. The CPS capability guard remains.
 Next: target build, publish the corrected Testing firmware and refresh the
 separate Testing CPS. Owner programming/reception checks remain pending;
 no connected radio or SDR was accessed.
+
+## Card Home P25 mode-label correction (2026-11-18)
+
+Owner confirms rc.3 writes the P25 codeplug successfully. Read-back shows
+P25 Trunking in CPS while the radio's card Home says FM. Reproduced in the
+UI simulator with mode=p25: the card used a DMR-or-FM label expression.
+The standard Home already handled P25. Share its mode labels with the card
+badge and dual-watch strip, and omit analog tone details on the single P25
+card. This is a display correction; it does not establish RF reception.
+
+Add conventional and trunking card flows requiring P25 and rejecting FM
+and No tone. Keep the existing standard-Home flow and add the trunked scene
+to the gallery. The simulator now reports P25 accurately in mode assertions.
+Initial color UI run passes all 1919 flows and its screen crawls.
+
+Monochrome (1908 flows) and card-disabled (1919 flows) runs also pass their
+screen crawls. The full gallery was regenerated; retain only the six P25
+scenes changed or added by this fix. The trunked card render is visually
+checked and its gallery caption is translated in all site catalogs.
+Strict site generation has zero warnings; documentation links and the
+generic-code check pass. The full target build passes at 692700 bytes,
+with unchanged static RAM (211264 bytes, 192 remaining).
+
+Next: finish UI configurations, gallery, target and task-stack checks;
+publish and refresh the separate Testing CPS. Hardware reception remains
+unverified. No radio or SDR was accessed.

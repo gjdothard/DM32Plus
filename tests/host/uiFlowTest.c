@@ -1436,6 +1436,14 @@ int main(void)
 		"Tall color Home uses the branded card layout", "", "branded-home", "screen=home shows=RECENT_ACTIVITY", 1, false,
 	};
 	run_flow(&card_home, sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+	static const flow_t card_p25[] = {
+		{ "P25 conventional card keeps its actual mode", "branded-home p25-home", "",
+		  "screen=home mode=p25 shows=P25 hides=FM hides=No_tone", 0, false },
+		{ "P25 trunking card keeps its actual mode", "branded-home p25-trunk-home", "",
+		  "screen=home mode=p25 shows=P25 shows=Palmetto_Monitor hides=FM hides=No_tone", 0, false },
+	};
+	for (size_t i = 0; i < sizeof card_p25 / sizeof card_p25[0]; i++)
+		run_flow(&card_p25[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
 	static const flow_t card_dual = {
 		"Tall color Dual Watch shows the per-channel state",
 		"", "branded-home quick 3 ctx 3 2 ok wait:3000", "screen=home shows=IDLE shows=RECENT_ACTIVITY", 6, false,

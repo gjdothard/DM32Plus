@@ -21,6 +21,12 @@ Recent activity starts each row with the pane letter, using the same colors as t
 The selected card shows the saved talkgroup name prominently and keeps the ID, slot, color code, and power on
 its detail row. Single-channel operation shows one card. Entry and large-text views retain their existing layouts.
 
+The card mode badge and dual-watch status strip use the same mode labels as
+the standard Home screen. A P25 channel displays `P25`; an unavailable mode
+displays `?`. The P25 single-channel card omits analog tone details. These
+labels identify the selected mode, not control-channel acquisition or voice
+decoding. Site, lock and live P25 talkgroup indicators are not yet displayed.
+
 On the same tall dark display, Quick Controls uses a 3×3 card grid with numbered tiles and a separate
 value row. Cyan indicates focus and amber indicates an open editor. The DMR and FM Memory grids keep
 their mode-specific controls. VFO retains its mode and TX frequency controls.

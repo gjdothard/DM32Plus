@@ -2250,5 +2250,6 @@
  "editor.qdmr.err.modes_binary": "Use una copia binaria para conservar los ajustes P25. Este formato no puede guardarlos.",
  "editor.problem.p25_control_limit": "Este firmware admite un máximo de 16 canales de control por sistema.",
  "editor.problem.p25_phase1_only": "Este firmware solo admite planes de canales de Fase 1.",
- "screen.home_p25": "Inicio, canal P25"
+ "screen.home_p25": "Inicio, canal P25",
+ "screen.home_p25_trunk": "Inicio, canal troncalizado P25"
 }

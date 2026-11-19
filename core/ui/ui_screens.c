@@ -287,12 +287,17 @@ static uint8_t rssi_bars(int16_t dbm)
 	return 0;
 }
 
+static const char *mode_label(uint8_t mode)
+{
+	if (mode == RADIO_MODE_P25) return "P25";
+	if (mode == RADIO_MODE_NONE) return "?";
+	return mode == RADIO_MODE_DMR ? "DMR" : "FM";
+}
+
 // The mode word: AM where an FM channel or the VFO is received in AM (the air band)
 static const char *mode_word(const radio_view_t *v)
 {
-	if (v->ch.mode == RADIO_MODE_P25) return "P25";
-	if (v->ch.mode == RADIO_MODE_NONE) return "?";
-	return v->ch.mode == RADIO_MODE_DMR ? "DMR" : v->am ? "AM" : "FM";
+	return v->ch.mode == RADIO_MODE_FM && v->am ? "AM" : mode_label(v->ch.mode);
 }
 
 // Status strip (P2): state pill, mode, monitor, lock, unread messages, signal, battery.
@@ -460,7 +465,7 @@ static int draw_top_as(const radio_view_t *v, radio_state_t st, const ui_state_t
 	const char *mw = mode_word(v);
 #if CONFIG_DUAL_WATCH
 	if (s->dual.on)
-		mw = s->dual.pane[s->dual.sel].mode == RADIO_MODE_DMR ? "DMR" : "FM";
+		mw = mode_label(s->dual.pane[s->dual.sel].mode);
 #endif
 	int lx = gfx_text(f, x, ty, mw, sfg);
 #if CONFIG_DUAL_WATCH
@@ -2351,7 +2356,7 @@ static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool
 	gfx_round_fill(x, row, sm->w + 5, sm->h, i ? CARD_YELLOW : ui_col.focus);
 	gfx_text(sm, x + 2, row, i ? "B" : "A", CARD_INK);
 	x += sm->w + 10;
-	x = gfx_text(sm, x, row, dmr ? "DMR" : "FM", ui_col.fg) + 5;
+	x = gfx_text(sm, x, row, mode_label(p->mode), ui_col.fg) + 5;
 	const char *activity = denied ? TR("NO TX") : tx ? "TX" : p->rx ? "RX" : selected || dual ? TR("IDLE") : "";
 	int status_w = gfx_text_width(meta, activity);
 	int right = w - 8 - status_w;
@@ -2441,6 +2446,9 @@ static void __attribute__((noinline)) card_single(const radio_view_t *v, const u
 	str_copy(p->name, sizeof p->name, v->ch.name);
 	sbuf_t b;
 	sb_init(&b, p->detail, sizeof p->detail);
+	if (p->mode == RADIO_MODE_P25 || p->mode == RADIO_MODE_NONE) {
+		sb_str(&b, mode_label(p->mode));
+	} else
 #if CONFIG_DMR
 	if (p->mode == RADIO_MODE_DMR) {
 		p->protection = s->privacy || v->dmr.privacy ? 1 : 0;

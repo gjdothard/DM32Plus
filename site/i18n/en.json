@@ -2250,5 +2250,6 @@
  "editor.qdmr.err.modes_binary": "Use a binary backup to preserve P25 settings. This format cannot store them.",
  "editor.problem.p25_control_limit": "This firmware supports at most 16 control channels per system.",
  "editor.problem.p25_phase1_only": "This firmware supports Phase 1 channel plans only.",
- "screen.home_p25": "Home, P25 channel"
+ "screen.home_p25": "Home, P25 channel",
+ "screen.home_p25_trunk": "Home, P25 trunking channel"
 }

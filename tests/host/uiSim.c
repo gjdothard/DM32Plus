@@ -38,6 +38,7 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "stub_entry", "splash:loader" },	// while the flashing tools have the radio (web flasher)
 	{ "home_dmr", "" },
 	{ "home_p25", "p25-home" },
+	{ "home_p25_trunk", "p25-trunk-home" },
 	{ "home_dmr_lastheard", "call:3101234,91,g wait:11000" },
 	{ "home_reply", "call:3101234,91,g" },
 	{ "home_fm", "down" },
@@ -667,6 +668,9 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 			{ "freq_trim_typing", "trim ok 9 0 up ok 1 2" },
 		};
 		const char *card_script = NULL;
+		if (!strcmp(g->name, "240x320i10x5") &&
+		    (!strcmp(name, "home_p25") || !strcmp(name, "home_p25_trunk")))
+			card_script = gallery[i].script;
 		if (!strcmp(g->name, "240x320i10x5"))
 			for (size_t j = 0; j < sizeof card_routes / sizeof card_routes[0]; j++)
 				if (!strcmp(name, card_routes[j].name)) {

@@ -934,6 +934,12 @@
    "needs": [
     "P25"
    ]
+  },
+  "home_p25_trunk": {
+   "group": "home",
+   "needs": [
+    "P25_TRUNK"
+   ]
   }
  },
  "_copyright": "Copyright (c) 2026 Garrett Dothard",
