@@ -15,6 +15,7 @@ import { kindRow, kindName, offeredKinds } from "../codeplug/modes.js";
 import { setKind } from "../codeplug/channelmodes.js";
 import { specField } from "./modefields.js";
 import { TALK_GROUP_MAX, validTalkGroups } from "../codeplug/talkgroups.js";
+import { contactAllowed } from "../codeplug/contact-protocol.js";
 import { MAX_ASSIGNMENTS, POOL_CAPACITY } from "../codeplug/talkgroup-pool.js";
 
 // --- Parsers shared by the columns and the forms ---
@@ -204,7 +205,7 @@ export function columns(table, m, t) {
 			only("fm", col("txTone", "editor.col.tx_tone", "text", tone(t), { format: (v) => toneText(v, t), editValue: (v) => v })),
 			only("dmr", col("colorCode", "editor.col.cc", "select", pick, { options: () => [...Array(16).keys()].map((n) => [n, String(n)]) })),
 			only("dmr", col("timeslot", "editor.col.ts", "select", pick, { options: () => [[1, "1"], [2, "2"]] })),
-			only("dmr", col("contact", "editor.col.contact", "select", pick, { options: () => refOptions(m.contacts, t), format: (v) => refLabel(v, t), sortValue: (r) => refLabel(r.contact, t) })),
+			only("dmr", col("contact", "editor.col.contact", "select", pick, { options: r => refOptions(m.contacts.filter(contact => contactAllowed(contact, r ?? {})), t), format: (v) => refLabel(v, t), sortValue: (r) => refLabel(r.contact, t) })),
 			only("dmr", col("rxList", "editor.col.rx_list", "select", pick, { options: () => refOptions(m.rxLists, t), format: (v) => refLabel(v, t), sortValue: (r) => refLabel(r.rxList, t) })),
 			only("dmr", col("privacySlot", "editor.col.encryption", "select", pick, { options: (r) => encryptionOptions(t, r?.privacySlot) })),
 			col("rxOnly", "editor.col.rx_only", "bool", null, { get: rxOnlyGet, set: rxOnlySet, readOnly: false }),
@@ -220,6 +221,7 @@ export function columns(table, m, t) {
 		return [
 			num,
 			col("name", "editor.col.name", "text", name(LIMITS.name)(t)),
+			col("protocol", "editor.col.protocol", "select", pick, { options: () => [["dmr", "DMR"], ["p25", "P25"], ["both", t("editor.protocol.both")]], get: r => r.protocol ?? "dmr" }),
 			col("id", "editor.col.id", "text", int(1, 0xFFFFFF)(t), { numeric: true, readOnly: false }),
 			col("type", "editor.col.call_type", "select", pick, { options: () => [["group", t("editor.call.group")], ["private", t("editor.call.private")], ["all", t("editor.call.all")]] }),
 			col("timeslot", "editor.col.ts_override", "select", pick, { options: () => [[0, t("editor.none")], [1, "1"], [2, "2"]] }),
@@ -351,9 +353,10 @@ export function channelForm(m, t, draftContacts = [], { features = null } = {}) 
 		dmr({ group: t("editor.form.digital") }),
 		dmr(sel("colorCode", "editor.col.cc", () => [...Array(16).keys()].map((n) => [n, String(n)]))),
 		dmr(sel("timeslot", "editor.col.ts", () => [[1, "1"], [2, "2"]])),
-		dmr(sel("contact", "editor.col.contact", () => refOptions(m.contacts, t))),
+		dmr(sel("contact", "editor.col.contact", r => refOptions(m.contacts.filter(contact => contactAllowed(contact, r)), t))),
 		dmr(sel("rxList", "editor.col.rx_list", () => refOptions(m.rxLists, t))),
-		dmr({ tab: "talkgroups", label: t("editor.col.talkgroups") }),
+		{ tab: "talkgroups", label: t("editor.col.talkgroups"), show: r => r.mode === "dmr" &&
+			(recordField(r, "talkGroups") || recordField(r, "talkgroupRefs")) },
 		dmr(channelTalkgroups(m, t, draftContacts)),
 		{ tab: "advanced", label: t("editor.form.advanced") },
 		{ group: t("editor.form.basic") },
@@ -400,14 +403,16 @@ function channelTalkgroups(model, t, draftContacts) {
 	const resolve = (selected, channel) => shared ? [...selected] : selected.map(contact => ({
 		id: contact.id, timeslot: contact.timeslot || channel.timeslot,
 	}));
-	const keyOf = contact => shared ? contact : contact.id;
 	const max = shared ? MAX_ASSIGNMENTS : TALK_GROUP_MAX;
 	return {
 		key: shared ? "talkgroupRefs" : "talkGroups",
 		contacts,
 		resolve,
 		label: t("editor.col.talkgroups"),
-		render(id, entries = []) {
+		render(id, entries = [], channel = {}) {
+			const p25 = () => channel.kind === 2 || channel.kind === 3;
+			const keyOf = contact => shared && !p25() ? contact : contact.id;
+			const allowed = contact => contactAllowed(contact, channel) && (!p25() || (Number.isInteger(contact.id) && contact.id > 0 && contact.id <= 0xFFFF));
 			const selected = shared ? [...entries] : entries.map(entry => ({
 				...entry, name: contacts.find(contact => contact.id === entry.id)?.name || "",
 			}));
@@ -415,7 +420,7 @@ function channelTalkgroups(model, t, draftContacts) {
 				total + (channel.mode === "dmr" && channel.talkgroupRefs !== entries ? (channel.talkgroupRefs?.length ?? 0) : 0), 0);
 			const limit = shared ? Math.min(max, Math.max(0, POOL_CAPACITY - other)) : max;
 			const label = contact => typeof contact === "number" ? t("editor.missing", { n: contact }) :
-				[contact.name, `TG ${contact.id}`, contact.timeslot ? `TS${contact.timeslot}` : t("editor.tg.channel_slot")]
+				[contact.name, `TG ${contact.id}`, p25() ? "" : contact.timeslot ? `TS${contact.timeslot}` : t("editor.tg.channel_slot")]
 					.filter(Boolean).join(" · ");
 			const panel = h("div", { id, class: "ed-tg-editor", role: "group", "aria-labelledby": id + "-label" });
 			const heading = h("p", { class: "small muted", "aria-live": "polite" });
@@ -454,11 +459,11 @@ function channelTalkgroups(model, t, draftContacts) {
 			const error = h("p", { class: "notice bad", role: "alert", hidden: true });
 			const createContact = () => {
 				if (selected.length >= limit || model.contacts.length + draftContacts.length >= LIMITS.contacts) return;
-				const contact = newContact({ timeslot: Number(slot.value) });
+				const contact = newContact({ protocol: p25() ? "p25" : "dmr", timeslot: p25() ? 0 : Number(slot.value) });
 				const invalid = name(LIMITS.name)(t)(contact, "name", contactName.value) ||
-					int(1, 0xFFFFFE)(t)(contact, "id", contactId.value);
+					int(1, p25() ? 0xFFFF : 0xFFFFFE)(t)(contact, "id", contactId.value);
 				const duplicate = [...contacts, ...draftContacts].some(item => item.id === contact.id &&
-					(!shared || (item.timeslot || 0) === contact.timeslot));
+					allowed(item) && (!shared || p25() || (item.timeslot || 0) === contact.timeslot));
 				error.hidden = !invalid && !duplicate;
 				if (!error.hidden) {
 					error.textContent = invalid || t("editor.tg.duplicate");
@@ -480,7 +485,7 @@ function channelTalkgroups(model, t, draftContacts) {
 				const used = new Set(selected.map(keyOf));
 				const choices = [...contacts, ...draftContacts].filter(contact => {
 					const key = keyOf(contact);
-					if (used.has(key) || !label(contact).toLowerCase().includes(query)) return false;
+					if (!allowed(contact) || used.has(key) || !label(contact).toLowerCase().includes(query)) return false;
 					used.add(key);
 					return true;
 				});
@@ -501,6 +506,7 @@ function channelTalkgroups(model, t, draftContacts) {
 				refreshChecks();
 			};
 			const update = () => {
+				slot.parentElement.hidden = p25();
 				heading.textContent = `${selected.length}/${limit}`;
 				empty.hidden = selected.length !== 0;
 				add.disabled = selected.length >= limit;
@@ -534,13 +540,17 @@ function channelTalkgroups(model, t, draftContacts) {
 				button(t("editor.tg.create_assign"), createContact, { primary: true }));
 			panel.append(h("div", { class: "ed-tg-actions" }, add, createButton, heading), empty, assigned, picker, create);
 			panel.readTalkGroups = channel => resolve(selected, channel);
+			panel.syncTalkGroups = update;
 			update();
 			return panel;
 		},
 		read(input, channel) { return input.readTalkGroups(channel); },
 		parse(record, field, entries) {
-			const valid = shared ? entries.length <= max && new Set(entries).size === entries.length &&
-				entries.every(contact => contacts.includes(contact) || draftContacts.includes(contact)) : validTalkGroups(entries);
+			const p25 = record.kind === 2 || record.kind === 3;
+			const valid = (!shared || entries.every(group => contactAllowed(group, record))) &&
+				(!p25 || new Set(entries.map(group => group.id)).size === entries.length &&
+				entries.every(group => Number.isInteger(group.id) && group.id > 0 && group.id <= 0xFFFF)) && (shared ? entries.length <= max && new Set(entries).size === entries.length &&
+				entries.every(contact => contacts.includes(contact) || draftContacts.includes(contact)) : validTalkGroups(entries));
 			if (!valid) return t("editor.err.talkgroups", { max });
 			record[field] = entries;
 		},
@@ -569,7 +579,7 @@ export function formDialog(title, fields, record, t, onSave, options = {}) {
 		const get = f.get || ((r) => r[f.key]);
 		let input;
 		if (f.render) {
-			input = f.render(id, get(work));
+			input = f.render(id, get(work), work);
 		} else if (f.type === "bool") {
 			input = h("input", { type: "checkbox", id });
 			input.checked = !!get(work);
@@ -650,6 +660,7 @@ export function formDialog(title, fields, record, t, onSave, options = {}) {
 		const mode = byKey("mode"), previous = work.kind;
 		if (mode?.f.set) mode.f.set(work, mode.input._opts[mode.input.selectedIndex]?.[0]);
 		if (previous !== work.kind) {
+			for (const { input } of rows) input?.syncTalkGroups?.();
 			for (const { f, input } of rows) {
 				if (!input || !f.get || f.key === "mode") continue;
 				const v = f.get(work);

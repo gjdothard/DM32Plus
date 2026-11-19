@@ -20,6 +20,7 @@ import { decodeArea, getValue, setValue, deleteValue, dedupe, putArea, KV_ADDR, 
 import { getName, putName } from "./fields.js";
 import { KINDS, kindRow, typeRow, radioRuns } from "./modes.js";
 import { u16, u32, put16, put32, sameBytes, sameValue, nameCheck } from "./modebytes.js";
+import { contactProtocolEntries } from "./contact-protocol.js";
 
 export const MODE_KEY = { system: 0x0100, entry: 0x0200, secret: 0x0300, tag: 0x0400, setting: 0x0A00 };
 export const MODE_LIMITS = { systems: 255, entries: 256, tags: 1024, name: 16 };
@@ -348,7 +349,7 @@ export function modeEntries(m, entries, baseNames = () => new Map()) {
 		if (v) set(key, v);
 		else del(key);
 	}
-	return out;
+	return contactProtocolEntries(m, out);
 }
 
 // The model's modes written into the image's settings area, only when they change it. An area of a newer version is
@@ -443,7 +444,8 @@ export function validateModes(m, err, warn, { features = null, baseNames } = {})
 	}
 	if (!m.base) return;
 	const state = decodeArea(m.base.bytes).state;
-	const any = systems.length || m.channels.some((c) => c.kind);
+	const any = systems.length || m.channels.some((c) => c.kind) ||
+		m.contacts.some(contact => contact.protocol === "p25" || contact.protocol === "both");
 	if (state === "newer") {
 		if (any) warn(S, null, null, "mode_area_newer");
 		return;

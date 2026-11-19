@@ -29,6 +29,8 @@ These show the card layout. The chapters also cover the standard Hub and smaller
 
 ### Use the radio
 
+- [P25 monitoring and talkgroups](p25.md): shared Talkgroups editor, protocol filtering and group selection
+
 5. [Keys and navigation](05-keys-and-navigation.md): the five key rules, Find, temporary changes, key lock
 6. [The Home screen](06-home-screen.md): what each region shows, receiving, transmitting
 7. [Channels, zones and the VFO](07-channels-zones-vfo.md)

@@ -21,6 +21,11 @@ const nacOut = (v, dflt) => (v === dflt ? 0 : NAC_SET | (v & 0x0FFF));
 function tgRange(c, problem) {
 	const tg = c.contact && typeof c.contact === "object" ? c.contact : null;
 	if (tg && tg.type === "group" && tg.id > 0xFFFF) problem.warn("contact", "p25_tg_range");
+	const groups = c.talkgroupRefs?.length ? c.talkgroupRefs : c.talkGroups ?? [];
+	if (new Set(groups.map(group => group.id)).size !== groups.length)
+		problem.err(c.talkgroupRefs?.length ? "talkgroupRefs" : "talkGroups", "talkgroups");
+	if (groups.some(group => !Number.isInteger(group.id) || group.id < 1 || group.id > 0xFFFF))
+		problem.err(c.talkgroupRefs?.length ? "talkgroupRefs" : "talkGroups", "p25_tg_list_range");
 }
 
 // --- Conventional channel (2) ---
@@ -59,7 +64,7 @@ export const p25Kind = {
 	contacts: true,
 	ownFreqs: true,
 	defaultTx: true,
-	recordFields: ["contact", "rxList", "dmrId", "dmo"],
+	recordFields: ["contact", "rxList", "dmrId", "dmo", "talkGroups", "talkgroupRefs"],
 	flags: {},
 	newParams: () => ({ squelch: 0, rxNac: NAC_DEFAULT, txNac: NAC_DEFAULT }),
 	decode: decodeConv,
@@ -231,7 +236,7 @@ export const p25TrunkKind = {
 	ownFreqs: false,
 	defaultTx: false,
 	fallback: false,
-	recordFields: ["contact", "rxList"],
+	recordFields: ["contact", "rxList", "talkGroups", "talkgroupRefs"],
 	flags: {},
 	newParams: () => ({ followAll: false }),
 	decode: (b) => ({ followAll: (u8(b, 0) & 1) !== 0 }),
