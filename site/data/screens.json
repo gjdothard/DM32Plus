@@ -988,6 +988,30 @@
    "needs": [
     "P25_UI"
    ]
+  },
+  "home_p25_control": {
+   "group": "home",
+   "needs": [
+    "P25_TRUNK"
+   ]
+  },
+  "home_p25_search": {
+   "group": "home",
+   "needs": [
+    "P25_TRUNK"
+   ]
+  },
+  "home_p25_unknown": {
+   "group": "home",
+   "needs": [
+    "P25_TRUNK"
+   ]
+  },
+  "home_p25_mismatch": {
+   "group": "home",
+   "needs": [
+    "P25_TRUNK"
+   ]
   }
  },
  "_copyright": "Copyright (c) 2026 Garrett Dothard",

@@ -4,6 +4,7 @@
 #include <string.h>
 #include "ui_p25.h"
 #include "fmt.h"
+#include "codeplug/codeplug_tag.h"
 #if CONFIG_P25_UI
 
 __attribute__((weak)) bool ui_svc_p25_view(p25_monitor_t *out)
@@ -12,6 +13,33 @@ __attribute__((weak)) bool ui_svc_p25_command(uint16_t channel, uint8_t op, uint
 { (void)channel; (void)op; (void)tg; return false; }
 __attribute__((weak)) bool ui_svc_p25_favorite(uint16_t channel, uint16_t tg, bool remove)
 { (void)channel; (void)tg; (void)remove; return false; }
+#if CONFIG_P25_TRUNK
+__attribute__((weak)) uint8_t ui_svc_p25_site(const p25_monitor_t *m, char *out, size_t cap)
+{ (void)m; if (cap) out[0] = '\0'; return P25_SITE_UNKNOWN; }
+#endif
+
+static void site_text(const p25_monitor_t *m, char *text, size_t cap, bool detail)
+{
+	(void)detail;
+	sbuf_t b;
+	sb_init(&b, text, cap);
+#if CONFIG_P25_TRUNK
+	char name[CODEPLUG_NAME_LEN + 1];
+	uint8_t state = ui_svc_p25_site(m, name, sizeof name);
+	if (state == P25_SITE_UNAVAILABLE) { sb_str(&b, TR("Site unavailable")); return; }
+	if (state == P25_SITE_MISMATCH) { sb_str(&b, TR("Site mismatch")); return; }
+	if (name[0]) {
+		if (!detail || state != P25_SITE_CONFIRMED) {
+			sb_str(&b, state == P25_SITE_CONFIRMED ? TR("Site") : TR("Candidate")); sb_str(&b, ": ");
+		}
+		sb_str(&b, name); return;
+	}
+#endif
+	if (m->state >= 2 && m->rfss != 0xFF && m->site != 0xFF) {
+		sb_str(&b, TR("Site")); sb_chr(&b, ' '); sb_u32(&b, m->rfss, 1);
+		sb_str(&b, " / "); sb_u32(&b, m->site, 1);
+	} else sb_str(&b, m->state >= 2 ? TR("Unknown site") : TR("Searching for control"));
+}
 
 void ui_p25_talkgroup_step(int16_t steps)
 {
@@ -107,6 +135,7 @@ static void __attribute__((noinline)) home_standard(const radio_view_t *v, const
 			line(f, &y, text, ui_col.dim);
 		}
 	} else line(f, &y, TR("No calls heard"), ui_col.dim);
+	if (m.flags & P25_MON_TRUNK) { site_text(&m, text, sizeof text, false); line(f, &y, text, ui_col.focus); }
 	if (gfx_height() >= 128) {
 		sb_init(&b, text, sizeof text); sb_str(&b, TR("Tuned")); sb_chr(&b, ' ');
 		sb_freq(&b, m.tuned_hz ? m.tuned_hz : v->ch.rx_hz); line(f, &y, text, ui_col.fg);
@@ -144,6 +173,33 @@ static void card_pair(int y, const char *label, const char *value, color_t color
 	gfx_text(font, width - right - 6, y, value, color);
 }
 
+static void card_state(const p25_monitor_t *m, const radio_view_t *v)
+{
+	int x = gfx_width() / 2 - 20, y = 56;
+	color_t color = ui_col.focus;
+	if (v->state == RS_TX || v->state == RS_TX_DENIED) {
+		gfx_text(&font_6x12, x, y, v->state == RS_TX ? "TX" : "!", ui_col.tx);
+	} else if ((m->flags & P25_MON_RX) || m->state == 3) {
+		// Speaker: voice reception or a voice grant, separate from the privacy indicator.
+		gfx_fill(x, y + 4, 3, 5, color);
+		gfx_vline(x + 3, y + 2, 9, color); gfx_vline(x + 4, y + 1, 11, color);
+		gfx_vline(x + 7, y + 3, 7, color); gfx_vline(x + 10, y + 1, 11, color);
+	} else if ((m->flags & P25_MON_ACTIVE) && m->state == 2) {
+		// A control-channel link, rather than the keypad/privacy padlock.
+		gfx_rect(x, y + 1, 7, 7, color); gfx_rect(x + 5, y + 5, 7, 7, color);
+	} else {
+		color = ui_col.warn;
+		gfx_hline(x + 2, y, 4, color); gfx_hline(x + 2, y + 7, 4, color);
+		gfx_vline(x, y + 2, 4, color); gfx_vline(x + 7, y + 2, 4, color);
+		gfx_pixel(x + 1, y + 1, color); gfx_pixel(x + 6, y + 1, color);
+		gfx_pixel(x + 1, y + 6, color); gfx_pixel(x + 6, y + 6, color);
+		for (int i = 0; i < 5; i++) gfx_pixel(x + 7 + i, y + 7 + i, color);
+	}
+	unsigned bars = !(m->flags & P25_MON_ACTIVE) ? 0 : v->rssi_dbm >= -75 ? 4 :
+		v->rssi_dbm >= -90 ? 3 : v->rssi_dbm >= -105 ? 2 : v->rssi_dbm >= -120 ? 1 : 0;
+	gfx_icon_bars(x + 20, y, 18, 12, 4, bars, color, ui_col.dim);
+}
+
 static void __attribute__((noinline)) home_card_body(const radio_view_t *v, const ui_state_t *s)
 {
 	p25_monitor_t m;
@@ -158,12 +214,18 @@ static void __attribute__((noinline)) home_card_body(const radio_view_t *v, cons
 		int tw = gfx_text_width(meta, TR("RX only"));
 		gfx_text(meta, width - tw - 6, 56, TR("RX only"), ui_col.warn);
 	}
-	sb_init(&b, text, sizeof text); sb_i32(&b, v->rssi_dbm); sb_str(&b, " dBm");
-	const char *state = v->state == RS_TX ? TR("Transmitting") : v->state == RS_TX_DENIED ? TR("TX denied") : status(&m);
-	int signal_width = gfx_text_width(meta, text);
-	card_text(meta, 6, 74, width - signal_width - 24, state,
-		v->state == RS_TX || v->state == RS_TX_DENIED ? ui_col.tx : ui_col.focus);
-	gfx_text(meta, width - signal_width - 6, 74, text, ui_col.dim);
+	if (m.flags & P25_MON_TRUNK) {
+		card_state(&m, v);
+		site_text(&m, text, sizeof text, false);
+		card_text(meta, 6, 74, width - 12, text, ui_col.focus);
+	} else {
+		sb_init(&b, text, sizeof text); sb_i32(&b, v->rssi_dbm); sb_str(&b, " dBm");
+		const char *state = v->state == RS_TX ? TR("Transmitting") : v->state == RS_TX_DENIED ? TR("TX denied") : status(&m);
+		int signal_width = gfx_text_width(meta, text);
+		card_text(meta, 6, 74, width - signal_width - 24, state,
+			v->state == RS_TX || v->state == RS_TX_DENIED ? ui_col.tx : ui_col.focus);
+		gfx_text(meta, width - signal_width - 6, 74, text, ui_col.dim);
+	}
 	// The call card uses the same surfaces and typography as the other card pages.
 	gfx_round_fill(2, 94, width - 4, 108, UI_CARD_SURFACE);
 	bool current = (m.flags & P25_MON_RX) || ((m.flags & P25_MON_TRUNK) && m.state == 3);
@@ -386,18 +448,18 @@ static void recent_draw(void)
 	ui_draw_bottom(&ui_st, TR("OK Hold  # Favorite"));
 }
 
-static uint16_t system_count(void) { return ui_frame()->arg ? 4 : 7; }
+static uint16_t system_count(void) { return ui_frame()->arg ? 4 : ui_view()->ch.kind == CODEPLUG_KIND_P25_TRUNK ? 8 : 7; }
 static void hex(sbuf_t *b, uint32_t value, unsigned digits)
 {
 	while (digits) { digits--; sb_chr(b, "0123456789ABCDEF"[(value >> (digits * 4)) & 15u]); }
 }
 static void system_item(uint16_t i, ui_item_t *it)
 {
-	static const uint8_t overview[] = {0, 1, 3, 4, 5, 10, 8};
+	static const uint8_t overview[] = {0, 11, 1, 3, 4, 5, 10, 8};
 	static const uint8_t decode[] = {2, 6, 7, 9};
-	i = ui_frame()->arg ? decode[i] : overview[i];
+	i = ui_frame()->arg ? decode[i] : overview[i + (i && ui_view()->ch.kind != CODEPLUG_KIND_P25_TRUNK ? 1 : 0)];
 	static const char *const labels[] = { TRN("Status"), TRN("Control"), TRN("Tuned"), "WACN / SYS", "RFSS / SITE", "NAC",
-		TRN("Valid blocks"), TRN("CRC failures"), TRN("Transmit"), TRN("Last skip"), TRN("Signal") };
+		TRN("Valid blocks"), TRN("CRC failures"), TRN("Transmit"), TRN("Last skip"), TRN("Signal"), TRN("Site") };
 	p25_monitor_t m;
 	bool ok = snapshot(&m);
 	str_copy(it->label, sizeof it->label, tr(labels[i]));
@@ -421,6 +483,7 @@ static void system_item(uint16_t i, ui_item_t *it)
 	case 9: sb_str(&b, m.refused == 1 ? TR("Encrypted call skipped") : m.refused == 2 ? TR("Phase 2 call skipped") :
 		m.refused == 3 ? TR("Missing channel plan") : TR("None")); break;
 	case 10: sb_i32(&b, ui_view()->rssi_dbm); sb_str(&b, " dBm"); break;
+	case 11: if (m.flags & P25_MON_TRUNK) site_text(&m, it->value, sizeof it->value, true); else sb_str(&b, "--"); break;
 	}
 }
 static void system_context(uint16_t i)

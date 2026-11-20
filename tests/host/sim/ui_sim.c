@@ -960,6 +960,18 @@ static radio_view_t view;
 static uint32_t serial;
 #if CONFIG_P25_UI
 static p25_monitor_t p25_monitor;
+#if CONFIG_P25_TRUNK
+static uint8_t p25_site_fixture;
+uint8_t ui_svc_p25_site(const p25_monitor_t *m, char *out, size_t cap)
+{
+	if (cap) out[0] = '\0';
+	if (!p25_site_fixture) return P25_SITE_UNKNOWN;
+	if (p25_site_fixture == 4) return P25_SITE_MISMATCH;
+	if (p25_site_fixture == 5) return P25_SITE_UNAVAILABLE;
+	if (p25_site_fixture != 3 && cap) snprintf(out, cap, "%s", p25_site_fixture == 6 ? "North Tower West" : "North Tower");
+	return m->state >= 2 ? P25_SITE_CONFIRMED : P25_SITE_CANDIDATE;
+}
+#endif
 bool ui_svc_p25_view(p25_monitor_t *out) { *out = p25_monitor; return (out->flags & P25_MON_ACTIVE) != 0; }
 bool ui_svc_p25_command(uint16_t channel, uint8_t op, uint16_t tg)
 {
@@ -2228,6 +2240,9 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	memset(&view, 0, sizeof view);
 #if CONFIG_P25_UI
 	memset(&p25_monitor, 0, sizeof p25_monitor);
+#if CONFIG_P25_TRUNK
+	p25_site_fixture = 0;
+#endif
 #endif
 	memset(&sim_rec, 0, sizeof sim_rec);
 	vfo_mode = RADIO_MODE_FM;	// a fresh VFO
@@ -2728,6 +2743,22 @@ static bool run_token(char *t, char *err, size_t len)
 		sim_cp_serial++;
 		return true;
 	}
+#if CONFIG_P25_UI && CONFIG_P25_TRUNK
+	if (strcmp(t, "p25-site") == 0 && arg) {
+		const char *state = arg;
+		p25_site_fixture = !strcmp(state, "unknown") ? 3 : !strcmp(state, "mismatch") ? 4 :
+			!strcmp(state, "reload") ? 5 : !strcmp(state, "long") ? 6 : 1;
+		p25_monitor.rfss = 1; p25_monitor.site = 3;
+		p25_monitor.state = !strcmp(state, "hunt") ? 1 : !strcmp(state, "voice") ? 3 : 2;
+		if (p25_monitor.state != 3) {
+			p25_monitor.flags &= (uint8_t)~P25_MON_RX;
+			p25_monitor.tuned_hz = p25_monitor.cc_hz;
+			view.state = RS_IDLE; view.p25_rx = false;
+		}
+		if (p25_monitor.state == 1) p25_monitor.rfss = p25_monitor.site = 0xFF;
+		serial++; advance(200); return true;
+	}
+#endif
 	if (strcmp(t, "p25-home") == 0 || strcmp(t, "p25-trunk-home") == 0) {
 		view.ch.mode = RADIO_MODE_P25;
 		view.ch.kind = strcmp(t, "p25-home") == 0 ? CODEPLUG_KIND_P25 : CODEPLUG_KIND_P25_TRUNK;

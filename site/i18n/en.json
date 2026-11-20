@@ -2263,5 +2263,13 @@
   "screen.p25_recent": "P25 recent calls",
   "screen.p25_selected": "P25 selected talkgroup",
   "screen.p25_system": "P25 system details",
-  "screen.p25_talkgroups": "P25 operating talkgroups"
+  "screen.p25_talkgroups": "P25 operating talkgroups",
+  "editor.p25.site_name": "Site name",
+  "editor.p25.site_name_help": "Optional, up to 16 Latin-1 characters. Enter the broadcast RFSS and site IDs to confirm this name on the radio. The site group number only links control channels.",
+  "editor.problem.p25_site_name": "Site names must contain at most 16 printable Latin-1 characters.",
+  "editor.problem.p25_site_name_version": "This site has a newer or incomplete name extension. Clear the name to preserve its data.",
+  "screen.home_p25_control": "Home, P25 control acquired",
+  "screen.home_p25_search": "Home, P25 searching for a site",
+  "screen.home_p25_unknown": "Home, P25 unnamed site",
+  "screen.home_p25_mismatch": "Home, P25 site mismatch"
 }

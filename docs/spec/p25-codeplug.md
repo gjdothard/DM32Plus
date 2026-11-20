@@ -79,7 +79,7 @@ must be validated before a mode uses them. A parameter default never grants TX.
 | Conventional | 5 | Squelch byte, RX NAC u16, TX NAC u16 |
 | Radio unit ID | 4 | Unit ID u32, 1..0xFFFFFE; unset/out of range inherits the supplied radio ID |
 | Trunked system | 10 | WACN u24, system ID u16, control NAC u16, options u8, hold seconds u8, roam dBm i8 |
-| Site | 2 | RFSS u8, site u8; absent fields 0xFF |
+| Site | 2 or 19 | RFSS u8, site u8; optional version u8 and name[16] |
 | Control channel | 10 | Identifier/channel u16, RX Hz u32, TX Hz u32 |
 | Identifier row | 18 | Base Hz u32, spacing Hz u32, signed TX offset i32, bandwidth Hz u32, type u8, slots u8 |
 
@@ -87,6 +87,24 @@ A NAC field's bit 15 marks an explicit 12-bit value. Unset or malformed fields
 take upstream defaults. RX defaults to 0x293; TX defaults to RX, or 0x293 when
 RX is any (0xF7E). RX 0xF7F and TX 0xF7E/0xF7F normalize to defaults.
 Conventional squelch is normal (0) or selective (1).
+
+Site bodies retain the original RFSS/site bytes, with 0xFF meaning unknown.
+An optional extension starts at offset 2: version 1, then 16 printable Latin-1
+name bytes. Names end at 0x00 or 0xFF and pad with 0xFF. Control characters,
+unknown versions and incomplete extensions produce no display name. A site
+group number links control entries; it is not the broadcast site ID.
+CPS preserves legacy bodies, unknown versions and all trailing bytes when
+editing other fields. Naming a legacy record adds the extension. An unknown
+or incomplete extension must remain intact; CPS refuses a name edit there.
+
+Names resolve within the selected trunked system under the storage lock.
+Confirmed names require a unique decoded RFSS/site match and agreement with
+configured WACN/system ID when known. A programmed CC group must agree with
+that identity. Duplicate matches or conflicting CC assignments report a
+mismatch. A learned alternate CC can use a unique decoded site match.
+Before acquisition, a unique programmed CC group supplies only an explicitly
+unconfirmed candidate. Unnamed or unconfigured acquired sites use numeric IDs.
+No site-name table is added to the follower configuration.
 
 Trunk options are skip encrypted (bit 0), programmed plan only (bit 1), and
 no registration/affiliation (bit 2). The last option permits voice requests

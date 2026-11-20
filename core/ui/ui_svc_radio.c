@@ -23,6 +23,14 @@
 #include "ui_p25.h"
 #include "radio/p25_monitor.h"
 bool ui_svc_p25_view(p25_monitor_t *out) { return radio_p25_monitor(out); }
+#if CONFIG_P25_TRUNK
+#include "radio/radio_p25.h"
+uint8_t ui_svc_p25_site(const p25_monitor_t *m, char *out, size_t cap)
+{
+	const radio_view_t *v = ui_view();
+	return radio_p25_site_name(m, v->channel_number, &v->ch, out, cap);
+}
+#endif
 bool ui_svc_p25_command(uint16_t channel, uint8_t op, uint16_t tg)
 {
 	if (op == P25_MON_ADD || op == P25_MON_REMOVE) return ui_svc_p25_favorite(channel, tg, op == P25_MON_REMOVE);

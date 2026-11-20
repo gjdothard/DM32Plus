@@ -26,9 +26,11 @@ typedef struct {
 
 typedef struct {
 	uint32_t tuned_hz, cc_hz, wacn, blocks, crc_fail, tx_target;
+	uint32_t base_generation, settings_generation;
 	uint16_t channel, sysid, nac, held_tg;
 	uint16_t favorites[P25_MONITOR_FAVORITES];
 	uint8_t flags, state, rfss, site, refused, listen, recent_count, favorite_count;
+	uint8_t system;
 	p25_monitor_call_t recent[P25_MONITOR_RECENT];
 } p25_monitor_t;
 

@@ -243,7 +243,8 @@ function cell(h, t, col, r) {
 		sel.addEventListener("change", () => (r[col.key] = opts[sel.selectedIndex][0]));
 		return sel;
 	}
-	const input = h("input", { type: "text", size: col.type === "freq" ? 9 : 5, spellcheck: "false", "aria-label": label(t, col.label), value: r._text?.[col.key] ?? formatSpec(col, r[col.key], t) });
+	const input = h("input", { type: "text", size: col.size ?? (col.type === "freq" ? 9 : 5), maxlength: col.maxLength,
+		title: col.help ? t(col.help) : null, spellcheck: "false", "aria-label": label(t, col.label), value: r._text?.[col.key] ?? formatSpec(col, r[col.key], t) });
 	input.addEventListener("input", () => (r._text = { ...r._text, [col.key]: input.value }));
 	return input;
 }

@@ -2263,5 +2263,13 @@
   "screen.p25_recent": "Chiamate recenti P25",
   "screen.p25_selected": "Gruppo di chiamata P25 selezionato",
   "screen.p25_system": "Dettagli del sistema P25",
-  "screen.p25_talkgroups": "Gruppi di chiamata operativi P25"
+  "screen.p25_talkgroups": "Gruppi di chiamata operativi P25",
+  "editor.p25.site_name": "Nome del sito",
+  "editor.p25.site_name_help": "Facoltativo, fino a 16 caratteri Latin-1. Inserire gli ID RFSS e sito trasmessi per confermare il nome sulla radio. Il numero del gruppo collega solo i canali di controllo.",
+  "editor.problem.p25_site_name": "I nomi dei siti ammettono fino a 16 caratteri Latin-1 stampabili.",
+  "editor.problem.p25_site_name_version": "Questo sito ha una nuova estensione del nome o una incompleta. Cancellare il nome per conservare i dati.",
+  "screen.home_p25_control": "Home, controllo P25 acquisito",
+  "screen.home_p25_search": "Home, ricerca sito P25",
+  "screen.home_p25_unknown": "Home, sito P25 senza nome",
+  "screen.home_p25_mismatch": "Home, sito P25 non corrispondente"
 }

@@ -162,12 +162,46 @@ static void test_follower_clock(void)
 	CHECK(key_calls == 0 && starts == 0 && !keyed);
 	CHECK(radio_p25_end());
 }
+#if CONFIG_P25_UI
+static void test_site_names(void)
+{
+	trunk_setup(true, false, false);
+	CHECK(radio_p25_end());
+	uint8_t raw[4 + P25_CP_SITE_LEN] = { 2, CODEPLUG_ENTRY_SITE, 0, 0, 1, 3, 1 };
+	memset(raw + 7, 0xFF, 16); memcpy(raw + 7, "North Tower", 11);
+	record(CODEPLUG_KEY_SYS_CHAN + 10, raw, sizeof raw);
+	request(RREQ_RELOAD, 0); step(30);
+	network(); step(100);
+	p25_tsbk_t site = { .kind = P25_TSBK_RFSS,
+		.u.site = { .sysid = 0x123, .rfss = 1, .site = 3, .ch = 1 } };
+	signaling(&site); step(20);
+	p25_monitor_t m;
+	char name[17];
+	CHECK(radio_p25_monitor(&m) && m.state == P25_FOLLOW_CONTROL && m.rfss == 1 && m.site == 3);
+	CHECK(radio_p25_site_name(&m, sm.view.channel_number, &sm.view.ch, name, sizeof name) ==
+	      P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
+	grant(42, 4, 0); step(20);
+	CHECK(radio_p25_monitor(&m) && m.state == P25_FOLLOW_VOICE && m.tuned_hz != m.cc_hz);
+	CHECK(radio_p25_site_name(&m, sm.view.channel_number, &sm.view.ch, name, sizeof name) ==
+	      P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
+	step(P25_FOLLOW_VOICE_LOST_MS + 20); step(20);
+	step(P25_FOLLOW_CC_LOST_MS + 20); step(20);
+	CHECK(radio_p25_monitor(&m) && m.state == P25_FOLLOW_HUNT && m.rfss == 0xFF && m.site == 0xFF);
+	CHECK(radio_p25_site_name(&m, sm.view.channel_number, &sm.view.ch, name, sizeof name) != P25_SITE_CONFIRMED);
+	CHECK(radio_p25_end());
+	CHECK(codeplug_kv_remove(CODEPLUG_KEY_SYS_CHAN + 10));
+}
+#endif
+
 int main(void)
 {
 	setup(true);
 	system_config(true, false);
 	dual_refusals();
 	test_follower_clock();
+#if CONFIG_P25_UI
+	test_site_names();
+#endif
 	// The shared DMR assignment bank feeds P25 receive groups, without changing TX permissions or target.
 	trunk_setup(true, false, false);
 	CHECK(radio_p25_end());
@@ -234,6 +268,21 @@ int main(void)
 	network(); step(100);
 	p25_monitor_t monitor;
 	CHECK(radio_p25_monitor(&monitor) && monitor.channel == sm.view.channel_number);
+	CHECK(monitor.base_generation == codeplug_serial() && monitor.settings_generation == codeplug_kv_generation());
+	char site_name[17] = "stale";
+	CHECK(radio_p25_site_name(&monitor, sm.view.channel_number + 1, &sm.view.ch, site_name, sizeof site_name) ==
+	      P25_SITE_UNAVAILABLE && !site_name[0]);
+	p25_monitor_t stale = monitor;
+	stale.system++;
+	CHECK(radio_p25_site_name(&stale, sm.view.channel_number, &sm.view.ch, site_name, sizeof site_name) ==
+	      P25_SITE_UNAVAILABLE && !site_name[0]);
+	stale = monitor;
+	stale.settings_generation--;
+	CHECK(radio_p25_site_name(&stale, sm.view.channel_number, &sm.view.ch, site_name, sizeof site_name) ==
+	      P25_SITE_UNAVAILABLE && !site_name[0]);
+	stale = monitor; stale.base_generation--;
+	CHECK(radio_p25_site_name(&stale, sm.view.channel_number, &sm.view.ch, site_name, sizeof site_name) ==
+	      P25_SITE_UNAVAILABLE && !site_name[0]);
 	CHECK((monitor.flags & (P25_MON_ACTIVE | P25_MON_TRUNK | P25_MON_RX_ONLY)) ==
 	      (P25_MON_ACTIVE | P25_MON_TRUNK | P25_MON_RX_ONLY));
 	CHECK(!radio_p25_monitor_command(P25_MON_HOLD, 0));
