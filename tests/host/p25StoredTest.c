@@ -414,6 +414,75 @@ static void test_trunk_load(void)
 	      cfg.iden[3].slots == 2);
 	CHECK(cfg.follow_all && cfg.talk_group == P25_CP_TG_DEFAULT && cfg.fallback == 20);
 
+	// Resolve names from the serving CC and decoded identity, never the voice frequency.
+	uint8_t named[P25_CP_SITE_LEN];
+	memset(named, 0xFF, sizeof named);
+	named[0] = 1; named[1] = 4; named[2] = 1;
+	memcpy(named + 3, "North Tower", 11);
+	sh[2] = 0;
+	put(CODEPLUG_KEY_SYS_CHAN, sh, 4, named, sizeof named);
+	p25_site_query_t q = { .control_hz = 851012500, .wacn = 0xBEE00, .sysid = 0x3A1,
+		.rfss = 1, .site = 4, .acquired = true };
+	char name[17];
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
+	// A second system can reuse a name, group number and CC without sharing identity.
+	put(CODEPLUG_KEY_SYSTEM + 3, hd, sizeof hd, blk, sizeof blk);
+	uint8_t other_head[4] = { 3, CODEPLUG_ENTRY_SITE, 0, 0 };
+	named[1] = 7;
+	put(CODEPLUG_KEY_SYS_CHAN + 30, other_head, 4, named, sizeof named);
+	uint8_t other_ctl[10] = { 0 };
+	for (unsigned i = 0; i < 4; i++) other_ctl[2 + i] = (uint8_t)(q.control_hz >> (8 * i));
+	other_head[1] = CODEPLUG_ENTRY_CHANNEL; other_head[3] = CODEPLUG_ENTRY_CONTROL;
+	put(CODEPLUG_KEY_SYS_CHAN + 31, other_head, 4, other_ctl, sizeof other_ctl);
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
+	CHECK(p25_site_name(3, &q, name, sizeof name) == P25_SITE_MISMATCH && !name[0]);
+	q.site = 7;
+	CHECK(p25_site_name(3, &q, name, sizeof name) == P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
+	q.site = named[1] = 4;
+	CHECK(codeplug_kv_remove(CODEPLUG_KEY_SYSTEM + 3));
+	CHECK(codeplug_kv_remove(CODEPLUG_KEY_SYS_CHAN + 30));
+	CHECK(codeplug_kv_remove(CODEPLUG_KEY_SYS_CHAN + 31));
+	q.control_hz = 851025000;
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
+	q.control_hz = 851037500; // learned alternate: the unique decoded identity still confirms it
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
+	put_ctl(10, CODEPLUG_GROUP_NONE, q.control_hz);
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
+	q.acquired = false;
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_UNKNOWN && !name[0]);
+	q.acquired = true;
+	CHECK(codeplug_kv_remove(CODEPLUG_KEY_SYS_CHAN + 10));
+	q.control_hz = 851012500; q.acquired = false;
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CANDIDATE && !strcmp(name, "North Tower"));
+	q.control_hz = 851500000;
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CANDIDATE && !name[0]);
+	q.acquired = true; q.site = 7;
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CONFIRMED && !name[0]);
+	q.control_hz = 851012500;
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_MISMATCH && !name[0]);
+	q.site = 4; q.wacn++;
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_MISMATCH && !name[0]);
+	q.wacn--; q.sysid++;
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_MISMATCH && !name[0]);
+	q.sysid--; q.site = 99; q.control_hz = 851037500;
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_UNKNOWN && !name[0]);
+	CHECK(p25_site_name(3, &q, name, sizeof name) == P25_SITE_UNKNOWN && !name[0]);
+	q.site = 4; q.control_hz = 851012500;
+	sh[2] = 2; // duplicate decoded identity must not pick the first name
+	put(CODEPLUG_KEY_SYS_CHAN + 2, sh, 4, named, sizeof named);
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_MISMATCH && !name[0]);
+	CHECK(codeplug_kv_remove(CODEPLUG_KEY_SYS_CHAN + 2));
+	put_ctl(10, 1, 851012500); // frequency assigned to conflicting site groups
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_MISMATCH && !name[0]);
+	CHECK(codeplug_kv_remove(CODEPLUG_KEY_SYS_CHAN + 10));
+	CHECK(p25_site_name(2, &q, name, 4) == P25_SITE_CONFIRMED && !strcmp(name, "Nor"));
+	p25_site_t decoded;
+	p25_site_decode(named, 2, &decoded); CHECK(!decoded.name[0] && decoded.site == 4);
+	p25_site_decode(named, 18, &decoded); CHECK(!decoded.name[0]);
+	named[2] = 2; p25_site_decode(named, sizeof named, &decoded); CHECK(!decoded.name[0]);
+	named[2] = 1; named[3] = 0x1B;
+	p25_site_decode(named, sizeof named, &decoded); CHECK(!decoded.name[0]);
+
 	// The channel's own "no fallback"; a fallback renamed under the system: none
 	t.flags = P25_TAG_NO_FALLBACK;
 	CHECK(codeplug_tag_write(21, "County TG", &t, NULL, 0));

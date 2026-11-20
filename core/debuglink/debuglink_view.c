@@ -605,6 +605,11 @@ void debuglink_view_section(uint8_t section, const radio_view_t *v, dl_text_t *t
 		dl_text(t, "p25.ui=1\np25.active=%u\np25.channel=%u\np25.flags=%u\np25.listen=%u\np25.held_tg=%u\n",
 			active, m.channel, m.flags, m.listen, m.held_tg);
 		dl_text(t, "p25.tx_target=%u\n", (unsigned)m.tx_target);
+#if CONFIG_P25_TRUNK
+		char site_name[CODEPLUG_NAME_LEN + 1];
+		uint8_t site_state = radio_p25_site_name(&m, v->channel_number, &v->ch, site_name, sizeof site_name);
+		dl_text(t, "p25.site_state=%u\np25.site_name=%s\n", site_state, site_name);
+#endif
 #if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
 		dl_text(t, "p25.groups=%u\np25.group_index=%u\n", active ? v->talkgroup_count : 0, active ? v->talkgroup_index : 0);
 #else

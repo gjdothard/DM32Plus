@@ -9,6 +9,25 @@ from rfoundry_hil import skip
 from rfoundry_debug import DOWN
 
 
+@pytest.mark.feature("p25_ui")
+def test_p25_site_name_visibility(radio):
+    """Read the serving-site presentation without changing channels or transmitting."""
+    view = radio.link.view(["core", "p25"])
+    if "p25.site_state" not in view:
+        skip("not_built", "P25 trunked site-name visibility is unavailable")
+    if view.get("mode") != "p25" or not int(view.get("p25.flags", "0")) & 2:
+        skip("state", "select a P25 trunked channel before checking site names")
+    state = int(view["p25.site_state"])
+    name = view["p25.site_name"]
+    assert state in range(5), view
+    assert len(name) <= 16, view
+    assert all(32 <= ord(c) <= 126 or 160 <= ord(c) <= 254 for c in name), view
+    if state in (0, 3, 4):
+        assert name == "", view
+    if state == 2:
+        assert int(view["p25.rfss"]) < 255 and int(view["p25.site"]) < 255, view
+
+
 @pytest.mark.feature("dual_watch")
 def test_p25_dual_watch_refused(radio):
     """A stored P25 channel cannot join a debug-link dual-watch pair; no RF or codeplug write."""

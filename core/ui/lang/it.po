@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 The RadioFoundry Authors
 # Copyright (c) 2026 Garrett Dothard
+# Copyright (c) 2026 The RadioFoundry Authors
 #
 # The radio's strings in Italiano (it; docs/dev/translating.md). Kept in step with the source by
 # tools/i18n.py --sync: translate the empty msgstr lines; an empty one shows the English.
@@ -3402,6 +3402,30 @@ msgid "Remove talkgroup"
 msgstr "Rimuovi gruppo"
 
 #: core/ui/ui_p25.c
+msgid "Site unavailable"
+msgstr "Sito non disponibile"
+
+#: core/ui/ui_p25.c
+msgid "Site mismatch"
+msgstr "Sito non corrispondente"
+
+#: core/ui/ui_p25.c
+msgid "Site"
+msgstr "Sito"
+
+#: core/ui/ui_p25.c
+msgid "Candidate"
+msgstr "Candidato"
+
+#: core/ui/ui_p25.c
+msgid "Unknown site"
+msgstr "Sito sconosciuto"
+
+#: core/ui/ui_p25.c
+msgid "Searching for control"
+msgstr "Ricerca controllo"
+
+#: core/ui/ui_p25.c
 msgid "P25 request unavailable"
 msgstr "Richiesta P25 non disponibile"
 
@@ -3424,10 +3448,6 @@ msgstr "In attesa di P25"
 #: core/ui/ui_p25.c
 msgid "Following voice"
 msgstr "Seguimento voce"
-
-#: core/ui/ui_p25.c
-msgid "Searching for control"
-msgstr "Ricerca controllo"
 
 #: core/ui/ui_p25.c
 msgid "Control channel locked"

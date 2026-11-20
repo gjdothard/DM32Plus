@@ -15,6 +15,14 @@ monitor lives inside that workspace. There is one permanent published copy.
 Closing the owner clears the published view. The UI also verifies the
 selected channel number and logical mode before using it.
 
+The monitor carries the owner's base and keyed-store generations. Site-name
+resolution rejects snapshots from an earlier codeplug or another selected
+channel. It reads names through the radio service from stored site entries,
+without dereferencing the decoder loan or caching a permanent name table.
+The serving control frequency and decoded RFSS/site remain the name binding
+during a voice grant. Pending control retunes publish hunting state without
+the previous site's IDs. Closing or reloading the owner clears its view.
+
 Recent history contains four distinct group destinations, newest first.
 Private calls are distinguished by source. Entries carry a source ID when
 decoded, actual tuned frequency, flags and last activity time. A grant with
@@ -74,6 +82,18 @@ ID, name and source; recent entries use two rows. A host pixel check verifies
 that P25 Home actually uses the card surface. Small and monochrome displays
 retain the standard layout. Context opens Recent; Quick opens listening.
 
+Trunked card Home centers reception and signal icons between P25 TRUNK and
+RX only. Linked squares mean acquired control, a speaker means a voice grant
+or reception, and a search symbol means acquisition. These are separate from
+the header's keypad-lock and privacy indicators. TX and denied TX remain
+explicit. Exact signal strength remains in System details.
+
+A site line replaces the separate state/dBm row. It shows the confirmed site
+name, numeric RFSS/site fallback, an explicitly labeled Candidate during
+search, or Site mismatch. System details retain the full name and decoded
+identity. Small and monochrome layouts use a text site line. Conventional
+Home retains its existing presentation.
+
 Home replaces FM-specific controls with P25 reception state, current or last
 talkgroup, programmed name, source, tuned/control frequencies, listening
 selection and signal strength as space permits. The footer retains RX-only
@@ -90,6 +110,10 @@ It exposes `p25.ui`, owner/channel/flags, receive selection/held group,
 decoded identity, frequencies, block/CRC counts, history/favorite counts
 and the newest talkgroup/source/time. The section reports `p25.ui=0` when
 the feature is disabled.
+
+With trunking enabled, `p25.site_name` is at most 16 Latin-1 characters.
+`p25.site_state` is 0 unknown, 1 candidate, 2 confirmed, 3 mismatch or
+4 unavailable/stale. Unknown, mismatched and stale names are empty.
 
 ## Integration checklist
 

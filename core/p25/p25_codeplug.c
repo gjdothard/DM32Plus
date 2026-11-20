@@ -216,6 +216,63 @@ void p25_site_decode(const uint8_t *b, int len, p25_site_t *out)
 {
 	out->rfss = len >= 1 ? b[0] : P25_CP_UNKNOWN;
 	out->site = len >= 2 ? b[1] : P25_CP_UNKNOWN;
+	out->name[0] = '\0';
+	if (len < (int)P25_CP_SITE_LEN || b[2] != 1u) return;
+	for (unsigned i = 0; i < CODEPLUG_NAME_LEN; i++) {
+		uint8_t c = b[3 + i];
+		if (c == 0u || c == 0xFFu) break;
+		if (c < 32u || (c >= 127u && c < 160u)) { out->name[0] = '\0'; return; }
+		out->name[i] = (char)c;
+		out->name[i + 1] = '\0';
+	}
+}
+
+uint8_t p25_site_name(uint8_t system, const p25_site_query_t *q, char *out, size_t cap)
+{
+	uint8_t b[CODEPLUG_SYS_HDR + P25_CP_TSYS_LEN];
+	// Each record is consumed before reading the next; reuse storage to bound the UI query's stack.
+	union { codeplug_system_t system; p25_tsys_t sys; p25_ctl_t ctl; p25_site_t site; } record;
+	if (!cap) return P25_SITE_UNKNOWN;
+	out[0] = '\0';
+	int n = codeplug_system(system, &record.system, b, P25_CP_TSYS_LEN);
+	if (n < 0 || record.system.type != CODEPLUG_SYSTYPE_P25_TRUNK) return P25_SITE_UNKNOWN;
+	p25_tsys_decode(b, n < (int)P25_CP_TSYS_LEN ? n : (int)P25_CP_TSYS_LEN, &record.sys);
+	if (q->acquired && ((q->wacn != 0xFFFFFFFFu && record.sys.wacn != P25_CP_WACN_ANY && record.sys.wacn != q->wacn) ||
+	    (q->sysid != 0xFFFFu && record.sys.sysid != P25_CP_SYSID_ANY && record.sys.sysid != q->sysid)))
+		return P25_SITE_MISMATCH;
+	codeplug_sys_entry_t e;
+	int at = -1, group = -1;
+	while (codeplug_sys_entry_next(&at, system, CODEPLUG_ENTRY_CHANNEL, &e, b, P25_CP_SITE_LEN) >= 0) {
+		p25_ctl_decode(b, e.len < (int)P25_CP_SITE_LEN ? e.len : (int)P25_CP_SITE_LEN, &record.ctl);
+		if (!(e.flags & CODEPLUG_ENTRY_CONTROL) || !q->control_hz || record.ctl.rx_hz != q->control_hz) continue;
+		if (e.group == CODEPLUG_GROUP_NONE) continue;
+		if (group >= 0 && group != e.group) return P25_SITE_MISMATCH;
+		group = e.group;
+	}
+	bool identified = q->acquired && q->rfss != P25_CP_UNKNOWN && q->site != P25_CP_UNKNOWN;
+	unsigned matches = 0, grouped = 0;
+	uint8_t result = P25_SITE_UNKNOWN;
+	at = -1;
+	while (codeplug_sys_entry_next(&at, system, CODEPLUG_ENTRY_SITE, &e, b, P25_CP_SITE_LEN) >= 0) {
+		if (e.group == CODEPLUG_GROUP_NONE) continue;
+		p25_site_decode(b, e.len < (int)P25_CP_SITE_LEN ? e.len : (int)P25_CP_SITE_LEN, &record.site);
+		if (group == e.group && ++grouped > 1u) { out[0] = '\0'; return P25_SITE_MISMATCH; }
+		bool same = identified && record.site.rfss == q->rfss && record.site.site == q->site;
+		if (identified && group == e.group &&
+		    ((record.site.rfss != P25_CP_UNKNOWN && record.site.rfss != q->rfss) ||
+		     (record.site.site != P25_CP_UNKNOWN && record.site.site != q->site))) {
+			out[0] = '\0'; return P25_SITE_MISMATCH;
+		}
+		if (identified ? !same : group != e.group) continue;
+		if (++matches > 1u || (identified && group >= 0 && group != e.group)) {
+			out[0] = '\0'; return P25_SITE_MISMATCH;
+		}
+		size_t i = 0;
+		while (i + 1 < cap && record.site.name[i]) { out[i] = record.site.name[i]; i++; }
+		out[i] = '\0';
+		result = identified ? P25_SITE_CONFIRMED : P25_SITE_CANDIDATE;
+	}
+	return result;
 }
 
 void p25_ctl_decode(const uint8_t *b, int len, p25_ctl_t *out)

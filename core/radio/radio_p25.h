@@ -12,6 +12,11 @@
 #include "p25/p25_workspace.h"
 #if CONFIG_P25_UI
 #include "radio/p25_monitor.h"
+#if CONFIG_P25_TRUNK
+// Resolve a published snapshot against a selected channel and the current codeplug.
+uint8_t radio_p25_site_name(const p25_monitor_t *monitor, uint16_t number, const channel_t *channel,
+	char *out, size_t cap);
+#endif
 #endif
 
 // Owner storage, exposed for compile-only resource accounting. Callers must not access a running owner's state.
