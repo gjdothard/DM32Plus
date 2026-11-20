@@ -270,8 +270,8 @@ bool ui_svc_dual(const ui_dual_ref_t ref[2], uint8_t sel)
 		radio_req_dual(NULL, 0);
 		return true;
 	}
-	static zone_t z;	// static: not on the UI task's stack
-	static channel_t ch;
+	// The zone is no longer needed once its channel number is copied.
+	static union { zone_t zone; channel_t channel; } lookup;
 	radio_dual_ref_t r[2];
 	for (uint8_t i = 0; i < 2; i++) {
 		r[i] = (radio_dual_ref_t){ ref[i].vfo, ref[i].vfo ? 0 : ref[i].zone,
@@ -279,9 +279,12 @@ bool ui_svc_dual(const ui_dual_ref_t ref[2], uint8_t sel)
 		if (r[i].vfo) {
 			if (!(CONFIG_VFO_FM || CONFIG_VFO_DMR))
 				return false;
-		} else if (r[i].pos >= CODEPLUG_ZONE_MAX || !codeplug_zone(r[i].zone, &z) || r[i].pos >= z.count ||
-			   !codeplug_radio_channel(z.channels[r[i].pos], &ch) || ch.kind != CODEPLUG_KIND_NONE) {
-			return false;
+		} else {
+			if (r[i].pos >= CODEPLUG_ZONE_MAX || !codeplug_zone(r[i].zone, &lookup.zone) || r[i].pos >= lookup.zone.count)
+				return false;
+			uint16_t number = lookup.zone.channels[r[i].pos];
+			if (!codeplug_radio_channel(number, &lookup.channel) || lookup.channel.kind != CODEPLUG_KIND_NONE)
+				return false;
 		}
 	}
 	if (sel > 1 || (r[0].vfo == r[1].vfo && r[0].zone == r[1].zone && r[0].pos == r[1].pos))

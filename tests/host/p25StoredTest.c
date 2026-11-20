@@ -425,6 +425,23 @@ static void test_trunk_load(void)
 		.rfss = 1, .site = 4, .acquired = true };
 	char name[17];
 	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
+	// A second system can reuse a name, group number and CC without sharing identity.
+	put(CODEPLUG_KEY_SYSTEM + 3, hd, sizeof hd, blk, sizeof blk);
+	uint8_t other_head[4] = { 3, CODEPLUG_ENTRY_SITE, 0, 0 };
+	named[1] = 7;
+	put(CODEPLUG_KEY_SYS_CHAN + 30, other_head, 4, named, sizeof named);
+	uint8_t other_ctl[10] = { 0 };
+	for (unsigned i = 0; i < 4; i++) other_ctl[2 + i] = (uint8_t)(q.control_hz >> (8 * i));
+	other_head[1] = CODEPLUG_ENTRY_CHANNEL; other_head[3] = CODEPLUG_ENTRY_CONTROL;
+	put(CODEPLUG_KEY_SYS_CHAN + 31, other_head, 4, other_ctl, sizeof other_ctl);
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
+	CHECK(p25_site_name(3, &q, name, sizeof name) == P25_SITE_MISMATCH && !name[0]);
+	q.site = 7;
+	CHECK(p25_site_name(3, &q, name, sizeof name) == P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
+	q.site = named[1] = 4;
+	CHECK(codeplug_kv_remove(CODEPLUG_KEY_SYSTEM + 3));
+	CHECK(codeplug_kv_remove(CODEPLUG_KEY_SYS_CHAN + 30));
+	CHECK(codeplug_kv_remove(CODEPLUG_KEY_SYS_CHAN + 31));
 	q.control_hz = 851025000;
 	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
 	q.control_hz = 851037500; // learned alternate: the unique decoded identity still confirms it
