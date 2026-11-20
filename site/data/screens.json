@@ -1012,6 +1012,20 @@
    "needs": [
     "P25_TRUNK"
    ]
+  },
+  "dual_p25_refused": {
+   "group": "home",
+   "needs": [
+    "P25",
+    "DUAL_WATCH"
+   ]
+  },
+  "home_dual_vfo_entry": {
+   "group": "home",
+   "needs": [
+    "DUAL_WATCH",
+    "VFO"
+   ]
   }
  },
  "_copyright": "Copyright (c) 2026 Garrett Dothard",

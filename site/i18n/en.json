@@ -2271,5 +2271,7 @@
   "screen.home_p25_control": "Home, P25 control acquired",
   "screen.home_p25_search": "Home, P25 searching for a site",
   "screen.home_p25_unknown": "Home, P25 unnamed site",
-  "screen.home_p25_mismatch": "Home, P25 site mismatch"
+  "screen.home_p25_mismatch": "Home, P25 site mismatch",
+  "screen.dual_p25_refused": "P25 dual watch refused",
+  "screen.home_dual_vfo_entry": "Home, dual watch VFO frequency entry"
 }

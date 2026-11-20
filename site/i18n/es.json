@@ -2271,5 +2271,7 @@
   "screen.home_p25_control": "Inicio, control P25 adquirido",
   "screen.home_p25_search": "Inicio, búsqueda de sitio P25",
   "screen.home_p25_unknown": "Inicio, sitio P25 sin nombre",
-  "screen.home_p25_mismatch": "Inicio, sitio P25 no coincidente"
+  "screen.home_p25_mismatch": "Inicio, sitio P25 no coincidente",
+  "screen.dual_p25_refused": "Doble escucha P25 rechazada",
+  "screen.home_dual_vfo_entry": "Inicio, entrada de frecuencia VFO en doble escucha"
 }
