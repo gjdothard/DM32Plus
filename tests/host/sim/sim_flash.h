@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // A simulated SPI NOR flash for host tests, as a hal_flash_t: programming only clears bits (old & new), erase sets a
 // 4 KB sector to 0xFF, and a power cut can be armed after a number of "units" (one programmed byte or one erase):
 // the operation in progress is torn (the bytes after the cut are not programmed; a torn erase leaves the sector
@@ -25,6 +26,7 @@ bool sim_flash_is_cut(void);
 void sim_flash_power_on(void);
 // Units used so far (programmed bytes + erases), and erases per sector so far
 uint32_t sim_flash_units(void);
+uint32_t sim_flash_reads(void);
 uint32_t sim_flash_erases(uint32_t addr);
 // A worn range: programs there fail (nothing programmed); erases still work. len 0 clears it
 void sim_flash_bad_range(uint32_t addr, uint32_t len);

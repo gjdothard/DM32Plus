@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // DMR voice glue: call stack frames <-> FEC <-> vocoder <-> PCM blocks (ambeVoice.h)
 #include "dmr/ambe/ambeVoice.h"
 #include "dmr/ambe/ambeFec.h"
@@ -273,6 +274,10 @@ static void rx_block(int16_t *spk)
 	}
 	if (queued == 0) {
 		if (ended) {
+			if (aud != NULL && aud->spk_pending != NULL && aud->spk_pending()) {
+				memset(spk, 0, AUDIO_BLOCK_SAMPLES * sizeof(int16_t));
+				return;	// retain the route until queued speaker audio finishes
+			}
 			cb_rx_live = false;
 			cb_rx_playing = false;
 			speaker(false);

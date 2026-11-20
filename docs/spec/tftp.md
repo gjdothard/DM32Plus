@@ -1,6 +1,12 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # TFTP codeplug access on the USB network link
+
+Codeplug writes currently refuse codeplugs containing tagged channels; a
+mode-aware writer is required to preserve logical permissions. Reads remain
+available. The transferred regions exclude managed metadata at EEPROM offset
+0xE000. See [tagged channel records](channel-modes.md).
 
 In USB network mode (`usb-network.md`) the radio runs a TFTP server on UDP port 69 at its own address:
 `get codeplug.bin` reads the codeplug, `put codeplug.bin` writes it, `get` and `put iddb.bin` do the same for the DMR

@@ -3,10 +3,13 @@
 // request ends when its header says it is complete (R, W/X, most C commands), or after CPS_GAP_MS of quiet for the rest
 // (C 2 text without a NUL, D, unknown bytes). A request still short of its header's length waits CPS_STALL_MS, so a
 // UART that delivers it in pieces doesn't cut it short; the PC waits for each reply before it sends again.
+// Copyright (c) 2026 Garrett Dothard
 #include <string.h>
 #include "cps/cps_openfw.h"
 #include "board.h"
 #include "codeplug/codeplug.h"
+#include "codeplug/codeplug_tag.h"
+#include "codeplug/codeplug_kv.h"
 #include "settings/settings.h"
 #include "storage/storage.h"
 
@@ -361,6 +364,7 @@ static bool writable(uint32_t addr, bool *cal)
 	if (m == NULL || !storage_ready() || addr >= flash_size()) {
 		return false;
 	}
+	if ((uint64_t)addr == (uint64_t)m->openfw_eeprom + CODEPLUG_KV_ADDR) return false;
 	if (overlaps(addr, STORAGE_SECTOR, m->settings_addr, m->settings_size) ||
 	    overlaps(addr, STORAGE_SECTOR, m->journal_addr, 2u * STORAGE_SECTOR) ||
 	    overlaps(addr, STORAGE_SECTOR, m->native_addr, m->native_size)) {
@@ -414,7 +418,7 @@ static void cmd_write(void)
 			return;
 		}
 		sector = storage_buffer_acquire();
-		if (sector == NULL || !board.flash->read(addr, sector, STORAGE_SECTOR)) {
+		if (sector == NULL || (!cal && !codeplug_legacy_write_allowed()) || !board.flash->read(addr, sector, STORAGE_SECTOR)) {
 			drop_sector();
 			refuse();
 			return;

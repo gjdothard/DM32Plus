@@ -3,6 +3,36 @@
 
 # Build configuration
 
+## P25 integration switches
+
+`CONFIG_P25` selects the Phase 1 engines and derives `CONFIG_AIR`, `CONFIG_IMBE`
+and `CONFIG_MBE`. `CONFIG_P25_TRUNK` follows it unless explicitly disabled.
+`CONFIG_P25_UI` also follows P25. Disable it to omit the monitoring Home,
+recent talkgroups, persistent favorites and system pages while keeping the
+protocol engines. See [P25 monitoring](spec/p25-ui.md).
+P25 requires `CONFIG_DMR` for shared codeplug contacts; trunking requires P25.
+Set the protocol switches rather than overriding the derived implementation
+switches. Make and `core/config.h` reject inconsistent dependencies.
+
+P25 defaults off globally; a board can enable P25 and trunking in its full
+build. Channel mode, CPS programming and the subscriber path are connected.
+Hardware qualification remains pending. See the [subsystem spec](spec/p25.md)
+and [feature matrix](feature-matrix.md) for board defaults and status.
+
+`CONFIG_P25=n CONFIG_P25_TRUNK=n` excludes the protocol libraries.
+`CONFIG_P25=y CONFIG_P25_TRUNK=n` builds conventional P25 without the follower.
+`CONFIG_P25=y` also builds trunking. These are code selection controls;
+transmit permission still comes from channel/system policy and normal radio
+checks. They do not replace the CPS RX-only option.
+
+`CONFIG_RX_EXTENDED` enables a board's experimental receive-only tuning
+range. It defaults off globally. The board supplies the limits; the switch
+does not establish sensitivity or synthesizer lock. Channels received in a
+receive-only range cannot transmit, even with a transmit frequency in a
+normal band. Such a trunking control-channel list forces passive following:
+no registration, affiliation, requests or voice transmission. Overlapping
+normal transmit bands retain their existing permissions.
+
 Features that cost flash, and values that differ per radio, are chosen at build time. Defaults live in
 `config/features.mk`. A platform changes them for every radio on it in `platform/<p>/config.mk`, a board changes them
 in `boards/<board>/config.mk`, and the make command line overrides all of them. The Makefile reads the board's file
@@ -226,6 +256,20 @@ make BOARD=<id> print-not-written       # what is not written yet
 [feature-matrix.md](feature-matrix.md) shows the result for every radio ("Built by default on each radio") and its
 notes give the reasons; a radio's hardware spec (`hardware-<id>.md`) holds the facts behind them. The switches off on
 most boards are `CONFIG_AUDIO_PROBE` (a bench diagnostic) and the ones that need a part the radio lacks.
+
+## P25 resource probe
+
+`make BOARD=<id> CONFIG_P25=y BUILD=build/p25-probe p25-resources` compiles a
+diagnostic object with the selected target ABI. Its `p25_bytes_*` symbol sizes
+report voice, engine, session, soft-modem and, with trunking enabled, follower
+state. The object is never linked into firmware. Use a separate `BUILD` for
+each switch combination. With P25 disabled it emits no size markers.
+
+These are individual type sizes, not a sum or a runtime allocation plan.
+Some state may share storage across modes. An enabled firmware link can discard
+unreferenced engines until channel integration calls them; its image size does
+not prove that an active P25 mode will fit. Check retained code, caller-owned
+state, task stacks and memory ownership before enabling the mode.
 
 ## Adding a feature
 

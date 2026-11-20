@@ -597,7 +597,7 @@ msgstr "10 min"
 msgid "30 min"
 msgstr "30 min"
 
-#: core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_p25.c core/ui/ui_screens.c
 msgid "None"
 msgstr "Ninguno"
 
@@ -745,7 +745,7 @@ msgstr "KISS por USB"
 msgid "Stations heard"
 msgstr "Estaciones oídas"
 
-#: core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_p25.c core/ui/ui_screens.c
 msgid "On"
 msgstr "Sí"
 
@@ -820,6 +820,10 @@ msgstr "Aún nada oído"
 #: core/ui/ui_dual.c core/ui/ui_screens.c
 msgid "No tone"
 msgstr "Sin tono"
+
+#: core/ui/ui_dual.c
+msgid "{Dual watch unavailable for P25|No dual watch on P25}"
+msgstr "{Escucha dual no disponible para P25|P25 sin escucha dual}"
 
 #: core/ui/ui_dual.c
 msgid "{Can't watch that channel: pick another|Can't watch that channel}"
@@ -1065,7 +1069,7 @@ msgstr "Sin acciones para esto"
 msgid "PTT talk  OK open  # more"
 msgstr "PTT hablar  OK abrir  # más"
 
-#: core/ui/ui_gps.c
+#: core/ui/ui_gps.c core/ui/ui_p25.c
 msgid "Status"
 msgstr "Estado"
 
@@ -1073,7 +1077,7 @@ msgstr "Estado"
 msgid "Sky"
 msgstr "Cielo"
 
-#: core/ui/ui_gps.c
+#: core/ui/ui_gps.c core/ui/ui_p25.c
 msgid "Signal"
 msgstr "Señal"
 
@@ -1253,7 +1257,7 @@ msgstr "No se puede registrar"
 msgid "Talk to "
 msgstr "Hablar a "
 
-#: core/ui/ui_menus.c
+#: core/ui/ui_menus.c core/ui/ui_p25.c
 msgid "Private call"
 msgstr "Llamada privada"
 
@@ -1769,7 +1773,7 @@ msgstr "Número"
 msgid "Mode"
 msgstr "Modo"
 
-#: core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/ui_menus.c core/ui/ui_p25.c core/ui/ui_screens.c
 msgid "RX only"
 msgstr "Solo RX"
 
@@ -2005,7 +2009,7 @@ msgstr "Contacto nuevo"
 msgid "Type"
 msgstr "Tipo"
 
-#: core/ui/ui_menus.c
+#: core/ui/ui_menus.c core/ui/ui_p25.c
 msgid "Talkgroup"
 msgstr "Grupo"
 
@@ -3305,6 +3309,10 @@ msgstr "Hablar a"
 msgid "{PTT once  OK use  Hold OK set|OK use  Hold OK set}"
 msgstr "{PTT una vez  OK usar  Mant OK fijar|OK usar  Mant OK fijar}"
 
+#: core/ui/ui_menus.c core/ui/ui_p25.c core/ui/ui_screens.c
+msgid "Talkgroups"
+msgstr "Grupos"
+
 #: core/ui/ui_menus.c
 msgid "Scan paused"
 msgstr "Escaneo en pausa"
@@ -3392,6 +3400,202 @@ msgstr "Lista de grupos llena"
 #: core/ui/ui_menus.c
 msgid "Remove talkgroup"
 msgstr "Quitar grupo"
+
+#: core/ui/ui_p25.c
+msgid "P25 request unavailable"
+msgstr "Solicitud P25 no disponible"
+
+#: core/ui/ui_p25.c
+msgid "P25 unavailable"
+msgstr "P25 no disponible"
+
+#: core/ui/ui_p25.c
+msgid "Encrypted call"
+msgstr "Llamada cifrada"
+
+#: core/ui/ui_p25.c
+msgid "Receiving voice"
+msgstr "Recibiendo voz"
+
+#: core/ui/ui_p25.c
+msgid "Waiting for P25"
+msgstr "Esperando P25"
+
+#: core/ui/ui_p25.c
+msgid "Following voice"
+msgstr "Siguiendo voz"
+
+#: core/ui/ui_p25.c
+msgid "Searching for control"
+msgstr "Buscando control"
+
+#: core/ui/ui_p25.c
+msgid "Control channel locked"
+msgstr "Canal de control adquirido"
+
+#: core/ui/ui_p25.c
+msgid "Transmitting"
+msgstr "Transmitiendo"
+
+#: core/ui/ui_p25.c
+msgid "Last heard"
+msgstr "Última recepción"
+
+#: core/ui/ui_p25.c
+msgid "Radio ID"
+msgstr "ID de radio"
+
+#: core/ui/ui_p25.c
+msgid "No calls heard"
+msgstr "Sin llamadas recibidas"
+
+#: core/ui/ui_p25.c
+msgid "Tuned"
+msgstr "Sintonizado"
+
+#: core/ui/ui_p25.c
+msgid "Control"
+msgstr "Control"
+
+#: core/ui/ui_p25.c
+msgid "Hold"
+msgstr "Mantener"
+
+#: core/ui/ui_p25.c
+msgid "All talkgroups"
+msgstr "Todos los grupos"
+
+#: core/ui/ui_p25.c
+msgid "Favorites only"
+msgstr "Solo favoritos"
+
+#: core/ui/ui_p25.c
+msgid "Programmed groups"
+msgstr "Grupos programados"
+
+#: core/ui/ui_p25.c
+msgid "RX only  # Recent"
+msgstr "Solo RX  # P25"
+
+#: core/ui/ui_p25.c
+msgid "OK Menu  # Recent"
+msgstr "OK Menú  # P25"
+
+#: core/ui/ui_p25.c
+msgid "TX denied"
+msgstr "TX denegada"
+
+#: core/ui/ui_p25.c
+msgid "Transmit target"
+msgstr "Destino de transmisión"
+
+#: core/ui/ui_p25.c
+msgid "Programmed target"
+msgstr "Destino programado"
+
+#: core/ui/ui_p25.c
+msgid "Voice"
+msgstr "Voz"
+
+#: core/ui/ui_p25.c
+msgid "* P25"
+msgstr "* P25"
+
+#: core/ui/ui_p25.c
+msgid "# Recent"
+msgstr "# Recientes"
+
+#: core/ui/ui_p25.c
+msgid "Recent calls"
+msgstr "Llamadas recientes"
+
+#: core/ui/ui_p25.c
+msgid "Hold last talkgroup"
+msgstr "Mantener último grupo"
+
+#: core/ui/ui_p25.c
+msgid "System details"
+msgstr "Detalles del sistema"
+
+#: core/ui/ui_p25.c
+msgid "Favorite list"
+msgstr "Lista de favoritos"
+
+#: core/ui/ui_p25.c
+msgid "Select a P25 trunked channel"
+msgstr "Seleccione un canal troncal P25"
+
+#: core/ui/ui_p25.c
+msgid "Add a recent talkgroup first"
+msgstr "Añada primero un grupo reciente"
+
+#: core/ui/ui_p25.c
+msgid "No group call to hold"
+msgstr "Sin llamada de grupo que mantener"
+
+#: core/ui/ui_p25.c
+msgid "Favorite list full"
+msgstr "Lista de favoritos llena"
+
+#: core/ui/ui_p25.c
+msgid "No calls or favorites"
+msgstr "Sin llamadas ni favoritos"
+
+#: core/ui/ui_p25.c
+msgid "OK Hold"
+msgstr "OK Mantener"
+
+#: core/ui/ui_p25.c
+msgid "# Favorite"
+msgstr "# Favorito"
+
+#: core/ui/ui_p25.c
+msgid "OK Hold  # Favorite"
+msgstr "OK Mantener # Favorito"
+
+#: core/ui/ui_p25.c
+msgid "Valid blocks"
+msgstr "Bloques válidos"
+
+#: core/ui/ui_p25.c
+msgid "CRC failures"
+msgstr "Errores CRC"
+
+#: core/ui/ui_p25.c
+msgid "Transmit"
+msgstr "Transmisión"
+
+#: core/ui/ui_p25.c
+msgid "Last skip"
+msgstr "Última omisión"
+
+#: core/ui/ui_p25.c
+msgid "Channel settings"
+msgstr "Ajustes del canal"
+
+#: core/ui/ui_p25.c
+msgid "Encrypted call skipped"
+msgstr "Llamada cifrada omitida"
+
+#: core/ui/ui_p25.c
+msgid "Phase 2 call skipped"
+msgstr "Llamada fase 2 omitida"
+
+#: core/ui/ui_p25.c
+msgid "Missing channel plan"
+msgstr "Falta plan de canales"
+
+#: core/ui/ui_p25.c
+msgid "P25 listening"
+msgstr "Escucha P25"
+
+#: core/ui/ui_p25.c
+msgid "P25 system"
+msgstr "Sistema P25"
+
+#: core/ui/ui_p25.c
+msgid "# Details  Back"
+msgstr "# Detalles  Atrás"
 
 #: core/ui/ui_screens.c
 msgid "IDLE"
@@ -4022,10 +4226,6 @@ msgid "Options"
 msgstr "Opciones"
 
 #: core/ui/ui_screens.c
-msgid "Talkgroups"
-msgstr "Grupos"
-
-#: core/ui/ui_screens.c
 msgid "2  Select channel"
 msgstr "2  Elegir canal"
 
@@ -4068,6 +4268,10 @@ msgstr "Solicitud de posición rechazada"
 #: core/ui/ui_svc_storage.c
 msgid "Couldn't write the codeplug: not saved"
 msgstr "Error al escribir codeplug: no guardado"
+
+#: core/ui/ui_svc_storage.c
+msgid "Couldn't save P25 favorites"
+msgstr "No se pudieron guardar los favoritos P25"
 
 #: core/ui/ui_svc_storage.c
 msgid "Couldn't read the channel: not saved"

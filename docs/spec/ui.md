@@ -19,7 +19,20 @@ The status row shows a satellite in green with a fix, yellow while acquiring a f
 The selected card keeps its cyan outline during calls. Each card has a separate state badge and power label.
 Recent activity starts each row with the pane letter, using the same colors as the cards.
 The selected card shows the saved talkgroup name prominently and keeps the ID, slot, color code, and power on
-its detail row. Single-channel operation shows one card. Entry and large-text views retain their existing layouts.
+its detail row. Single-channel operation shows one card. VFO frequency entry stays inside the selected card,
+with an amber field and the typed digits. The other dual-watch card keeps its position and contents.
+Entry does not retune until confirmed with OK or Context (#), including during dual watch. Back deletes a digit;
+deleting the last digit or the entry timeout cancels it. Large-text views retain their existing layouts.
+The single VFO card shows the opposite RX/TX frequency on its secondary line when they differ.
+
+The card mode badge and dual-watch status strip use the same mode labels as
+the standard Home screen. A P25 channel displays `P25`; an unavailable mode
+displays `?`. The P25 single-channel card omits analog tone details and shares
+the [P25 monitoring UI](p25-ui.md), including acquisition, decoded groups and
+system details. On Home, the encoder steps configured P25 groups in order and
+wraps at either end. Arrow keys retain channel navigation. With no configured
+groups, the encoder retains channel navigation too. An idle receive hold shows
+the selected group prominently instead of the last heard group.
 
 On the same tall dark display, Quick Controls uses a 3×3 card grid with numbered tiles and a separate
 value row. Cyan indicates focus and amber indicates an open editor. The DMR and FM Memory grids keep

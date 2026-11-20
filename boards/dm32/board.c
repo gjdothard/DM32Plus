@@ -21,6 +21,11 @@
 static const band_t bands[] = {
 	{ 136000000, 174000000, true },
 	{ 400000000, 480000000, true },
+#if CONFIG_RX_EXTENDED
+	// Existing synthesizer table starts at 16 MHz; eight BCD digits in 10 Hz units end below 1 GHz.
+	// Tuning permission for owner testing, not a claim of sensitivity or PLL lock across this span.
+	{ 16000000, 999999990, false },
+#endif
 #if CONFIG_AM_RX
 	{ 108000000, 136000000, false },	// the air band, AM receive only (docs/spec/airband-and-broadcast.md 3)
 #endif
@@ -97,6 +102,10 @@ const board_t board = {
 	.dmr = &hrc_dmr,
 	.audio = &hrc_audio_pcm,
 	.vocoder = &hrc_vocoder,
+#if CONFIG_AIR
+	.air = &hrc_air,
+	.baseband = &hrc_baseband,
+#endif
 #endif
 #if CONFIG_APRS
 	.afsk = &hrc_afsk,
@@ -201,7 +210,7 @@ void board_early_init(void)
 // Everything the core stores lives above the write floor (hardware-dm32.md 10.1): the open-firmware codeplug's 64 KB
 // "EEPROM" image at 0x700000 (CODEPLUG_OPENFW_EEPROM_BASE in board.mk), a decoded calibration copy from other firmware left alone at
 // 0x710000, the settings ring and the sector journal after it, the 1 MB open-firmware "flash" image at 0x720000
-// (CODEPLUG_OPENFW_FLASH_BASE) with room above it for the DMR ID database, the native codeplug in the last 1 MB. The
+// (CODEPLUG_OPENFW_FLASH_BASE) with room above it for the DMR ID database, staging and the future native codeplug. The
 // factory calibration is read only, so the open-firmware CPS gets no calibration window
 static const hal_flash_map_t flash_map = {
 	.settings_addr = 0x711000u,
@@ -214,9 +223,12 @@ static const hal_flash_map_t flash_map = {
 	.message_size = 0x080000u,
 	.calibration_addr = 0,
 	.calibration_size = 0,
-	.native_addr = 0xF00000u,
+	// Reserve the unused native-format prefix for atomic CPS transfers; the private key bank stays at the same end.
+	.staging_addr = 0xF00000u,
+	.staging_size = 0x040000u,
+	.native_addr = 0xF40000u,
 	// The final sector contains stock metadata. Keep it outside every native erase and the AES journal.
-	.native_size = 0x0FF000u,
+	.native_size = 0x0BF000u,
 };
 static const hrc_flash_cfg_t flash_cfg = {
 	.cs_pin = PIN_FLASH_CS,

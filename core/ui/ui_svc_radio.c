@@ -16,8 +16,19 @@
 #include "radio/radio_bcast.h"
 #include "input/input.h"
 #include "settings/settings.h"
+#include "codeplug/codeplug_tag.h"
 #include <string.h>
 #include "config.h"
+#if CONFIG_P25_UI
+#include "ui_p25.h"
+#include "radio/p25_monitor.h"
+bool ui_svc_p25_view(p25_monitor_t *out) { return radio_p25_monitor(out); }
+bool ui_svc_p25_command(uint16_t channel, uint8_t op, uint16_t tg)
+{
+	if (op == P25_MON_ADD || op == P25_MON_REMOVE) return ui_svc_p25_favorite(channel, tg, op == P25_MON_REMOVE);
+	return radio_req_p25_monitor(channel, op, tg);
+}
+#endif
 #if CONFIG_APRS
 #include "aprs/aprs.h"
 #endif
@@ -261,7 +272,7 @@ bool ui_svc_dual(const ui_dual_ref_t ref[2], uint8_t sel)
 			if (!(CONFIG_VFO_FM || CONFIG_VFO_DMR))
 				return false;
 		} else if (r[i].pos >= CODEPLUG_ZONE_MAX || !codeplug_zone(r[i].zone, &z) || r[i].pos >= z.count ||
-			   !codeplug_channel(z.channels[r[i].pos], &ch)) {
+			   !codeplug_radio_channel(z.channels[r[i].pos], &ch) || ch.kind != CODEPLUG_KIND_NONE) {
 			return false;
 		}
 	}

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The fast codeplug protocol (docs/spec/cps-fast.md): the debug link's CODEPLUG command reads and writes the
 // open-firmware codeplug image (the same bytes the open-firmware CPS shows, open-firmware-cps.md 7) in 4 KB blocks.
 // Blank blocks are reported, not sent; the host compares CRC-32s so only changed blocks move; blocks travel LZ4
@@ -42,6 +43,7 @@ enum {
 // stream of incompressible data is only 0.4 % longer, and one format keeps the radio smaller)
 enum { CPSF_FMT_LZ4 = 1, CPSF_FMT_BLANK = 2 };
 enum { CPSF_MODE_DIRECT = 0, CPSF_MODE_STAGED = 1 };
+#define CPSF_MODE_AWARE 0x80u // BEGIN staged only: managed tagged-codeplug transfer, INFO flags bit 2
 
 // STATUS states
 enum {

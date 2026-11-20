@@ -3,7 +3,7 @@
 
 # Channels, Zones and the VFO
 
-A **channel** is a saved frequency with its mode (FM or DMR) and settings. A **zone** is a named list of channels.
+A **channel** is a saved frequency with its mode (FM, DMR or P25 where supported) and settings. A **zone** is a named list of channels.
 The **VFO** tunes any frequency by hand. Channels and zones come from the codeplug ([Programming the radio](04-programming.md)).
 
 On displays with the card layout, Home gives the selected channel the larger card. Dual Watch shows A
@@ -12,6 +12,9 @@ activity and power. On a DMR channel, the highlighted card shows the talkgroup n
 ID, timeslot, and color code. Recent calls start with the letter of the channel that heard them.
 
 ## Changing the channel
+
+P25 channels show **P25** on Home, including the card layout. This identifies
+the selected channel mode; it does not confirm a control-channel lock.
 
 - Turn the channel knob, or press **Up** or **Down** on Home, to step through the zone's channels.
 - Type the channel's position on Home and press **OK**. For example, **1**, **2**, **OK** goes to channel 12 of the
@@ -245,6 +248,9 @@ key "Copy to VFO", on a press or a hold.
 
 On Home in the VFO, type the frequency digits from the hundreds of MHz down, without a decimal point. The radio shows
 what you typed as you go.
+
+On the card layout, the frequency is edited in place in an amber field. Dual Watch keeps the other card visible.
+The radio keeps its current frequency until you confirm with **OK** or **#**.
 
 | Keys | Frequency |
 |---|---|

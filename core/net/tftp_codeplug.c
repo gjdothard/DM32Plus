@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // codeplug.bin over TFTP (tftp_codeplug.h, docs/spec/tftp.md 3-4).
 //
 // The staging area (hal_flash_map_t.staging_*): sector 0 is the commit record, written only once the whole image is
@@ -14,6 +15,7 @@
 #include "storage/storage.h"
 #include "codeplug/codeplug.h"
 #include "config.h"
+#include "codeplug/codeplug_tag.h"
 #if CONFIG_CPS_FAST
 #include "cps/cps_fast.h"
 #endif
@@ -256,6 +258,10 @@ static int open_write(uint32_t tsize, const char **msg)
 		*msg = "the radio's flash isn't writable (foreign settings region?)";
 		return TFTP_FAIL(TFTP_ERR_ACCESS);
 	}
+	if (!codeplug_legacy_write_allowed()) {
+		*msg = "a mode-aware codeplug writer is required";
+		return TFTP_FAIL(TFTP_ERR_ACCESS);
+	}
 	if (!staging_ok()) {
 		*msg = "no staging area on this radio";
 		return TFTP_FAIL(TFTP_ERR_ACCESS);
@@ -442,6 +448,11 @@ static int commit(uint32_t size, const char **msg)
 		}
 	}
 	if (!w.recorded) {
+		if (!codeplug_legacy_write_allowed()) {
+			reset_write();
+			*msg = "a mode-aware codeplug writer is required";
+			return TFTP_FAIL(TFTP_ERR_ACCESS);
+		}
 		if (!write_record(w.crc)) {
 			reset_write();
 			*msg = "flash write failed";

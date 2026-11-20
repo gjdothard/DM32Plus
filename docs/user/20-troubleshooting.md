@@ -3,6 +3,13 @@
 
 # Troubleshooting
 
+For experimental P25 reception, Diagnostics separates receiver tuning,
+sample delivery and frame decoding. A matching frequency readback confirms
+register programming, not usable reception or PLL lock. Increasing sample
+counts with no sync/frame counts points to a different failure than stalled
+sample delivery. See [the debug-link specification](../spec/debuglink.md)
+for the detailed P25 counters.
+
 ## Installing
 
 The web installer's "Select the Symptom" step covers most of these on screen. The rows below also apply to the `rfoundry` command line.

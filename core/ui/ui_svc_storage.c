@@ -20,6 +20,13 @@
 #include "settings/settings.h"
 #include "radio/ref_trim.h"
 #include "storage/storage.h"
+#if CONFIG_P25_UI && CONFIG_P25_TRUNK
+#include "ui_p25.h"
+#include "p25/p25_favorites.h"
+#include "p25/p25_admission.h"
+#include "codeplug/codeplug_kv.h"
+#include "codeplug/codeplug_tag.h"
+#endif
 #if CONFIG_MESSAGE_JOURNAL
 #include "storage/message_journal.h"
 #endif
@@ -664,6 +671,31 @@ static struct {
 	bool private_call;
 } job;
 static channel_t job_ch;	// the job's working copy of the stored channel
+
+#if CONFIG_P25_UI && CONFIG_P25_TRUNK
+static void p25_favorite_job(void *ctx)
+{
+	(void)ctx;
+	storage_lock();
+	bool ok = codeplug_kv_generation() == job.id && codeplug_tagged_channel(job.channel, &job_ch) &&
+		p25_channel_matches(&job.now, &job_ch) &&
+		p25_favorites_edit(&job_ch, (uint16_t)(job.power | job.squelch << 8), job.temp != 0);
+	storage_unlock();
+	if (!ok) save_failed(TRN("Couldn't save P25 favorites"));
+}
+
+bool ui_svc_p25_favorite(uint16_t channel, uint16_t tg, bool remove)
+{
+	if (!tg || storage_job_busy()) return false;
+	storage_lock();
+	bool ok = codeplug_tagged_channel(channel, &job.now) && job.now.kind == CODEPLUG_KIND_P25_TRUNK;
+	job.id = codeplug_kv_generation();
+	storage_unlock();
+	if (!ok) return false;
+	job.channel = channel; job.power = (uint8_t)tg; job.squelch = (uint8_t)(tg >> 8); job.temp = remove;
+	return storage_job_post(p25_favorite_job, NULL);
+}
+#endif
 
 #if CONFIG_TALKGROUP_EDIT
 static void edit_talkgroups_job(void *ctx)

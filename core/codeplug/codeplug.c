@@ -7,6 +7,10 @@
 // Edits rewrite records through the sector journal (core/storage) and keep every byte the model doesn't own.
 #include <string.h>
 #include "codeplug.h"
+#include "codeplug_kv.h"
+#if CONFIG_P25
+#include "codeplug_tag.h"
+#endif
 #include "board.h"
 #include "storage/storage.h"
 
@@ -594,6 +598,10 @@ static bool talkgroup_has_overflow(void)
 
 static uint8_t read_talkgroups(uint16_t number, codeplug_talkgroup_t out[CODEPLUG_TALKGROUP_MAX])
 {
+	if (talkgroup_address(number) >= EE(CODEPLUG_KV_ADDR) && talkgroup_address(number) < EE(CODEPLUG_KV_ADDR + STORAGE_SECTOR)) {
+		uint8_t magic[4];
+		if (!flash_read(EE(CODEPLUG_KV_ADDR), magic, sizeof magic) || !memcmp(magic, "RFKV", sizeof magic)) return 0;
+	}
 	uint8_t bytes[TALKGROUP_RECORD_SIZE];
 	if (!flash_read(talkgroup_address(number), bytes, sizeof bytes)) {
 		return 0;
@@ -982,6 +990,44 @@ bool codeplug_channel(uint16_t number, channel_t *out)
 	return ok;
 }
 
+bool codeplug_channel_name(uint16_t number, char out[CODEPLUG_NAME_LEN + 1])
+{
+	if (out == NULL || number < 1 || number > CH_MAX) return false;
+	storage_lock();
+	bool ok = false;
+	if (source == CODEPLUG_BUILTIN && number <= builtin_count) {
+		strncpy(out, builtin[builtin_map[number - 1u]].name, CODEPLUG_NAME_LEN);
+		out[CODEPLUG_NAME_LEN] = '\0';
+		ok = true;
+	} else if (source == CODEPLUG_OPENFW && is_used(number)) {
+		uint8_t raw[CODEPLUG_NAME_LEN];
+		ok = flash_read(channel_addr(number) + CH_NAME, raw, sizeof raw);
+		if (ok) copy_name(out, raw, CODEPLUG_NAME_LEN);
+	}
+	if (!ok) out[0] = '\0';
+	storage_unlock();
+	return ok;
+}
+
+bool codeplug_base_copy(uint16_t from, uint16_t to)
+{
+	if (from < 1 || from > CH_MAX || to < 1 || to > CH_MAX) return false;
+	storage_lock();
+	uint8_t src[CH_SIZE], dst[CH_SIZE];
+	bool ok = source == CODEPLUG_OPENFW && is_used(from) && is_used(to)
+		&& flash_read(channel_addr(from), src, sizeof src) && src[CH_MODE] <= 1
+		&& flash_read(channel_addr(to), dst, sizeof dst);
+	if (ok) {
+		dst[CH_MODE] = src[CH_MODE];
+		const uint8_t mask = FLAG4_RX_ONLY | FLAG4_25K;
+		dst[CH_FLAG4] = (uint8_t)((dst[CH_FLAG4] & ~mask) | (src[CH_FLAG4] & mask));
+		ok = flash_write(channel_addr(to), dst, sizeof dst);
+		if (ok) serial++;
+	}
+	storage_unlock();
+	return ok;
+}
+
 uint16_t codeplug_zone_count(void)
 {
 	if (source == CODEPLUG_NONE) {
@@ -1098,7 +1144,7 @@ uint16_t codeplug_free_channel(void)
 bool codeplug_set_channel(uint16_t number, const channel_t *ch)
 {
 	uint8_t r[CH_SIZE];
-	if (number < 1 || number > CH_MAX || ch->rx_hz == 0 || ch->tx_hz == 0 || ch->rx_hz >= 1000000000u ||
+	if (ch->kind != 0 || number < 1 || number > CH_MAX || ch->rx_hz == 0 || ch->tx_hz == 0 || ch->rx_hz >= 1000000000u ||
 	    ch->tx_hz >= 1000000000u || (ch->privacy_slot > 4 && ch->privacy_slot != 255)) {
 		return false;
 	}
@@ -1623,7 +1669,7 @@ bool codeplug_delete_listen_list(uint16_t index)
 	return ok;
 }
 
-bool codeplug_contact_find(uint32_t id, bool group, contact_t *out)
+static bool contact_find(uint32_t id, bool group, uint8_t protocol, contact_t *out)
 {
 	enum { PER_READ = 32 };	// records per flash read
 	// Static, used only under the storage lock: on the stack it overflowed the radio task, whose DMR set-up calls
@@ -1648,6 +1694,19 @@ bool codeplug_contact_find(uint32_t id, bool group, contact_t *out)
 			}
 			uint32_t cid = type == CONTACT_ALL_CALL ? 0xFFFFFFu : bcd_id(&c[0x10]);
 			if (cid == id) {
+#if CONFIG_P25
+				uint8_t scope[7];
+				int len = codeplug_kv_get((uint16_t)(CODEPLUG_KEY_CONTACT_PROTOCOL + first + i), scope, sizeof scope);
+				char name[CODEPLUG_NAME_LEN + 1];
+				copy_name(name, c, CODEPLUG_NAME_LEN);
+				uint16_t check = codeplug_name_check(name);
+				bool bound = len == sizeof scope && scope[0] == 1 && scope[1] >= 1 && scope[1] <= 3 &&
+					(scope[2] | (uint16_t)scope[3] << 8) == check &&
+					(scope[4] | (uint32_t)scope[5] << 8 | (uint32_t)scope[6] << 16) == cid;
+				if (!((bound ? scope[1] : 1) & protocol)) continue;
+#else
+				(void)protocol;
+#endif
 				found = codeplug_contact((uint16_t)(first + i + 1u), out);	// the lock is recursive
 				done = true;
 				break;
@@ -1657,6 +1716,17 @@ bool codeplug_contact_find(uint32_t id, bool group, contact_t *out)
 	storage_unlock();
 	return found;
 }
+
+bool codeplug_contact_find(uint32_t id, bool group, contact_t *out)
+{
+	return contact_find(id, group, 1, out);
+}
+#if CONFIG_P25
+bool codeplug_contact_find_protocol(uint32_t id, bool group, uint8_t protocol, contact_t *out)
+{
+	return (protocol == 1 || protocol == 2) && contact_find(id, group, protocol, out);
+}
+#endif
 
 bool codeplug_dmr_settings(codeplug_dmr_settings_t *out)
 {

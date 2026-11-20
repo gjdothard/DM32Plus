@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // DM-32UV diagnostics page lines: raw readings for bench checks (cached values only, no bus traffic)
 #include <stddef.h>
 #include "dm32.h"
@@ -168,6 +169,30 @@ bool dm32_diag_line(uint8_t i, char *buf, uint8_t len)
 		} else {
 			put(&o, "none");
 		}
+		break;
+#endif
+	case 12:
+		put(&o, "rf t "); put_u(&o, dm32_radio_readback(0));
+		put(&o, " f "); put_u(&o, dm32_radio_readback(2));
+		break;
+	case 13:
+		put(&o, "rf exp "); put_u(&o, dm32_radio_readback(1));
+		put(&o, " b "); put_x(&o, dm32_radio_readback(3), 4);
+		put(&o, "/"); put_x(&o, dm32_radio_readback(4), 4);
+		break;
+	case 14:
+		put(&o, "rf s "); put_x(&o, dm32_radio_readback(5), 4);
+		put(&o, " p "); put_x(&o, dm32_radio_readback(6), 4);
+		break;
+#if CONFIG_AIR
+	case 15:
+		put(&o, "air h "); put_u(&o, hrc_air_rx_count(0));
+		put(&o, " c "); put_u(&o, hrc_air_rx_count(1));
+		put(&o, " ov "); put_u(&o, hrc_air_rx_count(2));
+		break;
+	case 16:
+		put(&o, "air us "); put_u(&o, hrc_air_rx_count(4));
+		put(&o, " miss "); put_u(&o, hrc_air_rx_count(3));
 		break;
 #endif
 	default:

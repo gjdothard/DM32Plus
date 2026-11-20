@@ -20,6 +20,21 @@ and what has been checked on it.
 
 [Planned radios](#planned-radios) lists the radios that aren't built yet.
 
+## Experimental DM-32UV receive range
+
+The full build includes conventional P25 Phase 1 and Phase 1 trunking.
+It also allows experimental reception from 16 to 999.999990 MHz, including
+the 740–850 MHz region. Program an RX frequency in the CPS and select the
+channel mode or trunking system as usual. Keep Receive only selected for
+monitoring channels. Firmware also blocks transmission whenever the RX
+frequency is outside the normal 136–174 and 400–480 MHz transmit bands.
+Trunking systems with extended-band control channels follow passively.
+
+Reception across this range is unverified; the antenna, filters and receiver
+may prevent useful reception. P25 Phase 2 and encrypted voice are not
+supported. This build enables owner testing; it does not establish reception
+of a particular public-safety system.
+
 ## Key roles
 
 The manual names keys by the job they do. Each radio puts those jobs on its own keys:

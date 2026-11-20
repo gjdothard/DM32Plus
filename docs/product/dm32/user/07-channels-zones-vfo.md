@@ -16,6 +16,12 @@ On Home, the knob changes channel. The Up/Down behavior can be reassigned in **S
 Use the channel editor for saved RX/TX frequencies, power, FM tones, and DMR parameters.
 Leaving an edited channel offers to save or discard changes.
 
+## P25
+
+P25 channels show **P25** on Home, including the card layout. This identifies
+the selected channel mode; it does not confirm a control-channel lock.
+Use CPS to edit P25 channel and system settings.
+
 ## FM
 
 Use Quick Controls for squelch, power, bandwidth, and tones. Monitor opens squelch while held when that role is assigned.

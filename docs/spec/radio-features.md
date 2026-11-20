@@ -10,6 +10,21 @@ engine, pure), `core/radio/beep.c` (beep patterns and synthesis), `core/radio/vi
 and RADIO ops 20-24 (`docs/spec/debuglink.md` 3.7, 3.8). Host tests: `tests/host/radioFeaturesTest.c`; HIL tests:
 `tests/hil/test_radio_features.py`.
 
+## Receive-only board ranges
+
+`CONFIG_RX_EXTENDED` permits a board to add experimental receive-only band
+rows. `board_receive_only()` is true when RX is permitted and no matching
+row permits TX. Overlapping TX rows take precedence. The radio task rejects
+PTT and hotspot transmission for a receive-only RX frequency regardless of
+the channel's TX frequency or RX-only flag. Conventional P25 applies the
+same admission rule. A trunking system with a receive-only control frequency
+disables registration and all subscriber transmissions, including after a
+grant moves the receiver into a normal band. CPS RX-only permissions remain
+independent and continue to apply in normal bands.
+
+Host coverage: `radioListenBandsTest`, `radioP25OwnerTest` and
+`radioP25TrunkStateTest`. Tuning admission is not RF qualification.
+
 ## 1. Settings
 
 The radio core keeps one `radio_settings_t` (`core/radio/radio.h`). It loads it from the settings store at
@@ -104,6 +119,10 @@ channel (zone index and position, any zone) or a VFO with its own settings. `ref
 `NULL` stops the watch on the selected channel. The view shows `scan=dual`, and the tuned channel as usual: its
 `zone_index`, `zone_pos` and zone name, or `vfo=1` and `vfo_index`, so the screens can tell which of the two the
 receiver is on.
+
+Both references must be untagged FM/DMR channels or supported VFOs. P25 conventional and trunked channels cannot
+participate. The UI checks logical channel tags before enabling a watch and reports "Dual watch unavailable for P25".
+Restoration and channel/codeplug changes apply the same restriction. Selecting a P25 channel outside the watch ends it.
 
 There are two VFOs, so each channel can have its own: a VFO ref's `pos` says which (0 or 1). The radio core keeps
 the one in use in `vfo_ch` and the other in `vfo_other`; a hop to a VFO pane swaps them first. Both are saved, with

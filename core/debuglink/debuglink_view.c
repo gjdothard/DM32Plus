@@ -6,6 +6,9 @@
 #include "config.h"
 #include "board.h"
 #include "hal_time.h"
+#if CONFIG_P25_UI
+#include "radio/p25_monitor.h"
+#endif
 #if CONFIG_RTC
 #include "app/wall_clock.h"
 #endif
@@ -18,6 +21,9 @@
 #include "codeplug/zone_edit.h"
 #include "settings/settings.h"
 #include "radio/ref_trim.h"
+#if CONFIG_P25 && CONFIG_DIAG
+#include "radio/radio_p25.h"
+#endif
 #include "storage/storage.h"
 #if CONFIG_APRS
 #include "aprs/aprs.h"
@@ -76,8 +82,26 @@ static void core_section(const radio_view_t *v, dl_text_t *t)
 
 	dl_text(t, "view=%u\n", DL_VIEW_VERSION);
 	dl_text(t, "state=%s\n", state_key((uint8_t)v->state));
+#if CONFIG_CPS_FAST
+	dl_text(t, "programming=%u\n", v->programming);
+#endif
 	dl_text(t, "tx_deny=%s\n", deny_key(v->tx_deny));
-	dl_text(t, "mode=%s\n", v->ch.mode == RADIO_MODE_DMR ? "dmr" : "fm");
+	dl_text(t, "mode=%s\n", v->ch.mode == RADIO_MODE_P25 ? "p25" : v->ch.mode == RADIO_MODE_NONE ? "unsupported" : v->ch.mode == RADIO_MODE_DMR ? "dmr" : "fm");
+#if CONFIG_P25
+	dl_text(t, "p25.active=%u\np25.rx=%u\n", v->p25_active, v->p25_rx);
+#if CONFIG_DIAG
+	radio_p25_diag_t pd;
+	if (radio_p25_diag(&pd)) {
+		dl_text(t, "p25.tuned_hz=%u\np25.tuned=%u\np25.chunks=%u\np25.symbols=%u\n",
+			(unsigned)pd.tuned_hz, pd.tuned, (unsigned)pd.chunks, (unsigned)pd.symbols);
+		dl_text(t, "p25.syncs=%u\np25.locks=%u\np25.rejects=%u\np25.frames=%u\np25.blocks=%u\np25.crc_fail=%u\n",
+			pd.syncs, pd.locks, pd.rejects, pd.frames, (unsigned)pd.blocks, (unsigned)pd.crc_fail);
+	}
+#endif
+#if CONFIG_P25_TRUNK
+	dl_text(t, "p25.trunk.state=%u\np25.trunk.reg=%u\np25.trunk.req=%u\n", v->p25_trunk_state, v->p25_registration, v->p25_request);
+#endif
+#endif
 	dl_text(t, "am=%u\nbcast=%u\nbcast_fault=%u\nbcast_khz=%u\n", v->am, v->bcast, v->bcast_fault, (unsigned)v->bcast_khz);
 	dl_text(t, "vfo=%u\nvfo_index=%u\n", v->vfo, v->vfo_index);
 	dl_text(t, "zone_index=%u\nzone_pos=%u\nzone_size=%u\nzone_count=%u\n", v->zone_index, v->zone_pos, v->zone_size,
@@ -111,7 +135,7 @@ static void channel_section(const radio_view_t *v, dl_text_t *t)
 
 	dl_text_kv_str(t, "ch.name", c->name);
 	dl_text(t, "ch.rx_hz=%u\nch.tx_hz=%u\n", (unsigned)c->rx_hz, (unsigned)c->tx_hz);
-	dl_text(t, "ch.mode=%s\n", c->mode == RADIO_MODE_DMR ? "dmr" : "fm");
+	dl_text(t, "ch.mode=%s\n", c->mode == RADIO_MODE_P25 ? "p25" : c->mode == RADIO_MODE_NONE ? "unsupported" : c->mode == RADIO_MODE_DMR ? "dmr" : "fm");
 	dl_text(t, "ch.bw=%s\n", c->bw == RADIO_BW_25K ? "25k" : "12k5");
 	tone(t, "ch.rx_tone", &c->rx_tone);
 	tone(t, "ch.tx_tone", &c->tx_tone);
@@ -469,7 +493,7 @@ static const char *const section_names[DL_VIEW_COUNT] = { "core", "channel", "dm
 						  "link", "features", "dmr_data", "storage", "dmr_ext",
 						  "dmr_data_stats", "roam", "aprs", "aprs_set", "dmr_ip", "net", "snmp", "usrp",
 						  "sfr", "tasks", "crash", "watchdog", "reset", "air", "net_svc",
-						  "net_link" };
+						  "net_link", "p25" };
 
 const char *debuglink_view_name(uint8_t section)
 {
@@ -573,6 +597,31 @@ void debuglink_view_section(uint8_t section, const radio_view_t *v, dl_text_t *t
 		dl_text(t, "usrp.built=0\n");
 #endif
 		break;
+	case DL_VIEW_P25:
+#if CONFIG_P25_UI
+	{
+		p25_monitor_t m;
+		bool active = radio_p25_monitor(&m);
+		dl_text(t, "p25.ui=1\np25.active=%u\np25.channel=%u\np25.flags=%u\np25.listen=%u\np25.held_tg=%u\n",
+			active, m.channel, m.flags, m.listen, m.held_tg);
+		dl_text(t, "p25.tx_target=%u\n", (unsigned)m.tx_target);
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+		dl_text(t, "p25.groups=%u\np25.group_index=%u\n", active ? v->talkgroup_count : 0, active ? v->talkgroup_index : 0);
+#else
+		dl_text(t, "p25.groups=0\np25.group_index=0\n");
+#endif
+		dl_text(t, "p25.wacn=%u\np25.sysid=%u\np25.rfss=%u\np25.site=%u\np25.nac=%u\np25.refused=%u\n",
+			(unsigned)m.wacn, m.sysid, m.rfss, m.site, m.nac, m.refused);
+		dl_text(t, "p25.cc_hz=%u\np25.voice_hz=%u\np25.blocks=%u\np25.crc_fail=%u\np25.recent=%u\np25.favorites=%u\n",
+			(unsigned)m.cc_hz, (unsigned)m.tuned_hz, (unsigned)m.blocks, (unsigned)m.crc_fail, m.recent_count, m.favorite_count);
+		if (m.recent_count) dl_text(t, "p25.tg=%u\np25.src=%u\np25.last_ms=%u\n", m.recent[0].tg,
+			(unsigned)m.recent[0].src, (unsigned)m.recent[0].ms);
+		break;
+	}
+#else
+		dl_text(t, "p25.ui=0\n");
+		break;
+#endif
 	default:
 		break;
 	}

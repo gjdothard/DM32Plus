@@ -14,5 +14,6 @@ python3 site/tests/radio_images_test.py
 python3 site/tests/shots_test.py
 python3 site/tests/toolzip_test.py
 python3 site/tests/firmware_links_test.py
-RFOUNDRY_SITE_FIXTURES="$OUT" RFOUNDRY_CPS_SIM="${RFOUNDRY_CPS_SIM:-$(pwd)/tests/host/cpsSim}" \
+RFOUNDRY_SITE_FIXTURES="$OUT" RFOUNDRY_CPS_REQUIRE_MANAGED=1 \
+    RFOUNDRY_CPS_SIM="${RFOUNDRY_CPS_SIM:-$(pwd)/tests/host/cpsSim}" \
     node --test --test-reporter=spec site/tests/*.test.mjs

@@ -37,6 +37,18 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "boot", "splash" },
 	{ "stub_entry", "splash:loader" },	// while the flashing tools have the radio (web flasher)
 	{ "home_dmr", "" },
+	{ "home_p25", "branded-home p25-home" },
+	{ "home_p25_trunk", "branded-home p25-trunk-home" },
+#if CONFIG_P25_UI
+	{ "p25_listen", "branded-home p25-trunk-home quick" },
+	{ "p25_talkgroups", "branded-home p25-trunk-home quick 8" },
+	{ "p25_selected", "branded-home p25-trunk-home enc+" },
+	{ "p25_recent", "branded-home p25-trunk-home ctx" },
+	{ "p25_hold", "branded-home p25-trunk-home quick 4" },
+	{ "p25_favorites", "branded-home p25-trunk-home quick ok ctx back 7" },
+	{ "p25_system", "branded-home p25-trunk-home quick 6" },
+	{ "p25_decode", "branded-home p25-trunk-home quick 6 ctx" },
+#endif
 	{ "home_dmr_lastheard", "call:3101234,91,g wait:11000" },
 	{ "home_reply", "call:3101234,91,g" },
 	{ "home_fm", "down" },
@@ -205,6 +217,8 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "home_dual_on_b", "quick 7 ctx 3 5 ok wait:3000 tune:b call:3101234,91,g tune:a call:3107777,3100,g wait:4000 ctx 1 wait:3000" },
 	{ "home_dual_tx", "quick 7 ctx 3 5 ok wait:3000 pttdown" },
 	{ "home_dual_vfo", "quick 7 ctx 1 vfokey ctx 1 wait:3000" },
+	{ "home_dual_vfo_entry", "quick:dual ctx 1 vfokey wait:3000 4 4 6" },
+	{ "dual_p25_refused", "p25-home dualkey" },
 	// A name that needs row 1 whole beside the PTT pill: the pill moves to row 3 where there is one
 	{ "home_dual_pill_row3", "quick 7 ctx 1 wait:3000" },
 	{ "home_dual_other_zone", "quick 7 ctx 1 zone+ ctx 1 wait:3000 tune:b fmrx" },
@@ -641,6 +655,8 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 			{ "home_dual_busy", "quick:dual ctx 3 5 ok wait:3000 tune:b call:3101234,91,g busy:a" },
 			{ "home_dual_tx", "quick:dual ctx 3 5 ok wait:3000 pttdown" },
 			{ "home_dual_vfo", "quick:dual ctx 1 vfokey ctx 1 wait:3000" },
+			{ "home_dual_vfo_entry", "quick:dual ctx 1 vfokey wait:3000 4 4 6" },
+			{ "dual_p25_refused", "p25-home dualkey" },
 			{ "home_dual_pill_row3", "quick:dual ctx 1 wait:3000" },
 			{ "home_dual_other_zone", "quick:dual ctx 1 zone+ ctx 1 wait:3000 tune:b fmrx" },
 			{ "home_dual_two_rx", "receivers:2 quick:dual ctx 3 5 ok wait:3000 rxa:3101234,3100,g rxb:3107777,91,g wait:1000" },
@@ -666,6 +682,9 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 			{ "freq_trim_typing", "trim ok 9 0 up ok 1 2" },
 		};
 		const char *card_script = NULL;
+		if (!strcmp(g->name, "240x320i10x5") &&
+		    (!strcmp(name, "home_p25") || !strcmp(name, "home_p25_trunk")))
+			card_script = gallery[i].script;
 		if (!strcmp(g->name, "240x320i10x5"))
 			for (size_t j = 0; j < sizeof card_routes / sizeof card_routes[0]; j++)
 				if (!strcmp(name, card_routes[j].name)) {

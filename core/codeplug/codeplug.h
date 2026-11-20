@@ -49,6 +49,9 @@ typedef struct {
 	uint8_t sfr_flag1;
 	uint8_t sfr_a;
 	uint8_t sfr_b;
+	// Logical tagged-mode metadata (zero for legacy reads); explicit tagged readers resolve it.
+	uint8_t kind;
+	uint8_t system;
 } channel_t;
 
 // channel_t.alias_tx: what the channel sends as talker alias on each timeslot (text = our radio name)
@@ -73,6 +76,9 @@ codeplug_source_t codeplug_source(void);
 uint16_t codeplug_channel_count(void);
 // false if the slot is empty or unreadable
 bool codeplug_channel(uint16_t number, channel_t *out);
+// Raw base helpers for the generic tag layer; no logical tag is applied here.
+bool codeplug_channel_name(uint16_t number, char out[CODEPLUG_NAME_LEN + 1]);
+bool codeplug_base_copy(uint16_t from, uint16_t to);
 // Reads of a used channel that failed (flash read or record decode), since start-up
 uint32_t codeplug_channel_errors(void);
 
@@ -204,6 +210,10 @@ bool codeplug_delete_listen_list(uint16_t index);
 // The first contact with this ID: group true finds a talkgroup (or all call for 0xFFFFFF), false a private contact.
 // Reads every contact record (24 KB of flash) in the worst case: cache the answer
 bool codeplug_contact_find(uint32_t id, bool group, contact_t *out);
+#if CONFIG_P25
+// Protocol-scoped name lookup: 1 DMR, 2 P25. Legacy contacts default to DMR.
+bool codeplug_contact_find_protocol(uint32_t id, bool group, uint8_t protocol, contact_t *out);
+#endif
 
 // General DMR settings (open-firmware general settings, docs/spec/open-firmware-cps.md 7.3.2)
 typedef struct {

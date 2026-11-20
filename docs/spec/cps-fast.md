@@ -1,8 +1,18 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 Garrett Dothard -->
 <!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Fast codeplug protocol
+
+Tagged codeplugs and their EEPROM metadata block at 0xE000 require managed
+staged programming, including boot recovery. Legacy direct and staged modes
+refuse these writes. A board must supply a staging area outside its other
+storage regions; protocol code alone does not establish support. INFO
+advertises managed capability only when usable staging slots exist. The
+entire changed codeplug must fit in one session. See
+[tagged channel records](channel-modes.md) and the managed programming section
+below.
 
 A second way to read and write the codeplug, beside the open-firmware CPS (`cps-protocol.md` 2). It moves the same
 bytes: the open-firmware image of `open-firmware-cps.md` 7, as the CPS shows it. It differs in how they travel:

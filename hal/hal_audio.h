@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // PCM audio between the MCU and the radio's codec (mic in, speaker out): 8 kHz, 16-bit signed, 20 ms blocks.
 // Used for DMR voice (vocoder in / out), beeps and voice prompts. FM audio does not pass through here on radios
 // whose modem chip routes it (the HR_C6000).
@@ -20,6 +21,8 @@ typedef struct {
 	void (*stop)(void);
 	// Route PCM to the speaker (DMR voice, beeps) instead of the modem's own FM path
 	void (*speaker_pcm)(bool on);
+	// Optional: non-silent speaker audio is queued or still playing. NULL: no deferred tail
+	bool (*spk_pending)(void);
 } hal_audio_t;
 
 #endif

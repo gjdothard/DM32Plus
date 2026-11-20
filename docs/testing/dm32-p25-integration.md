@@ -1,0 +1,941 @@
+<!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
+
+# P25 integration tracker
+
+Updated: 2026-11-19. Published integration: `Testing` (merged through `Development`
+from `codex/p25-integration`). Local knob work: `codex/p25-talkgroup-knob`,
+based on the receive timing fix in `codex/p25-timing-fix`.
+This is the working plan and progress record. Update it in every integration
+commit: completed task IDs, evidence, remaining work, and the next task. Mark a
+milestone complete only after its acceptance checks pass. Host, target-build,
+bench and interoperability evidence are separate.
+
+## Current local work: assigned talkgroup knob
+
+Published to `Testing` at `9731fe43` as `v1.1.0-rc.5`; GitHub firmware and
+stack checks pass. The P25 CPS branch is subsequently merged into Testing.
+An independent website updater now polls successful Testing workflows every
+two minutes. It waits for the matching checksummed website bundle before
+switching the separate test container; production deployment is unchanged.
+
+Home's encoder now steps through the selected P25 channel's assigned groups,
+wrapping in both directions. Selection updates the receive hold and transmit
+target through the existing assigned-group command. Channel and zone stay put;
+arrow keys retain channel navigation. Channels without groups retain encoder
+channel navigation. PTT-held and transmitting states reject target changes.
+Channel Receive Only and system listen-only permissions remain authoritative.
+
+Idle Home displays the selected group and programmed name using the existing
+standard or card layout, without a stale source radio ID. The published radio
+view reuses its group count/index fields; no static RAM is added. Debug-link
+P25 keys expose that count and index for a reversible passive hardware test.
+
+- [x] Pass 1020 trunked-owner assertions, both conventional/trunked owner variants
+  (481 each), and 175 state assertions, including signed wraparound, stale-channel
+  rejection, PTT-held rejection and receive-only behavior.
+- [x] Pass UI flows with color, monochrome, cards disabled and P25 UI disabled.
+- [x] Render and inspect the selected-group scene; add five display gallery images.
+- [x] Build with P25 UI, assigned talkgroups and trunking individually disabled;
+  every configuration has zero warnings.
+- [x] Finish the final full-image stack check and install locally.
+- [x] Check the real encoder request path, unchanged channel and no transmit;
+  restore the owner's target and listening mode.
+
+The full image builds at 706724 bytes with 211440 bytes of static RAM,
+unchanged from the timing image. Documentation links, generic-code checks and
+translation catalogs pass. Every task fits with the existing 128-byte margin;
+the least remaining margin is UI at 40 bytes. This local update does not
+require CPS changes.
+
+Installed locally on COM3: 173 application sectors, verified by CRC, version
+`ea713f42-dirty`; SHA-256
+`400001df92266f7bff88aee3e3ae8240f36ef058a589bf5584f878e70745baac`.
+The timing fix remains included. The live knob test passes with ten assigned
+groups, advances the receive hold and transmit target together, keeps channel 1,
+and restores target 882 with All listening. Effective system listen-only remains
+enabled, and the last-TX timestamp stays zero. No PTT or RF test was requested.
+All six applicable passive P25 hardware tests pass, including monitoring-page
+navigation and the published group snapshot. The extended-band test skips
+because the selected channel is UHF. Serial monitoring is closed. Next: owner
+checks the physical knob and listening behavior with USB disconnected.
+
+## Receive timing fix
+
+The owner reported incomplete conversations on the 380.075 MHz control channel.
+Read-only observation captured five control-loss/reacquisition events in three
+minutes at sampled signal strengths of -78 to -72 dBm. The same interval decoded
+10 calls and 1436 good voice frames, concealed four bad frames, and recorded no
+audio underruns, queue overflows or voice-loss timeouts. Encrypted grant skips
+are expected and remain enabled. These observations identify a reception concern;
+they do not prove that every loss event had the same cause.
+
+A host reproduction confirms a timing race: a provider can refresh the follower's
+receive timestamp between the radio task's clock read and ownership acquisition.
+The resulting unsigned time difference falsely triggers control or voice loss.
+The local fix samples the clock after acquisition and refreshes it after a retune
+finishes. A slow RF retune no longer consumes the new channel's receive window.
+
+- [x] Reproduce both false control loss and false voice loss through real owner callbacks.
+- [x] Verify delayed voice/control retunes receive their full timeout windows.
+- [x] Verify genuine control and voice silence still trigger loss recovery.
+- [x] Pass 1010 trunked-owner checks, conventional owner/state checks and 237 follower checks.
+- [x] Finish full target stack and trunking-disabled build checks.
+- [x] Install the local test image when the owner reconnects the radio.
+- [x] Compare control-loss counters and call continuity under live receive conditions.
+- [ ] Owner listening check with USB disconnected.
+
+Installed locally after the owner reconnected the radio: 706180 bytes, 173
+application sectors, CRC verified. Version `2234a79d-dirty`; SHA-256
+`cd010a3d3ee9856716a219e63e30a9e6672042dc067de80607ecbd26457081bc`.
+Full build uses 211440 bytes of static RAM, unchanged. Every task passes the
+128-byte stack margin, with 780 bytes remaining beyond that margin for the radio
+task and 40 for UI. Full and trunking-disabled builds have zero warnings.
+
+The owner's JBC/NWS channel and codeplug were preserved. Its channel Receive
+Only checkbox is off; the system's listen-only setting keeps reception passive.
+No timing-fix branch or image has been published.
+
+Post-install read-only comparison: 300.2 seconds, 599 samples, 22 decoded calls,
+1556 good voice frames and 19 concealed frames. Control losses, voice-loss
+timeouts, audio underruns and queue overflows all remained zero. P25 transmit
+frame/encoder counters and the last-TX timestamp remained zero. Effective
+listen-only stayed enabled throughout. All ten runtime tasks were tracked;
+minimum free heap was 7672 bytes. No serial requests timed out.
+
+This compares zero control losses in five minutes after the fix with five in
+three minutes before it. Traffic was live rather than controlled; the earlier
+UI All-groups override was replaced by the owner's programmed selection after
+reboot. The clock race is reproduced by host tests, while this sample supports
+improved live following. It does not establish audible conversation continuity.
+Serial monitoring is closed. Next: owner listening with USB disconnected.
+
+## Scope agreed with the owner
+
+Support conventional and trunked P25 Phase 1 receive and transmit using the
+MIT RadioFoundry implementation. Preserve the existing CPS receive-only option
+and normal transmit protections. Do not turn the whole implementation into a
+receive-only product. The owner confirmed VHF/UHF P25 as the hardware target
+after identifying Palmetto 800 around Goose Creek, Summerville and Berkeley
+County as an intended use. Palmetto 800 is outside the documented DM32 RF
+bands and is not an acceptance target for this port. Firmware work does not
+establish 700/800 MHz reception. Control channels and grants must pass the
+board's frequency checks before tuning or TX admission.
+
+Sources for this scope decision: the state's
+[Palmetto 800 overview](https://www.admin.sc.gov/services/technology-services/palmetto-800)
+and the manufacturer's
+[DM-32UV manual, Appendix B](https://baofeng.s3.amazonaws.com/Baofeng_DM-32UV_User_Manual_20250210.pdf).
+
+| Channel | CPS RX-only | System permits TX | Expected behavior |
+|---|---|---|---|
+| Conventional | yes | not applicable | Receive; PTT refused; no RF TX. |
+| Conventional | no | not applicable | PTT can transmit after normal checks. |
+| Trunked | yes | either | Follow calls; no registration, affiliation, service request or PTT TX. |
+| Trunked | no | no (listen-only) | Follow calls; no automatic signaling or PTT TX. |
+| Trunked | no | yes | Preserve upstream registration, affiliation and granted-call TX, subject to normal checks. |
+
+The RX-only rule applies before PTT as well as during it. A missing or invalid
+record must not grant transmit permission. Preserve these choices through save,
+load, copy, mode changes, CPS round trips and restart. Reapplying RX-only while
+requests or audio are queued must cancel the old session and release ownership
+without leaking queued signaling or leaving the PA armed.
+
+Phase 2, LSM/CQPSK, encryption, additional RF bands and NXDN integration are
+outside this effort. Do not import the GPL fork or private Next implementation.
+Upstream's active trunking is not live-system qualified; retain that distinction
+when exposing it in this product.
+
+## Baselines
+
+| Item | Revision |
+|---|---|
+| Main used to create the branch | `ca28180dd4e21789f2627742359ff03221d8c924` |
+| Pinned RadioFoundry implementation | `c34dc440aaf2d3952458bc0bd85b8c56c76f6b23` |
+| Foundation import | `ae0ade75` |
+
+See the [assessment](dm32-p25-plan.md),
+[import provenance](../../core/p25/UPSTREAM.md) and
+[current subsystem specification](../spec/p25.md).
+The histories have no shared ancestor. Integrate reviewed groups of changes;
+preserve DM32Plus history, product identity, custom UI and release configuration.
+
+## Milestones
+
+| ID | Status | Work | Acceptance gate |
+|---|---|---|---|
+| M0 | Complete | Branch, revision pins, clean-room/provenance review. | Branch based on main; no foreign/GPL implementation imported. |
+| M1 | Complete (host) | FEC, air framing/session/soft modem, IMBE, P25 engines and follower. | Eleven host configurations pass with warnings as errors; notices retained. |
+| M2 | In progress | Build switches, optional board interfaces, modem/audio ownership and target baseline. | Default and feature-off builds clean; provider tests and target stack/RAM checks pass. |
+| M3 | In progress | Upstream tagged channel/system records and RX-only admission. | Existing records preserved; real record decoder passes the permission matrix above. |
+| M4 | In progress | Conventional P25 radio-core receive and transmit. | Stored-channel RX/TX, startup/failure cleanup, RX-only PTT refusal and FM/DMR transitions pass host integration tests. |
+| M5 | Complete (host integration and target build) | Trunked acquisition, grant following and active subscriber path. | Hunt/hold/follow/return and allowed TX pass simulated-site tests; RX-only blocks every signaling path. Hardware qualification remains M8. |
+| M6 | Complete (CPS/host integration; hardware untested) | Product UI and companion CPS. | Mode/settings editing, capability/version checks and firmware/CPS round trips work; translations and gallery reviewed. |
+| M7 | Queued | Full regression, configuration matrix and packaging. | Host/sanitizer suite, zero-warning firmware matrix, stack/RAM limits and codec-free package checks pass. |
+| M8 | Needs owner-authorized hardware session | Qualification against independent equipment and representative systems. | RX, conventional TX and trunking behavior measured; RX-only has no emissions; qualification limits recorded. |
+
+Dependencies: M2 before radio operation; M3 before exposing stored P25 channels;
+M4 before M5; M3/M4/M5 before M6 acceptance; M7 before release qualification.
+UI/CPS schema design can proceed while provider work is being tested.
+
+## Current work: M2
+
+- [x] M2.1: Add optional `board_t.air` and `board_t.baseband` contracts. Existing
+  board initializers omit them and remain without providers.
+- [x] M2.1: Exercise missing/unsupported/busy providers, successful acquisition,
+  retune and idempotent release through the actual air-session implementation.
+- [x] M2.2 (host checked; target build pending): Add coordinated CONFIG switches and source selection; keep product
+  activation deferred until the radio core and storage use them. Retain the
+  IMBE About-page attribution when the codec is compiled.
+- [x] M2.3 (host): Port the HR_C7000 air provider and its required DMR-engine ownership
+  changes together. Route interrupts and deferred events through the owner;
+  release cleanly on failed open, stop, retune and mode change.
+- [x] M2.3a: Import the provider and its simulated register tests from the pinned
+  upstream. Keep the current DMR driver; the provider passes against it.
+- [x] M2.3b (host): Wire platform ownership, interrupts and deferred work. Protect
+  shared queues against DMR/BS calls and scheduler preemption; serialize audio
+  gate release with TX completion; reject stale PA-timer keying after close.
+- [x] M2.3c (host): Attach board provider pointers and real audio-gate callbacks.
+  Board/radio sources compile with P25 on/off and DMR off using fake CPU services.
+- [ ] M2.4: Port audio scheduling and memory/stack changes required by that
+  provider. Preserve FM/DMR/APRS operation and the private AMBE slot.
+- [x] M2.4a (host): PCM gate/release, latest ring request, stale-block rejection,
+  callback scratch storage, and exclusive APRS hold. Test P25/VOX on/off and
+  link the actual PCM gate into the modem lifecycle test.
+- [x] M2.4b (host scheduling): Add timer-driven FIFO refill independent of codec
+  callbacks, bounded writes, deferred settling and two-block priming. Natural
+  P25/DMR completion waits for queued non-silent speaker audio to drain.
+- [ ] M2.4b (target qualification): Measure FIFO behavior and sustained codec
+  throughput. Static stack/RAM/image baselines are recorded below; active-mode
+  mode-transition ownership remains open. The simulated FIFO model is not measured hardware.
+- [x] M2.5a: Establish a local C-SKY build, measure default/P25 links, and
+  resolve the interrupt-RAM overflow without shrinking the heap or codec slot.
+- [x] M2.5b: Check default, conventional-only, trunking-enabled and DMR-off
+  target builds. Check static task stacks in default and P25-enabled firmware.
+- [x] M2.5c (host and target ABI): Add exclusive codec-state loans and a grouped
+  P25 workspace that fits the existing encoder-state pool. Reject busy/stale
+  ownership, preserve codec identity/options and reinitialize AMBE after return.
+- [x] M4.1 (owner component): Connect the sized workspace lease to the conventional
+  mode owner and stop its air/audio callbacks before return.
+- [x] M4 handoff gate (host): Connect the owner to channel/PTT dispatch and test complete
+  FM/DMR/P25 transitions through the existing state machine.
+
+Next task: finish M4/M5 audio/coexistence checks and M6 mode-aware CPS editing.
+M2's physical FIFO
+and throughput qualification still needs an owner-authorized hardware session. Do not
+advertise release-qualified P25 support until the matching integration gates pass.
+
+## Current work: M3 and reuse strategy
+
+Before implementing each remaining layer, compare the pinned upstream's code,
+spec and tests. Reuse its format and implementation where possible; adapt only
+the local storage map, product UI, CPS behavior, RX-only admission and stricter
+memory ownership. Batch target links after backend changes stabilize. Use
+focused host/configuration tests during pure-codec and format work.
+
+- [x] M3.1: Import the parameter-only portions of `p25_codeplug.[ch]` and all
+  39 upstream P25 vectors (28 apply without trunking). No alternate record format.
+- [ ] M3.2: Port `codeplug_kv`, `codeplug_tag`, `codeplug_modes` and
+  `codeplug_records` with their simulated-flash and power-cut tests. Preserve
+  the fork's talkgroup/AES extensions and foreign-data protection.
+- [x] M3.2a (host): Reuse the upstream keyed store and its full test suite.
+  Adapt local storage guards, preserve unknown data and serialize raw commits.
+- [ ] M3.2b: Port the mode registry, tag layer and system readers. Before any
+  channel activation, verify unsupported modes remain parked with features off.
+- [x] M3.2b (configuration backend, host): Import the registry, tag and record
+  readers. Keep every tagged kind unrunnable and use an explicit tagged API;
+  the existing radio reader retains the safe legacy base.
+- [x] M3.2b (generic host suite): Reuse the full upstream tag/record tests,
+  including live/stale bindings, future kinds, full area, rewrites and shared
+  targets/lists/systems. All 241 checks pass through the explicit adapter.
+- [ ] M3.3: Restore upstream P25 storage loaders and adapt the logical channel
+  model. Test malformed/missing tags, copies, deletes, saves and CPS round trips.
+- [x] M3.3a (host): Restore full upstream loaders and stored-channel tests.
+  Check logical RX-only edits, safe legacy reads, rename, copy, deletion,
+  restart and stale-name replacement. CPS round trips remain pending.
+- [x] M3.3b (sampled host power cuts): Interrupt RX-only save, rename, deletion,
+  plain replacement and RX-only copy. Replay the actual journal; accept the
+  old committed state or a safe new/intermediate state. Preserve the source
+  during copy. This samples writes; it is not exhaustive per-byte qualification.
+- [ ] M3.4: Prove channel RX-only and system listen-only block PTT and all
+  automatic signaling. `NO_REG` is not receive-only permission.
+- [x] M3.4a (record policy): Add separate voice/request/registration permission
+  bits. RX-only, listen-only, missing targets, invalid resolved IDs, malformed
+  mode bodies, unknown flags and read failures grant no record permission.
+  Keep tolerant upstream receive defaults. Check the full `NO_REG` matrix.
+- [x] M3.4b (host runtime): Wire the record policy into the real owner and every
+  emission path, invalidate queued work on updates, and check actual grants,
+  frequencies, board capabilities and existing radio protections.
+
+The upstream tag writes the legacy base as receive-only DMR and reconstructs
+logical P25 permissions from its TX flag. The existing CPS checkbox must edit
+that logical permission through the P25 adapter; reading only the base bit is
+insufficient. Legacy transfers now refuse tagged codeplugs; do not expose
+mode-aware editing until this mapping is tested.
+See [P25 codeplug integration](../spec/p25-codeplug.md).
+
+M6 editor/capability contract is implemented and checked. The logical RX-only
+checkbox edits the tag permission. Legacy writers remain refused. See the
+[CPS integration record](p25-cps-integration.md). Next: M7 full regression and
+packaging, followed by the owner-authorized M8 hardware session.
+
+M4/M5 adapt upstream `core/radio/radio_p25.[ch]`, including its task handoff,
+retune and queued signaling logic. Its simple memory lending is replaced with
+the local exclusive lease API. The complete trunked owner is measured below;
+the minimum workspace alone does not include all owner bookkeeping.
+M6 should reuse upstream `site/static/js/codeplug/mode_p25.js` where compatible
+with the companion CPS, preserving this fork's existing editor behavior.
+
+## Initial target resource baseline (2026-11-18)
+
+The existing local QEMU builder runs GCC 14.2.0 in
+`ghcr.io/radiofoundry/rfoundry-csky-gcc14:20261011b`, image ID
+`sha256:4be36b7e30efa70f69d6e4a94223e734ad861a368111e44dbdcdaa8fcb44bede`.
+The build uses `52df41a4` plus this milestone's task-placement and DMR-off
+dashboard guard changes. FreeRTOS is clean at the pinned
+`3a22924e0a9ddbbc8b0758881c33b3422a5cc20d`. No codec file is included.
+
+Before the placement fix, default RAM usage was 211,440 bytes and P25 overflowed
+by 2,152 bytes (213,608 requested). Moving task-only glue and diagnostics to
+flash resolves the overflow. IRQ callbacks, locks and the PA state read remain
+in RAM. No heap, startup stack or private codec reservation was reduced.
+
+| Target configuration | Flash bytes | Main RAM bytes | Static RAM headroom |
+|---|---:|---:|---:|
+| Default, P25 off | 634,988 | 209,208 | 2,248 |
+| Conventional-only P25 | 645,248 | 210,976 | 480 |
+| P25 with trunking | 645,240 | 210,976 | 480 |
+| DMR off, P25 off | 336,352 | 129,152 | 82,304 |
+| Diagnostic retained-entry-point ELF | 675,616 | 211,120 | 336 |
+
+The application flash budget is 901,120 bytes; main RAM is 211,456 bytes.
+All four firmware builds use `-Os -Werror` and contain no compiler warnings.
+The diagnostic row is not a product image. Its caller-owned state is absent.
+
+The P25-enabled static stack check passes all ten tasks. After the tool's
+68-byte context overhead and 128-byte margin, audio retains 1,592 bytes,
+the modem task 688 bytes and the radio task 840 bytes. UI is the smallest
+at 40 bytes beyond that margin. These are static estimates, not measured
+stack high-water marks or an active-channel qualification.
+
+The compile-only `p25-resources` target reports these target ABI sizes with
+trunking enabled:
+
+| Caller-owned state | Bytes |
+|---|---:|
+| `p25_voice_mem_t` | 4,476 |
+| `p25_engine_t` | 872 |
+| `p25_follow_t` | 452 |
+| `air_session_t` | 196 |
+| `air_softmodem_t` | 372 |
+
+Without trunking, the engine is 860 bytes and no follower marker is emitted.
+With P25 off, no state markers are emitted. The same build directory was
+checked across all three settings to verify the probe is always recompiled.
+
+These are separate type sizes. They are not all incremental allocations:
+the provider already overlays the soft modem with idle DMR queue storage.
+The unconnected voice/engine/follower owner does not allocate its state yet.
+At this baseline the vocoder HAL had no memory-lending interface. The next
+milestone below adds exclusive state ownership and restoration. The private
+AMBE slot and reserved window remain intact.
+
+Within the build container, use distinct build directories and fixed version data:
+
+```sh
+make -j4 BOARD=dm32 BUILD=build/p25-target/default GITVERSION=52df41a4 GITDIRTY=-dirty RFOUNDRY_GIT_TIME=1795019138 RELEASE= OPT='-Os -Werror'
+make -j4 BOARD=dm32 BUILD=build/p25-target/p25 CONFIG_P25=y CONFIG_P25_TRUNK=y GITVERSION=52df41a4 GITDIRTY=-dirty RFOUNDRY_GIT_TIME=1795019138 RELEASE= OPT='-Os -Werror'
+make BOARD=dm32 BUILD=build/p25-target/resources CONFIG_P25=y CONFIG_P25_TRUNK=y OPT='-Os -Werror' p25-resources
+```
+
+For conventional-only use `CONFIG_P25=y CONFIG_P25_TRUNK=n`; for the DMR-off
+check use `CONFIG_DMR=n CONFIG_P25=n`, each in its own directory. The latter
+exposed a dashboard access to absent `radio_view_t.dmr` fields. Guarding that
+block fixes compilation; the DMR-enabled rendering is unchanged. A host
+compile regression now covers the feature-off dashboard.
+
+An enabled image can prune unreferenced P25 functions. A diagnostic ELF also
+retains voice, conventional TX and follower entry points with linker `--undefined`
+options. It still does not allocate caller-owned state or simulate a channel.
+The retained roots are `p25VoiceAudioBlock`, `p25VoiceInit`, `p25VoiceBegin`,
+`p25VoicePoll`, `p25VoiceTx`, `p25VoiceEnd`, `p25_engine_begin`,
+`p25_engine_tx_prepare`, `p25_follow_begin`, `p25_follow_tick` and `p25_follow_ptt`.
+This is a selected-entry-point diagnostic, not an all-code size bound.
+Linker headroom is static space, not free RTOS heap, and is not permission to
+put the voice state there. Hardware FIFO timing and sustained codec throughput
+remain unmeasured.
+
+## Workspace loan milestone
+
+`68f77717` plus the memory-loan changes adds the optional HAL loan pair and
+`p25_workspace.[ch]`. The provider lends the existing 7,168-byte encoder state;
+it rejects an active codec call, another loan, invalid size/alignment or permanent
+parking. Returns validate the exact pointer/capacity/generation. Reset is skipped
+and encode/decode return zero output while lent. Fresh AMBE initialization after
+return restores both encoder and decoder state. Codec identity and options stay
+available; executable code, flash and modem tables are never lent or rewritten.
+
+The target ABI probe reports a 5,800-byte trunked workspace or 5,336 bytes without
+trunking, and a 16-byte caller-owned lease handle. The engine already includes
+its air session. The target ELF confirms the existing encoder pool remains
+7,168 bytes and the decoder pool 6,144 bytes. This leaves 1,368 bytes within the
+encoder pool with trunking enabled; no second permanent workspace is allocated.
+
+`vocoderMemoryTest` runs the actual wrapper and workspace helpers with C codec
+stand-ins. Conventional/trunking/P25-off configurations pass 85/85/16 checks.
+They cover blocked calls without changing borrowed bytes, real reset-path
+reinitialization, options/identity, stale and malformed returns, unavailable
+providers, rollback failures, absent slots and parking during acquisition.
+The four existing radio suites pass 2,181/892/262/216 checks.
+
+| Workspace-era target configuration | Flash bytes | Main RAM bytes | Static RAM headroom |
+|---|---:|---:|---:|
+| Default, P25 off | 634,996 | 209,208 | 2,248 |
+| Conventional-only P25 | 645,704 | 210,992 | 464 |
+| P25 with trunking | 645,696 | 210,992 | 464 |
+| DMR off, P25 off | 336,352 | 129,152 | 82,304 |
+
+All four target builds pass with `-Os -Werror`. The loan provider adds 16 bytes
+of aligned main-RAM usage to the enabled image; the workspace itself reuses
+the existing pool. The 16-byte lease handle remains the future caller's cost.
+Use `BUILD=build/memory/<configuration>`, `GITVERSION=68f77717`, and the same
+fixed timestamp/options as the baseline commands above. Target evidence is in
+`build/p25-target`; the VM source tree is `/home/builder/p25-memory-68f77717`.
+The enabled target's static stack check passes all ten tasks: audio retains
+1,596 bytes beyond the context overhead/margin, the modem 688 bytes, the radio
+840 bytes and UI 40 bytes. This does not measure runtime high-water marks or
+the future channel owner's complete call chain.
+
+The workspace API is available for M4 but has no radio-core channel caller yet.
+The caller must stop AMBE before borrowing and stop P25 audio/air callbacks
+before return. This change does not prove that those mode transitions are wired,
+activate a P25 channel, or establish RF/voice interoperability.
+
+## Tagged configuration backend milestone
+
+The full pinned P25 loaders now use the shared tag/system readers through an
+explicit configuration API. `codeplug_channel` still returns the legacy base;
+the existing radio dispatch never receives a tag's logical TX permission.
+No tagged mode is advertised or runnable. The new fields in `channel_t` do
+not increase linked static RAM in the target configurations checked here.
+
+| Backend-era target configuration | Flash bytes | Main RAM bytes | Static RAM headroom |
+|---|---:|---:|---:|
+| Default, P25 off | 634,992 | 209,208 | 2,248 |
+| Conventional-only P25 | 645,696 | 210,992 | 464 |
+| P25 with trunking | 645,692 | 210,992 | 464 |
+| DMR off, P25 off | 336,352 | 129,152 | 82,304 |
+| Diagnostic retained entry points and loaders | 682,044 | 211,136 | 320 |
+
+The diagnostic link retains the previous voice/engine/follower roots plus
+`p25_conv_load`, `p25_conv_save`, `p25_trunk_load`,
+`codeplug_tagged_delete_channel` and `codeplug_tag_copy`. It has no unresolved
+symbols. It still does not allocate the complete future radio-owner state or
+prove an active channel fits. Normal builds discard unreachable loaders.
+
+These builds use `f2ac5367` plus the backend changes, `GITVERSION=f2ac5367`,
+`GITDIRTY=-dirty` and the fixed timestamp/options recorded above. Host tests
+pass all 32 P25-suite executables and 11 Python build checks, plus both legacy
+codeplug configurations. The imported generic metadata suite passes 241 checks;
+the stored P25 suites pass 116 conventional and 158 trunking-enabled checks.
+Generic lifecycle power-cut tests, strict runtime TX admission, feature-off
+dispatch and CPS transfer behavior remain open.
+All four normal target builds pass with `-Werror`. The P25-enabled static stack
+check passes every task; UI remains the tightest at 40 bytes beyond the required
+context overhead and margin. Logs, maps and the diagnostic ELF are archived in
+`build/p25-target/codeplug-evidence.tar.gz`. No hardware was accessed.
+
+## Record permission milestone
+
+Local `p25_admission.[ch]` adds a record policy independently of the imported
+receive loaders. It resolves the base/tag once under the storage lock and
+allocates no permanent state. A strict keyed lookup distinguishes an absent
+optional identity from a read error; the existing tolerant API is unchanged.
+Runtime dispatch still has no P25 channel caller, and the kind registry stays
+unrunnable. This does not complete M3.4's actual emission checks.
+
+Host evidence: all 34 `run-p25` executables and 11 Python checks pass. The new
+conventional/trunking suites pass 10,542/10,676 checks. Each configuration
+samples 2,228 actual power cuts across five edit operations, plus successful
+completion points. Tests inject a failure at each read position of the tested
+conventional/trunked record-policy paths. These simulated reads and flash
+units are not measured physical timing or hardware fault qualification.
+
+| Admission-era target configuration | Flash bytes | Main RAM bytes | Static RAM headroom |
+|---|---:|---:|---:|
+| Conventional-only P25 | 645,700 | 210,992 | 464 |
+| P25 with trunking | 645,692 | 210,992 | 464 |
+| Diagnostic roots, loaders and permission policy | 683,096 | 211,136 | 320 |
+
+Both enabled configurations pass with `-Os -Werror`; host checks also compile
+P25/trunking off and DMR off. The diagnostic retains the previous roots plus
+`p25_codeplug_tx_permissions` and has no unresolved symbols. The gate adds no
+static RAM. It still has no task caller; its eventual full owner call chain
+and complete state require M4 stack/RAM checks. Build inputs are `0e3a4a0d`
+plus this milestone, with the same fixed options/timestamp as above and
+`GITVERSION=0e3a4a0d`. Exported changed-source timestamps are refreshed before
+incremental compilation; target source hashes match the exported inputs.
+Evidence is in `build/p25-target/admission-evidence.tar.gz`.
+
+P25 and trunking now have qualification catalog entries. The feature list uses
+one declaration so the existing catalog reader sees both switches. Linux
+`bringup.py check` reports zero errors; pytest is absent in that build container,
+so it does not check test markers. Owner-authorized hardware checks remain open.
+
+## M4.1 conventional owner component
+
+- [x] Adapt upstream's stored conventional parameters and engine/voice lifecycle.
+  Allocate the active channel/generation snapshot in the sized codec loan.
+- [x] Check real symbol-to-PCM receive and PCM-to-symbol transmit with a reference
+  call decoder. Check RX-only refusal, TX capability/bands, failed open/audio/go,
+  stale settings during open and between prepare/go, and failed loan return.
+- [x] Check close, unkey, audio stop and reclaim order. A full low-byte serial
+  wrap still invalidates the session through the new 32-bit keyed generation.
+- [x] Discard primed symbols after a provider refuses TX start; retry cannot
+  send a previous header.
+- [x] M4.2 (host): Wire existing channel selection and PTT to the owner; recognize
+  and park unsupported tagged kinds with features off. Home identifies P25;
+  mode-aware editors and trunked dispatch remain gated.
+- [x] M4.2 (host): Apply existing inhibition, battery, BCL, timeout, power and RF checks.
+  Serialize prepare/check/key/go with storage writers. Legacy writers refuse
+  tagged codeplugs and managed metadata; mode-aware writers remain pending.
+- [x] M6 writer gate: Managed staged programming waits for radio-task quiescence
+  before copying. Completion reloads permissions before resuming. Failed managed
+  recovery keeps RF held; host and paired CPS round trips pass.
+- [ ] M4.2: Test complete FM/DMR/P25 transitions, beeps/audio routing, mic gain,
+  snapshots, retune, hotspot/APRS exclusions, callback shutdown and return failure.
+  Measure the complete state-machine call chain and its stack/RAM costs.
+
+All 36 `run-p25` executables and 11 Python checks pass. The owner suite passes
+431 checks both with trunking compiled off and on; these are conventional cases,
+not a trunked owner. Actual codec-wrapper loan tests now pass 91/91/16 checks.
+No radio hardware is involved. These figures describe the owner-component milestone.
+
+## M4.2 conventional channel and PTT connection
+
+Stored conventional tags now reach the real owner through `radio_sm`. Normal
+PTT keying holds the storage lock across final admission, prepare, RF key and
+modulation start. Release sends the terminator; timeout, failed start, shutdown
+and stale permissions abort and unkey. Failed codec-memory return parks the
+channel and prevents DMR startup; a later successful return permits transition.
+Canceled shutdown reloads P25 receive without keying.
+
+The generic tag/store guard remains built with P25 off. Unsupported tags,
+stale bindings and damaged or unreadable recognized metadata park with no
+FM/DMR transmission or automatic signaling. Unrelated non-RFKV legacy bytes
+remain compatible. Legacy CPS/fast-CPS/TFTP writes refuse tagged codeplugs and
+cannot overwrite managed metadata. Reads are allowed. This is a temporary
+editor limitation, not a completed firmware/CPS round trip.
+
+The complete suite passes 39 executables and 11 Python checks. The real radio
+state-machine integration passes 145 checks, including RX-only, inhibit, critical battery, BCL, TOT,
+graceful release, settings invalidation while keyed, failed modulation start,
+failed memory return, shutdown cancellation, host-stream PTT refusal and FM/DMR/P25 transitions. The
+owner component still passes 431 checks in each trunking build configuration.
+Feature-off dispatch and both enabled/disabled generic tag readers are tested.
+
+Existing radio core/features, feature-off variants, roaming, receive bands,
+APRS and CPS/fast-CPS/TFTP regressions pass. The NAND suite excludes the newly
+reserved metadata sector from legacy writes, verifies refusal, and still
+exercises 169 CPS power cuts including garbage collection. Host warnings are
+errors, with the existing CPS build-date macro warning disabled for Zig.
+
+UI flows pass, and the P25 home page is rendered at all five display classes;
+only the five new P25 PNGs are added. No new translated strings are introduced.
+Debug core view adds `mode=p25|unsupported` and `p25.active` / `p25.rx` when
+compiled in. A read-only HIL check is supplied for a preprogrammed channel.
+No HIL or hardware session was run.
+
+Final target builds use `712d76b0` plus this work, `GITVERSION=712d76b0`,
+`GITDIRTY=-dirty`, `RFOUNDRY_GIT_TIME=1795019138` and `-Os -Werror`.
+The connected owner is reachable in these normal images; no artificial
+entry-point retention is needed.
+
+| Configuration | Flash bytes | RAM bytes | RAM free bytes |
+|---|---:|---:|---:|
+| Default, P25 off | 637,472 | 209,216 | 2,240 |
+| Conventional P25 | 678,680 | 211,208 | 248 |
+| P25 with trunking compiled | 680,276 | 211,208 | 248 |
+| DMR off, P25 off | 338,688 | 129,160 | 82,296 |
+
+The default format guard adds compatibility checks with P25 off. The P25
+protocol and voice costs still require the feature switch. The remaining
+248-byte static headroom is tight; future trunked state must use the loan or
+reduce existing allocations. These builds omit the private codec image.
+
+Default and connected P25 static stack checks pass with the configured
+68-byte port overhead and 128-byte margin. The P25 radio task has 840 bytes
+remaining, audio 1,596 and modem 688; the smallest remainder is UI at 40.
+The analysis reports seven functions without call graphs, each charged 64
+bytes. Runtime stack high-water marks remain a hardware qualification item.
+Source inputs match after line-ending/trailing-whitespace normalization.
+Logs, input hashes, images, maps, ELFs and the source snapshot are retained in
+ignored `build/p25-target/connected-evidence.tar.gz`.
+
+Full CI, hardware PCM/beep/microphone/voice quality and RF qualification remain
+open. The state-machine fixture disables beeps, hotspot, APRS and SFR; existing
+feature regressions and target builds cover their compilation, not P25 hardware
+coexistence. Trunked owner integration, mode-aware editors and synchronous
+external permission-update handling are still required before release.
+The Linux feature catalog check reports zero errors; its pytest-marker scan
+was unavailable because the build container does not have pytest.
+
+## M5 trunked owner connection
+
+- [x] Connect stored trunked channel selection to the existing follower and engine.
+- [x] Adapt the pinned upstream's task handoff, queued retunes and subscriber path.
+- [x] Hunt, hold, follow a clear Phase 1 grant and return on voice loss/call end.
+- [x] Gate voice hooks to a confirmed voice-channel tune; reject invalid retunes.
+- [x] Connect registration, affiliation, PTT voice requests and current granted TX.
+- [x] Check strict permissions and normal radio protection at every RF key.
+- [x] Cancel released requests, failed starts and sessions invalidated by edits.
+- [x] Bind queued bursts to their tune generation; learn TX NAC from the current
+  control channel when configured for any NAC.
+- [x] Publish small trunk/registration/request state fields through the radio view
+  and debug link. Add a read-only HIL visibility check without running hardware.
+- [ ] Qualify PCM/audio timing, RF interoperability and no-emission RX-only on
+  owner-authorized equipment. Full CI and detailed mode-aware UI/CPS remain open.
+
+All 40 `run-p25` executables and 11 Python checks pass. The trunked state-machine
+suite passes 607 checks using real storage, follower, engine, framing and voice
+with simulated hardware. It covers passive hunt/follow/return, receive routing,
+registration/affiliation, request/grant/TX/release, system listen-only, channel
+RX-only, NO_REG, canceled requests, unsupported frequencies/identifiers,
+encrypted/TDMA grants, failed starts, permission revocation during voice,
+inhibit, PTT denial during automatic signaling and FM/DMR handoff. The conventional state suite passes 158 checks,
+including parking trunked tags when only conventional P25 is compiled. Existing
+radio core/features, feature-off variants, roaming, receive bands and APRS pass.
+
+The complete owner measures 6,436 bytes on C-SKY, leaving 732 bytes in the
+existing 7,168-byte encoder-state loan. The Windows host layout is 6,600 bytes.
+The loader output shares voice memory before startup and is cleared before
+voice initialization. Configuration arrays, pending bursts and keying callback
+live in the loan; no new permanent follower or loader buffer is allocated.
+
+Target builds use `c5f8e31b` plus this work, `GITVERSION=c5f8e31b`,
+`GITDIRTY=-dirty`, `RFOUNDRY_GIT_TIME=1795019138` and `-Os -Werror`.
+
+| Configuration | Flash bytes | RAM bytes | RAM free bytes |
+|---|---:|---:|---:|
+| Default, P25 off | 637,476 | 209,216 | 2,240 |
+| Conventional P25, trunking off | 678,776 | 211,208 | 248 |
+| Connected trunked P25 | 691,744 | 211,256 | 200 |
+| DMR off, P25 off | 338,696 | 129,160 | 82,296 |
+
+The added permanent RAM is the published trunking status in existing view
+copies. Static headroom remains tight. Runtime stack high-water marks, audio
+quality and live-system behavior are not established by a successful link.
+The final trunked static stack check passes with 68 bytes of port overhead and
+128 bytes of margin. Remaining space is 788 bytes in the radio task, 1,596 in
+audio, 604 in the modem task and a minimum of 40 in UI. Seven functions without
+call graphs are charged 64 bytes each. Runtime high-water marks remain unmeasured.
+The Linux feature catalog has zero errors; pytest-marker scanning is unavailable
+in the container because pytest is not installed. Documentation links, generic
+layering and license checks pass. No new UI strings or drawing changes were made.
+
+Eight changed firmware/resource inputs match the build source after line-ending
+and trailing-whitespace normalization. Target logs, resource probe, stack report,
+maps, ELFs, images and source snapshot are retained in ignored
+`build/p25-target/trunk-evidence.tar.gz`. No hardware or HIL session was run.
+
+The home mode label remains P25. Detailed trunk state UI and mode-aware editing
+are M6. Legacy writers still refuse tagged codeplugs. Internal configuration
+changes invalidate on the next poll; a future external mode-aware writer must
+quiesce the owner before acknowledging permission changes. Fallback activation,
+Phase 2, LSM/CQPSK and encryption are not implemented. This is an experimental
+Phase 1 integration, not a qualified firmware release.
+
+### M4.1 target component baseline (historical)
+
+The target ABI reports a 5,416-byte owner without trunking, or 5,880 bytes with
+it compiled in. The latter fits the existing 7,168-byte encoder-state loan with
+1,288 bytes remaining. The persistent lease handle is still 16 bytes. These
+sizes include the current conventional owner; future trunk configuration and
+handoff fields must be measured separately.
+
+| Owner-era target configuration | Flash bytes | Main RAM bytes | Static RAM headroom |
+|---|---:|---:|---:|
+| Default, P25 off | 634,996 | 209,208 | 2,248 |
+| Conventional-only P25 | 645,708 | 210,992 | 464 |
+| P25 with trunking | 645,696 | 210,992 | 464 |
+| DMR off, P25 off | 336,352 | 129,152 | 82,304 |
+| Diagnostic roots, loaders, policy and owner | 685,168 | 211,160 | 296 |
+
+All four normal target builds pass with `-Os -Werror`. The diagnostic retains
+the previous roots plus every owner entry point and has no unresolved symbols.
+Normal links can prune the uncalled owner. Inputs are `d7b8d6b2` plus this work,
+`GITVERSION=d7b8d6b2`, with the fixed timestamp/options above. Source, build
+logs, maps, ABI probe and diagnostic ELF are recorded under ignored
+`build/p25-target`; target evidence is `owner-evidence.tar.gz`. Full state-machine
+stack checks and hardware FIFO/codec qualification remain open.
+
+## Required test cases to carry through later stages
+
+- Conventional: clear calls, NAC/group filtering, encode/decode, PTT start/end,
+  timeout, microphone/speaker routing and RX-only refusal.
+- Trunked RX: control-channel hunting/loss, identifiers and frequency checks,
+  desired grants, encrypted/TDMA rejection, call end, voice loss and return.
+- Trunked TX: permitted registration/affiliation, queued/denied/timed-out voice
+  request, valid grant, granted TX, release and return. Never key a stale grant.
+- RX-only: automatic startup/tick without PTT; PTT on control and voice; saved
+  and copied records; restart; system listen-only; RX-only applied while waiting
+  for a grant or holding queued TX. Check send callbacks and actual radio/PA
+  admission, not just a UI message or one follower flag.
+- Existing product: FM/DMR calls, APRS, talkgroups, storage preservation, home
+  and quick controls, navigation, serial CPS and packaging regressions.
+
+## Evidence and work log
+
+| Work | Evidence | Limit |
+|---|---|---|
+| M0/M1, `ae0ade75` | Exact-source audit of 60 imported files; 11 host configurations passed with Zig 0.14.1 and `-Wall -Wextra -Wshadow -Werror`. | Includes trunking on/off and passive PTT; not board/radio/CPS integration. |
+| M1 documentation | 153 Markdown files, zero broken links; generic-code check passed. | Full CI and target build not run. |
+| M2.1, `71f2367a` | `boardAirTest`: 20 checks passed; existing `boardBandTest` passed, warnings as errors. | Simulated provider; no board driver enabled or hardware touched. |
+| M2.2 | Actual Make selection plus C compile/link matrix for default-off, P25-only, P25+trunking and explicit-off; invalid dependencies and overrides rejected; conditional license attribution and idempotence checked. | Host compile/link, not a target image. |
+| M2.3a, `a8de90c0` | `hrc7000AirTest`: 13,306 simulated checks passed with the current DMR driver. Provider-off object build checked by `p25BuildTest.py`. | Initial driver import; subsequent platform ownership is covered by M2.3b. |
+| M2.3b | Real glue/driver lifecycle tests with air and split support independently on/off: 94, 11, 100 and 11 checks passed. Optimized builds checked. Existing DMR, split-DMR and BS-driver regressions passed. DMR-disabled glue compiles in the build matrix. | Simulated IRQ/RTOS services; audio-gate callbacks are fakes. Board attachment, target memory/timing and hardware behavior remain pending. |
+| Combined host Make run | `run-p25`: 13 executable configurations and 5 Python build/attribution tests passed with warnings as errors. Documentation: 155 files, zero broken links; generic-code check passed. | No C-SKY target build, sanitizer run, complete host suite or hardware session yet. |
+| Combined run after M2.3b | `run-p25`: 17 executable configurations and 6 Python build/attribution tests passed, including the optimized handoff tests. Documentation: 155 files, zero broken links; generic-code check passed. | Target builds, full CI, board/audio attachment and hardware qualification are still pending. |
+| M2.3c/M2.4a | PCM/APRS tests: 50/16/50/16 checks for P25/VOX on/off. Modem lifecycle linked to the real PCM gate: 96 checks. Changed board/radio files compile with P25 on/off and DMR off. | Simulated CPU/IRQ/RTOS services; native compiler checks are not a C-SKY image or hardware qualification. |
+| Combined run after PCM attachment | `run-p25`: 22 executable configurations and 7 Python build/attribution tests passed with warnings as errors. Documentation: 155 files, zero broken links; generic-code check passed. | Hardware-paced refill, target resource checks, full CI and radio/CPS channel integration remain pending. |
+| M2.4b host refill/drain | PCM/APRS: 246/17/246/17 checks for P25/VOX on/off; includes clock wrap, a 30 ms callback, bounded IRQ writes, ownership and silent-tail completion. P25 voice: 66 checks; DMR voice: 107 checks. | Timer 6 and two-half FIFO behavior require target validation; priming adds one block of startup buffering. |
+| Combined run after refill | `run-p25`: 23 executable configurations and 7 Python build/attribution tests passed with optimized warnings-as-errors builds. | No C-SKY target build, complete host suite, full CI or hardware qualification. |
+| Existing audio/radio regressions | Radio core/features/receive bands/roaming/USRP: 2181/892/262/216/121 checks passed. Board/radio attachment compiles with P25 on/off and DMR off. Documentation: 155 files, zero broken links; generic-code check passed. | Host compiler with fake CPU services; not target resource or hardware evidence. |
+| M2.5 target build/resource milestone | Default, P25, conventional-only and DMR-off C-SKY images build with `-Werror`; default and P25 static task-stack checks pass. Retained-entry-point ELF and target ABI probe expose current code/state costs. Task-only placement fixes a 2,152-byte RAM overflow. | Caller-owned P25 state is not allocated yet; memory ownership and restoration remain open. |
+| Host checks after target placement | All 23 `run-p25` executables and 9 Python build/attribution/probe/feature-off checks pass. | Full CI and owner-authorized hardware qualification remain pending. |
+| M2.5c memory ownership | 26 `run-p25` executables and 10 Python checks pass; real codec-wrapper/workspace ownership tests pass with P25/trunking independently on/off. Target probe confirms the grouped workspace fits the existing encoder pool, and four firmware configurations build without warnings. | Codec stand-ins validate the wrapper, not proprietary codec behavior on hardware. The real channel owner has not acquired or released a workspace yet. |
+| M3.1 upstream codecs | Exact-source audit: 14 parameter/helper functions and all 39 P25 vectors match the pin. Vector tests: 30 checks without trunking, 42 with it. All 28 `run-p25` executables and 11 Python checks pass with warnings as errors. | Parameter bodies only; generic storage, loaders, RX-only admission and CPS mapping remain pending. Target links are batched with the backend integration. |
+| M3.2a keyed-store reuse | Full imported NOR/power-cut suite plus local guard/interleaving tests: 4,471 checks pass. Removing the raw-commit outer lock reproduces key loss and fails the new regression. All 29 `run-p25` executables, 11 Python checks and both existing codeplug test configurations pass. | Host only; no transfer caller or tagged channel is activated. Target linking/resource checks are batched with the tag/reader integration. |
+| M3.2b/M3.3a metadata and loaders | Full upstream tag/record suite: 241 checks; stored P25: 116/158 checks. All 32 P25-suite executables, 11 Python build checks and both legacy codeplug configurations pass. Four target configurations and the P25 static stack check pass; diagnostic retained-loader link fits. Exact-source audit matches six imported implementation/header/vector files after only documented adaptations. | Explicit configuration API only. Lifecycle power cuts, strict TX admission, radio dispatch and CPS round trips remain open. |
+| M3.3b/M3.4a record permissions | Conventional/trunked admission: 10,542/10,676 checks; 2,228 sampled cuts per configuration; per-read fault injection. All 34 P25 executables, 11 Python checks and both legacy codeplug configurations pass. Both enabled target configurations and the retained-permission link fit without added static RAM. Feature catalog: zero errors on Linux. | Record policy only. Actual emission gates, session invalidation, frequency/grant checks, CPS round trips, complete-owner resource checks and hardware qualification remain open. Catalog test markers were not checked because the build container lacks pytest. |
+| M4.1 conventional owner | Owner: 431 checks with trunking off/on. Complete P25 suite: 36 executables and 11 Python checks. Codec-wrapper loan suites: 91/91/16 checks. Four target configurations and retained-owner link pass; the target owner fits the existing codec pool. | Component integration only; ordinary channel/PTT dispatch, real FM/DMR transitions, writer quiescence, full caller stack/RAM costs and hardware qualification remain open. |
+| M4.2 channel/PTT connection | Real state-machine P25: 145 checks; feature-off parking: 5; tag readers: 254 each with P25 on/off. All 39 P25 executables and 11 Python checks pass. Existing radio/transfer/NAND regressions, UI flows and four target builds pass. | Conventional only. Tight static RAM; complete CI, mode-aware editing, trunked owner and hardware qualification remain pending. Legacy writers refuse tagged codeplugs. |
+| M5 trunked owner | Trunked state machine: 607 checks; conventional: 158. All 40 P25 executables and 11 Python checks pass, with affected radio regressions. Four target builds and the connected trunked stack check pass. Complete owner 6,436 bytes fits the loan; static RAM headroom 200 bytes. | Experimental Phase 1 C4FM. Full CI, mode-aware UI/CPS, fallback activation and hardware RF/audio qualification remain pending. No radio was accessed. |
+| Scope update | Owner requested retaining TX and honoring existing CPS RX-only; permission matrix above replaces the earlier passive-only product scope. | Hardware TX still requires its own authorized test session and --allow-rf. |
+
+Local ignored test output is in `build/p25-host`. Python works outside the
+sandbox; the earlier launcher failures were sandbox access failures. A portable
+GNU Make binary is now available under ignored `build/host-tools`, downloaded
+from MSYS2 with its published SHA-256 verified. It uses Git's existing runtime;
+no system installation or firmware-source import was involved. Portable Zig
+is available for host checks. The Windows host Make run overrides the existing
+ELF attribute-stripping CFLAGS, which otherwise break Windows runtime inlines;
+warnings remain errors. WSL is not installed and native C-SKY GCC is not on PATH.
+The existing localhost-only build VM now provides target compilation. Target
+logs and artifacts are kept under ignored `build/p25-target`; the VM workspace
+is `/home/builder/p25-integration-52df41a4`. No hardware service was accessed.
+Do not equate a pruned firmware link with active-mode memory fit.
+
+No branch push, deployment, CPS/radio session or hardware test has been performed.
+Keep this record current as those facts change; remove temporary CI build trees
+after successful runs as required by AGENTS.md.
+
+## M6 CPS and managed programming (2026-11-18)
+
+The companion CPS and bundled editor now edit conventional P25 NAC/squelch,
+trunked systems/control channels/plans, per-system transmit permission and
+radio-wide P25 unit ID. Logical channel RX-only is independent of the safe
+legacy DMR stand-in bit. New trunked channels and systems are listen only.
+Binary backups, drafts, rename, undo and transfer preserve these permissions.
+Legacy inline DMR assignments are migrated before RFKV uses their tail sector.
+
+The managed transfer contract quiesces the real radio task before any commit
+copy. Failed or damaged managed recovery keeps RF held. See the
+[CPS integration record](p25-cps-integration.md) for provenance and checks.
+Full CI, release packaging and all RF/interoperability qualification remain
+open. No connected radio or SDR was accessed.
+
+M6 target checks: default/P25-off, conventional-only, trunking, DMR/P25-off
+and fast-CPS-off builds pass. Final trunked image: 692452 bytes flash,
+211264 bytes static RAM, 192 bytes RAM remaining. Static task stacks still
+fit; UI retains 40 bytes after the context and required margin. Evidence
+hashes and all target sizes are in the CPS integration record. These tight
+margins are not a hardware qualification.
+
+## Development integration (2026-11-18)
+
+Merged the complete P25 integration, including paired CPS support, into
+`Development`. Resolved overlapping UI, shared talkgroup, feature-list,
+translation and release-workflow edits. The resulting production sources
+match the already verified P25 integration tree; the duplicate copyright
+line in the debug-link specification is removed. Integration branches remain
+available. This merge does not change feature defaults or establish hardware
+qualification. Release CI, packaging and owner-authorized hardware checks
+remain open.
+
+Merge validation: 37 P25/CPS, editor, DMR-preservation, unsaved-dialog and
+release-channel checks passed. Documentation: 167 files, zero broken links.
+Production/test/build inputs match the previously verified integration tree,
+so its target build and stack evidence remain applicable.
+
+## Testing integration (2026-11-18)
+
+Merged local Development `448cbaa8` into Testing after updating Testing to
+remote `35ad6d77`. Preserved Testing's newer CPS builder, product documentation,
+unified site navigation and CI/test fixes. Resolved overlapping catalogs by
+keeping Testing's existing wording and adding P25 fields and identity text.
+P25 configuration defaults and hardware qualification status are unchanged.
+
+The product programming guide includes the P25 instructions, so the current
+Testing manual retains the channel permissions, binary-backup limitation,
+and managed-transfer requirements introduced by the integration.
+
+Testing merge validation: 110 CPS/editor/transfer/custom-build/release checks
+passed; one optional external dmrconf check skipped. The installer suite
+passed 15 checks; its existing untried-console stub-load simulation timed out
+at 60 seconds on the local Windows runner. Its production IAP, console and
+simulator modules are unchanged from Testing `35ad6d77`. The test DOM now
+provides the language field used by board-picture captions. The timeout
+remains a release-validation limitation, not a verified installer result.
+
+The strict Testing site build passes with zero warnings after registering
+P25/P25_TRUNK in the feature matrix and the P25 home screenshot/captions.
+Documentation: 177 files, zero broken links; generic-code check passes.
+Core firmware, configuration, HAL and platform sources still match the
+verified Development build. No radio or SDR was accessed. This merge is
+local; remote Testing and release workflows are not changed by this action.
+
+## Testing release build follow-up (2026-11-18)
+
+Published Testing merge `5d06ab28`. Its GitHub firmware workflow stopped at
+version selection before compilation because `v1.0.0` is already published.
+Advanced the feature integration base to `1.1.0`, preserving the guard against
+reusing a released final version. Testing now selects `v1.1.0-rc.N`.
+
+## Full-build defaults and extended receive (2026-11-18)
+
+Work branch: `codex/extended-rx-test`, based on Testing `07e309f1`.
+The full build now enables conventional P25 Phase 1, Phase 1 trunking and
+`CONFIG_RX_EXTENDED`. The board admits experimental RX from 16 MHz to
+999.999990 MHz, the existing synthesizer-table minimum and codeplug format
+maximum. There is no extra 850 or 870 MHz cutoff. Front-end performance,
+PLL lock, audio and over-the-air interoperability remain untested.
+
+Normal TX bands are unchanged. A receive-only RX frequency blocks PTT,
+hotspot and conventional P25 TX even when the stored TX frequency is valid.
+A trunking system with any receive-only control frequency forces passive
+following and blocks registration, affiliation, requests and voice. Normal
+VHF/UHF channel and system permissions, including the CPS Receive only
+option, remain in force.
+
+Completed: 40 P25 host programs and 12 Python configuration checks pass;
+extended receive/PTT admission checks pass (305 assertions); FD6818
+highest-range register checks pass. Trunk owner: 752 assertions, 6600-byte
+host workspace. Initial full target build passes with warnings treated as
+errors: 692688-byte image, 211264 bytes static RAM, 192 bytes remaining.
+Static RAM use is unchanged from the earlier P25/trunking image.
+
+The extended-RX-off build passes (692676 bytes flash, 211264 bytes RAM),
+trunking-off passes (679600/211216), and P25-off passes (638276/209272).
+All target builds treat warnings as errors. A regression check across the
+board registry confirms disabling DMR also disables its default P25
+dependents. The 42 CPS checks, including extended frequency parsing and
+managed simulator programming, pass. Strict site generation has zero
+warnings; documentation links and generic-code checks pass.
+
+The default-optimization task-stack check passes for all ten tasks with
+68-byte context overhead and 128-byte margin: radio free 788 bytes, audio
+1596, UI 40. It links 692684 bytes with the same static RAM use. These tight
+margins still require owner hardware checks. Target evidence is retained
+locally in `build/p25-target/wide-p25-{build,stack}.log`.
+
+Next: publish and verify the Testing candidate for owner reception testing.
+The read-only extended trunking HIL check is provided but was not run.
+No radio or SDR was accessed. Phase 2 and encrypted voice remain outside
+this integration.
+
+## Managed programming board-map correction (2026-11-18)
+
+Owner report: `v1.1.0-rc.2` identifies correctly but CPS refuses managed P25
+writes. Root cause: the board's flash map has no staging area, so the real
+INFO response lacks managed support. Protocol tests and the CPS simulator
+used maps with staging and did not cover the production board map.
+
+Reserve 256 KiB at `0xF00000` from the unused future-native-format prefix.
+Move the native reserve's start to `0xF40000` and reduce its size equally,
+preserving its end, the AES key journal and final stock metadata sector.
+No existing codeplug, settings, ID database or message area moves. The
+20 KiB gap after the settings journal would provide only four slots and
+cannot hold an entire changed codeplug atomically.
+
+Regression: discover full P25/CPS builds from the board registry and compile
+their actual map initializer into the production CPS/storage host harness.
+INFO must advertise usable managed staging with at least 33 slots. Stage
+33 blocks without changing destinations, commit under the RF hold, then
+recover on restart. All 111 assertions pass, including message and key-bank
+preservation. All 13 P25 build checks pass. The CPS capability guard remains.
+
+Next: target build, publish the corrected Testing firmware and refresh the
+separate Testing CPS. Owner programming/reception checks remain pending;
+no connected radio or SDR was accessed.
+
+## Card Home P25 mode-label correction (2026-11-18)
+
+Owner confirms rc.3 writes the P25 codeplug successfully. Read-back shows
+P25 Trunking in CPS while the radio's card Home says FM. Reproduced in the
+UI simulator with mode=p25: the card used a DMR-or-FM label expression.
+The standard Home already handled P25. Share its mode labels with the card
+badge and dual-watch strip, and omit analog tone details on the single P25
+card. This is a display correction; it does not establish RF reception.
+
+Add conventional and trunking card flows requiring P25 and rejecting FM
+and No tone. Keep the existing standard-Home flow and add the trunked scene
+to the gallery. The simulator now reports P25 accurately in mode assertions.
+Initial color UI run passes all 1919 flows and its screen crawls.
+
+Monochrome (1908 flows) and card-disabled (1919 flows) runs also pass their
+screen crawls. The full gallery was regenerated; retain only the six P25
+scenes changed or added by this fix. The trunked card render is visually
+checked and its gallery caption is translated in all site catalogs.
+Strict site generation has zero warnings; documentation links and the
+generic-code check pass. The full target build passes at 692700 bytes,
+with unchanged static RAM (211264 bytes, 192 remaining).
+
+Next: finish UI configurations, gallery, target and task-stack checks;
+publish and refresh the separate Testing CPS. Hardware reception remains
+unverified. No radio or SDR was accessed.
+
+## Local receiver diagnostic build (2026-11-18)
+
+Owner authorized read-only diagnostics and then direct local installation
+of an experimental image, bypassing GitHub releases and website deployment.
+rc.4 samples confirm P25 active, RX-only, continuously searching, median
+-131 dBm both with and without the antenna (12 samples each). No control
+channel was acquired. The 440 MHz baseline was about -106 dBm. Evidence is
+retained locally in `build/radio-diag`; no audio or private dumps were taken.
+
+Add read-only frequency/band/state/power register snapshots under DIAG,
+sampled on the radio task at 250 ms intervals. Add provider input-half and
+chunk counters, and radio-task-published P25 symbol/sync/frame/block counts.
+Correct the remaining FM diagnostic labels and missing VERSION capability
+tokens. No tuning table or transmit permission changes are included.
+Driver tests verify readback causes no RF writes and exposes disagreement;
+owner tests verify counters after receive and zeroed snapshots after close.
+Next: local build, stack/configuration checks, application-only upload,
+then owner-authorized receive diagnostics. Do not publish this image.
+
+Local validation passes: all 40 P25 programs, 13 configuration tests,
+FD6818 readback tests and both owner variants (446 assertions each).
+Changed production units pass target syntax checks with DIAG, P25 and
+P25_TRUNK individually off. Full target: 693960 bytes flash, 211328 bytes
+static RAM (128 remaining). All ten task stacks fit; minimum UI margin
+remains 40 bytes. Documentation and generic-code checks pass.
+
+Installed locally on COM3 using the existing RAM updater, application only:
+170 sectors written and verified by CRC, then reset successfully. Local
+version `7e866b73-rxdiag1-dirty`; SHA-256
+`ffbd80068d793c9f091fc31b97a7ce586cacb464b4f8094ef7e6caa401b639a8`.
+The write ends at 0xB56C8, below the 0xE8000 codec slot. Codec 048 remains
+recognized; Palmetto Monitor and RX-only persist. No GitHub release, branch
+push, site deployment or transmit command was performed.
+
+Live new diagnostics: frequency readback equals programmed 77365625
+(10 Hz units), bands 1F80/3AF0, receive state BFF1, power 1F1F. With the
+owner-confirmed large antenna connected, the median is -130 dBm. Across
+about 9.2 seconds, symbols increase by 43929, while syncs, frames and trunk
+blocks remain zero and state remains hunt. Input halves and processed
+duration advance without overruns or missing halves. All core keys,
+including the last keys, remain readable. No PLL lock or useful RF signal
+is established by register agreement or sample delivery. Evidence and
+upload log remain in `build/radio-diag`. Next: isolate RF/PLL/front-end or
+waveform/decoder mismatch with a known signal or validated hardware data.

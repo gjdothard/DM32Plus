@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // FD6818 transceiver driver (docs/spec/hardware-dm32.md 8)
 #include <stddef.h>
 #include "fd6818.h"
@@ -143,6 +144,19 @@ uint16_t fd6818_read(fd6818_t *dev, uint8_t reg)
 {
 	return rfbus_read(dev->bus, reg);
 }
+
+#if CONFIG_DIAG
+void fd6818_readback(fd6818_t *dev, fd6818_readback_t *out)
+{
+	out->expected_10hz = dev->freq_10hz;
+	out->actual_10hz = fd6818_read(dev, FD6818_REG_FREQ_LO);
+	out->actual_10hz |= (uint32_t)fd6818_read(dev, FD6818_REG_FREQ_HI) << 16;
+	out->band_a = fd6818_read(dev, FD6818_REG_BAND_A);
+	out->band_b = fd6818_read(dev, FD6818_REG_BAND_B);
+	out->state = fd6818_read(dev, FD6818_REG_STATE);
+	out->power = fd6818_read(dev, FD6818_REG_POWER);
+}
+#endif
 
 static void write_table(fd6818_t *dev, const regval_t *t, size_t n)
 {

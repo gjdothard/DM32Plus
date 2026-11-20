@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Microphone gain (mic_gain.h; docs/spec/radio-features.md 3.6)
 #include "radio/mic_gain.h"
 #if CONFIG_DMR
 #include "dmr/ambe/ambeVoice.h"
+#endif
+#if CONFIG_P25
+#include "p25/p25Voice.h"
 #endif
 
 static volatile uint8_t mic_step = MIC_GAIN_UNITY;
@@ -21,6 +25,9 @@ void radio_set_mic_gain(uint8_t step)
 #if CONFIG_DMR
 	// With the board's gain the samples stay as they are: scaling them too would count the step twice
 	ambeVoiceSetMicGain(hw ? (uint8_t)MIC_GAIN_UNITY : step);
+#endif
+#if CONFIG_P25
+	p25VoiceSetMicGain(hw ? (uint8_t)MIC_GAIN_UNITY : step);
 #endif
 }
 

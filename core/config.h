@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
 // Copyright (c) 2026 Garrett Dothard
-// Feature switches (config/features.mk sets them for firmware builds; everything defaults on here, e.g. for host
-// tests). Always defined to 0 or 1: test with #if CONFIG_X, never #ifdef. See docs/build-config.md.
+// Feature switches (config/features.mk sets them for firmware builds; most default on here for host tests).
+// Integration-stage modes default off. Always 0 or 1: use #if CONFIG_X. See docs/build-config.md.
 #ifndef RFOUNDRY_CONFIG_H
 #define RFOUNDRY_CONFIG_H
 
@@ -14,6 +14,40 @@
 #endif
 #ifndef CONFIG_DMR
 #define CONFIG_DMR			1
+#endif
+// Integration-stage modes stay off unless the caller explicitly builds them
+#ifndef CONFIG_P25
+#define CONFIG_P25			0
+#endif
+#ifndef CONFIG_RX_EXTENDED
+#define CONFIG_RX_EXTENDED		0
+#endif
+#ifndef CONFIG_P25_TRUNK
+#define CONFIG_P25_TRUNK		CONFIG_P25
+#endif
+#ifndef CONFIG_P25_UI
+#define CONFIG_P25_UI			CONFIG_P25
+#endif
+#ifndef CONFIG_AIR
+#define CONFIG_AIR			CONFIG_P25
+#endif
+#ifndef CONFIG_IMBE
+#define CONFIG_IMBE			CONFIG_P25
+#endif
+#ifndef CONFIG_MBE
+#define CONFIG_MBE			CONFIG_IMBE
+#endif
+#if CONFIG_P25 && !CONFIG_DMR
+#error "CONFIG_P25 needs CONFIG_DMR (codeplug contacts)"
+#endif
+#if CONFIG_P25_TRUNK && !CONFIG_P25
+#error "CONFIG_P25_TRUNK needs CONFIG_P25"
+#endif
+#if CONFIG_P25_UI && !CONFIG_P25
+#error "CONFIG_P25_UI needs CONFIG_P25"
+#endif
+#if CONFIG_AIR != CONFIG_P25 || CONFIG_IMBE != CONFIG_P25 || CONFIG_MBE != CONFIG_IMBE
+#error "CONFIG_AIR, CONFIG_IMBE and CONFIG_MBE are derived from CONFIG_P25"
 #endif
 #ifndef CONFIG_DMR_PRIVACY
 #define CONFIG_DMR_PRIVACY		1

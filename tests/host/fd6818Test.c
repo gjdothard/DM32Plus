@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // FD6818 driver: band words, CTCSS word, and the bit-banged frames against a fake chip that samples the data line on
 // rising clock edges while CS is low (docs/spec/hardware-dm32.md 8.1-8.4)
 #include <stdio.h>
@@ -179,6 +180,9 @@ static void test_helpers(void)
 	uint16_t a, b;
 	CHECK(fd6818_band_words(14400000u, &a, &b) && a == 0xAF28 && b == 0x375C);	// 144 MHz: >= 124 MHz row
 	CHECK(fd6818_band_words(43500000u, &a, &b) && a == 0x2F50 && b == 0x39F0);	// 435 MHz: >= 370 MHz row
+	CHECK(fd6818_band_words(73999999u, &a, &b) && a == 0x1F80 && b == 0x3AF0);
+	CHECK(fd6818_band_words(85000000u, &a, &b) && a == 0x1F80 && b == 0x3AF0);
+	CHECK(fd6818_band_words(99999999u, &a, &b) && a == 0x1F80 && b == 0x3AF0);
 	CHECK(fd6818_band_words(18500000u, &a, &b) && a == 0x3F48 && b == 0x38F0);	// 185 MHz
 	CHECK(fd6818_band_words(18499999u, &a, &b) && a == 0x3F48);			// the row's own boundary value
 	CHECK(fd6818_band_words(18499998u, &a, &b) && a == 0xAF28);
@@ -216,6 +220,19 @@ static void test_frames(void)
 	CHECK(chip.n == 2);	// a read logs no write
 	chip.regs[0x65] = 0xA55A;
 	CHECK(fd6818_read(&dev, 0x65) == 0xA55A);
+#if CONFIG_DIAG
+	chip.regs[0x38] = (uint16_t)77365625u;
+	chip.regs[0x39] = (uint16_t)(77365625u >> 16);
+	chip.regs[0x1A] = 0x1F80; chip.regs[0x40] = 0x3AF0;
+	chip.regs[0x30] = 0xBFF1; chip.regs[0x37] = 0x1F0F;
+	dev.freq_10hz = 77366875u;
+	uint32_t writes = dev.bus->writes;
+	fd6818_readback_t rb;
+	fd6818_readback(&dev, &rb);
+	CHECK(rb.actual_10hz == 77365625u && rb.expected_10hz == 77366875u);
+	CHECK(rb.band_a == 0x1F80 && rb.band_b == 0x3AF0 && rb.state == 0xBFF1 && rb.power == 0x1F0F);
+	CHECK(dev.bus->writes == writes && chip.protocol_errors == 0);
+#endif
 }
 
 static void test_sequences(void)

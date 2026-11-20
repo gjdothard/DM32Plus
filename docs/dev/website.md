@@ -95,6 +95,35 @@ GitHub app, configure the following settings. Retry a deployment in that project
 
 ## Sources
 
+### Automatic Testing deployment
+
+The product firmware workflow builds and tests a separate Testing website after
+the firmware and task-stack checks pass. It publishes a checksummed
+`website-testing-VERSION.tar.gz` asset on the matching release candidate. The
+bundle contains the CPS and firmware from the same source commit and shows a
+translated Testing banner. A failed build leaves the previous website active.
+
+Install `tools/website/install-testing.py --root DEPLOYMENT --repository OWNER/REPO`
+as the existing owner of a separate `testing-cps` Compose deployment. Keep
+`testing_update.py` beside the installer. The installer retains the existing
+ports, public host, builder network and read-only mounts. It adds an independent
+user cron entry that polls every two minutes and survives SSH logout and reboot.
+It does not change the production updater, proxy, or DNS.
+
+The updater accepts only successful Testing push runs and complete release
+candidate website assets. It checks the release tag's commit, GitHub asset
+digest, archive paths, every bundled checksum and deployment identity before
+recreating only `testing-cps`. Its fixed local Compose configuration ignores the
+archive's Compose file. A failed health check restores the previous release.
+Overlapping polls are locked out; a failed download is retried at the next poll.
+Successful deployment records the workflow run ID to prevent older-run replay.
+Previous release directories remain available for rollback.
+
+Inspect `DEPLOYMENT/updater/update.log` and the public `/deployment.json` marker.
+To stop automatic updates, remove only the crontab line labeled
+`testing-cps-website-updater`. The original Compose file is retained under
+`DEPLOYMENT/updater/compose.before-automatic.yaml` for manual rollback.
+
 Nothing on the site is copied by hand. Each page reads its source at build time:
 
 | Shows | Comes from |

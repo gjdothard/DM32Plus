@@ -87,7 +87,7 @@ The privacy key itself is never in the codeplug. A channel names a slot. The ope
 
 ## 4. Storage plan (not built)
 
-- **Area.** `hal_flash_map_t.native_addr` / `native_size`, set by the board: 1 MB above anything an open-firmware tool
+- **Area.** `hal_flash_map_t.native_addr` / `native_size`, set by the board: a reserve above anything an open-firmware tool
   writes (`openfw_end`). The CPS shim refuses writes there. Each radio's flash map is in its hardware spec.
   With `CONFIG_DMR_AES256`, its last two sectors belong to the private key journal and are excluded from native
   codeplug data and erase operations ([settings-store.md](settings-store.md#7-private-aes-key-bank)).

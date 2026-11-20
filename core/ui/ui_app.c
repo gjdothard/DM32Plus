@@ -18,6 +18,9 @@
 #include "ui_app.h"
 #include "ui_nav.h"
 #include "ui_svc.h"
+#if CONFIG_P25_UI
+#include "ui_p25.h"
+#endif
 #include "fmt.h"
 #include "i18n.h"
 #include "input/input.h"
@@ -859,6 +862,7 @@ static void entry_digit(char d)
 	if (!ui_freq_entry_digit(ui_st.entry_digits, &ui_st.entry_len, d))
 		return;
 	ui_st.entry = true;
+	ui_st.toast = NULL;
 	dirty = true;
 }
 
@@ -1099,12 +1103,17 @@ bool ui_home_key(const input_event_t *ev)
 		if (ui_st.entry)
 			entry_cancel();
 		// Settings > Keys > Up/Down on Home: the channel (default), the zone, or the talk target (DMR channels). The
-		// arrow keys only: the channel knob always steps the channel, so the two can do different jobs (#25)
+		// Arrow keys keep channel navigation when the knob selects assigned talkgroups.
 		bool arrows = ev->action != ACT_ENC_STEP;
 #if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
-		if (!view->vfo && view->ch.mode == RADIO_MODE_DMR && view->talkgroup_count) {
-			if (!arrows)
-				radio_req_dmr_talkgroup_step(ev->value);
+		if (!view->vfo && (view->ch.mode == RADIO_MODE_DMR || (CONFIG_P25_UI && view->ch.mode == RADIO_MODE_P25)) && view->talkgroup_count) {
+			if (!arrows) {
+#if CONFIG_P25_UI
+				if (view->ch.mode == RADIO_MODE_P25) ui_p25_talkgroup_step(ev->value);
+				else
+#endif
+					radio_req_dmr_talkgroup_step(ev->value);
+			}
 			else
 				for (int i = steps(ev); i > 0; i--)
 					radio_req_channel_step(nav_dir(ev));
@@ -1150,9 +1159,13 @@ bool ui_home_key(const input_event_t *ev)
 	}
 	if (ev->gesture == GESTURE_LONG) {
 		if (ev->action == ACT_SELECT) {
-			if (!has_quick_key)
+			if (!has_quick_key) {
+#if CONFIG_P25_UI
+				if (view->ch.mode == RADIO_MODE_P25) ui_push(SCR_P25_LISTEN, 0);
+				else
+#endif
 				ui_push(SCR_QUICK, 0);	// few-key boards: long SELECT is QUICK
-			else
+			} else
 				ui_try_save_channel();
 			return true;
 		}
@@ -1204,11 +1217,21 @@ bool ui_home_key(const input_event_t *ev)
 		dirty = true;
 		return true;
 	case ACT_QUICK:
+#if CONFIG_P25_UI
+		if (view->ch.mode == RADIO_MODE_P25) {
+			ui_push(SCR_P25_LISTEN, 0);
+			return true;
+		}
+#endif
 		ui_push(SCR_QUICK, 0);
 		return true;
 	case ACT_CONTEXT:
 		if (ui_st.entry)
 			entry_commit();		// # tunes the typed frequency, like OK
+#if CONFIG_P25_UI
+		else if (view->ch.mode == RADIO_MODE_P25)
+			ui_push(SCR_P25_RECENT, 0);
+#endif
 		else if (ui_st.scanning)
 			ui_push(SCR_SCAN, 0);	// skip / stay / always skip (task-flows.md 11)
 		else
@@ -1841,6 +1864,12 @@ static void list_draw(const ui_scr_def_t *d)
 	if (CONFIG_UI_SETTINGS && CONFIG_DMR_ARS && f->scr == SCR_MENU_SECTION && f->arg == MENU_SECTION_ARS)
 		l.hint = TR("OK change  Back");
 	if (ui_card_layout(&ui_st)) {
+#if CONFIG_P25_UI
+		if (f->scr == SCR_P25_LISTEN || f->scr == SCR_P25_RECENT || f->scr == SCR_P25_SYSTEM) {
+			ui_draw_card_page(&ui_st, &l, UI_CARD_PAGE_FIELDS);
+			return;
+		}
+#endif
 		if (f->scr == SCR_ZCHANNEL || f->scr == SCR_ZONEEDIT || f->scr == SCR_SHARE ||
 		    f->scr == SCR_ROAM || f->scr == SCR_OFFER) {
 			if (f->scr == SCR_ZONEEDIT)
@@ -2322,6 +2351,17 @@ void ui_app_key(const input_event_t *ev)
 	const ui_scr_def_t *d = ui_scr[stack[sp].scr];
 	if (ev->action == ACT_QUICK && ev->gesture == GESTURE_PRESS && stack[sp].scr != SCR_QUICK &&
 			stack[sp].scr != SCR_DIAG && stack[sp].scr != SCR_HOME && !typing) {
+#if CONFIG_P25_UI
+		if (view->ch.mode == RADIO_MODE_P25) {
+			if (stack[sp].scr == SCR_P25_LISTEN) { ui_pop(); return; }
+			for (unsigned i = sp; i > 0; i--) if (stack[i].scr == SCR_P25_LISTEN) {
+				while (sp > i) ui_pop();
+				return;
+			}
+			ui_push(SCR_P25_LISTEN, 0);
+			return;
+		}
+#endif
 		ui_push(SCR_QUICK, 0);
 		return;
 	}

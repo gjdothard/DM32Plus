@@ -4,6 +4,7 @@
 """Bundle a rendered website and its matching release proxy for Compose deployment."""
 import argparse
 import hashlib
+import html
 import json
 from pathlib import Path
 import re
@@ -14,7 +15,11 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def package(site, product_file, version, output):
+def package(site, product_file, version, output, *, channel=None, public_url=None):
+    if channel is not None and channel != "Testing":
+        raise ValueError("unsupported website channel")
+    if channel and (not public_url or not re.fullmatch(r"https://[a-z0-9.-]+", public_url)):
+        raise ValueError("Testing requires an HTTPS public origin")
     product = json.loads(product_file.read_text(encoding="utf-8"))
     base = f"{product['prefix']}-{product['board']}-{version}"
     manifest_path = site / "firmware" / product["board"] / (base + ".json")
@@ -36,10 +41,25 @@ def package(site, product_file, version, output):
     with tempfile.TemporaryDirectory() as tmp:
         bundle = Path(tmp)
         shutil.copytree(site, bundle / "site")
+        if channel:
+            labels = {
+                "en": "Testing CPS — experimental firmware and programming tools.",
+                "es": "CPS de pruebas — firmware y herramientas de programación experimentales.",
+                "it": "CPS di test — firmware e strumenti di programmazione sperimentali.",
+            }
+            for page in (bundle / "site").rglob("*.html"):
+                text = page.read_text(encoding="utf-8")
+                if 'id="testing-cps-banner"' in text:
+                    continue
+                label = labels.get(page.relative_to(bundle / "site").parts[0], labels["en"])
+                banner = '<aside id="testing-cps-banner" style="padding:12px 20px;background:#713f12;color:#fff;text-align:center">' + html.escape(label) + '</aside>'
+                text = re.sub(r"(<body\b[^>]*>)", lambda m: m[1] + banner, text, count=1)
+                page.write_text(text, encoding="utf-8")
         (bundle / "site/deployment.json").write_text(json.dumps({
             "_license": "SPDX-License-Identifier: MIT",
             "_copyright": "Copyright (c) 2026 Garrett Dothard",
             "version": version, "git": manifest["git_full"], "product": product["name"],
+            **({"channel": channel, "site_git": manifest["git_full"], "public_url": public_url} if channel else {}),
         }) + "\n", encoding="utf-8")
         for name in ("serve.py", "compose.yaml"):
             shutil.copyfile(ROOT / "tools/website" / name, bundle / name)
@@ -66,5 +86,7 @@ if __name__ == "__main__":
     ap.add_argument("--product", type=Path, required=True)
     ap.add_argument("--version", required=True)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--channel", choices=["Testing"])
+    ap.add_argument("--public-url")
     args = ap.parse_args()
-    package(args.site, args.product, args.version, args.out)
+    package(args.site, args.product, args.version, args.out, channel=args.channel, public_url=args.public_url)

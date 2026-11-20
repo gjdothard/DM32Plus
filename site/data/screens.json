@@ -928,8 +928,68 @@
     "UI_CARD_MENU",
     "UI_SETTINGS"
    ]
+  },
+  "home_p25": {
+   "group": "home",
+   "needs": [
+    "P25"
+   ]
+  },
+  "home_p25_trunk": {
+   "group": "home",
+   "needs": [
+    "P25_TRUNK"
+   ]
+  },
+  "p25_decode": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_favorites": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_hold": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_listen": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_recent": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_selected": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_system": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_talkgroups": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
   }
  },
  "_copyright": "Copyright (c) 2026 Garrett Dothard",
- "_license": "SPDX-License-Identifier: MIT"
+ "_license": "MIT"
 }
