@@ -217,6 +217,8 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "home_dual_on_b", "quick 7 ctx 3 5 ok wait:3000 tune:b call:3101234,91,g tune:a call:3107777,3100,g wait:4000 ctx 1 wait:3000" },
 	{ "home_dual_tx", "quick 7 ctx 3 5 ok wait:3000 pttdown" },
 	{ "home_dual_vfo", "quick 7 ctx 1 vfokey ctx 1 wait:3000" },
+	{ "home_dual_vfo_entry", "quick:dual ctx 1 vfokey wait:3000 4 4 6" },
+	{ "dual_p25_refused", "p25-home dualkey" },
 	// A name that needs row 1 whole beside the PTT pill: the pill moves to row 3 where there is one
 	{ "home_dual_pill_row3", "quick 7 ctx 1 wait:3000" },
 	{ "home_dual_other_zone", "quick 7 ctx 1 zone+ ctx 1 wait:3000 tune:b fmrx" },
@@ -653,6 +655,8 @@ static bool gallery_shot(size_t i, int c, const sim_geom_t *g, char *name, size_
 			{ "home_dual_busy", "quick:dual ctx 3 5 ok wait:3000 tune:b call:3101234,91,g busy:a" },
 			{ "home_dual_tx", "quick:dual ctx 3 5 ok wait:3000 pttdown" },
 			{ "home_dual_vfo", "quick:dual ctx 1 vfokey ctx 1 wait:3000" },
+			{ "home_dual_vfo_entry", "quick:dual ctx 1 vfokey wait:3000 4 4 6" },
+			{ "dual_p25_refused", "p25-home dualkey" },
 			{ "home_dual_pill_row3", "quick:dual ctx 1 wait:3000" },
 			{ "home_dual_other_zone", "quick:dual ctx 1 zone+ ctx 1 wait:3000 tune:b fmrx" },
 			{ "home_dual_two_rx", "receivers:2 quick:dual ctx 3 5 ok wait:3000 rxa:3101234,3100,g rxb:3107777,91,g wait:1000" },

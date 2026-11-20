@@ -862,6 +862,7 @@ static void entry_digit(char d)
 	if (!ui_freq_entry_digit(ui_st.entry_digits, &ui_st.entry_len, d))
 		return;
 	ui_st.entry = true;
+	ui_st.toast = NULL;
 	dirty = true;
 }
 

@@ -219,7 +219,7 @@ static void __attribute__((noinline)) home_card(const radio_view_t *v, const ui_
 	ui_draw_card_begin(s, NULL);
 	home_card_body(v, s);
 	ui_draw_card_footer(s, TR("* P25"), TR("# Recent"));
-	if (s->locked || v->state == RS_TX_DENIED) ui_draw_bottom(s, TR("OK Menu  # Recent"));
+	if (s->toast || s->locked || v->state == RS_TX_DENIED) ui_draw_bottom(s, TR("OK Menu  # Recent"));
 }
 #endif
 

@@ -55,9 +55,40 @@ static void setup(bool rx_only)
 	key_calls = 0;
 }
 
+// Both the UI's queued pair and the debug link's older scan command reject either P25 pane.
+static void dual_refusals(void)
+{
+	zone_t zone = { .name = "Mixed", .count = 3, .channels = {10, 11, 12} };
+	CHECK(codeplug_set_zone(0, &zone));
+	request(RREQ_RELOAD, 0);
+	step(30);
+	radio_dual_ref_t pair[2] = { {false, 0, 0}, {false, 0, 1} };
+	radio_req_t req = { .type = RREQ_DUAL, .arg = (int32_t)radio_dual_arg(&pair[0], true),
+		.arg2 = (int32_t)radio_dual_arg(&pair[1], false) };
+	radio_sm_request(&sm, &req, hal_millis());
+	CHECK(sm.view.scan == 0 && sm.view.channel_number == 10);
+	request(RREQ_CH_STEP, 1);
+	pair[0].pos = 1; pair[1].pos = 0;
+	req.arg = (int32_t)radio_dual_arg(&pair[0], true);
+	req.arg2 = (int32_t)radio_dual_arg(&pair[1], false);
+	radio_sm_request(&sm, &req, hal_millis());
+	CHECK(sm.view.scan == 0 && sm.view.channel_number == 11);
+	radio_req_t legacy = { .type = RREQ_SCAN, .arg = RSCAN_DUAL, .arg2 = 0 };
+	radio_sm_request(&sm, &legacy, hal_millis());
+	CHECK(sm.view.scan == 0);
+	pair[1].pos = 2;
+	req.arg2 = (int32_t)radio_dual_arg(&pair[1], false);
+	radio_sm_request(&sm, &req, hal_millis());
+	CHECK(sm.view.scan == 3);
+	request(RREQ_CH_STEP, -1);
+	CHECK(sm.view.scan == 0 && sm.view.channel_number == 10 && sm.view.ch.mode == RADIO_MODE_P25);
+}
+
 #ifndef P25_TRUNK_STATE_TEST
 int main(void)
 {
+	setup(true);
+	dual_refusals();
 	setup(true);
 	CHECK(sm.view.channel_number == 10 && sm.view.ch.mode == RADIO_MODE_P25 && sm.view.p25_active);
 	CHECK(!sm.dmr_running && physical_mode == RADIO_MODE_DMR && loaned);

@@ -1,10 +1,37 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Garrett Dothard
 """Passive P25 visibility and reversible monitoring controls."""
+import time
+
 import pytest
 
 from rfoundry_hil import skip
 from rfoundry_debug import DOWN
+
+
+@pytest.mark.feature("dual_watch")
+def test_p25_dual_watch_refused(radio):
+    """A stored P25 channel cannot join a debug-link dual-watch pair; no RF or codeplug write."""
+    initial = radio.link.view(["core", "features", "p25"])
+    if initial.get("mode") != "p25":
+        skip("state", "select a stored P25 channel before checking dual-watch admission")
+    if not int(initial.get("p25.flags", "0")) & 16:
+        skip("state", "use an effectively receive-only P25 channel for the passive admission check")
+    if initial.get("dual.built") != "1":
+        skip("not_built", "dual watch is disabled")
+    count = int(initial.get("zone_size", "0"))
+    if count < 2 or initial.get("scan") != "off":
+        skip("state", "use a zone with at least two channels and stop scanning first")
+    other = (int(initial["zone_pos"]) + 1) % count
+    try:
+        radio.link.scan("dual", other)
+        time.sleep(0.3)  # Allow the queued request to run before checking that it stayed off.
+        current = radio.link.view(["core", "features"])
+        assert current["scan"] == "off"
+        assert current["channel_number"] == initial["channel_number"]
+        assert current["last_tx_ms"] == initial["last_tx_ms"]
+    finally:
+        radio.link.scan("cancel")
 
 
 @pytest.mark.feature("p25_ui")

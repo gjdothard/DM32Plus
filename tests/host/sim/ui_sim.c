@@ -52,6 +52,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ui_sim.h"
+#include "codeplug/codeplug_tag.h"
 #include "ui/ui_p25.h"
 // The board is changed at run time here (display, key map): this file defines it writable, the UI sees it const
 #define board board_as_declared
@@ -587,6 +588,8 @@ uint16_t codeplug_channel_count(void)
 			top = sim_edits[i].number;
 	return top;
 }
+
+bool codeplug_radio_channel(uint16_t number, channel_t *out) { return codeplug_channel(number, out); }
 
 bool codeplug_channel(uint16_t number, channel_t *out)
 {
@@ -1732,7 +1735,9 @@ bool ui_svc_dual(const ui_dual_ref_t ref[2], uint8_t sel)
 	for (int i = 0; i < 2; i++) {
 		if (!ref[i].vfo) {
 			zone_t z;
-			if (!codeplug_zone(ref[i].zone, &z) || ref[i].pos >= z.count)
+			channel_t ch;
+			if (!codeplug_zone(ref[i].zone, &z) || ref[i].pos >= z.count ||
+			    !codeplug_radio_channel(z.channels[ref[i].pos], &ch) || ch.kind != CODEPLUG_KIND_NONE)
 				return false;
 		}
 		if (!sim_same(&sim_dual[i], &ref[i]))
@@ -2470,6 +2475,10 @@ static bool check(const char *kv, char *err, size_t len)
 	else if (strcmp(key, "vfo") == 0) snprintf(got, sizeof got, "%u", view.vfo);
 	else if (strcmp(key, "freq") == 0) snprintf(got, sizeof got, "%u", (unsigned)view.ch.rx_hz);
 	else if (strcmp(key, "txfreq") == 0) snprintf(got, sizeof got, "%u", (unsigned)view.ch.tx_hz);
+	else if (strcmp(key, "homecard") == 0) snprintf(got, sizeof got, "%u", gfx_get_pixel(3, 58) == UI_CARD_SELECTED ||
+		gfx_get_pixel(3, 58) == UI_CARD_SURFACE);
+	else if (strcmp(key, "entrycard") == 0) snprintf(got, sizeof got, "%u", gfx_get_pixel(8,
+		ui_st.dual.on && ui_st.dual.sel ? 167 : 99) == ui_col.warn);
 	else if (strcmp(key, "mode") == 0) snprintf(got, sizeof got, "%s", view.ch.mode == RADIO_MODE_P25 ? "p25" : view.ch.mode == RADIO_MODE_DMR ? "dmr" : "fm");
 #if CONFIG_P25_UI
 	else if (strcmp(key, "p25hold") == 0) snprintf(got, sizeof got, "%u", p25_monitor.held_tg);
@@ -2708,13 +2717,28 @@ static bool run_token(char *t, char *err, size_t len)
 		return true;
 	}
 #endif
+	if (strcmp(t, "p25-channel") == 0 && arg != NULL) {
+		channel_t ch;
+		uint16_t number = (uint16_t)atoi(arg);
+		if (!codeplug_channel(number, &ch)) return false;
+		ch.kind = strstr(arg, ",trunk") ? CODEPLUG_KIND_P25_TRUNK : CODEPLUG_KIND_P25;
+		ch.mode = RADIO_MODE_P25;
+		if (!ui_svc_write_channel(number, &ch)) return false;
+		sim_rec.codeplug_writes--;
+		sim_cp_serial++;
+		return true;
+	}
 	if (strcmp(t, "p25-home") == 0 || strcmp(t, "p25-trunk-home") == 0) {
 		view.ch.mode = RADIO_MODE_P25;
+		view.ch.kind = strcmp(t, "p25-home") == 0 ? CODEPLUG_KIND_P25 : CODEPLUG_KIND_P25_TRUNK;
 		view.ch.bw = RADIO_BW_12K5;
 		strcpy(view.ch.name, strcmp(t, "p25-home") == 0 ? "P25 Ops" : "Charleston NSA");
 		if (strcmp(t, "p25-trunk-home") == 0)
 			view.ch.rx_hz = 773656250;
 		view.ch.rx_only = true;
+		if (!ui_svc_write_channel(view.channel_number, &view.ch)) return false;
+		sim_rec.codeplug_writes--;
+		view.scan = 0;
 #if CONFIG_P25_UI
 		memset(&p25_monitor, 0, sizeof p25_monitor);
 		p25_monitor.channel = view.channel_number;

@@ -875,6 +875,15 @@ static void draw_talk_dmr(const radio_view_t *v);
 static void draw_chips_dmr(const radio_view_t *v, const ui_state_t *s);
 #endif
 
+static void entry_text(sbuf_t *b, const ui_state_t *s, bool full)
+{
+	int show = full ? UI_ENTRY_MAX : s->entry_len > UI_ENTRY_MHZ + 3 ? s->entry_len : UI_ENTRY_MHZ + 3;
+	for (int i = 0; i < show; i++) {
+		if (i == UI_ENTRY_MHZ) sb_chr(b, '.');
+		sb_chr(b, i < s->entry_len ? s->entry_digits[i] : '_');
+	}
+}
+
 static void draw_place(const radio_view_t *v, const ui_state_t *s)
 {
 	const ui_layout_t *L = &ui_layout;
@@ -930,13 +939,7 @@ static void draw_place(const radio_view_t *v, const ui_state_t *s)
 		bool tx = v->state == RS_TX && v->vfo;
 		sb_init(&b, buf, sizeof buf);
 		if (s->entry) {
-			int dec = s->entry_len > UI_ENTRY_MHZ ? s->entry_len - UI_ENTRY_MHZ : 0;
-			int show = dec < 3 ? 3 : dec;
-			for (int i = 0; i < UI_ENTRY_MHZ + show; i++) {
-				if (i == UI_ENTRY_MHZ)
-					sb_chr(&b, '.');
-				sb_chr(&b, i < s->entry_len ? s->entry_digits[i] : '_');
-			}
+			entry_text(&b, s, false);
 		} else {
 			sb_freq(&b, tx ? v->ch.tx_hz : v->ch.rx_hz);
 		}
@@ -1721,8 +1724,10 @@ static void draw_home_large(const radio_view_t *v, const ui_state_t *s)
 	char form[48];
 	sb_init(&b, buf, sizeof buf);
 	bool tx = v->state == RS_TX && v->vfo;
-	if (v->vfo)
-		sb_freq(&b, tx ? v->ch.tx_hz : v->ch.rx_hz);
+	if (v->vfo) {
+		if (s->entry && !tx) entry_text(&b, s, false);
+		else sb_freq(&b, tx ? v->ch.tx_hz : v->ch.rx_hz);
+	}
 	else
 		sb_str(&b, v->ch.name);
 	const font_t *f = large_font(buf, room, form, sizeof form);
@@ -1759,7 +1764,7 @@ bool ui_card_layout(const ui_state_t *s)
 {
 	return CONFIG_DUAL_WATCH && CONFIG_UI_COLOR && board.home_brand && gfx_bpp() != 1 &&
 	       gfx_width() >= 220 && gfx_height() >= 300 &&
-	       ui_theme == 0 && !s->large_text && !s->entry;
+	       ui_theme == 0 && !s->large_text;
 }
 
 #if CONFIG_DUAL_WATCH
@@ -2012,12 +2017,17 @@ static void dual_pane(const radio_view_t *v, const ui_state_t *s, int i, int y, 
 			mf->w / 2;
 	}
 	dual_name(p, buf, sizeof buf);
+	bool editing = sel && p->vfo && s->entry && !tx;
+	if (editing) {
+		sb_init(&b, buf, sizeof buf);
+		entry_text(&b, s, false);
+	}
 	if (tx && p->vfo) {	// the VFO transmitting: its TX frequency (the view's channel is the selected pane's)
 		sb_init(&b, buf, sizeof buf);
 		sb_freq(&b, v->ch.tx_hz);
 	}
 	gfx_text_fit(f, buf, rx_end - x, fit, sizeof fit);
-	x = gfx_text(f, x, base - f->ascent, fit, tx && p->vfo ? ui_col.tx : rx ? ui_col.rx : fg);
+	x = gfx_text(f, x, base - f->ascent, fit, editing ? ui_col.warn : tx && p->vfo ? ui_col.tx : rx ? ui_col.rx : fg);
 	if (p->vfo && x + sm->w / 2 + gfx_text_width(sm, "MHz") <= rx_end) {
 		gfx_text(sm, x + sm->w / 2, base - sm->ascent, "MHz", ui_col.dim);
 		x += sm->w / 2 + gfx_text_width(sm, "MHz");
@@ -2161,9 +2171,10 @@ static void dual_large(const radio_view_t *v, const ui_state_t *s)
 		sbuf_t b;
 		sb_init(&b, buf, sizeof buf);
 		sb_str(&b, i ? "B " : "A ");
-		if (p->vfo)
-			sb_freq(&b, p->rx_hz);
-		else
+		if (p->vfo) {
+			if (s->entry && d->sel == i) entry_text(&b, s, false);
+			else sb_freq(&b, p->rx_hz);
+		} else
 			sb_str(&b, p->name);
 		const font_t *f = large_font(buf, room, form, sizeof form);
 		bool tx = v->state == RS_TX && d->sel == i, rx = !tx && p->rx;
@@ -2256,6 +2267,7 @@ static void dual_activity(const radio_view_t *v, const ui_state_t *s, int y, int
 
 static const char *dual_hint(const radio_view_t *v, const ui_state_t *s)
 {
+	if (s->entry) return home_hint(v, s);
 	const ui_dual_t *d = &s->dual;
 	if (v->state == RS_TX_DENIED)
 		return deny_action(v);
@@ -2360,12 +2372,14 @@ int ui_draw_card_begin(const ui_state_t *s, const char *title)
 	return 30;
 }
 
-static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool tx, bool denied, bool dual)
+static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool tx, bool denied, bool dual,
+		      const ui_state_t *s)
 {
 	const font_t *sm = ui_layout.small;
 	const font_t *meta = dual ? &font_6x12 : sm;
 	int w = gfx_width(), h = selected ? 92 : 60;
 	bool dmr = p->mode == RADIO_MODE_DMR;
+	bool editing = p->vfo && selected && s->entry && !tx;
 	color_t state = denied || tx ? ui_col.tx : p->rx ? ui_col.rx : ui_col.idle;
 	color_t edge = dual && selected ? ui_col.focus :
 		denied || tx || p->rx ? state : selected ? ui_col.focus : CARD_EDGE;
@@ -2410,7 +2424,11 @@ static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool
 		gfx_text(sm, 8, row + sm->h, p->name, ui_col.dim);
 	sb_init(&b, line, sizeof line);
 	if (p->vfo) {
-		sb_freq(&b, p->rx_hz);
+		if (editing) {
+			entry_text(&b, s, false);
+		} else {
+			sb_freq(&b, p->rx_hz);
+		}
 		primary = line;
 	} else if (named && named[1]) {
 		sb_str(&b, "TG ");
@@ -2427,7 +2445,11 @@ static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool
 	if (f->h > detail_y - title_y || gfx_text_width(f, primary) > w - 16)
 		f = sm;
 	gfx_text_fit(f, primary, w - 16, fit, sizeof fit);
-	gfx_text(f, 8, title_y, fit, ui_col.fg);
+	if (editing) {
+		gfx_round_fill(4, title_y - 2, w - 8, f->h + 4, ui_col.warn);
+		gfx_round_fill(5, title_y - 1, w - 10, f->h + 2, CARD_SELECTED);
+	}
+	gfx_text(f, 8, title_y, fit, editing ? ui_col.warn : ui_col.fg);
 
 	sb_init(&b, line, sizeof line);
 	if (dmr && !strncmp(p->target, "TG ", 3)) {
@@ -2465,6 +2487,11 @@ static void __attribute__((noinline)) card_single(const radio_view_t *v, const u
 	p->rx = v->state == RS_RX;
 	str_copy(p->name, sizeof p->name, v->ch.name);
 	sbuf_t b;
+	if (v->vfo && v->ch.tx_hz != v->ch.rx_hz) {
+		sb_init(&b, p->name, sizeof p->name);
+		sb_str(&b, v->state == RS_TX ? "RX " : "TX ");
+		sb_freq(&b, v->state == RS_TX ? v->ch.rx_hz : v->ch.tx_hz);
+	}
 	sb_init(&b, p->detail, sizeof p->detail);
 	if (p->mode == RADIO_MODE_P25 || p->mode == RADIO_MODE_NONE) {
 		sb_str(&b, mode_label(p->mode));
@@ -2488,7 +2515,7 @@ static void __attribute__((noinline)) card_single(const radio_view_t *v, const u
 	{
 		sb_tone(&b, &v->ch.tx_tone);
 	}
-	card_pane(p, 0, 55, true, v->state == RS_TX, v->state == RS_TX_DENIED, false);
+	card_pane(p, 0, 55, true, v->state == RS_TX, v->state == RS_TX_DENIED, false, s);
 }
 
 static void draw_card_home(const radio_view_t *v, const ui_state_t *s)
@@ -2501,8 +2528,8 @@ static void draw_card_home(const radio_view_t *v, const ui_state_t *s)
 	int recent = 155;
 	if (s->dual.on) {
 		bool a = s->dual.sel == 0;
-		card_pane(&s->dual.pane[0], 0, 55, a, a && v->state == RS_TX, a && v->state == RS_TX_DENIED, true);
-		card_pane(&s->dual.pane[1], 1, a ? 155 : 123, !a, !a && v->state == RS_TX, !a && v->state == RS_TX_DENIED, true);
+		card_pane(&s->dual.pane[0], 0, 55, a, a && v->state == RS_TX, a && v->state == RS_TX_DENIED, true, s);
+		card_pane(&s->dual.pane[1], 1, a ? 155 : 123, !a, !a && v->state == RS_TX, !a && v->state == RS_TX_DENIED, true, s);
 		gfx_hline(0, 221, width, CARD_EDGE);
 		recent = 225;
 	} else {
@@ -2529,8 +2556,8 @@ static void draw_card_home(const radio_view_t *v, const ui_state_t *s)
 	if (row == recent + sm->h && !heard)
 		gfx_text(sm, 0, row, TR("No calls heard yet"), ui_col.dim);
 	ui_draw_banner(s);
-	if (s->toast || s->locked || v->state == RS_TX_DENIED) {
-		ui_draw_bottom(s, s->dual.on ? dual_hint(v, s) : home_hint(v, s));
+	if (s->entry || v->vfo || s->toast || s->locked || v->state == RS_TX_DENIED) {
+		ui_draw_bottom(s, s->dual.on && !s->entry ? dual_hint(v, s) : home_hint(v, s));
 	} else if (s->hints) {
 		const font_t *keys = &font_6x12;
 		const char *quick = TR("* Quick"), *actions = TR("# Actions");
@@ -3324,11 +3351,7 @@ static const char *quick_split_hint(const radio_view_t *v, const ui_state_t *s, 
 	sbuf_t b;
 	sb_init(&b, buf, len);
 	sb_str(&b, "TX ");
-	for (uint8_t i = 0; i < UI_ENTRY_MAX; i++) {
-		if (i == UI_ENTRY_MHZ)
-			sb_chr(&b, '.');
-		sb_chr(&b, i < s->entry_len ? s->entry_digits[i] : '_');
-	}
+	entry_text(&b, s, true);
 	sb_str(&b, TR("  OK sets"));
 	return buf;
 }

@@ -21,6 +21,7 @@ or the VFO: dual watch is two frequencies, not the two timeslots of one DMR freq
 - Each channel keeps its changes for now (power, squelch, width, tones, timeslot, color code, talk target, hear all)
   while the receiver goes back and forth. A changed channel loses its changes when it is replaced or the watch stops.
 - **Only the user stops it** (section 5).
+- Selecting a P25 channel ends it. P25 cannot participate in either pane, including a restored watch.
 - A radio with one receiver (every radio today) alternates between A and B, so a call on one can be missed while it
   is on the other. Home doesn't say so: the mode in the strip implies it, and the user guide has the caveat. A radio
   with two receivers (`ui_svc_receivers()` > 1, `ui_svc_dual_rx(pane)`) hears both at once (section 3.1). No radio
@@ -28,7 +29,8 @@ or the VFO: dual watch is two frequencies, not the two timeslots of one DMR freq
   would be the first.
 - What the radio core does with the pair (any zone or the VFO, PTT, retunes) is in
   [radio-features.md 2.1](../spec/radio-features.md#21-dual-watch). The UI refuses only a channel the radio can't
-  read, or the same channel twice: "Can't watch that channel: pick another".
+  read, a tagged channel, or the same channel twice: "Can't watch that channel: pick another".
+  P25 conventional or trunked in either pane is refused with "Dual watch unavailable for P25".
 
 ## 2. Turning it on and off
 
@@ -133,7 +135,7 @@ Every screen in every class is in the gallery (`docs/ux/screens/*/home_dual*.png
 | Zone keys (Next / Previous zone, the DM-1701's P1 / P2; Up / Down set to Zone in Settings › Keys) | The selected channel goes to the next / previous zone, on its first channel that isn't the other one ("A zone: Simplex"). A zone with no such channel is passed over. From the VFO: the zone the radio was last on. The knob still steps the channel |
 | Home zone key | The selected channel goes to the first zone, the same way |
 | **Monitor** (held) | Opens the squelch on the selected channel: the receiver goes there and the watch waits while the key is held. On a DMR channel a press is digital monitor, as without dual watch |
-| **#** | Dual watch actions: **1** Talk on B (or A), **2** Change A, **3** Change B, **4** Caller (the last caller and how long ago; OK opens their actions; dim until a call was heard), **5** Stop, stay on A (or B). Change A and B open the picker |
+| **#** | Confirms VFO frequency entry while digits are being typed. Otherwise, Dual watch actions: **1** Talk on B (or A), **2** Change A, **3** Change B, **4** Caller (the last caller and how long ago; OK opens their actions; dim until a call was heard), **5** Stop, stay on A (or B). Change A and B open the picker |
 | **\*** | Quick settings of the selected channel |
 | **VFO** key | The selected channel becomes its own VFO ("A: VFO"); again, back to the channel it was ("Back to channels"). Each channel has its own VFO: with the other channel on one, this one gets the second |
 | Copy to VFO | The selected channel is copied into its own VFO, which becomes the selected channel. With the other channel on a VFO, the copy goes to the second; the other's frequency doesn't change |

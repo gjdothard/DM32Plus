@@ -16,6 +16,7 @@
 #include "radio/radio_bcast.h"
 #include "input/input.h"
 #include "settings/settings.h"
+#include "codeplug/codeplug_tag.h"
 #include <string.h>
 #include "config.h"
 #if CONFIG_P25_UI
@@ -271,7 +272,7 @@ bool ui_svc_dual(const ui_dual_ref_t ref[2], uint8_t sel)
 			if (!(CONFIG_VFO_FM || CONFIG_VFO_DMR))
 				return false;
 		} else if (r[i].pos >= CODEPLUG_ZONE_MAX || !codeplug_zone(r[i].zone, &z) || r[i].pos >= z.count ||
-			   !codeplug_channel(z.channels[r[i].pos], &ch)) {
+			   !codeplug_radio_channel(z.channels[r[i].pos], &ch) || ch.kind != CODEPLUG_KIND_NONE) {
 			return false;
 		}
 	}

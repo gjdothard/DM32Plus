@@ -164,6 +164,9 @@ static void test_follower_clock(void)
 }
 int main(void)
 {
+	setup(true);
+	system_config(true, false);
+	dual_refusals();
 	test_follower_clock();
 	// The shared DMR assignment bank feeds P25 receive groups, without changing TX permissions or target.
 	trunk_setup(true, false, false);
@@ -435,7 +438,8 @@ int main(void)
 	request(RREQ_PTT, 1); step(100);
 	CHECK(key_calls == passive_keys && !keyed && !on);
 	request(RREQ_PTT, 0); CHECK(radio_p25_end());
-	printf("radioP25TrunkStateTest: %u checks, %u failed; owner %zu bytes\n", checks, failures, sizeof(radio_p25_mem_t));
+	printf("radioP25TrunkStateTest: %u checks, %u failed; owner %lu bytes\n", checks, failures,
+	       (unsigned long)sizeof(radio_p25_mem_t));
 	sim_flash_free();
 	return failures != 0;
 }

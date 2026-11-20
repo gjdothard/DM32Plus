@@ -414,6 +414,13 @@ static const flow_t flows[] = {
 #endif
 	{ "12 into the VFO", "", "ok 4 up ok", "vfo=1 screen=home", 4, false },
 	{ "12 446.000 in the VFO", "ok 4 up ok", "4 4 6 0 0 0 ok", "freq=446000000", 7, false },
+	{ "VFO entry waits for confirmation", "vfokey", "4 4 6", "screen=home entry=446 freq=146520000", 3, false },
+	{ "VFO entry Back deletes", "vfokey 4 4 6", "back", "entry=44 freq=146520000", 1, false },
+	{ "VFO entry Back cancels the last digit", "vfokey 4", "back", "entry=none freq=146520000", 1, false },
+	{ "VFO entry timeout does not retune", "vfokey 4 4 6", "wait:11000", "entry=none freq=146520000", 0, false },
+	{ "Dual VFO typed digits are drawn on standard layouts", "quick:dual ctx 1 vfokey wait:3000", "4 4 6",
+	  "screen=home dual=1 entry=446 shows=446.", 3, false },
+	{ "VFO entry rejects an out of band prefix", "vfokey 4", "9", "entry=4 freq=146520000", 1, false },
 	{ "13 lock", "", "long:quick", "locked=1", 1, false },
 	{ "13 unlock", "long:quick", "long:quick", "locked=0", 1, false },
 	{ "14 GPS details", "", "ok 6 2", "screen=gps", 3, false },
@@ -1486,6 +1493,48 @@ int main(void)
 		"", "branded-home quick 3 ctx 3 2 ok wait:3000", "screen=home shows=IDLE shows=RECENT_ACTIVITY", 6, false,
 	};
 	run_flow(&card_dual, sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+	static const flow_t card_vfo[] = {
+		{ "VFO entry keeps its card and typed digits", "branded-home vfokey wait:3000", "4 4 6",
+		  "screen=home homecard=1 entrycard=1 entry=446 shows=446. shows=RECENT_ACTIVITY freq=146520000", 3, false },
+		{ "VFO card entry retains all decimal digits", "branded-home vfokey", "4 4 6 0 0 6 2 5",
+		  "screen=home entrycard=1 entry=44600625 shows=446.00625 freq=146520000", 8, false },
+		{ "VFO entry OK tunes and keeps Home", "branded-home vfokey 4 4 6", "ok",
+		  "screen=home homecard=1 entry=none freq=446000000", 1, false },
+		{ "DMR VFO entry keeps its card", "branded-home vfokey quick 4 back wait:3000", "4 4 6",
+		  "screen=home homecard=1 entrycard=1 entry=446 mode=dmr freq=146520000", 3, false },
+		{ "Split VFO card exposes its TX frequency", "branded-home vfokey quick 5 up ok back wait:3000", "",
+		  "homecard=1 shows=TX_147.120 freq=146520000 txfreq=147120000", 0, false },
+		{ "Dual VFO B entry keeps both cards", "branded-home quick:dual ctx 1 vfokey wait:3000", "4 4 6",
+		  "screen=home dual=1 sel=B homecard=1 entrycard=1 entry=446 shows=COUNTY_DMR", 3, false },
+		{ "Dual VFO B hash confirms instead of opening actions", "branded-home quick:dual ctx 1 vfokey 4 4 6", "ctx",
+		  "screen=home dual=1 sel=B entry=none freq=446000000", 1, false },
+		{ "Dual VFO B entry survives a receiver hop", "branded-home quick:dual ctx 1 vfokey 4 4 6", "tune:a ctx",
+		  "screen=home dual=1 sel=B entry=none freq=446000000", 1, false },
+		{ "Dual VFO A entry keeps both cards", "branded-home vfokey quick:dual wait:3000", "4 4 6",
+		  "screen=home dual=1 sel=A homecard=1 entrycard=1 entry=446", 3, false },
+	};
+	for (size_t i = 0; i < sizeof card_vfo / sizeof card_vfo[0]; i++)
+		run_flow(&card_vfo[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+	static const flow_t p25_dual[] = {
+		{ "P25 card displays the dual-watch refusal", "branded-home p25-home", "dualkey",
+		  "dual=0 scanning=0 shows=No_dual_watch_on_P25", 1, false },
+		{ "P25 conventional cannot start dual watch", "p25-home", "dualkey",
+		  "dual=0 scanning=0 toast=Dual_watch_unavailable_for_P25", 1, false },
+		{ "P25 trunked cannot start dual watch", "p25-trunk-home", "dualkey",
+		  "dual=0 scanning=0 toast=Dual_watch_unavailable_for_P25", 1, false },
+		{ "P25 cannot replace B in the picker", "quick:dual ctx 3 p25-channel:5", "5 ok",
+		  "dual=1 bpos=4 toast=Dual_watch_unavailable_for_P25", 2, false },
+		{ "P25 B edit stops an active watch", "quick:dual ctx 3 5 ok", "p25-channel:5,trunk wait:1000",
+		  "dual=0 scanning=0 toast=Dual_watch_unavailable_for_P25", 0, false },
+		{ "P25 A edit stops an active watch", "quick:dual", "p25-channel:3 wait:1000",
+		  "dual=0 scanning=0 toast=Dual_watch_unavailable_for_P25", 0, false },
+		{ "Saved P25 B cannot resume a watch", "quick:dual ctx 3 5 ok p25-channel:5,trunk", "reboot wait:1000",
+		  "dual=0 scanning=0", 0, false },
+		{ "P25 debug-link pair is refused", "p25-home", "dldual:5 wait:1000",
+		  "dual=0 scanning=0", 0, false },
+	};
+	for (size_t i = 0; i < sizeof p25_dual / sizeof p25_dual[0]; i++)
+		run_flow(&p25_dual[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "P25 dual watch");
 	static const flow_t card_quick[] = {
 		{ "Tall color DMR Quick Controls", "", "branded-home quick", "screen=quick shows=Quick_Controls shows=GPS", 1, false },
 		{ "Tall color FM Quick Controls", "", "branded-home down quick 4 up", "screen=quick sq=6 shows=Quick_Controls", 4, false },

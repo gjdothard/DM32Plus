@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 #
 # The radio's strings in Italiano (it; docs/dev/translating.md). Kept in step with the source by
 # tools/i18n.py --sync: translate the empty msgstr lines; an empty one shows the English.
@@ -819,6 +820,10 @@ msgstr "Ancora niente sentito"
 #: core/ui/ui_dual.c core/ui/ui_screens.c
 msgid "No tone"
 msgstr "Nessun tono"
+
+#: core/ui/ui_dual.c
+msgid "{Dual watch unavailable for P25|No dual watch on P25}"
+msgstr "{Dual watch non disponibile per P25|P25 senza dual watch}"
 
 #: core/ui/ui_dual.c
 msgid "{Can't watch that channel: pick another|Can't watch that channel}"
