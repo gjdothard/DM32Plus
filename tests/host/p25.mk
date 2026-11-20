@@ -82,9 +82,9 @@ p25StoredTestTrunk: p25StoredTest.c $(P25_STORE_CORE) $(P25_STORE_HEADERS) $(COR
 		$(CORE)/p25/p25_codeplug.c $(P25_STORE_CORE) sim/sim_flash.c
 
 codeplugKvTest: codeplugKvTest.c $(CORE)/codeplug/codeplug_kv.c $(CORE)/codeplug/codeplug_kv.h \
-	$(CORE)/codeplug/codeplug.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c sim/sim_flash.c sim/sim_flash.h
+	$(CORE)/codeplug/codeplug.c $(CORE)/codeplug/codeplug_tag.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c sim/sim_flash.c sim/sim_flash.h
 	$(CC) $(CFLAGS) $(P25_FLAGS) -o $@ codeplugKvTest.c $(CORE)/codeplug/codeplug_kv.c \
-		$(CORE)/codeplug/codeplug.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c sim/sim_flash.c
+		$(CORE)/codeplug/codeplug.c $(CORE)/codeplug/codeplug_tag.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c sim/sim_flash.c
 
 p25CodeplugTest: p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c $(P25_STORE_CORE) $(P25_STORE_HEADERS) \
 	sim/p25_link_sim.c $(CORE)/p25/p25_codeplug.h ../vectors/p25-codeplug.txt

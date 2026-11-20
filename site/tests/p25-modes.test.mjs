@@ -15,6 +15,45 @@ import { History } from "../static/js/editor/undo.js";
 import { CpsSerial, keepIdentity, writeRanges } from "../static/js/codeplug/transport.js";
 import { exportTable } from "../static/js/codeplug/csv.js";
 import { exportQdmr } from "../static/js/codeplug/qdmr.js";
+import { decodeSite, encodeSite } from "../static/js/codeplug/mode_p25.js";
+
+test("site name extension preserves legacy and future bodies", () => {
+	const legacy = Uint8Array.of(1, 3);
+	assert.deepEqual(decodeSite(legacy), { rfss: 1, site: 3, siteName: "" });
+	assert.deepEqual(encodeSite({ ...decodeSite(legacy), rfss: 2 }, legacy), Uint8Array.of(2, 3));
+	let body = encodeSite({ rfss: 1, site: 3, siteName: "North Tower" }, legacy);
+	assert.equal(body.length, 19); assert.equal(body[2], 1);
+	assert.equal(decodeSite(body).siteName, "North Tower");
+	const tail = Uint8Array.from([...body, 0x12, 0x34]);
+	body = encodeSite({ ...decodeSite(tail), siteName: "South" }, tail);
+	assert.deepEqual([...body.slice(19)], [0x12, 0x34]);
+	assert.equal(decodeSite(body).siteName, "South");
+	assert.equal(decodeSite(encodeSite({ ...decodeSite(body), siteName: "" }, body)).siteName, "");
+	for (const unknown of [Uint8Array.of(1, 3, 9, 0xAB, 0xCD), tail.slice(0, 10)]) {
+		assert.equal(decodeSite(unknown).siteName, "");
+		assert.deepEqual([...encodeSite({ ...decodeSite(unknown), rfss: 2 }, unknown).slice(2)], [...unknown.slice(2)]);
+		assert.deepEqual(encodeSite({ ...decodeSite(unknown), siteName: "New" }, unknown), unknown);
+	}
+});
+
+test("site names survive binary save, rename, undo and validation", () => {
+	let m = trunked();
+	m.systems[0].entries.push({ cls: 1, group: 0, rfss: 1, site: 3, siteName: "Caf\u00e9 Tower" });
+	m = decode(encode(m));
+	let site = m.systems[0].entries.find(e => e.cls === 1);
+	assert.equal(site.siteName, "Caf\u00e9 Tower");
+	const history = new History(); history.record(m);
+	m.systems[0].entries = m.systems[0].entries.map(e => e === site ? { ...e, siteName: "South Tower" } : e);
+	assert.equal(decode(encode(m)).systems[0].entries.find(e => e.cls === 1).siteName, "South Tower");
+	history.undo(m); site = m.systems[0].entries.find(e => e.cls === 1);
+	assert.equal(site.siteName, "Caf\u00e9 Tower");
+	for (const invalid of ["12345678901234567", "Bad\nName", "Tower \u2603"]) {
+		site.siteName = invalid;
+		assert.ok(validate(m).some(p => p.code === "p25_site_name" && p.level === "error"));
+	}
+	site.raw = Uint8Array.of(0, 1, 0, 0, 1, 3, 9, 0xAB); site.siteName = "New";
+	assert.ok(validate(m).some(p => p.code === "p25_site_name_version"));
+});
 
 test("P25 uses the DMR Talkgroups editor and preserves ordered shared assignments", () => {
 	for (const kind of [2, 3]) {
@@ -149,7 +188,7 @@ test("managed writes refuse oversized bundles before beginning and never retry t
 	await assert.rejects(tr.fastWrite(null, null, { progress() {} }), e => e === refusal);
 });
 
-test("CPS talks to the C firmware simulator using managed staged writes", { skip: !process.env.RFOUNDRY_CPS_SIM, timeout: 60000 }, async () => {
+test("P25 site writes require managed firmware and preserve names through staging", { skip: !process.env.RFOUNDRY_CPS_SIM, timeout: 60000 }, async () => {
 	const dir = mkdtempSync(join(tmpdir(), "p25-cps-"));
 	const p = spawn(process.env.RFOUNDRY_CPS_SIM, ["--features", "FM,DMR,CPS_FAST,P25,P25_TRUNK,DMR_TALKGROUP_POOL,IDDB_COMPACT", "--dump", join(dir, "synthetic.bin")], { stdio: ["pipe", "pipe", "inherit"] });
 	const stream = { buf: new Uint8Array(), clear() { this.buf = new Uint8Array(); },
@@ -159,12 +198,19 @@ test("CPS talks to the C firmware simulator using managed staged writes", { skip
 	const tr = new CpsSerial(stream);
 	try {
 		await tr.identify([{ id: "sim", codeplug: { base: 0, end: 0xE00000, names: ["sim"] } }]);
-		assert.equal(tr.fast.managed, true);
-		const have = await tr.read({ iddb: false }), want = encode(trunked());
+		if (process.env.RFOUNDRY_CPS_REQUIRE_MANAGED) assert.equal(tr.fast.managed, true);
+		const model = trunked();
+		model.systems[0].entries.push({ cls: 1, group: 0, rfss: 1, site: 3, siteName: "North Tower" });
+		const have = await tr.read({ iddb: false }), want = encode(model);
+		if (!tr.fast.managed) {
+			await assert.rejects(tr.write(want, have), { code: "modes_firmware" });
+			return;
+		}
 		const result = await tr.write(want, have); await tr.verify(want, result.plan);
 		const saved = decode(await tr.read({ iddb: false }));
 		assert.equal(saved.channels[0].kind, 3); assert.equal(saved.channels[0].tagTx, false);
 		assert.equal(saved.systems[0].tx, false); assert.equal(saved.systems[0].fields.sysid, 0x123);
+		assert.equal(saved.systems[0].entries.find(e => e.cls === 1).siteName, "North Tower");
 	} finally {
 		const done = new Promise(resolve => p.once("close", resolve)); p.stdin.end(); await done;
 		rmSync(dir, { recursive: true, force: true });

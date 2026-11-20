@@ -52,6 +52,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ui_sim.h"
+#include "codeplug/codeplug_tag.h"
 #include "ui/ui_p25.h"
 // The board is changed at run time here (display, key map): this file defines it writable, the UI sees it const
 #define board board_as_declared
@@ -588,6 +589,8 @@ uint16_t codeplug_channel_count(void)
 	return top;
 }
 
+bool codeplug_radio_channel(uint16_t number, channel_t *out) { return codeplug_channel(number, out); }
+
 bool codeplug_channel(uint16_t number, channel_t *out)
 {
 	const channel_t *e = sim_edit(number);
@@ -957,6 +960,18 @@ static radio_view_t view;
 static uint32_t serial;
 #if CONFIG_P25_UI
 static p25_monitor_t p25_monitor;
+#if CONFIG_P25_TRUNK
+static uint8_t p25_site_fixture;
+uint8_t ui_svc_p25_site(const p25_monitor_t *m, char *out, size_t cap)
+{
+	if (cap) out[0] = '\0';
+	if (!p25_site_fixture) return P25_SITE_UNKNOWN;
+	if (p25_site_fixture == 4) return P25_SITE_MISMATCH;
+	if (p25_site_fixture == 5) return P25_SITE_UNAVAILABLE;
+	if (p25_site_fixture != 3 && cap) snprintf(out, cap, "%s", p25_site_fixture == 6 ? "North Tower West" : "North Tower");
+	return m->state >= 2 ? P25_SITE_CONFIRMED : P25_SITE_CANDIDATE;
+}
+#endif
 bool ui_svc_p25_view(p25_monitor_t *out) { *out = p25_monitor; return (out->flags & P25_MON_ACTIVE) != 0; }
 bool ui_svc_p25_command(uint16_t channel, uint8_t op, uint16_t tg)
 {
@@ -1732,7 +1747,9 @@ bool ui_svc_dual(const ui_dual_ref_t ref[2], uint8_t sel)
 	for (int i = 0; i < 2; i++) {
 		if (!ref[i].vfo) {
 			zone_t z;
-			if (!codeplug_zone(ref[i].zone, &z) || ref[i].pos >= z.count)
+			channel_t ch;
+			if (!codeplug_zone(ref[i].zone, &z) || ref[i].pos >= z.count ||
+			    !codeplug_radio_channel(z.channels[ref[i].pos], &ch) || ch.kind != CODEPLUG_KIND_NONE)
 				return false;
 		}
 		if (!sim_same(&sim_dual[i], &ref[i]))
@@ -2223,6 +2240,9 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	memset(&view, 0, sizeof view);
 #if CONFIG_P25_UI
 	memset(&p25_monitor, 0, sizeof p25_monitor);
+#if CONFIG_P25_TRUNK
+	p25_site_fixture = 0;
+#endif
 #endif
 	memset(&sim_rec, 0, sizeof sim_rec);
 	vfo_mode = RADIO_MODE_FM;	// a fresh VFO
@@ -2470,6 +2490,10 @@ static bool check(const char *kv, char *err, size_t len)
 	else if (strcmp(key, "vfo") == 0) snprintf(got, sizeof got, "%u", view.vfo);
 	else if (strcmp(key, "freq") == 0) snprintf(got, sizeof got, "%u", (unsigned)view.ch.rx_hz);
 	else if (strcmp(key, "txfreq") == 0) snprintf(got, sizeof got, "%u", (unsigned)view.ch.tx_hz);
+	else if (strcmp(key, "homecard") == 0) snprintf(got, sizeof got, "%u", gfx_get_pixel(3, 58) == UI_CARD_SELECTED ||
+		gfx_get_pixel(3, 58) == UI_CARD_SURFACE);
+	else if (strcmp(key, "entrycard") == 0) snprintf(got, sizeof got, "%u", gfx_get_pixel(8,
+		ui_st.dual.on && ui_st.dual.sel ? 167 : 99) == ui_col.warn);
 	else if (strcmp(key, "mode") == 0) snprintf(got, sizeof got, "%s", view.ch.mode == RADIO_MODE_P25 ? "p25" : view.ch.mode == RADIO_MODE_DMR ? "dmr" : "fm");
 #if CONFIG_P25_UI
 	else if (strcmp(key, "p25hold") == 0) snprintf(got, sizeof got, "%u", p25_monitor.held_tg);
@@ -2708,13 +2732,44 @@ static bool run_token(char *t, char *err, size_t len)
 		return true;
 	}
 #endif
+	if (strcmp(t, "p25-channel") == 0 && arg != NULL) {
+		channel_t ch;
+		uint16_t number = (uint16_t)atoi(arg);
+		if (!codeplug_channel(number, &ch)) return false;
+		ch.kind = strstr(arg, ",trunk") ? CODEPLUG_KIND_P25_TRUNK : CODEPLUG_KIND_P25;
+		ch.mode = RADIO_MODE_P25;
+		if (!ui_svc_write_channel(number, &ch)) return false;
+		sim_rec.codeplug_writes--;
+		sim_cp_serial++;
+		return true;
+	}
+#if CONFIG_P25_UI && CONFIG_P25_TRUNK
+	if (strcmp(t, "p25-site") == 0 && arg) {
+		const char *state = arg;
+		p25_site_fixture = !strcmp(state, "unknown") ? 3 : !strcmp(state, "mismatch") ? 4 :
+			!strcmp(state, "reload") ? 5 : !strcmp(state, "long") ? 6 : 1;
+		p25_monitor.rfss = 1; p25_monitor.site = 3;
+		p25_monitor.state = !strcmp(state, "hunt") ? 1 : !strcmp(state, "voice") ? 3 : 2;
+		if (p25_monitor.state != 3) {
+			p25_monitor.flags &= (uint8_t)~P25_MON_RX;
+			p25_monitor.tuned_hz = p25_monitor.cc_hz;
+			view.state = RS_IDLE; view.p25_rx = false;
+		}
+		if (p25_monitor.state == 1) p25_monitor.rfss = p25_monitor.site = 0xFF;
+		serial++; advance(200); return true;
+	}
+#endif
 	if (strcmp(t, "p25-home") == 0 || strcmp(t, "p25-trunk-home") == 0) {
 		view.ch.mode = RADIO_MODE_P25;
+		view.ch.kind = strcmp(t, "p25-home") == 0 ? CODEPLUG_KIND_P25 : CODEPLUG_KIND_P25_TRUNK;
 		view.ch.bw = RADIO_BW_12K5;
 		strcpy(view.ch.name, strcmp(t, "p25-home") == 0 ? "P25 Ops" : "Charleston NSA");
 		if (strcmp(t, "p25-trunk-home") == 0)
 			view.ch.rx_hz = 773656250;
 		view.ch.rx_only = true;
+		if (!ui_svc_write_channel(view.channel_number, &view.ch)) return false;
+		sim_rec.codeplug_writes--;
+		view.scan = 0;
 #if CONFIG_P25_UI
 		memset(&p25_monitor, 0, sizeof p25_monitor);
 		p25_monitor.channel = view.channel_number;

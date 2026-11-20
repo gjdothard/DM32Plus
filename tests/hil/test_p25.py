@@ -1,10 +1,56 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Garrett Dothard
 """Passive P25 visibility and reversible monitoring controls."""
+import time
+
 import pytest
 
 from rfoundry_hil import skip
 from rfoundry_debug import DOWN
+
+
+@pytest.mark.feature("p25_ui")
+def test_p25_site_name_visibility(radio):
+    """Read the serving-site presentation without changing channels or transmitting."""
+    view = radio.link.view(["core", "p25"])
+    if "p25.site_state" not in view:
+        skip("not_built", "P25 trunked site-name visibility is unavailable")
+    if view.get("mode") != "p25" or not int(view.get("p25.flags", "0")) & 2:
+        skip("state", "select a P25 trunked channel before checking site names")
+    state = int(view["p25.site_state"])
+    name = view["p25.site_name"]
+    assert state in range(5), view
+    assert len(name) <= 16, view
+    assert all(32 <= ord(c) <= 126 or 160 <= ord(c) <= 254 for c in name), view
+    if state in (0, 3, 4):
+        assert name == "", view
+    if state == 2:
+        assert int(view["p25.rfss"]) < 255 and int(view["p25.site"]) < 255, view
+
+
+@pytest.mark.feature("dual_watch")
+def test_p25_dual_watch_refused(radio):
+    """A stored P25 channel cannot join a debug-link dual-watch pair; no RF or codeplug write."""
+    initial = radio.link.view(["core", "features", "p25"])
+    if initial.get("mode") != "p25":
+        skip("state", "select a stored P25 channel before checking dual-watch admission")
+    if not int(initial.get("p25.flags", "0")) & 16:
+        skip("state", "use an effectively receive-only P25 channel for the passive admission check")
+    if initial.get("dual.built") != "1":
+        skip("not_built", "dual watch is disabled")
+    count = int(initial.get("zone_size", "0"))
+    if count < 2 or initial.get("scan") != "off":
+        skip("state", "use a zone with at least two channels and stop scanning first")
+    other = (int(initial["zone_pos"]) + 1) % count
+    try:
+        radio.link.scan("dual", other)
+        time.sleep(0.3)  # Allow the queued request to run before checking that it stayed off.
+        current = radio.link.view(["core", "features"])
+        assert current["scan"] == "off"
+        assert current["channel_number"] == initial["channel_number"]
+        assert current["last_tx_ms"] == initial["last_tx_ms"]
+    finally:
+        radio.link.scan("cancel")
 
 
 @pytest.mark.feature("p25_ui")

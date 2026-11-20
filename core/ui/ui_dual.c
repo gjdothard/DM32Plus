@@ -20,6 +20,7 @@
 #include "i18n.h"
 #include "board.h"
 #include "codeplug/codeplug.h"
+#include "codeplug/codeplug_tag.h"
 
 #define START_GRACE_MS	500	// the radio view may still show no watch this soon after asking for one
 #define BACK_AGAIN_MS	2000	// Back on Home, then Back again within this: the watch stops
@@ -72,6 +73,11 @@ typedef struct {
 } snap_t;
 static snap_t snap[2];
 static bool refill[2];		// snap[i] changed what pane i shows
+
+// Admission and default-channel search run serially on the UI task. Share their scratch instead of reserving
+// another zone and channel for a check; neither caller retains them across the other.
+static zone_t watch_zone;
+static channel_t watch_ch;
 
 static ui_dual_t *dual(void) { return &ui_st.dual; }
 
@@ -425,9 +431,30 @@ const radio_view_t *ui_dual_view(const radio_view_t *v)
 	return &mixed;
 }
 
+// Read logical channels: the legacy base of a P25 channel looks like DMR.
+static bool pair_p25(void)
+{
+	for (uint8_t i = 0; i < 2; i++) {
+		if (!ref[i].vfo && ref[i].pos < CODEPLUG_ZONE_MAX && codeplug_zone(ref[i].zone, &watch_zone) &&
+		    ref[i].pos < watch_zone.count && codeplug_radio_channel(watch_zone.channels[ref[i].pos], &watch_ch) &&
+		    (watch_ch.kind == CODEPLUG_KIND_P25 || watch_ch.kind == CODEPLUG_KIND_P25_TRUNK || watch_ch.mode == RADIO_MODE_P25))
+			return true;
+	}
+	return false;
+}
+
+static void p25_unavailable(void)
+{
+	ui_toast(TR(TEXT_ALT_OPEN "Dual watch unavailable for P25" TEXT_ALT_NEXT "No dual watch on P25" TEXT_ALT_CLOSE));
+}
+
 // Ask the radio for the watch as ref[] and sel say; false (and a toast saying what to do) when it can't
 static bool apply(uint8_t sel)
 {
+	if (pair_p25()) {
+		p25_unavailable();
+		return false;
+	}
 	if (!ui_svc_dual(ref, sel)) {
 		ui_toast(TR(TEXT_ALT_OPEN "Can't watch that channel: pick another"
 			    TEXT_ALT_NEXT "Can't watch that channel" TEXT_ALT_CLOSE));
@@ -460,18 +487,17 @@ static void watch_on(ui_dual_t *d)
 // B with no last B to use: the next channel of a's zone, else the first one of a later zone, else the VFO. False: none
 static bool b_default(const ui_dual_ref_t *a, ui_dual_ref_t *out)
 {
-	static zone_t z;	// static: not on the UI task's stack
-	static channel_t ch;
 	uint16_t n = codeplug_zone_count();
 	uint16_t first = a->vfo ? ui_view()->zone_index : a->zone;
 	for (uint16_t k = 0; k < n; k++) {
 		uint16_t zi = (uint16_t)((first + k) % n);
-		if (!codeplug_zone(zi, &z) || z.count == 0)
+		if (!codeplug_zone(zi, &watch_zone) || watch_zone.count == 0)
 			continue;
 		uint16_t start = k == 0 && !a->vfo ? (uint16_t)(a->pos + 1u) : 0;
-		for (uint16_t j = 0; j < z.count && j < CODEPLUG_ZONE_MAX; j++) {
-			ui_dual_ref_t r = { false, zi, (uint16_t)((start + j) % z.count) };
-			if (!ref_same(&r, a) && codeplug_channel(z.channels[r.pos], &ch)) {
+		for (uint16_t j = 0; j < watch_zone.count && j < CODEPLUG_ZONE_MAX; j++) {
+			ui_dual_ref_t r = { false, zi, (uint16_t)((start + j) % watch_zone.count) };
+			if (!ref_same(&r, a) && codeplug_radio_channel(watch_zone.channels[r.pos], &watch_ch) &&
+			    watch_ch.kind == CODEPLUG_KIND_NONE) {
 				*out = r;
 				return true;
 			}
@@ -741,7 +767,7 @@ bool ui_dual_home_key(const input_event_t *ev)
 		ui_dual_select(ev->action == ACT_NAV_RIGHT ? 1 : 0);
 		return true;
 	case ACT_CONTEXT:
-		if (!press)
+		if (!press || ui_st.entry)
 			return false;
 		ui_push(SCR_DUAL, 0);
 		return true;
@@ -820,6 +846,8 @@ void ui_dual_key(void)
 	ui_go_home();
 	if (dual()->on) {
 		ui_dual_stop();
+	} else if (ui_view()->ch.mode == RADIO_MODE_P25) {
+		p25_unavailable();
 	} else if (b_last()) {
 		ui_dual_start(&ref[1]);
 	} else {
@@ -887,6 +915,10 @@ static void watch_lost(ui_dual_t *d, const radio_view_t *v)
 	d->on = false;
 	d->back_to = UI_DUAL_NONE;
 	state_save();
+	if (pair_p25() || v->ch.mode == RADIO_MODE_P25) {
+		p25_unavailable();
+		return;
+	}
 	sbuf_t b;
 	sb_init(&b, msg, sizeof msg);
 	sb_str(&b, TR("Dual watch off: on "));
@@ -1004,8 +1036,10 @@ static bool resume_poll(ui_dual_t *d, const radio_view_t *v)
 		return false;
 	ref_here(v, &ref[sel]);
 	ref[!sel] = other;
-	if (ref_same(&ref[0], &ref[1]) || !ui_svc_dual(ref, sel))
+	if (ref_same(&ref[0], &ref[1]) || !apply(sel)) {
+		state_save();
 		return false;
+	}
 	d->sel = sel;
 	started_ms = ui_st.now_ms;
 	b_known = true;
@@ -1024,6 +1058,12 @@ static bool adopt_poll(ui_dual_t *d, const radio_view_t *v)
 		return false;
 	ref[0] = r[0];
 	ref[1] = r[1];
+	if (pair_p25()) {
+		ui_svc_dual(NULL, 0);
+		state_save();
+		p25_unavailable();
+		return false;
+	}
 	d->sel = sel ? 1 : 0;
 	b_known = true;
 	started_ms = ui_st.now_ms;
@@ -1332,10 +1372,15 @@ static void pick_item(uint16_t i, ui_item_t *it)
 		}
 		return;
 	}
-	if (!codeplug_zone(pick_zone, &z) || raw - 1u >= z.count || !codeplug_channel(z.channels[raw - 1u], &ch))
+	if (!codeplug_zone(pick_zone, &z) || raw - 1u >= z.count || !codeplug_radio_channel(z.channels[raw - 1u], &ch))
 		return;
 	pick_raw_label(raw, it->label, sizeof it->label);
 	sb_init(&b, it->value, sizeof it->value);
+	if (ch.kind == CODEPLUG_KIND_P25 || ch.kind == CODEPLUG_KIND_P25_TRUNK || ch.mode == RADIO_MODE_P25) {
+		sb_str(&b, "P25");
+		it->flags |= UI_ITEM_DIM;
+		return;
+	}
 	ui_dual_ref_t r = { false, pick_zone, (uint16_t)(raw - 1u) };
 	// The other channel can't be picked for this pane: named so (when the watch starts, A is the channel on view)
 	ui_dual_ref_t other;

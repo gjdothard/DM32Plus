@@ -19,7 +19,11 @@ The status row shows a satellite in green with a fix, yellow while acquiring a f
 The selected card keeps its cyan outline during calls. Each card has a separate state badge and power label.
 Recent activity starts each row with the pane letter, using the same colors as the cards.
 The selected card shows the saved talkgroup name prominently and keeps the ID, slot, color code, and power on
-its detail row. Single-channel operation shows one card. Entry and large-text views retain their existing layouts.
+its detail row. Single-channel operation shows one card. VFO frequency entry stays inside the selected card,
+with an amber field and the typed digits. The other dual-watch card keeps its position and contents.
+Entry does not retune until confirmed with OK or Context (#), including during dual watch. Back deletes a digit;
+deleting the last digit or the entry timeout cancels it. Large-text views retain their existing layouts.
+The single VFO card shows the opposite RX/TX frequency on its secondary line when they differ.
 
 The card mode badge and dual-watch status strip use the same mode labels as
 the standard Home screen. A P25 channel displays `P25`; an unavailable mode

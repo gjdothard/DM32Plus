@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Garrett Dothard
 # Copyright (c) 2026 The RadioFoundry Authors
 #
 # The radio's strings in Italiano (it; docs/dev/translating.md). Kept in step with the source by
@@ -819,6 +820,10 @@ msgstr "Ancora niente sentito"
 #: core/ui/ui_dual.c core/ui/ui_screens.c
 msgid "No tone"
 msgstr "Nessun tono"
+
+#: core/ui/ui_dual.c
+msgid "{Dual watch unavailable for P25|No dual watch on P25}"
+msgstr "{Dual watch non disponibile per P25|P25 senza dual watch}"
 
 #: core/ui/ui_dual.c
 msgid "{Can't watch that channel: pick another|Can't watch that channel}"
@@ -3397,6 +3402,30 @@ msgid "Remove talkgroup"
 msgstr "Rimuovi gruppo"
 
 #: core/ui/ui_p25.c
+msgid "Site unavailable"
+msgstr "Sito non disponibile"
+
+#: core/ui/ui_p25.c
+msgid "Site mismatch"
+msgstr "Sito non corrispondente"
+
+#: core/ui/ui_p25.c
+msgid "Site"
+msgstr "Sito"
+
+#: core/ui/ui_p25.c
+msgid "Candidate"
+msgstr "Candidato"
+
+#: core/ui/ui_p25.c
+msgid "Unknown site"
+msgstr "Sito sconosciuto"
+
+#: core/ui/ui_p25.c
+msgid "Searching for control"
+msgstr "Ricerca controllo"
+
+#: core/ui/ui_p25.c
 msgid "P25 request unavailable"
 msgstr "Richiesta P25 non disponibile"
 
@@ -3419,10 +3448,6 @@ msgstr "In attesa di P25"
 #: core/ui/ui_p25.c
 msgid "Following voice"
 msgstr "Seguimento voce"
-
-#: core/ui/ui_p25.c
-msgid "Searching for control"
-msgstr "Ricerca controllo"
 
 #: core/ui/ui_p25.c
 msgid "Control channel locked"

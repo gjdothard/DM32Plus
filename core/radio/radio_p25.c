@@ -28,6 +28,22 @@ static radio_p25_mem_t *mem;
 static p25_monitor_t monitor;
 static volatile uint8_t monitor_seq;
 
+#if CONFIG_P25_TRUNK
+uint8_t radio_p25_site_name(const p25_monitor_t *m, uint16_t number, const channel_t *ch, char *out, size_t cap)
+{
+	if (cap) out[0] = '\0';
+	if (!(m->flags & P25_MON_ACTIVE) || !(m->flags & P25_MON_TRUNK) ||
+	    m->channel != number || m->system != ch->system || ch->kind != CODEPLUG_KIND_P25_TRUNK) return P25_SITE_UNAVAILABLE;
+	p25_site_query_t q = { .control_hz = m->cc_hz, .wacn = m->wacn, .sysid = m->sysid,
+		.rfss = m->rfss, .site = m->site, .acquired = m->state == 2 || m->state == 3 };
+	storage_lock();
+	uint8_t result = m->base_generation == codeplug_serial() && m->settings_generation == codeplug_kv_generation() ?
+		p25_site_name(ch->system, &q, out, cap) : P25_SITE_UNAVAILABLE;
+	storage_unlock();
+	return result;
+}
+#endif
+
 bool radio_p25_monitor(p25_monitor_t *out)
 {
 	if (!out) return false;
@@ -451,6 +467,9 @@ static void monitor_update(void)
 	m->flags = P25_MON_ACTIVE | (ev.rx_active ? P25_MON_RX : 0) |
 		(mem->channel.rx_only || board_receive_only(mem->channel.rx_hz) ? P25_MON_RX_ONLY : 0);
 	m->channel = mem->number; m->tuned_hz = mem->channel.rx_hz;
+	m->system = mem->channel.system;
+	m->base_generation = mem->base_generation;
+	m->settings_generation = mem->settings_generation;
 	m->tx_target = mem->work.engine.cfg.tx_lc.lcf == P25_LCF_UNIT ? mem->work.engine.cfg.tx_lc.dst : mem->work.engine.cfg.tx_lc.tgid;
 	if (mem->work.engine.cfg.tx_lc.lcf == P25_LCF_UNIT) m->flags |= P25_MON_TX_UNIT;
 	m->nac = ev.rx.nac;
@@ -468,6 +487,9 @@ static void monitor_update(void)
 		if (!(t->cfg.flags & P25_FOLLOW_TX)) m->flags |= P25_MON_RX_ONLY;
 		m->tuned_hz = t->hz; m->cc_hz = v->cc_hz; m->state = v->state;
 		m->nac = v->nac; m->sysid = v->sysid; m->wacn = v->wacn; m->rfss = v->rfss; m->site = v->site;
+		if (v->state != P25_FOLLOW_VOICE && (!t->tuned || t->want != t->done || mem->work.follower.tuning)) {
+			m->state = P25_FOLLOW_HUNT; m->rfss = m->site = 0xFF;
+		}
 		m->blocks = v->blocks; m->crc_fail = v->crc_fail; m->refused = v->refused;
 		if (v->state == P25_FOLLOW_VOICE) {
 			tg = v->unit_call ? 0 : v->tg;

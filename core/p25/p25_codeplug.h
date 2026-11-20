@@ -89,9 +89,21 @@ void p25_tsys_encode(const p25_tsys_t *s, uint8_t out[P25_CP_TSYS_LEN]);
 
 // A site entry's body (3.1), a control channel's (3.2) and an identifier plan row's (3.3)
 #define P25_CP_UNKNOWN		0xFFu
+#define P25_CP_SITE_LEN		19u
 typedef struct {
 	uint8_t rfss, site;	// P25_CP_UNKNOWN: not known
+	char name[CODEPLUG_NAME_LEN + 1];
 } p25_site_t;
+typedef struct {
+	uint32_t control_hz, wacn;
+	uint16_t sysid;
+	uint8_t rfss, site;
+	bool acquired;
+} p25_site_query_t;
+enum { P25_SITE_UNKNOWN, P25_SITE_CANDIDATE, P25_SITE_CONFIRMED, P25_SITE_MISMATCH, P25_SITE_UNAVAILABLE };
+// Resolve against the active system's stored entries. The caller holds storage_lock.
+// No decoder pointers or persistent site-name cache are needed.
+uint8_t p25_site_name(uint8_t system, const p25_site_query_t *query, char *out, size_t cap);
 typedef struct {
 	uint16_t chan;		// identifier << 12 | channel, 0 = by frequency only
 	uint32_t rx_hz, tx_hz;

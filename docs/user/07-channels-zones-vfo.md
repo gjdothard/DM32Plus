@@ -249,6 +249,9 @@ key "Copy to VFO", on a press or a hold.
 On Home in the VFO, type the frequency digits from the hundreds of MHz down, without a decimal point. The radio shows
 what you typed as you go.
 
+On the card layout, the frequency is edited in place in an amber field. Dual Watch keeps the other card visible.
+The radio keeps its current frequency until you confirm with **OK** or **#**.
+
 | Keys | Frequency |
 |---|---|
 | **4** **4** **6** **0** **0** **0** | 446.000 MHz |

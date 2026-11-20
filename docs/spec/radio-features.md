@@ -120,6 +120,10 @@ channel (zone index and position, any zone) or a VFO with its own settings. `ref
 `zone_index`, `zone_pos` and zone name, or `vfo=1` and `vfo_index`, so the screens can tell which of the two the
 receiver is on.
 
+Both references must be untagged FM/DMR channels or supported VFOs. P25 conventional and trunked channels cannot
+participate. The UI checks logical channel tags before enabling a watch and reports "Dual watch unavailable for P25".
+Restoration and channel/codeplug changes apply the same restriction. Selecting a P25 channel outside the watch ends it.
+
 There are two VFOs, so each channel can have its own: a VFO ref's `pos` says which (0 or 1). The radio core keeps
 the one in use in `vfo_ch` and the other in `vfo_other`; a hop to a VFO pane swaps them first. Both are saved, with
 the one in use (`settings-store.md` 3, second VFO). Outside dual watch the VFO key opens the one last used. Copy to

@@ -7,6 +7,8 @@
 
 import { u8, u16, u24, u32, s8, put16, put24, put32, grow } from "./modebytes.js";
 
+import { getName, putName } from "./fields.js";
+
 export const NAC_DEFAULT = 0x293, NAC_ANY = 0xF7E, NAC_REPEAT_ANY = 0xF7F, NAC_SET = 0x8000;
 export const UNIT_MAX = 0xFFFFFE;
 // Above this the editor warns: unit IDs this long are unusual (the standard's range is not checked here)
@@ -127,6 +129,27 @@ export function encodeTsys(s, prev = null) {
 	return v;
 }
 
+// Site body: legacy RFSS/site, then version 1 and a 16-byte Latin-1 name.
+export function decodeSite(body) {
+	const name = body.length >= 19 && body[2] === 1 ? getName(body, 3, 16) : "";
+	return {
+		rfss: body.length >= 1 && body[0] !== P25_UNKNOWN ? body[0] : null,
+		site: body.length >= 2 && body[1] !== P25_UNKNOWN ? body[1] : null,
+		siteName: /[^\x20-\x7e\xa0-\xfe]/.test(name) ? "" : name,
+	};
+}
+
+export function encodeSite(e, body = null) {
+	const supported = !body || body.length <= 2 || (body[2] === 1 && body.length >= 19);
+	const changed = supported && (e.siteName ?? "") !== decodeSite(body ?? new Uint8Array()).siteName;
+	// Unknown and incomplete extensions belong to their writer, even after an RFSS edit.
+	const v = grow(body, changed ? 19 : 2);
+	v[0] = e.rfss ?? P25_UNKNOWN;
+	v[1] = e.site ?? P25_UNKNOWN;
+	if (changed) { v[2] = 1; putName(v, 3, 16, e.siteName); }
+	return v;
+}
+
 const optHex = (key, label, max, digits) => ({ key, label, type: "hex", min: 0, max, digits, any: true, format: (v) => v.toString(16).toUpperCase().padStart(digits, "0") });
 const byteOrUnknown = (key, label) => ({ key, label, type: "int", min: 0, max: 254, any: true });
 
@@ -159,15 +182,10 @@ export const p25System = {
 	classes: [
 		{
 			cls: 1, name: "sites", group: true, groupLabel: "editor.p25.site_no", groupMax: 254,
-			newEntry: (list) => ({ group: Math.min(254, list.reduce((n, e) => Math.max(n, e.group + 1), 0)), rfss: null, site: null }),
-			decode: (body) => ({ rfss: u8(body, 0) === P25_UNKNOWN || !body.length ? null : body[0], site: u8(body, 1) === P25_UNKNOWN || body.length < 2 ? null : body[1] }),
-			encode: (e, body) => {
-				const v = grow(body, 2);
-				v[0] = e.rfss ?? P25_UNKNOWN;
-				v[1] = e.site ?? P25_UNKNOWN;
-				return v;
-			},
-			fields: [{ ...byteOrUnknown("rfss", "editor.p25.rfss"), help: "editor.p25.unknown_help" }, { ...byteOrUnknown("site", "editor.p25.site"), help: "editor.p25.unknown_help" }],
+			newEntry: (list) => ({ group: Math.min(254, list.reduce((n, e) => Math.max(n, e.group + 1), 0)), rfss: null, site: null, siteName: "" }),
+			decode: decodeSite,
+			encode: encodeSite,
+			fields: [{ key: "siteName", label: "editor.p25.site_name", type: "text", size: 16, maxLength: 16, help: "editor.p25.site_name_help" }, { ...byteOrUnknown("rfss", "editor.p25.rfss"), help: "editor.p25.unknown_help" }, { ...byteOrUnknown("site", "editor.p25.site"), help: "editor.p25.unknown_help" }],
 		},
 		{
 			cls: 0, name: "control", group: true, groupLabel: "editor.p25.site_no", groupMax: 254, control: true,
@@ -216,6 +234,13 @@ export const p25System = {
 		if (s.ownId > UNIT_MAX) problem.err("ownId", "p25_unit_range");
 		if (s.number > 8) problem.err("number", "p25_system_limit");
 		const sites = entries.filter((e) => e.cls === 1);
+		for (const e of sites) {
+			if ((e.siteName ?? "").length > 16 || /[^\x20-\x7e\xa0-\xfe]/.test(e.siteName ?? ""))
+				problem.err("entries", "p25_site_name");
+			const raw = e.raw?.slice(4);
+			if (raw?.length > 2 && (raw[2] !== 1 || raw.length < 19) && e.siteName)
+				problem.err("entries", "p25_site_name_version");
+		}
 		const groups = new Set(sites.map((e) => e.group));
 		if (groups.size !== sites.length) problem.err("entries", "p25_site_twice");
 		const plan = entries.filter((e) => e.cls === 2);
