@@ -188,7 +188,7 @@ test("managed writes refuse oversized bundles before beginning and never retry t
 	await assert.rejects(tr.fastWrite(null, null, { progress() {} }), e => e === refusal);
 });
 
-test("CPS talks to the C firmware simulator using managed staged writes", { skip: !process.env.RFOUNDRY_CPS_SIM, timeout: 60000 }, async () => {
+test("P25 site writes require managed firmware and preserve names through staging", { skip: !process.env.RFOUNDRY_CPS_SIM, timeout: 60000 }, async () => {
 	const dir = mkdtempSync(join(tmpdir(), "p25-cps-"));
 	const p = spawn(process.env.RFOUNDRY_CPS_SIM, ["--features", "FM,DMR,CPS_FAST,P25,P25_TRUNK,DMR_TALKGROUP_POOL,IDDB_COMPACT", "--dump", join(dir, "synthetic.bin")], { stdio: ["pipe", "pipe", "inherit"] });
 	const stream = { buf: new Uint8Array(), clear() { this.buf = new Uint8Array(); },
@@ -198,10 +198,14 @@ test("CPS talks to the C firmware simulator using managed staged writes", { skip
 	const tr = new CpsSerial(stream);
 	try {
 		await tr.identify([{ id: "sim", codeplug: { base: 0, end: 0xE00000, names: ["sim"] } }]);
-		assert.equal(tr.fast.managed, true);
+		if (process.env.RFOUNDRY_CPS_REQUIRE_MANAGED) assert.equal(tr.fast.managed, true);
 		const model = trunked();
 		model.systems[0].entries.push({ cls: 1, group: 0, rfss: 1, site: 3, siteName: "North Tower" });
 		const have = await tr.read({ iddb: false }), want = encode(model);
+		if (!tr.fast.managed) {
+			await assert.rejects(tr.write(want, have), { code: "modes_firmware" });
+			return;
+		}
 		const result = await tr.write(want, have); await tr.verify(want, result.plan);
 		const saved = decode(await tr.read({ iddb: false }));
 		assert.equal(saved.channels[0].kind, 3); assert.equal(saved.channels[0].tagTx, false);

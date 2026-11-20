@@ -148,7 +148,7 @@ test("the build step builds a picked radio language in and takes it out again wh
 test("the build step offers the start language, preset to the page's on an installation only", () => {
 	const src = readFileSync(new URL("../static/js/flasher/app.js", import.meta.url), "utf8");
 	assert.match(src, /const want = S\.startLang \?\? \(S\.task === "install" \? LANG : null\);/);
-	assert.match(src, /S\.data\.features\.filter\(\(f\) => f\.group === g && f\.name !== "AUDIO_PROBE" && !startCode\(f\.name\)\)/);
+	assert.match(src, /S\.data\.features\.filter\(\(f\) => f\.group === g && f\.name !== "AUDIO_PROBE" && !startCode\(f\.name\)\s*&& \(!bundledMode\(\) \|\| sel\.supported\(f\.name\)\)\)/);
 	for (const lang of ["en", "es", "it"]) {
 		const cat = JSON.parse(readFileSync(new URL(`../i18n/${lang}.json`, import.meta.url), "utf8"));
 		for (const k of ["flash.build.start_lang", "flash.build.start_lang_help"]) assert.ok(cat[k], `${lang}: ${k}`);
