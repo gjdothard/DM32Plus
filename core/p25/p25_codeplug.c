@@ -229,23 +229,22 @@ void p25_site_decode(const uint8_t *b, int len, p25_site_t *out)
 
 uint8_t p25_site_name(uint8_t system, const p25_site_query_t *q, char *out, size_t cap)
 {
-	uint8_t b[CODEPLUG_SYS_HDR + P25_CP_SITE_LEN];
-	codeplug_system_t sy;
-	p25_tsys_t sys;
+	uint8_t b[CODEPLUG_SYS_HDR + P25_CP_TSYS_LEN];
+	// Each record is consumed before reading the next; reuse storage to bound the UI query's stack.
+	union { codeplug_system_t system; p25_tsys_t sys; p25_ctl_t ctl; p25_site_t site; } record;
 	if (!cap) return P25_SITE_UNKNOWN;
 	out[0] = '\0';
-	int n = codeplug_system(system, &sy, b, P25_CP_SITE_LEN);
-	if (n < 0 || sy.type != CODEPLUG_SYSTYPE_P25_TRUNK) return P25_SITE_UNKNOWN;
-	p25_tsys_decode(b, n < (int)P25_CP_SITE_LEN ? n : (int)P25_CP_SITE_LEN, &sys);
-	if (q->acquired && ((q->wacn != 0xFFFFFFFFu && sys.wacn != P25_CP_WACN_ANY && sys.wacn != q->wacn) ||
-	    (q->sysid != 0xFFFFu && sys.sysid != P25_CP_SYSID_ANY && sys.sysid != q->sysid)))
+	int n = codeplug_system(system, &record.system, b, P25_CP_TSYS_LEN);
+	if (n < 0 || record.system.type != CODEPLUG_SYSTYPE_P25_TRUNK) return P25_SITE_UNKNOWN;
+	p25_tsys_decode(b, n < (int)P25_CP_TSYS_LEN ? n : (int)P25_CP_TSYS_LEN, &record.sys);
+	if (q->acquired && ((q->wacn != 0xFFFFFFFFu && record.sys.wacn != P25_CP_WACN_ANY && record.sys.wacn != q->wacn) ||
+	    (q->sysid != 0xFFFFu && record.sys.sysid != P25_CP_SYSID_ANY && record.sys.sysid != q->sysid)))
 		return P25_SITE_MISMATCH;
 	codeplug_sys_entry_t e;
 	int at = -1, group = -1;
 	while (codeplug_sys_entry_next(&at, system, CODEPLUG_ENTRY_CHANNEL, &e, b, P25_CP_SITE_LEN) >= 0) {
-		p25_ctl_t ctl;
-		p25_ctl_decode(b, e.len < (int)P25_CP_SITE_LEN ? e.len : (int)P25_CP_SITE_LEN, &ctl);
-		if (!(e.flags & CODEPLUG_ENTRY_CONTROL) || !q->control_hz || ctl.rx_hz != q->control_hz) continue;
+		p25_ctl_decode(b, e.len < (int)P25_CP_SITE_LEN ? e.len : (int)P25_CP_SITE_LEN, &record.ctl);
+		if (!(e.flags & CODEPLUG_ENTRY_CONTROL) || !q->control_hz || record.ctl.rx_hz != q->control_hz) continue;
 		if (group >= 0 && group != e.group) return P25_SITE_MISMATCH;
 		group = e.group;
 	}
@@ -254,13 +253,12 @@ uint8_t p25_site_name(uint8_t system, const p25_site_query_t *q, char *out, size
 	uint8_t result = P25_SITE_UNKNOWN;
 	at = -1;
 	while (codeplug_sys_entry_next(&at, system, CODEPLUG_ENTRY_SITE, &e, b, P25_CP_SITE_LEN) >= 0) {
-		p25_site_t site;
-		p25_site_decode(b, e.len < (int)P25_CP_SITE_LEN ? e.len : (int)P25_CP_SITE_LEN, &site);
+		p25_site_decode(b, e.len < (int)P25_CP_SITE_LEN ? e.len : (int)P25_CP_SITE_LEN, &record.site);
 		if (group == e.group && ++grouped > 1u) { out[0] = '\0'; return P25_SITE_MISMATCH; }
-		bool same = identified && site.rfss == q->rfss && site.site == q->site;
+		bool same = identified && record.site.rfss == q->rfss && record.site.site == q->site;
 		if (identified && group == e.group &&
-		    ((site.rfss != P25_CP_UNKNOWN && site.rfss != q->rfss) ||
-		     (site.site != P25_CP_UNKNOWN && site.site != q->site))) {
+		    ((record.site.rfss != P25_CP_UNKNOWN && record.site.rfss != q->rfss) ||
+		     (record.site.site != P25_CP_UNKNOWN && record.site.site != q->site))) {
 			out[0] = '\0'; return P25_SITE_MISMATCH;
 		}
 		if (identified ? !same : group != e.group) continue;
@@ -268,7 +266,7 @@ uint8_t p25_site_name(uint8_t system, const p25_site_query_t *q, char *out, size
 			out[0] = '\0'; return P25_SITE_MISMATCH;
 		}
 		size_t i = 0;
-		while (i + 1 < cap && site.name[i]) { out[i] = site.name[i]; i++; }
+		while (i + 1 < cap && record.site.name[i]) { out[i] = record.site.name[i]; i++; }
 		out[i] = '\0';
 		result = identified ? P25_SITE_CONFIRMED : P25_SITE_CANDIDATE;
 	}
