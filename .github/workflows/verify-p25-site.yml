@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Garrett Dothard
+name: Verify P25 site names
+on:
+  push:
+    branches: [codex/7-p25-site-names]
+    paths: [.github/workflows/verify-p25-site.yml]
+permissions:
+  contents: read
+  packages: read
+jobs:
+  disabled-target:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        feature: [P25, P25_TRUNK, P25_UI]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          submodules: false
+      - uses: ./.github/actions/toolchain
+        id: tc
+        with:
+          toolchain: csky
+      - run: git submodule update --init -- third_party/FreeRTOS-Kernel
+      - name: Build with feature disabled and check task stacks
+        env:
+          RUN: ${{ steps.tc.outputs.run }}
+          FEATURE: ${{ matrix.feature }}
+        run: |
+          set -eu
+          $RUN make -j8 BOARD=dm32 "CONFIG_${FEATURE}=n" BUILD=build/verify-p25 stack-check > target.log 2>&1 || { tail -60 target.log; exit 1; }
+          if grep 'warning:' target.log; then exit 1; fi
+          tail -25 target.log
+  focused-host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          submodules: false
+      - name: Build focused regressions
+        run: make -C tests/host -j8 p25StoredTestTrunk radioP25TrunkStateTest uiFlowTest uiFlowTestNoColor cpsSim
+      - name: Run storage, follower and UI regressions
+        working-directory: tests/host
+        run: |
+          ./p25StoredTestTrunk
+          ./radioP25TrunkStateTest
+          ./uiFlowTest
+          ./uiFlowTestNoColor
+      - name: Verify managed CPS site-name transfer
+        env:
+          RFOUNDRY_CPS_REQUIRE_MANAGED: "1"
+        run: RFOUNDRY_CPS_SIM="$PWD/tests/host/cpsSim" node --test --test-reporter=spec site/tests/p25-modes.test.mjs site/tests/p25-talkgroups-ui.test.mjs
