@@ -245,6 +245,7 @@ uint8_t p25_site_name(uint8_t system, const p25_site_query_t *q, char *out, size
 	while (codeplug_sys_entry_next(&at, system, CODEPLUG_ENTRY_CHANNEL, &e, b, P25_CP_SITE_LEN) >= 0) {
 		p25_ctl_decode(b, e.len < (int)P25_CP_SITE_LEN ? e.len : (int)P25_CP_SITE_LEN, &record.ctl);
 		if (!(e.flags & CODEPLUG_ENTRY_CONTROL) || !q->control_hz || record.ctl.rx_hz != q->control_hz) continue;
+		if (e.group == CODEPLUG_GROUP_NONE) continue;
 		if (group >= 0 && group != e.group) return P25_SITE_MISMATCH;
 		group = e.group;
 	}
@@ -253,6 +254,7 @@ uint8_t p25_site_name(uint8_t system, const p25_site_query_t *q, char *out, size
 	uint8_t result = P25_SITE_UNKNOWN;
 	at = -1;
 	while (codeplug_sys_entry_next(&at, system, CODEPLUG_ENTRY_SITE, &e, b, P25_CP_SITE_LEN) >= 0) {
+		if (e.group == CODEPLUG_GROUP_NONE) continue;
 		p25_site_decode(b, e.len < (int)P25_CP_SITE_LEN ? e.len : (int)P25_CP_SITE_LEN, &record.site);
 		if (group == e.group && ++grouped > 1u) { out[0] = '\0'; return P25_SITE_MISMATCH; }
 		bool same = identified && record.site.rfss == q->rfss && record.site.site == q->site;

@@ -446,6 +446,12 @@ static void test_trunk_load(void)
 	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
 	q.control_hz = 851037500; // learned alternate: the unique decoded identity still confirms it
 	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
+	put_ctl(10, CODEPLUG_GROUP_NONE, q.control_hz);
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CONFIRMED && !strcmp(name, "North Tower"));
+	q.acquired = false;
+	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_UNKNOWN && !name[0]);
+	q.acquired = true;
+	CHECK(codeplug_kv_remove(CODEPLUG_KEY_SYS_CHAN + 10));
 	q.control_hz = 851012500; q.acquired = false;
 	CHECK(p25_site_name(2, &q, name, sizeof name) == P25_SITE_CANDIDATE && !strcmp(name, "North Tower"));
 	q.control_hz = 851500000;
