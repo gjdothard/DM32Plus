@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The page scripts' strings (static/js/i18n.js): plural forms, numbers and dates in the page's language, the catalog
 // overrides of repository texts; and the build step's offer of a firmware language pack (flasher/langsuggest.js).
 
