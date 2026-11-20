@@ -2247,5 +2247,9 @@
  "editor.radio_err.modes_stage_full": "These changes exceed the radio staging capacity. Reduce the changes and try again.",
  "editor.qdmr.err.modes_binary": "Use a binary backup to preserve P25 settings. This format cannot store them.",
  "editor.problem.p25_control_limit": "This firmware supports at most 16 control channels per system.",
- "editor.problem.p25_phase1_only": "This firmware supports Phase 1 channel plans only."
+ "editor.problem.p25_phase1_only": "This firmware supports Phase 1 channel plans only.",
+ "editor.p25.site_name": "Site name",
+ "editor.p25.site_name_help": "Optional, up to 16 Latin-1 characters. Enter the broadcast RFSS and site IDs to confirm this name on the radio. The site group number only links control channels.",
+ "editor.problem.p25_site_name": "Site names must contain at most 16 printable Latin-1 characters.",
+ "editor.problem.p25_site_name_version": "This site has a newer or incomplete name extension. Clear the name to preserve its data."
 }

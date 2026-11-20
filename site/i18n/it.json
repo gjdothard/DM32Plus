@@ -2247,5 +2247,9 @@
  "editor.radio_err.modes_stage_full": "Le modifiche superano la capacità temporanea della radio. Ridurre le modifiche e riprovare.",
  "editor.qdmr.err.modes_binary": "Usare un backup binario per conservare le impostazioni P25. Questo formato non può memorizzarle.",
  "editor.problem.p25_control_limit": "Questo firmware supporta al massimo 16 canali di controllo per sistema.",
- "editor.problem.p25_phase1_only": "Questo firmware supporta solo piani di canale Fase 1."
+ "editor.problem.p25_phase1_only": "Questo firmware supporta solo piani di canale Fase 1.",
+ "editor.p25.site_name": "Nome del sito",
+ "editor.p25.site_name_help": "Facoltativo, fino a 16 caratteri Latin-1. Inserire gli ID RFSS e sito trasmessi per confermare il nome sulla radio. Il numero del gruppo collega solo i canali di controllo.",
+ "editor.problem.p25_site_name": "I nomi dei siti ammettono fino a 16 caratteri Latin-1 stampabili.",
+ "editor.problem.p25_site_name_version": "Questo sito ha una nuova estensione del nome o una incompleta. Cancellare il nome per conservare i dati."
 }
