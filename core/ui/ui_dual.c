@@ -74,6 +74,11 @@ typedef struct {
 static snap_t snap[2];
 static bool refill[2];		// snap[i] changed what pane i shows
 
+// Admission and default-channel search run serially on the UI task. Share their scratch instead of reserving
+// another zone and channel for a check; neither caller retains them across the other.
+static zone_t watch_zone;
+static channel_t watch_ch;
+
 static ui_dual_t *dual(void) { return &ui_st.dual; }
 
 void ui_dual_reset(void)
@@ -429,12 +434,10 @@ const radio_view_t *ui_dual_view(const radio_view_t *v)
 // Read logical channels: the legacy base of a P25 channel looks like DMR.
 static bool pair_p25(void)
 {
-	static zone_t z;
-	static channel_t ch;
 	for (uint8_t i = 0; i < 2; i++) {
-		if (!ref[i].vfo && ref[i].pos < CODEPLUG_ZONE_MAX && codeplug_zone(ref[i].zone, &z) && ref[i].pos < z.count &&
-		    codeplug_radio_channel(z.channels[ref[i].pos], &ch) &&
-		    (ch.kind == CODEPLUG_KIND_P25 || ch.kind == CODEPLUG_KIND_P25_TRUNK || ch.mode == RADIO_MODE_P25))
+		if (!ref[i].vfo && ref[i].pos < CODEPLUG_ZONE_MAX && codeplug_zone(ref[i].zone, &watch_zone) &&
+		    ref[i].pos < watch_zone.count && codeplug_radio_channel(watch_zone.channels[ref[i].pos], &watch_ch) &&
+		    (watch_ch.kind == CODEPLUG_KIND_P25 || watch_ch.kind == CODEPLUG_KIND_P25_TRUNK || watch_ch.mode == RADIO_MODE_P25))
 			return true;
 	}
 	return false;
@@ -484,18 +487,17 @@ static void watch_on(ui_dual_t *d)
 // B with no last B to use: the next channel of a's zone, else the first one of a later zone, else the VFO. False: none
 static bool b_default(const ui_dual_ref_t *a, ui_dual_ref_t *out)
 {
-	static zone_t z;	// static: not on the UI task's stack
-	static channel_t ch;
 	uint16_t n = codeplug_zone_count();
 	uint16_t first = a->vfo ? ui_view()->zone_index : a->zone;
 	for (uint16_t k = 0; k < n; k++) {
 		uint16_t zi = (uint16_t)((first + k) % n);
-		if (!codeplug_zone(zi, &z) || z.count == 0)
+		if (!codeplug_zone(zi, &watch_zone) || watch_zone.count == 0)
 			continue;
 		uint16_t start = k == 0 && !a->vfo ? (uint16_t)(a->pos + 1u) : 0;
-		for (uint16_t j = 0; j < z.count && j < CODEPLUG_ZONE_MAX; j++) {
-			ui_dual_ref_t r = { false, zi, (uint16_t)((start + j) % z.count) };
-			if (!ref_same(&r, a) && codeplug_radio_channel(z.channels[r.pos], &ch) && ch.kind == CODEPLUG_KIND_NONE) {
+		for (uint16_t j = 0; j < watch_zone.count && j < CODEPLUG_ZONE_MAX; j++) {
+			ui_dual_ref_t r = { false, zi, (uint16_t)((start + j) % watch_zone.count) };
+			if (!ref_same(&r, a) && codeplug_radio_channel(watch_zone.channels[r.pos], &watch_ch) &&
+			    watch_ch.kind == CODEPLUG_KIND_NONE) {
 				*out = r;
 				return true;
 			}
