@@ -51,9 +51,9 @@ service = dict(image="python:3.12-slim", restart="unless-stopped", user="65534:6
         "from urllib.request import urlopen; urlopen(\"http://127.0.0.1:8080/codeplug/\", timeout=3).close()"],
         interval="10s", timeout="5s", retries=3, start_period="5s"))
 base = pathlib.Path("/etc/website-updater")
-(base/"compose.yaml").write_text(json.dumps({"x-license":"SPDX-License-Identifier: MIT",
+(base/"compose.yaml").write_text(json.dumps({"x-license":"MIT",
     "x-copyright":"Copyright (c) 2026 Garrett Dothard", "name":name, "services":{"cps":service}}, indent=2)+"\n")
-(base/"config.json").write_text(json.dumps({"_license":"SPDX-License-Identifier: MIT",
+(base/"config.json").write_text(json.dumps({"_license":"MIT",
     "_copyright":"Copyright (c) 2026 Garrett Dothard", "repository":repo, "deployment_root":str(root)}, indent=2)+"\n")
 ' "$root" "$2"
 chmod 644 /etc/website-updater/compose.yaml /etc/website-updater/config.json

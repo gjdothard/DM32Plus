@@ -3553,6 +3553,8 @@ static const ui_scr_def_t discard_screen = {
 };
 #endif
 
+#endif // CONFIG_CHANNEL_LIST
+
 #if CONFIG_CHANNEL_EDIT || CONFIG_DMR_SMS
 // ======================= Text entry: keypad letters (ui.md 2.1) =======================
 // Phone keypad: in ABC / abc, 2-9 cycle their letters, the digit, then the letters in the other case (ABC: A B C 2 a b
@@ -3805,6 +3807,7 @@ static const ui_scr_def_t sms_text_screen = {
 #endif
 #endif
 
+#if CONFIG_CHANNEL_LIST
 #if CONFIG_CHANNEL_EDIT
 #if CONFIG_CONTACT_EDIT
 // ======================= The contact editor (ui.md 2.4) =======================
@@ -7028,7 +7031,7 @@ static const ui_scr_def_t p25_talkgroups_screen = {
 	.name = "p25-talkgroups", .flags = SF_LIST | SF_FIELD, .prefix = TRN("Talkgroups"),
 	.hint = TRN("OK choose  Back cancel"),
 	.count = picker_count, .item = picker_item, .select = picker_select,
-	.enter = picker_enter, .title = picker_title,
+	.enter = picker_enter, .body = picker_title,
 };
 #endif
 

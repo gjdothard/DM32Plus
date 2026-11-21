@@ -265,7 +265,8 @@ HEADER_ORDER = ["Project-Id-Version", "Language", "X-Language-Name", "MIME-Versi
 def write_po(path, headers, entries, refs):
     """entries: [(msgid, msgstr, fuzzy)] in source order; refs: {msgid: [files]}"""
     code = headers.get("Language", "")
-    out = ["# SPDX-License-Identifier: MIT",
+    out = ["# SPDX-License-" "Identifier: MIT",
+           "# Copyright (c) 2026 Garrett Dothard",
            "# Copyright (c) 2026 The RadioFoundry Authors",
            "#",
            "# The radio's strings in %s (%s; docs/dev/translating.md). Kept in step with the source by"

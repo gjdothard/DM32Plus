@@ -10,6 +10,7 @@ static bool fake_slot_check(const uint8_t *, uint32_t, const codec_windows_t *, 
 #define RFOUNDRY_BOARD_ID "test"
 #include "../../platform/hrc7000/vocoder.c"
 #undef codec_slot_check
+_Static_assert(__alignof__(enc_state) >= 8, "host tests must preserve the codec loan alignment");
 #if CONFIG_P25
 #include "p25/p25_workspace.h"
 _Static_assert(sizeof(p25_workspace_t) <= sizeof enc_state, "P25 workspace exceeds the loan pool");

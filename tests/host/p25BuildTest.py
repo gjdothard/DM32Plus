@@ -20,6 +20,18 @@ OPTIONS, UNITTEST_ARGS = parser.parse_known_args()
 
 
 class P25BuildTest(unittest.TestCase):
+    def test_font_defaults_follow_antialiasing(self):
+        for board in sorted((ROOT / "boards").iterdir()):
+            if not (board / "board.mk").is_file():
+                continue
+            with self.subTest(board=board.name):
+                result = subprocess.run([OPTIONS.make, "--no-print-directory", "-s", f"BOARD={board.name}",
+                                         "CONFIG_FONT_AA=n", "print-vars", "VARS=CONFIG_FONT_AA CONFIG_FONT_BIG"],
+                                        cwd=ROOT, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("CONFIG_FONT_AA=n", result.stdout)
+                self.assertIn("CONFIG_FONT_BIG=n", result.stdout)
+
     def test_full_board_managed_transfer(self):
         """Exercise production board maps, rather than the protocol simulator's map."""
         for board in sorted((ROOT / "boards").iterdir()):
@@ -39,7 +51,7 @@ class P25BuildTest(unittest.TestCase):
                 flash = re.search(r"\.openfw_flash\s*=\s*(0x[0-9a-fA-F]+)", maps[0])[1]
                 source = self.work / "board_transfer.c"
                 source.write_text(
-                    '// SPDX-License-Identifier: MIT\n// Copyright (c) 2026 Garrett Dothard\n'
+                    '// SPDX-License-' 'Identifier: MIT\n// Copyright (c) 2026 Garrett Dothard\n'
                     '#define main protocol_suite_main\n#include "cpsFastTest.c"\n#undef main\n'
                     'static const hal_flash_map_t selected_map = ' + maps[0] + ';\n' + r'''
 int main(void)
@@ -115,7 +127,7 @@ int main(void)
         self.work = Path(self.tmp.name)
         self.harness = self.work / "probe.mk"
         self.harness.write_text(
-            "# SPDX-License-Identifier: MIT\n"
+            "# SPDX-License-" "Identifier: MIT\n"
             "# Copyright (c) 2026 Garrett Dothard\n"
             "include config/features.mk\ninclude config/p25.mk\n"
             "$(info DIRS=$(CORE_DIRS))\n$(info NOTICES=$(ABOUT_MORE))\n"

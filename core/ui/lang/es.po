@@ -1109,7 +1109,7 @@ msgstr "2D fijado"
 msgid "Fix"
 msgstr "Fijado"
 
-#: core/ui/ui_gps.c
+#: core/ui/ui_gps.c core/ui/ui_p25.c
 msgid "Searching"
 msgstr "Buscando"
 
@@ -3454,6 +3454,26 @@ msgid "Control channel locked"
 msgstr "Canal de control adquirido"
 
 #: core/ui/ui_p25.c
+msgid "Unavailable"
+msgstr "No disp."
+
+#: core/ui/ui_p25.c
+msgid "Encrypted"
+msgstr "Cifrado"
+
+#: core/ui/ui_p25.c
+msgid "Voice"
+msgstr "Voz"
+
+#: core/ui/ui_p25.c
+msgid "Waiting"
+msgstr "En espera"
+
+#: core/ui/ui_p25.c
+msgid "Control"
+msgstr "Control"
+
+#: core/ui/ui_p25.c
 msgid "Transmitting"
 msgstr "Transmitiendo"
 
@@ -3472,10 +3492,6 @@ msgstr "Sin llamadas recibidas"
 #: core/ui/ui_p25.c
 msgid "Tuned"
 msgstr "Sintonizado"
-
-#: core/ui/ui_p25.c
-msgid "Control"
-msgstr "Control"
 
 #: core/ui/ui_p25.c
 msgid "Hold"
@@ -3512,10 +3528,6 @@ msgstr "Destino de transmisión"
 #: core/ui/ui_p25.c
 msgid "Programmed target"
 msgstr "Destino programado"
-
-#: core/ui/ui_p25.c
-msgid "Voice"
-msgstr "Voz"
 
 #: core/ui/ui_p25.c
 msgid "* P25"

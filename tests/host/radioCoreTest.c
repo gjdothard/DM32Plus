@@ -610,6 +610,7 @@ static void test_squelch(void)
 static void test_tx(void)
 {
 	setup_codeplug();
+	chans[5].tx_hz = 146520000;	// a valid split TX frequency cannot enable a receive-only RX band
 	start();
 	signal(10, true);
 	poll_for(50);
@@ -651,7 +652,7 @@ static void test_tx(void)
 	req(RREQ_CH_STEP, 1);
 	CHECK(sm.view.channel_number == 5 && sm.view.power == 0);
 	req(RREQ_PTT, 1);
-	CHECK(sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_BAND && hw.tx_calls == 1);
+	CHECK(sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_RX_ONLY && hw.tx_calls == 1);
 	req(RREQ_PTT, 0);
 }
 
@@ -720,7 +721,7 @@ static void test_vfo(void)
 	req(RREQ_VFO_SET, 520000000);		// out of every band: refused
 	CHECK(sm.view.ch.rx_hz == 108000000);
 	req(RREQ_PTT, 1);			// receive-only band
-	CHECK(sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_BAND && hw.tx_calls == 0);
+	CHECK(sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_RX_ONLY && hw.tx_calls == 0);
 	req(RREQ_PTT, 0);
 	req(RREQ_VFO_SET, 446000000);
 	req(RREQ_PTT, 1);

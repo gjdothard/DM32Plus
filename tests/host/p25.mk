@@ -97,13 +97,14 @@ p25CodeplugTestTrunk: p25CodeplugTest.c $(CORE)/p25/p25_codeplug.c $(P25_STORE_C
 P25_MEMORY := vocoderMemoryTest.c $(CORE)/p25/p25_workspace.c
 P25_MEMORY_DEPS := $(ROOT)/platform/hrc7000/vocoder.c $(P25_HEADERS) $(ROOT)/hal/hal_vocoder.h \
 	$(wildcard $(ROOT)/platform/hrc7000/*.h stubs/modem_rtos/*.h)
+# The provider's loan contract needs its alignment attributes on the host too.
 vocoderMemoryTest: $(P25_MEMORY) $(P25_MEMORY_DEPS)
-	$(CC) $(CFLAGS) $(P25_FLAGS) -I$(ROOT)/platform/hrc7000 -Istubs/modem_rtos -o $@ $(P25_MEMORY)
+	$(CC) $(CFLAGS) -U__attribute__ $(P25_FLAGS) -I$(ROOT)/platform/hrc7000 -Istubs/modem_rtos -o $@ $(P25_MEMORY)
 vocoderMemoryTestTrunk: $(P25_MEMORY) $(P25_MEMORY_DEPS)
-	$(CC) $(CFLAGS) $(P25_FLAGS) -UCONFIG_P25_TRUNK -DCONFIG_P25_TRUNK=1 \
+	$(CC) $(CFLAGS) -U__attribute__ $(P25_FLAGS) -UCONFIG_P25_TRUNK -DCONFIG_P25_TRUNK=1 \
 		-I$(ROOT)/platform/hrc7000 -Istubs/modem_rtos -o $@ $(P25_MEMORY)
 vocoderMemoryTestNoP25: $(P25_MEMORY) $(P25_MEMORY_DEPS)
-	$(CC) $(CFLAGS) $(P25_FLAGS) -UCONFIG_P25 -DCONFIG_P25=0 -UCONFIG_IMBE -DCONFIG_IMBE=0 \
+	$(CC) $(CFLAGS) -U__attribute__ $(P25_FLAGS) -UCONFIG_P25 -DCONFIG_P25=0 -UCONFIG_IMBE -DCONFIG_IMBE=0 \
 		-I$(ROOT)/platform/hrc7000 -Istubs/modem_rtos -o $@ $(P25_MEMORY)
 
 P25_HRC7 := $(ROOT)/drivers/modem/hrc7000

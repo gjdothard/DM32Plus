@@ -38,6 +38,15 @@ msgstr "中"
 
 
 class Generate(unittest.TestCase):
+    def test_synced_catalog_keeps_copyright_notices(self):
+        path = os.path.join(self.dir.name, "xx.po")
+        headers, entries, refs = i18n.synced(path, [("Done", ["core/ui/x.c"])])
+        i18n.write_po(path, headers, entries, refs)
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("# Copyright (c) 2026 The RadioFoundry Authors\n", text)
+        self.assertIn("# Copyright (c) 2026 Garrett Dothard\n", text)
+
     def test_catalog_on_another_drive(self):
         path = os.path.join(self.dir.name, "xx.po")
         with patch.object(i18n.os.path, "relpath", side_effect=ValueError("different drives")):

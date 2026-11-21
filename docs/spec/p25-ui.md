@@ -129,8 +129,11 @@ card and standard layouts. No configured groups means ordinary channel stepping.
 
 The listening menu also opens the existing operating-talkgroup picker. P25
 uses the shared channel assignments, names and ordering; timeslot labels are
-omitted. Selecting an assignment holds that group and changes the transmit
-target. Recent-call Hold and favorites remain receive-only operations. The
+omitted. The channel name appears above the assignments, separately from the
+page title. Recent and favorite selections use inverse text on monochrome
+displays. System status uses a shorter translated value when the full status
+would crowd its label. Selecting an assignment holds that group and changes
+the transmit target. Recent-call Hold and favorites remain receive-only operations. The
 selection does not grant TX permission. See [codeplug integration](p25-codeplug.md).
 
 - [x] Bounded published monitor and receive selection independent of TX.

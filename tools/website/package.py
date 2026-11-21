@@ -56,7 +56,7 @@ def package(site, product_file, version, output, *, channel=None, public_url=Non
                 text = re.sub(r"(<body\b[^>]*>)", lambda m: m[1] + banner, text, count=1)
                 page.write_text(text, encoding="utf-8")
         (bundle / "site/deployment.json").write_text(json.dumps({
-            "_license": "SPDX-License-Identifier: MIT",
+            "_license": "MIT",
             "_copyright": "Copyright (c) 2026 Garrett Dothard",
             "version": version, "git": manifest["git_full"], "product": product["name"],
             **({"channel": channel, "site_git": manifest["git_full"], "public_url": public_url} if channel else {}),
