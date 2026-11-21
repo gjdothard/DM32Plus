@@ -2273,5 +2273,18 @@
   "screen.home_p25_unknown": "Inicio, sitio P25 sin nombre",
   "screen.home_p25_mismatch": "Inicio, sitio P25 no coincidente",
   "screen.dual_p25_refused": "Doble escucha P25 rechazada",
-  "screen.home_dual_vfo_entry": "Inicio, entrada de frecuencia VFO en doble escucha"
+  "screen.home_dual_vfo_entry": "Inicio, entrada de frecuencia VFO en doble escucha",
+  "editor.contacts.pages": "Subpáginas de contactos",
+  "editor.contacts.all": "Todos",
+  "editor.contacts.dmr": "TG DMR",
+  "editor.contacts.p25": "TG P25",
+  "editor.contacts.private": "Llamadas privadas (PC)",
+  "editor.contacts.shared": "TG compartidos",
+  "editor.contacts.unit_id": "ID de unidad",
+  "editor.contacts.capacity": "{n} / {max} contactos digitales usados (capacidad compartida)",
+  "editor.contacts.renumber": "Renumerar todos los contactos",
+  "editor.contacts.moved": "{name} ahora está en {page}. Deshacer restaura la clasificación anterior.",
+  "editor.contacts.reclassified": "Contactos actualizados. Sus subpáginas reflejan la nueva clasificación; Deshacer la restaura.",
+  "editor.contacts.assigned": "Elimine o reemplace las asignaciones de contactos incompatibles antes de cambiar la clasificación: {channels}",
+  "editor.contacts.rx_list": "Elimine este contacto de las listas de grupos RX antes de cambiar su tipo de llamada."
 }

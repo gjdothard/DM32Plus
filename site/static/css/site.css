@@ -676,6 +676,26 @@ dialog.ed-channel-dialog { width: min(44rem, calc(100% - 2rem)); box-sizing: bor
 	.ed-channel-body .form-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* System tables span their panel; inputs never size the surrounding form grid. */
+dialog.ed-system-dialog { width: min(68rem, calc(100% - 2rem)); max-width: 68rem; }
+.ed-system-dialog .ed-channel-header h2 { font-size: 1.35rem; }
+.ed-system-dialog .ed-channel-tabs { gap: var(--space-1); }
+.ed-system-dialog .ed-channel-tabs .btn { font-size: var(--text-sm); padding: var(--space-1) var(--space-2); }
+.ed-system-dialog .ed-channel-body { min-height: 16rem; }
+.ed-system-dialog .form-grid { align-content: start; }
+.ed-system-table { grid-column: 1 / -1; min-width: 0; }
+.ed-system-table .table-wrap { margin-bottom: var(--space-2); }
+.ed-system-table :is(th, td) { padding: var(--space-2); vertical-align: middle; }
+.ed-system-table input[type="text"], .ed-system-table select { width: 100%; min-width: 4rem; }
+.ed-system-table .ed-entry-freq { min-width: 9rem; }
+.ed-system-table .ed-entry-text { min-width: 11rem; }
+.ed-system-table .ed-actions { flex-wrap: nowrap; }
+.ed-system-table .ed-actions .btn { padding: var(--space-1) var(--space-2); }
+@media (max-width: 640px) {
+	.ed-system-dialog .ed-channel-body { padding: var(--space-3); }
+	.ed-system-dialog .ed-channel-header, .ed-system-dialog .ed-channel-footer { padding: var(--space-3); }
+}
+
 /* glossary terms in the docs (site.js turns the title into a popover) */
 abbr.gl { text-decoration: underline dotted; text-decoration-thickness: 1.5px; text-underline-offset: 0.2em; cursor: help; }
 abbr.gl:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }

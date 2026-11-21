@@ -2273,5 +2273,18 @@
   "screen.home_p25_unknown": "Home, P25 unnamed site",
   "screen.home_p25_mismatch": "Home, P25 site mismatch",
   "screen.dual_p25_refused": "P25 dual watch refused",
-  "screen.home_dual_vfo_entry": "Home, dual watch VFO frequency entry"
+  "screen.home_dual_vfo_entry": "Home, dual watch VFO frequency entry",
+  "editor.contacts.pages": "Contact subpages",
+  "editor.contacts.all": "All",
+  "editor.contacts.dmr": "DMR TG",
+  "editor.contacts.p25": "P25 TG",
+  "editor.contacts.private": "Private Calls (PC)",
+  "editor.contacts.shared": "Shared TG",
+  "editor.contacts.unit_id": "Unit ID",
+  "editor.contacts.capacity": "{n} / {max} digital contacts used (shared capacity)",
+  "editor.contacts.renumber": "Renumber all contacts",
+  "editor.contacts.moved": "{name} is now in {page}. Undo restores the previous classification.",
+  "editor.contacts.reclassified": "Contacts updated. Their subpages reflect the new classification; Undo restores it.",
+  "editor.contacts.assigned": "Remove or replace incompatible contact assignments before changing classification: {channels}",
+  "editor.contacts.rx_list": "Remove this contact from RX group lists before changing its call type."
 }

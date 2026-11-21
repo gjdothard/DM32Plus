@@ -106,6 +106,26 @@ Choose **Add** to create a record in its editor. **Save** adds it to the codeplu
 unchanged. The pencil beside a record opens its editor again. A new channel and any talkgroups created with it
 can be undone together.
 
+In **Systems**, Edit opens a tabbed form. Choose a section for system identity, radio settings,
+control channels, sites, or the channel plan. Tables use the full panel width; on a small screen,
+scroll the table sideways to reach every column. Switching sections keeps your edits.
+Save checks every section and opens one with an error if correction is needed. Cancel asks before
+discarding changes.
+
+Contacts has **All**, **DMR TG**, **P25 TG**, **Private Calls (PC)**, and **Shared TG** subpages.
+Shared groups apply to both DMR and P25. Existing all-call contacts remain accessible in All;
+DTMF contacts have their own page. Every subpage uses the same shared contact capacity.
+
+Add uses the current subpage's protocol and call type. P25 groups omit the DMR timeslot field;
+private calls show Unit ID and protocol. Each subpage remembers its search and sort. Switching
+subpages clears selection, and bulk actions affect only visible selected records.
+**Renumber all contacts** always applies to the whole digital contact table.
+
+Changing a contact's protocol or call type moves it to the matching subpage. Undo restores the
+previous classification. Remove incompatible channel or RX-list assignments before changing it.
+**Add from RadioID.net** is available in All and Private Calls; imported contacts appear in
+Private Calls. File exports continue to include the whole codeplug.
+
 For a DMR channel, the full form also holds **Operating talkgroups** and **Encryption**. Assign saved group contacts
 and order them for the channel knob. **Channels > Convert Operating Talkgroups** converts legacy assignments
 to shared saved contacts; review the counts and any conversion warning before writing. See

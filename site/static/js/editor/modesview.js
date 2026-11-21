@@ -74,7 +74,7 @@ function deleteSystem(api, s) {
 
 // --- A system's header and its type's fields ---
 
-export function systemDialog(api, s, isNew) {
+export function systemForm(api, s) {
 	const { model: m, t } = api;
 	const row = typeRow(s.type), mod = row.module;
 	const holder = { get: (r) => r.fields, put: (r, key, v) => (r.fields = { ...r.fields, [key]: v }) };
@@ -137,6 +137,14 @@ export function systemDialog(api, s, isNew) {
 			{ type: "note", key: "sys.keynote", text: () => t("editor.modes.secret_note") },
 			...sec.fields.map((x) => ({ ...specField(x, t, keyHolder, "sec"), disabled: (r) => !r.needsKey })));
 	}
+	let index = 0;
+	return fields.map(field => field.group ? { tab: `system-${index++}`, label: field.group } : field);
+}
+
+export function systemDialog(api, s, isNew) {
+	const { model: m, t } = api;
+	const row = typeRow(s.type), mod = row.module, sec = mod.secret;
+	const fields = systemForm(api, s);
 	formDialog(t(isNew ? "editor.modes.add_title" : "editor.modes.edit_title", { name: s.name, type: t(`editor.mode_name.${row.token}`) }), fields, s, t, (work) => api.change(t("editor.undo.edit"), () => {
 		if (isNew) {
 			m.systems.push(s);
@@ -146,7 +154,7 @@ export function systemDialog(api, s, isNew) {
 		Object.assign(s, work, { number: s.number });
 		if (sec) s.secret = !v || Object.values(v).every((x) => x === "" || x === 0) ? null : v;
 		syncModes(m);
-	}), { list: true, saveLabel: t("editor.save_record") });
+	}), { className: "ed-system-dialog", sectionLabel: t("editor.tab.systems"), saveLabel: t("editor.save_record") });
 }
 
 // --- A system's entries: a table per class, inside the system form ---
@@ -173,31 +181,33 @@ function entryTables(api, s) {
 		const g = c.group ? [{ key: "group", label: c.groupLabel, type: "int", min: 0, max: c.groupMax }] : [];
 		return c.control ? [...c.fields, ...g] : [...g, ...c.fields];
 	};
-	const parseAll = (form) => {
+	const parsed = new Map();
+	const parseRows = (form, c, rows) => {
 		const bad = [], out = [];
-		for (const { c, rows } of work) {
-			rows.forEach((r, i) => {
-				if (r._blank && !r._text) return;
-				const e = { ...r };
-				delete e._blank;
-				for (const col of columns(c)) {
-					if (col.type === "bool" || col.type === "select") continue;
-					const res = parseSpec(col, r._text?.[col.key] ?? formatSpec(col, r[col.key], t), t, e);
-					if (res.error) bad.push(`${t(`editor.modes.class.${c.name}`)} ${i + 1}, ${label(t, col.label)}: ${res.error}`);
-					else e[col.key] = res.value;
-				}
-				delete e._text;
-				out.push(e);
-			});
+		rows.forEach((r, i) => {
+			if (r._blank && !r._text) return;
+			const e = { ...r };
+			delete e._blank;
+			for (const col of columns(c)) {
+				if (col.type === "bool" || col.type === "select") continue;
+				const res = parseSpec(col, r._text?.[col.key] ?? formatSpec(col, r[col.key], t), t, e);
+				if (res.error) bad.push(`${t(`editor.modes.class.${c.name}`)} ${i + 1}, ${label(t, col.label)}: ${res.error}`);
+				else e[col.key] = res.value;
+			}
+			delete e._text;
+			out.push(e);
+		});
+		if (!bad.length) {
+			parsed.set(c.cls, out);
+			form.entries = [...work.flatMap(w => parsed.get(w.c.cls) ?? s.entries.filter(e => e.cls === w.c.cls)), ...others];
 		}
-		if (!bad.length) form.entries = [...out, ...others];
 		return bad;
 	};
-	return work.map(({ c, rows }, n) => {
+	return work.map(({ c, rows }) => {
 		const cols = columns(c);
 		const tbody = h("tbody", {});
 		const draw = () => {
-			tbody.replaceChildren(...rows.map((r, i) => h("tr", {}, ...cols.map((col) => h("td", {}, cell(h, t, col, r))),
+			tbody.replaceChildren(...rows.map((r, i) => h("tr", {}, ...cols.map((col) => h("td", { class: `ed-entry-${col.type}` }, cell(h, t, col, r))),
 				h("td", {}, h("div", { class: "ed-actions" },
 					c.control ? icon("↑", t("editor.modes.up"), () => {
 						if (i) [rows[i - 1], rows[i]] = [rows[i], rows[i - 1]];
@@ -209,7 +219,7 @@ function entryTables(api, s) {
 					}, { quiet: true, danger: true }))))));
 		};
 		draw();
-		const table = h("div", { class: "form-table" },
+		const table = h("div", { class: "form-table ed-system-table" },
 			h("div", { class: "table-wrap" }, h("table", { class: "data" },
 				h("thead", {}, h("tr", {}, ...cols.map((x) => h("th", {}, label(t, x.label))), h("th", {}, ""))), tbody)),
 			button(`+ ${t(`editor.modes.add_${c.name}`)}`, () => {
@@ -221,8 +231,7 @@ function entryTables(api, s) {
 			fields: [
 				{ group: t(`editor.modes.class.${c.name}`), ...(c.control ? {} : { collapsed: !rows.length }) },
 				{ type: "note", key: `sys.cls${c.cls}`, text: () => t(`editor.modes.class.${c.name}_help`) },
-				// one parse covers every table: the first table's field does it
-				{ type: "custom", key: `sys.tbl${c.cls}`, render: () => table, parse: (form) => (n === 0 ? parseAll(form) : []) },
+				{ type: "custom", key: `sys.tbl${c.cls}`, render: () => table, parse: form => parseRows(form, c, rows) },
 			],
 		};
 	});
