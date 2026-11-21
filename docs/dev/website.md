@@ -103,9 +103,11 @@ the firmware and task-stack checks pass. It publishes a checksummed
 bundle contains the CPS and firmware from the same source commit and shows a
 translated Testing banner. A failed build leaves the previous website active.
 
-Install `tools/website/install-testing.py --root DEPLOYMENT --repository OWNER/REPO`
+Install `tools/website/install-testing.py --root DEPLOYMENT --repository OWNER/REPO --project PROJECT`
 as the existing owner of a separate `testing-cps` Compose deployment. Keep
-`testing_update.py` beside the installer. The installer retains the existing
+`testing_update.py` beside the installer. Use the existing Compose project name for
+`PROJECT` so updates keep targeting the same deployment. Existing updater configurations
+without a project field use the name in their generated Compose file. The installer retains the existing
 ports, public host, builder network and read-only mounts. It adds an independent
 user cron entry that polls every two minutes and survives SSH logout and reboot.
 It does not change the production updater, proxy, or DNS.

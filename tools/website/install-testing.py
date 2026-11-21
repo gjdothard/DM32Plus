@@ -10,14 +10,20 @@ import shutil
 import subprocess
 
 
-def install(root, repository):
+def compose_config(source, project):
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", project):
+        raise ValueError("invalid Compose project name")
+    return json.loads(subprocess.check_output(["docker", "compose", "-p", project,
+                      "-f", str(source), "config", "--format", "json"], text=True))
+
+
+def install(root, repository, project):
     root = root.resolve(strict=True)
     if (root == Path("/") or not re.fullmatch(r"/[A-Za-z0-9_./-]+", str(root))
             or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository)):
         raise ValueError("invalid Testing deployment configuration")
     source = root / "compose.yaml"
-    compose = json.loads(subprocess.check_output(["docker", "compose", "-p", "dm32plus-cps-testing",
-                       "-f", str(source), "config", "--format", "json"], text=True))
+    compose = compose_config(source, project)
     if set(compose["services"]) != {"testing-cps"}:
         raise ValueError("expected the separate Testing service only")
     service = compose["services"]["testing-cps"]
@@ -46,7 +52,7 @@ def install(root, repository):
     fixed_compose.write_text(json.dumps(compose, indent=2) + "\n")
     subprocess.run(["docker", "compose", "-f", str(fixed_compose), "config", "--quiet"], check=True)
     config = control / "config.json"
-    config.write_text(json.dumps(dict(root=str(root), repository=repository, compose=str(fixed_compose),
+    config.write_text(json.dumps(dict(root=str(root), repository=repository, project=project, compose=str(fixed_compose),
                       health_url="http://127.0.0.1:8083/deployment.json"), indent=2) + "\n")
     # Preserve every unrelated cron entry. No privileged service or production configuration changes.
     existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
@@ -63,5 +69,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--repository", required=True)
+    parser.add_argument("--project", required=True, help="existing Compose project name")
     args = parser.parse_args()
-    install(args.root, args.repository)
+    install(args.root, args.repository, args.project)

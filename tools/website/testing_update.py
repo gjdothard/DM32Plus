@@ -83,7 +83,9 @@ def unpack(archive, destination, sha, version):
 
 
 def compose(config):
-    subprocess.run(["docker", "compose", "-p", "dm32plus-cps-testing", "-f", config["compose"],
+    # Older installations already pin the project with the generated Compose file's name.
+    project = ["-p", config["project"]] if "project" in config else []
+    subprocess.run(["docker", "compose", *project, "-f", config["compose"],
                     "up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "60", "testing-cps"],
                    check=True, timeout=150)
 

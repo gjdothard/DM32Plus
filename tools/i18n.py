@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """The firmware's translations (docs/dev/translating.md): the strings the radio shows, marked in core/ with TR("...")
 or TRN("..."), and one gettext catalog per language in core/ui/lang/<code>.po.
 
@@ -187,6 +188,14 @@ def po_unquote(s, where):
     return "".join(out)
 
 
+def display_path(path):
+    try:
+        return os.path.relpath(path, ROOT)
+    except ValueError:
+        # A catalog supplied by a caller may live on another Windows drive.
+        return os.path.abspath(path)
+
+
 def read_po(path):
     """(headers dict, [(msgid, msgstr, fuzzy)]); fuzzy is False, True, or the English the translation was made for
     (a "#| msgid" line: the source's English changed since)"""
@@ -194,7 +203,7 @@ def read_po(path):
     cur = None
     field = None
     fuzzy = False
-    rel = os.path.relpath(path, ROOT)
+    rel = display_path(path)
 
     def flush():
         nonlocal cur
@@ -466,7 +475,7 @@ def tables():
         name = headers.get("X-Language-Name", code)
         pairs = {}
         for msgid, msgstr, fz in body:
-            where = "%s: %r" % (os.path.relpath(path, ROOT), msgid)
+            where = "%s: %r" % (display_path(path), msgid)
             en = text_to_bytes(msgid, where)
             h = fnv1a(en)
             # every English the UI marks, translated or not: one that collides would be shown the other's translation
@@ -589,7 +598,7 @@ def main():
                 raise I18nError("CODE: an ISO 639-1 code other than en, two lower-case letters")
             path = os.path.join(LANG_DIR, code + ".po")
             if os.path.exists(path):
-                raise I18nError("%s exists" % os.path.relpath(path, ROOT))
+                raise I18nError("%s exists" % display_path(path))
             text_to_bytes(name, "NAME")
             os.makedirs(LANG_DIR, exist_ok=True)
             source = extract()
@@ -599,7 +608,7 @@ def main():
                  [(t, "", False) for t, _ in source], dict(source))
             print("wrote %s; next: add the build switches CONFIG_LANG_%s and CONFIG_LANG_DEFAULT_%s "
                   "(docs/dev/translating.md, step 2)"
-                  % (os.path.relpath(path, ROOT), code.upper(), code.upper()))
+                  % (display_path(path), code.upper(), code.upper()))
             return 0
         if args[:1] in (["--sync"], ["--check"], ["--stats"]):
             only = [a for a in args[1:] if not a.startswith("--")]
@@ -608,7 +617,7 @@ def main():
             for code, path in catalogs().items():
                 if only and code not in only:
                     continue
-                rel = os.path.relpath(path, ROOT)
+                rel = display_path(path)
                 headers, entries, refs = synced(path, source)
                 if headers.get("Language") != code:
                     errs.append("%s: its Language header isn't %s" % (rel, code))

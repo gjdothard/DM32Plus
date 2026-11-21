@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """The glossary: one data file (docs/glossary.json), the two pages generated from it, and the checks on it.
 
     tools/glossary.py --check          the data is sound and the generated pages are current (CI)
@@ -110,7 +111,7 @@ def render(data, scope):
 			meaning = e["definition"].replace("|", "\\|")
 			if e.get("link"):
 				target = os.path.join(ROOT, "docs", e["link"])
-				meaning += " [More](%s)" % os.path.relpath(target, os.path.dirname(PAGES[scope]))
+				meaning += " [More](%s)" % os.path.relpath(target, os.path.dirname(PAGES[scope])).replace("\\", "/")
 			out.append('| <a id="%s"></a>%s | %s |' % (anchor(e["term"]), label, meaning))
 		out.append("")
 	return "\n".join(out).rstrip("\n") + "\n"
