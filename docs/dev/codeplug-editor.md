@@ -27,6 +27,7 @@ use it too. Both are plain ES modules that also run in Node. The user's view is 
 | `codeplug/iddb.js` | The DMR ID database in format N and format C ([iddb-compact.md](../spec/iddb-compact.md)): write, read, convert, size |
 | `codeplug/sources/` | Contacts sources: `radioid.js` (RadioID.net's `user.csv` and API), `regions.js` (generated region names), `output.js` (users to the ID database or contacts) |
 | `editor/app.js` | The page: tabs, the file menu, radio read and write, the draft |
+| `editor/contact-views.js` | Contact subpage classification, creation defaults, columns, and assignment checks; views keep the shared contact objects |
 | `editor/grid.js`, `views.js` | The table (in-place edit, sort, filter, selection, keyboard) and each record kind's columns, form and membership editor |
 | `editor/undo.js` | Snapshots of every table's order and every record's fields |
 | `editor/files.js` | What an opened file holds (codeplug image, backup bundle, `codeplug.bin`), and the draft in IndexedDB |

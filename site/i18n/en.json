@@ -2251,5 +2251,18 @@
  "editor.p25.site_name": "Site name",
  "editor.p25.site_name_help": "Optional, up to 16 Latin-1 characters. Enter the broadcast RFSS and site IDs to confirm this name on the radio. The site group number only links control channels.",
  "editor.problem.p25_site_name": "Site names must contain at most 16 printable Latin-1 characters.",
- "editor.problem.p25_site_name_version": "This site has a newer or incomplete name extension. Clear the name to preserve its data."
+ "editor.problem.p25_site_name_version": "This site has a newer or incomplete name extension. Clear the name to preserve its data.",
+ "editor.contacts.pages": "Contact subpages",
+ "editor.contacts.all": "All",
+ "editor.contacts.dmr": "DMR TG",
+ "editor.contacts.p25": "P25 TG",
+ "editor.contacts.private": "Private Calls (PC)",
+ "editor.contacts.shared": "Shared TG",
+ "editor.contacts.unit_id": "Unit ID",
+ "editor.contacts.capacity": "{n} / {max} digital contacts used (shared capacity)",
+ "editor.contacts.renumber": "Renumber all contacts",
+ "editor.contacts.moved": "{name} is now in {page}. Undo restores the previous classification.",
+ "editor.contacts.reclassified": "Contacts updated. Their subpages reflect the new classification; Undo restores it.",
+ "editor.contacts.assigned": "Remove or replace incompatible contact assignments before changing classification: {channels}",
+ "editor.contacts.rx_list": "Remove this contact from RX group lists before changing its call type."
 }

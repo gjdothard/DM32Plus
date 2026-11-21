@@ -2251,5 +2251,18 @@
  "editor.p25.site_name": "Nombre del sitio",
  "editor.p25.site_name_help": "Opcional, hasta 16 caracteres Latin-1. Introduzca los ID de RFSS y sitio emitidos para confirmar este nombre en la radio. El número de grupo solo vincula los canales de control.",
  "editor.problem.p25_site_name": "Los nombres de sitio admiten hasta 16 caracteres Latin-1 imprimibles.",
- "editor.problem.p25_site_name_version": "Este sitio tiene una extensión de nombre nueva o incompleta. Borre el nombre para conservar sus datos."
+ "editor.problem.p25_site_name_version": "Este sitio tiene una extensión de nombre nueva o incompleta. Borre el nombre para conservar sus datos.",
+ "editor.contacts.pages": "Subpáginas de contactos",
+ "editor.contacts.all": "Todos",
+ "editor.contacts.dmr": "TG DMR",
+ "editor.contacts.p25": "TG P25",
+ "editor.contacts.private": "Llamadas privadas (PC)",
+ "editor.contacts.shared": "TG compartidos",
+ "editor.contacts.unit_id": "ID de unidad",
+ "editor.contacts.capacity": "{n} / {max} contactos digitales usados (capacidad compartida)",
+ "editor.contacts.renumber": "Renumerar todos los contactos",
+ "editor.contacts.moved": "{name} ahora está en {page}. Deshacer restaura la clasificación anterior.",
+ "editor.contacts.reclassified": "Contactos actualizados. Sus subpáginas reflejan la nueva clasificación; Deshacer la restaura.",
+ "editor.contacts.assigned": "Elimine o reemplace las asignaciones de contactos incompatibles antes de cambiar la clasificación: {channels}",
+ "editor.contacts.rx_list": "Elimine este contacto de las listas de grupos RX antes de cambiar su tipo de llamada."
 }

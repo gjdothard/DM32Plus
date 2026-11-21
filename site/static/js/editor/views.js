@@ -8,6 +8,7 @@
 import { h, button } from "../flasher/dom.js";
 import { guardDialog } from "./unsaved.js";
 import { keyboardTabs } from "./navigation.js";
+import { contactEditError } from "./contact-views.js";
 import { parseFreq, parseTone, mhz } from "../codeplug/fields.js";
 import { LIMITS, POWER_NAMES } from "../codeplug/records.js";
 import { refNumber, listenBand, newContact } from "../codeplug/model.js";
@@ -159,9 +160,10 @@ export function visibleChannelColumns(all, selected = DEFAULT_CHANNEL_COLUMNS) {
 
 // Reuse the table parsers for compact contact, DTMF, and APRS record editors.
 export function recordForm(table, model, t) {
-	return columns(table, model, t).filter(column => column.set).map(column => ({
-		key: column.key, label: column.label, type: column.type === "bool" ? "bool" : column.type === "select" ? "select" : "text",
+	return columns(table, model, t, { guardContacts: false }).filter(column => column.set).map(column => ({
+		key: column.key, label: table === "contacts" && column.key === "id" ? record => t(record.type === "private" ? "editor.contacts.unit_id" : "editor.col.id") : column.label, type: column.type === "bool" ? "bool" : column.type === "select" ? "select" : "text",
 		options: column.options,
+		show: table === "contacts" && column.key === "timeslot" ? record => (record.protocol ?? "dmr") !== "p25" && record.type !== "private" : undefined,
 		disabled: table === "contacts" && column.key === "id" ? record => record.type === "all" : undefined,
 		parse: (record, key, value) => {
 			if (table === "contacts" && key === "id" && record.type === "all") return;
@@ -171,7 +173,7 @@ export function recordForm(table, model, t) {
 	}));
 }
 
-export function columns(table, m, t) {
+export function columns(table, m, t, { guardContacts = true } = {}) {
 	const col = (key, label, type, parse, extra = {}) => ({
 		key, label: t(label), type,
 		get: (r) => r[key],
@@ -222,10 +224,16 @@ export function columns(table, m, t) {
 			num,
 			col("name", "editor.col.name", "text", name(LIMITS.name)(t)),
 			col("protocol", "editor.col.protocol", "select", pick, { options: () => [["dmr", "DMR"], ["p25", "P25"], ["both", t("editor.protocol.both")]], get: r => r.protocol ?? "dmr" }),
-			col("id", "editor.col.id", "text", int(1, 0xFFFFFF)(t), { numeric: true, readOnly: false }),
+			col("id", "editor.col.id", "text", int(1, 0xFFFFFF)(t), { numeric: true, readOnly: r => r.type === "all" }),
 			col("type", "editor.col.call_type", "select", pick, { options: () => [["group", t("editor.call.group")], ["private", t("editor.call.private")], ["all", t("editor.call.all")]] }),
-			col("timeslot", "editor.col.ts_override", "select", pick, { options: () => [[0, t("editor.none")], [1, "1"], [2, "2"]] }),
-		];
+			col("timeslot", "editor.col.ts_override", "select", pick, { options: () => [[0, t("editor.none")], [1, "1"], [2, "2"]],
+				readOnly: r => r.protocol === "p25" || r.type === "private", format: (v, r) => r.protocol === "p25" || r.type === "private" ? "" : v ? String(v) : t("editor.none") }),
+		].map(column => !guardContacts || !column.set ? column : { ...column, set: (record, value) => {
+			const work = { ...record };
+			const error = column.set(work, value) || contactEditError(m, record, work, t);
+			if (error) return error;
+			Object.assign(record, work);
+		} });
 	case "rxLists":
 		return [
 			num,
@@ -747,11 +755,13 @@ export function formDialog(title, fields, record, t, onSave, options = {}) {
 				first ??= row;
 			}
 		}
+		const validation = options.validate?.(work);
+		if (validation) bad.push(validation);
 		if (bad.length) {
 			errs.hidden = false;
 			errs.textContent = bad.join(" · ");
 			if (first?.section && !first.section.control.hidden) select(first.section);
-			(first.input.matches("input, select") ? first.input : first.input.querySelector("input, button"))?.focus();
+			if (first) (first.input.matches("input, select") ? first.input : first.input.querySelector("input, button"))?.focus();
 			return;
 		}
 		if (onSave(work) === false) return;
