@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Garrett Dothard
 # Copyright (c) 2026 The RadioFoundry Authors
 """Convert a fixed-cell BDF bitmap font, or a monospaced TrueType font, into the C data the UI draws with
 (core/ui/font.h).
@@ -181,7 +182,7 @@ def main():
             data.append([0] * (((cw * bpp + 7) // 8) * ch))
 
     w = sys.stdout.write
-    w("// SPDX-License-Identifier: %s\n" % spdx)
+    w("// SPDX-License-" "Identifier: %s\n" % spdx)
     if ttf:
         for l in license_text:
             m = re.match(r"Copyright (\d.*)", l)

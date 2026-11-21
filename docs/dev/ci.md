@@ -62,8 +62,8 @@ application region, also put in the job summary on GitHub) and fails when the ap
 images and logs are workflow artifacts (`firmware-arm`, `firmware-csky`), as are the unit test logs with the screen gallery
 (`host-logs`) and the coverage report (`coverage-report`).
 
-`reuse lint` is part of the `checks` job only when the repository variable `RFOUNDRY_CI_REUSE` is `true`; it doesn't pass on
-the current tree yet (run it to see the files), and the nightly reports it as a warning meanwhile.
+`reuse lint` is part of the `checks` job only when the repository variable `RFOUNDRY_CI_REUSE` is `true`.
+The tree passes the check. The nightly job reports failures as warnings; `tools/ci.sh` treats them as errors.
 
 ## Submodules
 
@@ -163,7 +163,7 @@ support it, so check the first run on the Gitea runner before relying on the com
 | Job | Command |
 |---|---|
 | `matrix (C-SKY)` | `tools/ci.sh --matrix --steps firmware --board <product-board-id>`: each switch off alone, fm-minimal, and maximal |
-| `reuse` | `reuse lint`, a warning until it passes |
+| `reuse` | `reuse lint`; failures reported as warnings |
 
 The maximal build turns on every switch except the board's `BOARD_UNSUPPORTED` (the hardware can't),
 `BOARD_NOT_WRITTEN` (the code isn't written for the radio yet) and `MAXIMAL_SKIP` lists, and `CONFIG_AUDIO_PROBE`
