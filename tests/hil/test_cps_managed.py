@@ -6,7 +6,7 @@ import pytest
 from rfoundry_hil import skip
 
 
-@pytest.mark.feature("cps_managed")
+@pytest.mark.feature("cps_fast")
 def test_managed_programming_capability(radio):
     _, info = radio.link.request(0x1C, bytes([0]))
     assert len(info) >= 26 and info[0] == 1, info

@@ -274,11 +274,15 @@ aprsRadioTest: $(APRSRT) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/aprs/*
 	$(CC) $(CFLAGS) $(CORE_HAL) -I. $(FMONLY) -o $@ $(APRSRT) -lm
 
 # Air band AM receive through the radio core (docs/spec/airband-and-broadcast.md 3), a fake board with CAP_AM_RX
-TESTS   += radioListenBandsTest
+TESTS   += radioListenBandsTest radioListenBandsTestNoScan
 AMTEST  := radioListenBandsTest.c $(filter-out radioFeaturesTest.c,$(RFTEST))
 
 radioListenBandsTest: $(AMTEST) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/call/*.h)
 	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_HOTSPOT=0 -DCONFIG_APRS=0 -o $@ $(AMTEST) -lm
+
+radioListenBandsTestNoScan: $(AMTEST) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/call/*.h)
+	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_HOTSPOT=0 -DCONFIG_APRS=0 \
+		-DCONFIG_SCAN=0 -DCONFIG_DUAL_WATCH=0 -DCONFIG_UI_CARD_MENU=0 -o $@ $(AMTEST) -lm
 
 inputTest: inputTest.c $(CORE)/input/input_engine.c $(CORE)/input/input_engine.h $(CORE)/input/input.h
 	$(CC) $(CFLAGS) $(CORE_HAL) -o $@ inputTest.c $(CORE)/input/input_engine.c
@@ -317,10 +321,10 @@ TESTS   += boardBandTest
 boardBandTest: boardBandTest.c $(ROOT)/hal/board.h
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ boardBandTest.c
 
-radioCoreTest radioCoreTestNoVfoDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest aprsRadioTest: sim/radio_task.h
+radioCoreTest radioCoreTestNoVfoDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest radioListenBandsTestNoScan aprsRadioTest: sim/radio_task.h
 
 run: run-core
-run-core: radioCoreTest radioCoreTestNoVfoDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest inputTest aprsRadioTest quadratureTest serialmicTest miclevelTest \
+run-core: radioCoreTest radioCoreTestNoVfoDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest radioListenBandsTestNoScan inputTest aprsRadioTest quadratureTest serialmicTest miclevelTest \
           rx2LinkTest keyassignTest powerSwitchTest boardBandTest batteryTest
 	./aprsRadioTest
 	./radioCoreTest
@@ -329,6 +333,7 @@ run-core: radioCoreTest radioCoreTestNoVfoDmr radioFeaturesTest radioFeaturesTes
 	./radioFeaturesTestNoDual
 	./roamTest
 	./radioListenBandsTest
+	./radioListenBandsTestNoScan
 	./inputTest
 	./quadratureTest
 	./serialmicTest
@@ -502,7 +507,7 @@ $(shell python3 $(ROOT)/tools/gen_about.py $(ROOT)/AUTHORS $(ROOT)/platform/stm3
 UIFLAGS := -std=gnu99 -Wall -Wextra -Wno-unused-parameter -Wshadow -g $(COVFLAGS) $(SANFLAGS) -I$(CORE) -I$(ROOT)/hal -I. -Iout/gen \
            '-DGFX_FB_BYTES=(320u*320u*2u)' -DGFX_MAX_ROWS=320 -DCONFIG_FONT_XL=1 -DCONFIG_UI_CARD_MENU=1 -DCONFIG_DMR_TALKGROUP_ENTRIES=1 -DCONFIG_P25=1 -DCONFIG_P25_UI=1 -DCONFIG_P25_TRUNK=1 -DFONT_BOTH -DGFX_INDEXED=1 -DGFX_FIT_TRACE
 UIDEPS  := $(UIAPP) $(ABOUT_H) $(LANG_H) $(wildcard $(CORE)/ui/*.h $(CORE)/ui/fonts/*.inc sim/ui_sim.h)
-TESTS   += uiFlowTest uiFlowTestNoColor uiFlowTestHistory uiSim
+TESTS   += uiFlowTest uiFlowTestNoColor uiFlowTestHistory uiSim uiSimNoChannelList
 
 uiFlowTest: uiFlowTest.c $(UIDEPS)
 	$(CC) $(UIFLAGS) -o $@ uiFlowTest.c $(UIAPP) -lz
@@ -519,6 +524,10 @@ uiFlowTestHistory: uiFlowTest.c $(UIDEPS)
 uiSim: uiSim.c $(UIDEPS)
 	$(CC) $(UIFLAGS) -DCONFIG_MESSAGE_JOURNAL=1 -o $@ uiSim.c $(UIAPP) -lz
 
+uiSimNoChannelList: uiSim.c $(UIDEPS)
+	$(CC) $(UIFLAGS) -DCONFIG_CHANNEL_LIST=0 -DCONFIG_CHANNEL_EDIT=0 -DCONFIG_ZONE_EDIT=0 \
+		-DCONFIG_CONTACT_EDIT=0 -DCONFIG_TALKGROUP_EDIT=0 -o $@ uiSim.c $(UIAPP) -lz
+
 # The highlight colors the gallery shows its color pages in: the list in .github/workflows/ui-gallery.yml, so the
 # committed gallery and a pull request's before / after pictures show the same colors
 UI_GALLERY_COLORS ?= $(shell sed -n 's/^ *UI_GALLERY_COLORS: *"\([^"]*\)".*/\1/p' $(ROOT)/.github/workflows/ui-gallery.yml)
@@ -532,7 +541,7 @@ ui-sheets: uiSim
 	UI_GALLERY_COLORS="$(UI_GALLERY_COLORS)" ./uiSim --sheets out/sheets $(GEOM)
 
 run: run-ui
-run-ui: gfxTest i18nTest i18nTestNoLang i18nTestDefault uiFlowTest uiFlowTestNoColor uiFlowTestHistory uiSim
+run-ui: gfxTest i18nTest i18nTestNoLang i18nTestDefault uiFlowTest uiFlowTestNoColor uiFlowTestHistory uiSim uiSimNoChannelList
 	./gfxTest
 	./i18nTest
 	./i18nTestNoLang
@@ -540,6 +549,7 @@ run-ui: gfxTest i18nTest i18nTestNoLang i18nTestDefault uiFlowTest uiFlowTestNoC
 	./uiFlowTest
 	./uiFlowTestNoColor
 	./uiFlowTestHistory
+	./uiSimNoChannelList --geom 128x64 --map M --script "call:3101234,91,g wait:11000 ctx 3 down down down down ok expect:screen=sms-write"
 	./uiSim --layout
 .PHONY: run-ui ui-gallery ui-sheets
 

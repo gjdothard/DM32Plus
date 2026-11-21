@@ -62,6 +62,15 @@ static const char *status(const p25_monitor_t *m)
 	return TR("Control channel locked");
 }
 
+static const char *compact_status(const p25_monitor_t *m)
+{
+	if (!(m->flags & P25_MON_ACTIVE)) return TR("Unavailable");
+	if (m->flags & P25_MON_RX) return m->flags & P25_MON_ENC ? TR("Encrypted") : TR("Voice");
+	if (!(m->flags & P25_MON_TRUNK)) return TR("Waiting");
+	if (m->state == 3) return TR("Voice");
+	return m->state == 2 ? TR("Control") : TR("Searching");
+}
+
 static bool favorite(const p25_monitor_t *m, uint16_t tg)
 {
 	for (unsigned i = 0; i < m->favorite_count; i++) if (m->favorites[i] == tg) return true;
@@ -404,7 +413,7 @@ static void __attribute__((noinline)) recent_body(int y, bool cards)
 	if (!count) line(font, &y, TR("No calls or favorites"), ui_col.dim);
 	for (unsigned i = frame->top; i < count && i < frame->top + rows; i++) {
 		bool selected = i == frame->focus;
-		color_t color = selected && !cards ? ui_col.focus_fg : ui_col.fg;
+		color_t color = selected && !cards ? (gfx_bpp() == 1 ? ui_col.bg : ui_col.focus_fg) : ui_col.fg;
 		if (selected) {
 			if (cards) {
 				gfx_round_fill(1, y - 1, gfx_width() - 2, pitch - 2, UI_CARD_SELECTED);
@@ -467,7 +476,10 @@ static void system_item(uint16_t i, ui_item_t *it)
 	sb_init(&b, it->value, sizeof it->value);
 	if (!ok) { sb_str(&b, "--"); return; }
 	switch (i) {
-	case 0: sb_str(&b, status(&m)); break;
+	case 0:
+		sb_str(&b, TEXT_ALT_OPEN); sb_str(&b, status(&m));
+		sb_str(&b, TEXT_ALT_NEXT); sb_str(&b, compact_status(&m)); sb_str(&b, TEXT_ALT_CLOSE);
+		break;
 	case 1: if (m.cc_hz) sb_freq(&b, m.cc_hz); else sb_str(&b, "--"); break;
 	case 2: sb_freq(&b, m.tuned_hz); break;
 	case 3:

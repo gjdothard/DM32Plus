@@ -49,8 +49,8 @@ static const flow_t flows[] = {
 	{ "P25 Quick opens protocol controls", "p25-trunk-home", "quick", "screen=p25-listen", 1, false },
 	{ "P25 Quick returns to recent", "p25-trunk-home ctx", "quick back", "screen=p25-recent", 2, false },
 	{ "P25 recent calls opens", "p25-trunk-home quick", "ok", "screen=p25-recent", 1, false },
-	{ "P25 system details opens", "p25-trunk-home quick", "6", "screen=p25-system", 1, false },
-	{ "P25 assigned talkgroups opens the shared picker", "p25-trunk-home quick", "8", "screen=p25-talkgroups", 1, false },
+	{ "P25 system details opens", "p25-trunk-home quick", "6", "screen=p25-system shows=Status", 1, false },
+	{ "P25 assigned talkgroups opens the shared picker", "p25-trunk-home quick", "8", "screen=p25-talkgroups shows=Charleston_NSA", 1, false },
 	{ "P25 assigned group changes target without transmitting", "p25-trunk-home quick 8", "down ok",
 	  "screen=home p25hold=2456 p25target=2456 tx=0", 2, false },
 	{ "P25 system decode details opens", "p25-trunk-home quick 6", "ctx", "screen=p25-system", 1, false },
@@ -1247,6 +1247,29 @@ static void crawl(const sim_geom_t *g, sim_map_t map, const char *mapname)
 	printf("# crawl [%s]: %d screens and states checked\n", mapname, screens);
 }
 
+#if CONFIG_P25_UI
+static void check_p25_selection_contrast(void)
+{
+	static const char *const scripts[] = {
+		"p25-trunk-home ctx expect:screen=p25-recent",
+		"p25-trunk-home quick ok ctx back 7 expect:screen=p25-recent",
+	};
+	for (int g = 0; g < sim_geom_count; g++) {
+		for (size_t i = 0; i < sizeof scripts / sizeof scripts[0]; i++) {
+			char err[300], issues[SIM_LAYOUT_MAX][160];
+			sim_reset(&sim_geoms[g], SIM_MAP_K);
+			if (!sim_run(scripts[i], err, sizeof err)) {
+				printf("FAIL P25 selection [%s]: %s\n", sim_geoms[g].name, err);
+				fails++;
+			} else if (sim_layout_issues(issues, SIM_LAYOUT_MAX) != 0) {
+				printf("FAIL P25 selection [%s]: %s\n", sim_geoms[g].name, issues[0]);
+				fails++;
+			}
+		}
+	}
+}
+#endif
+
 // About (Settings > Advanced): every word readable at every display class (nothing shortened with an ellipsis, all
 // the way to the end), no status strip while idle, the strip back while transmitting
 static void about_checks(void)
@@ -1434,6 +1457,9 @@ int main(void)
 {
 	if (check_name_is_id() != 0)
 		return 1;
+#if CONFIG_P25_UI
+	check_p25_selection_contrast();
+#endif
 #if CONFIG_DMR_SMS
 	{
 		// The cursor follows a draft past the visible rows, and a rejected key cannot change the last character.

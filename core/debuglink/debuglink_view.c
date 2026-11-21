@@ -21,7 +21,7 @@
 #include "codeplug/zone_edit.h"
 #include "settings/settings.h"
 #include "radio/ref_trim.h"
-#if CONFIG_P25 && CONFIG_DIAG
+#if CONFIG_P25
 #include "radio/radio_p25.h"
 #endif
 #include "storage/storage.h"

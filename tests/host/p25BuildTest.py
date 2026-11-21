@@ -20,6 +20,18 @@ OPTIONS, UNITTEST_ARGS = parser.parse_known_args()
 
 
 class P25BuildTest(unittest.TestCase):
+    def test_font_defaults_follow_antialiasing(self):
+        for board in sorted((ROOT / "boards").iterdir()):
+            if not (board / "board.mk").is_file():
+                continue
+            with self.subTest(board=board.name):
+                result = subprocess.run([OPTIONS.make, "--no-print-directory", "-s", f"BOARD={board.name}",
+                                         "CONFIG_FONT_AA=n", "print-vars", "VARS=CONFIG_FONT_AA CONFIG_FONT_BIG"],
+                                        cwd=ROOT, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("CONFIG_FONT_AA=n", result.stdout)
+                self.assertIn("CONFIG_FONT_BIG=n", result.stdout)
+
     def test_full_board_managed_transfer(self):
         """Exercise production board maps, rather than the protocol simulator's map."""
         for board in sorted((ROOT / "boards").iterdir()):

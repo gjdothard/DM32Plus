@@ -376,7 +376,11 @@ static bool bcast_listening(const radio_sm_t *sm)
 #if CONFIG_APRS
 	own_rx = sm->aprs_phase == APRS_RF_OFF;
 #endif
-	return own_rx && sm->view.bcast && !sm->view.bcast_fault && !scan_on(&sm->scan);
+#if CONFIG_SCAN
+	if (scan_on(&sm->scan))
+		return false;
+#endif
+	return own_rx && sm->view.bcast && !sm->view.bcast_fault;
 #else
 	(void)sm;
 	return false;
