@@ -97,6 +97,12 @@ Choose **Add** to create a record in its editor. **Save** adds it to the codeplu
 unchanged. The pencil beside a record opens its editor again. A new channel and any talkgroups created with it
 can be undone together.
 
+In **Systems**, Edit opens a tabbed form. Choose a section for system identity, radio settings,
+control channels, sites, or the channel plan. Tables use the full panel width; on a small screen,
+scroll the table sideways to reach every column. Switching sections keeps your edits.
+Save checks every section and opens one with an error if correction is needed. Cancel asks before
+discarding changes.
+
 Contacts has **All**, **DMR TG**, **P25 TG**, **Private Calls (PC)**, and **Shared TG** subpages.
 Shared groups apply to both DMR and P25. Existing all-call contacts remain accessible in All;
 DTMF contacts have their own page. Every subpage uses the same shared contact capacity.

@@ -571,7 +571,7 @@ export function formDialog(title, fields, record, t, onSave, options = {}) {
 	const errs = h("p", { class: "notice bad", hidden: true });
 	const rows = [];
 	const body = h("div", { class: "ed-channel-body" + (fields.some(field => field.tab) ? "" : " form-grid") });
-	const nav = h("div", { class: "ed-channel-tabs", role: "tablist", "aria-label": t("editor.form.sections"), hidden: !fields.some(field => field.tab) });
+	const nav = h("div", { class: "ed-channel-tabs", role: "tablist", "aria-label": options.sectionLabel || t("editor.form.sections"), hidden: !fields.some(field => field.tab) });
 	const sections = [];
 	let section;
 	const select = (active) => {
@@ -637,7 +637,7 @@ export function formDialog(title, fields, record, t, onSave, options = {}) {
 			content.append(row);
 		} else if (f.type === "custom") {
 			const row = f.render();
-			rows.push({ f, input: null, row });
+			rows.push({ f, input: null, row, section });
 			content.append(row);
 		} else if (f.type === "note") {
 			// a line of text from the inputs as they are typed
@@ -719,7 +719,7 @@ export function formDialog(title, fields, record, t, onSave, options = {}) {
 	body.addEventListener("input", sync);
 	keyboardTabs(nav, control => select(sections.find(tab => tab.control === control)));
 	sync();
-	const dlg = h("dialog", { class: "confirm editor-dialog ed-channel-dialog", "aria-labelledby": "channel-edit-title" });
+	const dlg = h("dialog", { class: "confirm editor-dialog ed-channel-dialog" + (options.className ? " " + options.className : ""), "aria-labelledby": "channel-edit-title" });
 	const signature = () => JSON.stringify(rows.map(({ f, input, row }) => f.type === "custom" ?
 		[...row.querySelectorAll("input,select")].map(i => i.type === "checkbox" ? i.checked : i.value) :
 		input ? (f.read ? f.read(input, work) : input.type === "checkbox" ? input.checked : input.value) : null));

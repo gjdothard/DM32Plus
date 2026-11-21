@@ -31,6 +31,14 @@ plan for a native format. Nothing in section 4 is built yet.
 - Radio-wide state, keys included, lives in the settings store, not in the codeplug. A codeplug file can be shared
   without leaking keys or the owner's last channel.
 
+### CPS system editor
+
+The system editor separates identity, radio settings, and each entry-table class into keyboard-accessible
+tabs. Entry tables use the full panel width and scroll horizontally on narrow displays. Save and Cancel
+remain visible while the panel scrolls. Switching tabs retains unsaved fields and rows. Save validates
+every tab and opens the first section with an error. Cancel discards the staged edits after confirmation.
+Unknown entry classes remain intact when a supported class is edited.
+
 ### CPS contact views
 
 The Contacts page offers All, DMR TG, P25 TG, Private Calls (PC), and Shared TG subpages.
