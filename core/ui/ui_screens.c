@@ -14,6 +14,7 @@
 #include "dmr/dmrDataService.h"
 #endif
 #include "config.h"
+#include "ui_p25.h"
 
 ui_layout_t ui_layout;
 static const font_t *font_largest;	// the large text setting's font (large_font)
@@ -287,10 +288,17 @@ static uint8_t rssi_bars(int16_t dbm)
 	return 0;
 }
 
+static const char *mode_label(uint8_t mode)
+{
+	if (mode == RADIO_MODE_P25) return "P25";
+	if (mode == RADIO_MODE_NONE) return "?";
+	return mode == RADIO_MODE_DMR ? "DMR" : "FM";
+}
+
 // The mode word: AM where an FM channel or the VFO is received in AM (the air band)
 static const char *mode_word(const radio_view_t *v)
 {
-	return v->ch.mode == RADIO_MODE_DMR ? "DMR" : v->am ? "AM" : "FM";
+	return v->ch.mode == RADIO_MODE_FM && v->am ? "AM" : mode_label(v->ch.mode);
 }
 
 // Status strip (P2): state pill, mode, monitor, lock, unread messages, signal, battery.
@@ -458,7 +466,7 @@ static int draw_top_as(const radio_view_t *v, radio_state_t st, const ui_state_t
 	const char *mw = mode_word(v);
 #if CONFIG_DUAL_WATCH
 	if (s->dual.on)
-		mw = s->dual.pane[s->dual.sel].mode == RADIO_MODE_DMR ? "DMR" : "FM";
+		mw = mode_label(s->dual.pane[s->dual.sel].mode);
 #endif
 	int lx = gfx_text(f, x, ty, mw, sfg);
 #if CONFIG_DUAL_WATCH
@@ -867,6 +875,15 @@ static void draw_talk_dmr(const radio_view_t *v);
 static void draw_chips_dmr(const radio_view_t *v, const ui_state_t *s);
 #endif
 
+static void entry_text(sbuf_t *b, const ui_state_t *s, bool full)
+{
+	int show = full ? UI_ENTRY_MAX : s->entry_len > UI_ENTRY_MHZ + 3 ? s->entry_len : UI_ENTRY_MHZ + 3;
+	for (int i = 0; i < show; i++) {
+		if (i == UI_ENTRY_MHZ) sb_chr(b, '.');
+		sb_chr(b, i < s->entry_len ? s->entry_digits[i] : '_');
+	}
+}
+
 static void draw_place(const radio_view_t *v, const ui_state_t *s)
 {
 	const ui_layout_t *L = &ui_layout;
@@ -922,13 +939,7 @@ static void draw_place(const radio_view_t *v, const ui_state_t *s)
 		bool tx = v->state == RS_TX && v->vfo;
 		sb_init(&b, buf, sizeof buf);
 		if (s->entry) {
-			int dec = s->entry_len > UI_ENTRY_MHZ ? s->entry_len - UI_ENTRY_MHZ : 0;
-			int show = dec < 3 ? 3 : dec;
-			for (int i = 0; i < UI_ENTRY_MHZ + show; i++) {
-				if (i == UI_ENTRY_MHZ)
-					sb_chr(&b, '.');
-				sb_chr(&b, i < s->entry_len ? s->entry_digits[i] : '_');
-			}
+			entry_text(&b, s, false);
 		} else {
 			sb_freq(&b, tx ? v->ch.tx_hz : v->ch.rx_hz);
 		}
@@ -1002,6 +1013,10 @@ static void draw_talk(const radio_view_t *v)
 static void draw_chips(const radio_view_t *v, const ui_state_t *s)
 {
 	const ui_layout_t *L = &ui_layout;
+	if (v->ch.mode == RADIO_MODE_P25 || v->ch.mode == RADIO_MODE_NONE) {
+		gfx_text(L->small, 0, L->chips_y, mode_word(v), ui_col.fg);
+		return;
+	}
 	const font_t *f = L->small;
 	int w = gfx_width();
 	char buf[48];
@@ -1709,8 +1724,10 @@ static void draw_home_large(const radio_view_t *v, const ui_state_t *s)
 	char form[48];
 	sb_init(&b, buf, sizeof buf);
 	bool tx = v->state == RS_TX && v->vfo;
-	if (v->vfo)
-		sb_freq(&b, tx ? v->ch.tx_hz : v->ch.rx_hz);
+	if (v->vfo) {
+		if (s->entry && !tx) entry_text(&b, s, false);
+		else sb_freq(&b, tx ? v->ch.tx_hz : v->ch.rx_hz);
+	}
 	else
 		sb_str(&b, v->ch.name);
 	const font_t *f = large_font(buf, room, form, sizeof form);
@@ -1747,7 +1764,7 @@ bool ui_card_layout(const ui_state_t *s)
 {
 	return CONFIG_DUAL_WATCH && CONFIG_UI_COLOR && board.home_brand && gfx_bpp() != 1 &&
 	       gfx_width() >= 220 && gfx_height() >= 300 &&
-	       ui_theme == 0 && !s->large_text && !s->entry;
+	       ui_theme == 0 && !s->large_text;
 }
 
 #if CONFIG_DUAL_WATCH
@@ -1756,6 +1773,12 @@ static void draw_card_home(const radio_view_t *v, const ui_state_t *s);
 
 void ui_draw_home(const radio_view_t *v, const ui_state_t *s)
 {
+#if CONFIG_P25_UI
+	if (v->ch.mode == RADIO_MODE_P25 && !s->entry) {
+		ui_p25_home(v, s);
+		return;
+	}
+#endif
 #if CONFIG_DUAL_WATCH
 	if (ui_card_layout(s)) {
 		draw_card_home(v, s);
@@ -1994,12 +2017,17 @@ static void dual_pane(const radio_view_t *v, const ui_state_t *s, int i, int y, 
 			mf->w / 2;
 	}
 	dual_name(p, buf, sizeof buf);
+	bool editing = sel && p->vfo && s->entry && !tx;
+	if (editing) {
+		sb_init(&b, buf, sizeof buf);
+		entry_text(&b, s, false);
+	}
 	if (tx && p->vfo) {	// the VFO transmitting: its TX frequency (the view's channel is the selected pane's)
 		sb_init(&b, buf, sizeof buf);
 		sb_freq(&b, v->ch.tx_hz);
 	}
 	gfx_text_fit(f, buf, rx_end - x, fit, sizeof fit);
-	x = gfx_text(f, x, base - f->ascent, fit, tx && p->vfo ? ui_col.tx : rx ? ui_col.rx : fg);
+	x = gfx_text(f, x, base - f->ascent, fit, editing ? ui_col.warn : tx && p->vfo ? ui_col.tx : rx ? ui_col.rx : fg);
 	if (p->vfo && x + sm->w / 2 + gfx_text_width(sm, "MHz") <= rx_end) {
 		gfx_text(sm, x + sm->w / 2, base - sm->ascent, "MHz", ui_col.dim);
 		x += sm->w / 2 + gfx_text_width(sm, "MHz");
@@ -2143,9 +2171,10 @@ static void dual_large(const radio_view_t *v, const ui_state_t *s)
 		sbuf_t b;
 		sb_init(&b, buf, sizeof buf);
 		sb_str(&b, i ? "B " : "A ");
-		if (p->vfo)
-			sb_freq(&b, p->rx_hz);
-		else
+		if (p->vfo) {
+			if (s->entry && d->sel == i) entry_text(&b, s, false);
+			else sb_freq(&b, p->rx_hz);
+		} else
 			sb_str(&b, p->name);
 		const font_t *f = large_font(buf, room, form, sizeof form);
 		bool tx = v->state == RS_TX && d->sel == i, rx = !tx && p->rx;
@@ -2238,6 +2267,7 @@ static void dual_activity(const radio_view_t *v, const ui_state_t *s, int y, int
 
 static const char *dual_hint(const radio_view_t *v, const ui_state_t *s)
 {
+	if (s->entry) return home_hint(v, s);
 	const ui_dual_t *d = &s->dual;
 	if (v->state == RS_TX_DENIED)
 		return deny_action(v);
@@ -2256,10 +2286,10 @@ static const char *dual_hint(const radio_view_t *v, const ui_state_t *s)
 
 // Card Home on tall color displays. Keep the palette small enough for indexed displays and use the same
 // renderer for Memory and VFO, so changing the selected pane moves the emphasis without swapping A and B.
-#define CARD_INK	RGB565(5, 9, 14)
-#define CARD_SURFACE	RGB565(16, 30, 41)
-#define CARD_SELECTED	RGB565(18, 54, 65)
-#define CARD_EDGE	RGB565(48, 70, 83)
+#define CARD_INK	UI_CARD_INK
+#define CARD_SURFACE	UI_CARD_SURFACE
+#define CARD_SELECTED	UI_CARD_SELECTED
+#define CARD_EDGE	UI_CARD_EDGE
 #define CARD_YELLOW	RGB565(255, 226, 92)
 
 static void card_status(const ui_state_t *s)
@@ -2329,12 +2359,27 @@ static void card_center_title(const char *title, int padding, char *fit, size_t 
 	gfx_text(font, (width - gfx_text_width(font, fit)) / 2, 29, fit, ui_col.focus);
 }
 
-static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool tx, bool denied, bool dual)
+int ui_draw_card_begin(const ui_state_t *s, const char *title)
+{
+	char fit[48];
+	if (title) {
+		card_header(s, 24);
+		card_center_title(title, 6, fit, sizeof fit);
+		return 55;
+	}
+	gfx_clear(CARD_INK);
+	card_status(s);
+	return 30;
+}
+
+static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool tx, bool denied, bool dual,
+		      const ui_state_t *s)
 {
 	const font_t *sm = ui_layout.small;
 	const font_t *meta = dual ? &font_6x12 : sm;
 	int w = gfx_width(), h = selected ? 92 : 60;
 	bool dmr = p->mode == RADIO_MODE_DMR;
+	bool editing = p->vfo && selected && s->entry && !tx;
 	color_t state = denied || tx ? ui_col.tx : p->rx ? ui_col.rx : ui_col.idle;
 	color_t edge = dual && selected ? ui_col.focus :
 		denied || tx || p->rx ? state : selected ? ui_col.focus : CARD_EDGE;
@@ -2345,7 +2390,7 @@ static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool
 	gfx_round_fill(x, row, sm->w + 5, sm->h, i ? CARD_YELLOW : ui_col.focus);
 	gfx_text(sm, x + 2, row, i ? "B" : "A", CARD_INK);
 	x += sm->w + 10;
-	x = gfx_text(sm, x, row, dmr ? "DMR" : "FM", ui_col.fg) + 5;
+	x = gfx_text(sm, x, row, mode_label(p->mode), ui_col.fg) + 5;
 	const char *activity = denied ? TR("NO TX") : tx ? "TX" : p->rx ? "RX" : selected || dual ? TR("IDLE") : "";
 	int status_w = gfx_text_width(meta, activity);
 	int right = w - 8 - status_w;
@@ -2379,7 +2424,11 @@ static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool
 		gfx_text(sm, 8, row + sm->h, p->name, ui_col.dim);
 	sb_init(&b, line, sizeof line);
 	if (p->vfo) {
-		sb_freq(&b, p->rx_hz);
+		if (editing) {
+			entry_text(&b, s, false);
+		} else {
+			sb_freq(&b, p->rx_hz);
+		}
 		primary = line;
 	} else if (named && named[1]) {
 		sb_str(&b, "TG ");
@@ -2396,7 +2445,11 @@ static void card_pane(const ui_dual_pane_t *p, int i, int y, bool selected, bool
 	if (f->h > detail_y - title_y || gfx_text_width(f, primary) > w - 16)
 		f = sm;
 	gfx_text_fit(f, primary, w - 16, fit, sizeof fit);
-	gfx_text(f, 8, title_y, fit, ui_col.fg);
+	if (editing) {
+		gfx_round_fill(4, title_y - 2, w - 8, f->h + 4, ui_col.warn);
+		gfx_round_fill(5, title_y - 1, w - 10, f->h + 2, CARD_SELECTED);
+	}
+	gfx_text(f, 8, title_y, fit, editing ? ui_col.warn : ui_col.fg);
 
 	sb_init(&b, line, sizeof line);
 	if (dmr && !strncmp(p->target, "TG ", 3)) {
@@ -2434,7 +2487,15 @@ static void __attribute__((noinline)) card_single(const radio_view_t *v, const u
 	p->rx = v->state == RS_RX;
 	str_copy(p->name, sizeof p->name, v->ch.name);
 	sbuf_t b;
+	if (v->vfo && v->ch.tx_hz != v->ch.rx_hz) {
+		sb_init(&b, p->name, sizeof p->name);
+		sb_str(&b, v->state == RS_TX ? "RX " : "TX ");
+		sb_freq(&b, v->state == RS_TX ? v->ch.rx_hz : v->ch.tx_hz);
+	}
 	sb_init(&b, p->detail, sizeof p->detail);
+	if (p->mode == RADIO_MODE_P25 || p->mode == RADIO_MODE_NONE) {
+		sb_str(&b, mode_label(p->mode));
+	} else
 #if CONFIG_DMR
 	if (p->mode == RADIO_MODE_DMR) {
 		p->protection = s->privacy || v->dmr.privacy ? 1 : 0;
@@ -2454,7 +2515,7 @@ static void __attribute__((noinline)) card_single(const radio_view_t *v, const u
 	{
 		sb_tone(&b, &v->ch.tx_tone);
 	}
-	card_pane(p, 0, 55, true, v->state == RS_TX, v->state == RS_TX_DENIED, false);
+	card_pane(p, 0, 55, true, v->state == RS_TX, v->state == RS_TX_DENIED, false, s);
 }
 
 static void draw_card_home(const radio_view_t *v, const ui_state_t *s)
@@ -2467,8 +2528,8 @@ static void draw_card_home(const radio_view_t *v, const ui_state_t *s)
 	int recent = 155;
 	if (s->dual.on) {
 		bool a = s->dual.sel == 0;
-		card_pane(&s->dual.pane[0], 0, 55, a, a && v->state == RS_TX, a && v->state == RS_TX_DENIED, true);
-		card_pane(&s->dual.pane[1], 1, a ? 155 : 123, !a, !a && v->state == RS_TX, !a && v->state == RS_TX_DENIED, true);
+		card_pane(&s->dual.pane[0], 0, 55, a, a && v->state == RS_TX, a && v->state == RS_TX_DENIED, true, s);
+		card_pane(&s->dual.pane[1], 1, a ? 155 : 123, !a, !a && v->state == RS_TX, !a && v->state == RS_TX_DENIED, true, s);
 		gfx_hline(0, 221, width, CARD_EDGE);
 		recent = 225;
 	} else {
@@ -2495,8 +2556,8 @@ static void draw_card_home(const radio_view_t *v, const ui_state_t *s)
 	if (row == recent + sm->h && !heard)
 		gfx_text(sm, 0, row, TR("No calls heard yet"), ui_col.dim);
 	ui_draw_banner(s);
-	if (s->toast || s->locked || v->state == RS_TX_DENIED) {
-		ui_draw_bottom(s, s->dual.on ? dual_hint(v, s) : home_hint(v, s));
+	if (s->entry || v->vfo || s->toast || s->locked || v->state == RS_TX_DENIED) {
+		ui_draw_bottom(s, s->dual.on && !s->entry ? dual_hint(v, s) : home_hint(v, s));
 	} else if (s->hints) {
 		const font_t *keys = &font_6x12;
 		const char *quick = TR("* Quick"), *actions = TR("# Actions");
@@ -3088,6 +3149,15 @@ uint8_t ui_quick_kind(int pos, const radio_view_t *v)
 	};
 	if (pos < 0 || pos >= UI_QUICK_TILES)
 		return QT_POWER;
+#if CONFIG_P25_UI
+	if (v->ch.mode == RADIO_MODE_P25) {
+		static const uint8_t p25[UI_QUICK_TILES] = {
+			QT_POWER, QT_P25_LISTEN, QT_P25_HOLD, QT_P25_TALK, QT_P25_RECENT,
+			QT_P25_FAVORITES, QT_P25_SYSTEM, QT_P25_DETAILS, QT_BRIGHTNESS,
+		};
+		return p25[pos];
+	}
+#endif
 	if ((board.home_brand || CONFIG_DMR_TALKGROUP_ENTRIES) && gfx_width() >= 220 && !v->vfo) {
 		static const uint8_t wide_fm[UI_QUICK_TILES] = {
 			QT_POWER, QT_ZONE_SCAN, QT_SCAN, QT_SQUELCH, QT_TONE, QT_SPLIT, QT_MONITOR, QT_BANDWIDTH, QT_GPS,
@@ -3110,7 +3180,7 @@ static bool feat(uint32_t f)
 	return (ui_svc_features() & f) != 0;
 }
 
-bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *label, size_t label_len,
+static bool __attribute__((noinline)) quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *label, size_t label_len,
 	char *value, size_t value_len)
 {
 	// The whole word, and an abbreviation of 6 characters at most for a tile (font.h alternates), so a tile's name
@@ -3136,6 +3206,7 @@ bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *l
 		[QT_ZONE_SCAN] = TRN("Scan"), [QT_GPS] = "GPS",
 	};
 	uint8_t kind = ui_quick_kind(tile, v);
+
 	bool editing = s->quick_edit && s->quick_focus == tile;
 	sbuf_t b;
 	sb_init(&b, label, label_len);
@@ -3262,6 +3333,21 @@ bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *l
 	}
 }
 
+bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *label, size_t label_len,
+	char *value, size_t value_len)
+{
+#if CONFIG_P25_UI
+	// Keep the monitor snapshot off the shared controls' larger stack frame.
+	uint8_t kind = ui_quick_kind(tile, v);
+	if (v->ch.mode == RADIO_MODE_P25 && kind != QT_BRIGHTNESS) {
+		if (label_len) { label[0] = (char)('1' + tile); if (label_len > 1) label[1] = '\0'; }
+		return ui_p25_quick_tile(kind, label_len > 1 ? label + 1 : label, label_len > 1 ? label_len - 1 : 0,
+			value, value_len);
+	}
+#endif
+	return quick_tile(tile, v, s, label, label_len, value, value_len);
+}
+
 static uint16_t quick_list_focus;
 static const radio_view_t *quick_v;
 static const ui_state_t *quick_s;
@@ -3290,11 +3376,7 @@ static const char *quick_split_hint(const radio_view_t *v, const ui_state_t *s, 
 	sbuf_t b;
 	sb_init(&b, buf, len);
 	sb_str(&b, "TX ");
-	for (uint8_t i = 0; i < UI_ENTRY_MAX; i++) {
-		if (i == UI_ENTRY_MHZ)
-			sb_chr(&b, '.');
-		sb_chr(&b, i < s->entry_len ? s->entry_digits[i] : '_');
-	}
+	entry_text(&b, s, true);
 	sb_str(&b, TR("  OK sets"));
 	return buf;
 }
@@ -3312,6 +3394,9 @@ static void __attribute__((noinline)) draw_quick_list(const radio_view_t *v, con
 	ui_list_t l = { .prefix = TR("Quick"), .name = v->vfo ? "VFO" : v->ch.name,
 		.count = UI_QUICK_TILES, .focus = quick_list_focus, .top = &top, .item = quick_list_item,
 		.hint = split_hint != NULL ? split_hint : TR("1-9 change  Hold OK save") };
+#if CONFIG_P25_UI
+	if (v->ch.mode == RADIO_MODE_P25) l.hint = ui_p25_quick_hint(ui_quick_kind(s->quick_focus, v));
+#endif
 	ui_draw_list(v, s, &l);
 }
 
@@ -3327,7 +3412,7 @@ static void __attribute__((noinline)) draw_quick_tiles(const radio_view_t *v, co
 	// Title row keeps the state pill (P2)
 	int top = ui_draw_top(v, s, TR("Quick"), name);
 	int bottom = h;
-	if (s->toast != NULL || split_hint != NULL || h >= UI_TALL_PX)
+	if (s->toast != NULL || split_hint != NULL || h >= UI_TALL_PX || (CONFIG_P25_UI && v->ch.mode == RADIO_MODE_P25))
 		bottom = L->hint_y;
 	int gh = bottom - top;
 	const font_t *lf = L->small;
@@ -3340,7 +3425,7 @@ static void __attribute__((noinline)) draw_quick_tiles(const radio_view_t *v, co
 		int cx = i % 3, cy = i / 3;
 		int x0 = w * cx / 3, x1 = w * (cx + 1) / 3 - (cx == 2 ? 1 : 0);
 		int y0 = top + gh * cy / 3, y1 = top + gh * (cy + 1) / 3 - (cy == 2 ? 1 : 0);
-		char value[12], fit[12];	// label: "5" and the name's alternates
+		char value[32], fit[16];	// label: "5" and the name's alternates
 		bool ok = ui_quick_tile(i, v, s, label, sizeof label, value, sizeof value);
 		bool focus = i == s->quick_focus;
 		color_t fg = ok ? ui_col.fg : ui_col.line, bg = ui_col.bg;
@@ -3366,8 +3451,7 @@ static void __attribute__((noinline)) draw_quick_tiles(const radio_view_t *v, co
 			sb_chr(&vb, '<');
 			sb_str(&vb, value);
 			sb_chr(&vb, '>');
-			memcpy(value, tmp, sizeof value - 1);
-			value[sizeof value - 1] = 0;
+			str_copy(value, sizeof value, tmp);
 		}
 		const font_t *tf = vf;	// a value too wide for the tile ("<D023N>") drops to the label font
 		if (gfx_text_width(tf, value) > x1 - x0 - 3)
@@ -3381,6 +3465,10 @@ static void __attribute__((noinline)) draw_quick_tiles(const radio_view_t *v, co
 	ui_draw_banner(s);
 	if (s->toast != NULL)
 		ui_draw_hint(s->toast, true);
+#if CONFIG_P25_UI
+	else if (v->ch.mode == RADIO_MODE_P25)
+		ui_draw_hint(ui_p25_quick_hint(ui_quick_kind(s->quick_focus, v)), false);
+#endif
 	else if (split_hint != NULL)
 		ui_draw_hint(quick_split_hint(v, s, label, sizeof label), false);	// the tiles used label
 	else if (h >= UI_TALL_PX)
@@ -3393,9 +3481,20 @@ static void __attribute__((noinline)) draw_quick_cards(const radio_view_t *v, co
 	const font_t *meta = &font_6x12;
 	const font_t *value_font = ui_layout.small;
 	int width = gfx_width(), top = 57, bottom = ui_layout.hint_y - 4;
-	char label[40], value[16], fit[32];
+	char label[40], value[32], fit[32];
 	card_header(s, 24);
 	const char *title = TR("Quick Controls");
+#if CONFIG_P25_UI
+	bool p25 = v->ch.mode == RADIO_MODE_P25;
+	if (p25) {
+		title = TR("Quick Actions");
+		ui_p25_quick_context(label, sizeof label, true);
+		gfx_text_fit(meta, label, width - 10, fit, sizeof fit);
+		gfx_text(meta, 5, top, fit, ui_col.warn);
+		top += 18;
+		bottom -= 30;
+	}
+#endif
 	gfx_text(value_font, 5, 29, title, ui_col.focus);
 	const char *mode = mode_word(v);
 	gfx_text(meta, width - 5 - gfx_text_width(meta, mode), 33, mode, ui_col.fg);
@@ -3428,15 +3527,28 @@ static void __attribute__((noinline)) draw_quick_cards(const radio_view_t *v, co
 			gfx_text(meta, x + w - 5 - meta->w, value_y, ">", edge);
 		}
 	}
+#if CONFIG_P25_UI
+	if (p25) {
+		const char *help = ui_p25_quick_hint(ui_quick_kind(s->quick_focus, v));
+		gfx_text_fit(meta, help, width - 10, fit, sizeof fit);
+		gfx_text(meta, 5, bottom + 4, fit, ui_col.focus);
+		ui_p25_quick_context(label, sizeof label, false);
+		gfx_text_fit(meta, label, width - 10, fit, sizeof fit);
+		gfx_text(meta, 5, bottom + 18, fit, ui_col.dim);
+	}
+#endif
 	ui_draw_banner(s);
 	const char *hint = quick_split_hint(v, s, label, sizeof label);
 	if (s->toast || hint) {
 		ui_draw_hint(s->toast ? s->toast : hint, s->toast != NULL);
 	} else {
 		const char *keys = TR("0 All settings  Hold OK save");
-		gfx_hline(0, bottom + 2, width, CARD_EDGE);
+#if CONFIG_P25_UI
+		if (p25) keys = TR("OK choose  Back");
+#endif
+		gfx_hline(0, ui_layout.hint_y - 2, width, CARD_EDGE);
 		gfx_text_fit(meta, keys, width - 10, fit, sizeof fit);
-		gfx_text(meta, (width - gfx_text_width(meta, fit)) / 2, bottom + 7, fit, ui_col.dim);
+		gfx_text(meta, (width - gfx_text_width(meta, fit)) / 2, ui_layout.hint_y + 3, fit, ui_col.dim);
 	}
 }
 #endif
@@ -3507,6 +3619,12 @@ static void card_page_footer(const ui_state_t *s, int y, const char *hint)
 		*last = 0;
 	}
 	card_list_footer(s, y, left, back, fit, sizeof fit);
+}
+
+void ui_draw_card_footer(const ui_state_t *s, const char *left, const char *right)
+{
+	char fit[40];
+	card_list_footer(s, gfx_height() - 19, left, right, fit, sizeof fit);
 }
 
 static int card_page_text(const font_t *font, const char *text, int y, int end, bool draw, color_t color)
@@ -3849,6 +3967,7 @@ void ui_draw_data_dashboard(const radio_view_t *v, const ui_state_t *s, const ui
 	}
 	row_text(font, 5, 159, width - 10, TR("Refresh interval"), value, ui_col.dim, ui_col.fg, false);
 	dashboard_control(l, DATA_SERVER, 1, 171, width - 2, CONFIG_DMR_ARS);
+#if CONFIG_DMR
 	if (v->dmr.active) {
 		char id[16];
 		sb_init(&b, id, sizeof id);
@@ -3863,6 +3982,7 @@ void ui_draw_data_dashboard(const radio_view_t *v, const ui_state_t *s, const ui
 		sb_u32(&b, v->dmr.cc, 1);
 		row_text(font, 5, 191, width - 10, value, id, ui_col.fg, ui_col.dim, false);
 	}
+#endif
 	dashboard_subscriptions(s, &data, width, footer);
 	card_list_footer(s, footer, TR("OK Select"), TR("Back"), fit, sizeof fit);
 }

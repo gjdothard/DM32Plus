@@ -105,6 +105,11 @@ test("tone, frequency and coordinate fields", () => {
 	assert.equal(parseTone("20"), null);
 	assert.equal(parseFreq("446.00625"), 446006250);
 	assert.equal(parseFreq("438500000"), 438500000);
+	assert.equal(parseFreq("16"), 16000000);
+	assert.equal(parseFreq("740"), 740000000);
+	assert.equal(parseFreq("850.0125"), 850012500);
+	assert.equal(parseFreq("999.999990"), 999999990);
+	assert.equal(parseFreq("1000"), null);
 	assert.equal(parseFreq("x"), null);
 	assert.equal(mhz(446006250), "446.00625");
 	assert.equal(mhz(438500000), "438.500");

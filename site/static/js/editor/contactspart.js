@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The DMR ID Database tab: build the database, or private-call contacts, from RadioID.net users. Users come from a
 // user.csv the user downloads, or from RadioID's API for a few regions. The user picks regions, filters and the text
 // each record shows. The choices and the user's own RadioID API key are kept in this browser (localStorage), never
@@ -66,7 +67,7 @@ register({
 		return B.el;
 	},
 	tableActions(tab, api) {
-		if (tab !== "contacts") return [];
+		if (tab !== "contacts" || !["all", "private"].includes(api.contactView)) return [];
 		return [button(api.t("editor.rid.add_from"), () => {
 			api.show("iddb");
 			setTimeout(() => B.parts?.output.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
@@ -441,6 +442,7 @@ function output(kind) {
 		r = addContacts(api.model, sel, { template: pr.contactTemplate, upper: pr.upper });
 		return r.added ? undefined : false;
 	});
+	if (r.added) api.showContacts("private");
 	const msg = [r.added ? t("editor.rid.contacts_done", { n: r.added }) : t("editor.rid.contacts_none")];
 	if (r.existing) msg.push(t("editor.rid.contacts_existing", { n: r.existing }));
 	if (r.full) msg.push(t("editor.rid.contacts_full", { n: r.full }));

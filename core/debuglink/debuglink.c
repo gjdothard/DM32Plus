@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The debug link's commands (docs/spec/debuglink.md). Everything runs in the host link task, between the bytes of the
 // other protocols: each command is short (a reply of at most DL_REPLY_MAX bytes, no waiting on other tasks; radio
 // requests are queued, injected keys are timed by the input task).
@@ -132,7 +133,7 @@ static bool summary_line(uint8_t i, char *buf, uint8_t len)
 										       : "?";
 	switch (i) {
 	case 0:
-		dl_fmt(buf, len, "radio %s %s ch %u '%s' %u.%05u %s%s", view.ch.mode == RADIO_MODE_DMR ? "DMR" : "FM",
+		dl_fmt(buf, len, "radio %s %s ch %u '%s' %u.%05u %s%s", view.ch.mode == RADIO_MODE_P25 ? "P25" : view.ch.mode == RADIO_MODE_NONE ? "?" : view.ch.mode == RADIO_MODE_DMR ? "DMR" : "FM",
 		       view.vfo ? "VFO" : "MEM", view.channel_number, view.ch.name, (unsigned)(view.ch.rx_hz / 1000000u),
 		       (unsigned)((view.ch.rx_hz % 1000000u) / 10u), state_name((uint8_t)view.state),
 		       view.hotspot ? " HOTSPOT" : "");

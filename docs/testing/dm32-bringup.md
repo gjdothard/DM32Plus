@@ -323,3 +323,40 @@ The HR_C7000 copies its FM receive audio to the CPU (`modem-hrc7000.md` 8.5). AP
   ACK was captured. Later shared-buffer contents included unrelated traffic; RAM reads alone cannot establish
   a stable acknowledgment payload. Added an atomic, bounded ACK snapshot at packet dispatch, including parse
   validity and outgoing SMS context. Further on-radio diagnosis needs this diagnostic build installed.
+
+
+### Shared operating talkgroups before integration
+
+At the `v26.11b16` (`a8dcba73`) checkpoint, two independent CPS reads agreed, but the legacy overflow
+sector contained unrecognized data. The encoder refused that sector before transfer. A four-byte write
+to an erased pool slot passed a live CPS write and readback; the original talkgroup region was restored
+and verified byte for byte. Both proposed 16 KiB bank ranges at image offsets `0x34000` and `0x38000`
+were read as erased. Six assignments through that editor were not verified at that checkpoint.
+The later shared-bank implementation and conversion are described in the
+[codeplug specification](../spec/codeplug-native.md) and [CPS guide](../dev/codeplug-editor.md).
+
+### Conversation history checks, November 15, 2026
+
+Baseline backup verified on November 15, 2026. Its 512 KiB reserve is all erased. The 20 KiB
+service gap contains programmed bytes and is excluded. The installed 315,996-record database
+fits the lower boundary.
+
+Local hardware test build `v26.11b7` at `0f6f4876` installed on November 15, 2026 with the
+journal enabled. The application-only updater verified all 150 written sectors by CRC.
+After reboot, the radio reported the expected build and existing codec, the database
+reported 315,996 records, and the journal diagnostic reported zero drops. The owner reported
+that message history works on the radio. A normal reboot retained all three sampled archive
+records byte for byte, and their CRCs passed before and after reboot.
+
+The owner reported a private-call freeze with the TX indication stuck while the cable was
+connected. The diagnostic link answered and reported no crash record or watchdog reset. The
+owner repeated the call successfully with the cable unplugged. The cause is undetermined.
+At that checkpoint, the radio remained on the test build. Interrupted-write and rollback checks are pending.
+
+Host fault tests now cover a second cut during sector replay, a temporary read failure,
+and a silent target write error. A physical cut needs an isolated reserve and fixture.
+
+Local test build `v26.11b8` at `5b442dfd` was installed. The updater verified all 150
+written application sectors by CRC. After boot, the codec and database count matched the
+baseline, and the sampled archive still held the same three records byte for byte. The
+owner chose to move on from live journal testing. Physical fault testing remains a lab task.

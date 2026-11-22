@@ -135,3 +135,37 @@ jobs:
             gh release create "$tag" "${assets[@]}" "${args[@]}" --verify-tag --prerelease \
               --title "$title" --notes "$notes"
           fi
+
+  testing-website:
+    if: github.ref == 'refs/heads/Testing'
+    needs: [firmware, prerelease]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: product-firmware
+          path: build/website-firmware
+      - name: Test and build the Testing CPS
+        env:
+          VERSION: ${{ needs.firmware.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install -r site/requirements.txt
+          python3 site/tests/fixtures.py build/site-tests
+          node --test site/tests/*.test.mjs
+          python3 tests/host/websiteTestingTest.py
+          python3 site/build.py --strict --out build/website-testing --firmware build/website-firmware --ref "$GITHUB_SHA"
+          python3 tools/website/package.py --site build/website-testing --product "$PRODUCT_FILE" \
+            --version "$VERSION" --channel Testing --public-url https://testing.cps.pplan.net \
+            --out "build/website-testing-$VERSION.tar.gz"
+          gh release upload "$VERSION" "build/website-testing-$VERSION.tar.gz" --clobber

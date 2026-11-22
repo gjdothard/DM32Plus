@@ -2,6 +2,38 @@
 <!-- Copyright (c) 2026 Garrett Dothard -->
 # Baofeng DM-32UV hardware
 
+## Receive diagnostics
+
+With Diagnostics enabled, the radio task reads FD6818 frequency, band,
+state and power registers at most every 250 ms while awake and receiving.
+The host/UI only reads cached values. `rf t` is snapshot uptime in ms
+(zero: invalid), `f` is frequency-register readback in 10 Hz units, and
+`exp` is the programmed frequency in the same units. `b` contains 0x1A/0x40;
+`s` is 0x30 and `p` is 0x37. A concurrent RF write invalidates the timestamp.
+Register agreement is not a PLL-lock indication.
+
+With the air provider built, `air h` counts copied input halves, `c` counts
+soft-modem chunks, `ov` counts ring overruns, `us` counts processed sample
+duration and `miss` counts interrupts without a valid input half. Stalled
+counters isolate sample-path problems from lack of P25 framing. No audio
+samples are returned. See [the debug link](debuglink.md) for P25 counters.
+
+## Experimental extended receive
+
+The full build enables `CONFIG_RX_EXTENDED`, `CONFIG_P25` and
+`CONFIG_P25_TRUNK`. Extended RX admits 16 MHz through 999.999990 MHz. The
+lower limit is the existing FD6818 synthesizer table's first range; the
+upper limit is the eight-digit, 10 Hz BCD codeplug representation. The
+existing table includes a range starting near 740 MHz. Neither that table
+nor tuning admission proves PLL lock, sensitivity or usable reception
+through the board's RF front end. These remain untested on hardware.
+
+Transmit bands remain 136–174 and 400–480 MHz. Channels received outside
+those bands are receive-only even when their stored TX frequency is inside
+a normal band. See [radio behavior](radio-features.md#receive-only-board-ranges)
+for trunking and overlapping-range admission rules. No connected radio was
+used to qualify this change.
+
 This page covers what is needed to bring up the DM-32UV: SoC, memory, peripherals, pins, RF chip, audio, flash,
 calibration, GPS and the update paths. The DMR modem inside the SoC is in `modem-hrc7000.md`. The AMBE codec placement
 is in `codec-dm32.md`. The stock AES voice format is in [hardware-dm32-encryption.md](hardware-dm32-encryption.md).
@@ -223,7 +255,8 @@ CONTROLREG: bit 0 enable, bit 1 user-defined (periodic reload) mode, bit 2 inter
 | 2 (0x14000014) | 34 | 1 kHz system tick |
 | 3 (0x14000028) | 35 | DMR PA one-shot (`TIMER_PA`) |
 | 4 (0x1400003C) | 36 | APRS AFSK: tops up the prompt FIFO (`TIMER_AFSK`) |
-| 5, 6 | 37, 38 | unused |
+| 5 (0x14000050) | 37 | Board-owned one-shot (`TIMER_BOARD`) |
+| 6 (0x14000064) | 38 | PCM FIFO refill with `CONFIG_AIR` (`TIMER_PCM_REFILL`), 1 ms |
 
 ### 3.5 Watchdog (0x14010000)
 
@@ -881,6 +914,21 @@ switches per burst. As a user it reports both copies of a call (gotchas 14.15).
 
 ## 9. Audio path
 
+P25 integration builds (`CONFIG_AIR`) attach `board.air` and `board.baseband`
+to the shared HR_C7000 providers. The board's `dmr_board` supplies
+`hrc_audio_pcm_air_gate` and `hrc_audio_pcm_air_release`; `ring_play` goes through
+`hrc_audio_pcm_ring`, so a beep cannot reopen ring playback during air TX.
+APRS and air TX refuse conflicting prompt-FIFO ownership. These paths are host
+tested; target FIFO timing, stack/RAM fit and on-radio operation remain
+unqualified. P25 remains default-off and is not yet a working channel mode.
+
+Timer 6 refills PCM independently of codec callbacks with `CONFIG_AIR`.
+It primes two blocks and bounds each interrupt to one FIFO chunk. The
+[air-interface specification](air-interface.md) describes deferred settling
+and speaker-tail draining. Timer 3 remains the PA owner, Timer 4 remains APRS,
+and Timer 5 remains board-owned. These assignments and the two-half FIFO model
+need target validation before enabling P25 in a release.
+
 | Element | Detail |
 |---|---|
 | Mic | into the C7000 codec ADC (MIC input 2: CR_MIC2 bit 6 = 1) |
@@ -998,6 +1046,24 @@ from CPS. Channels, talkgroups, and saved contacts have separate records.
 The reserve may still contain bytes from an older ID database. Initialize it only as part of a journal
 migration. Older firmware and CPS versions can write through this region, so verify rollback behavior
 before storing conversations there. The native codeplug and AES journal remain above the reserve.
+
+### Managed codeplug transfer staging
+
+The board reserves `0xF00000–0xF3FFFF` (256 KiB) for staged codeplug
+transfers: one commit-record sector and 63 data slots. This range was part
+of the unused future-native-format reserve. The native reserve now starts
+at `0xF40000` with size `0x0BF000`; its end remains `0xFFF000`.
+The private AES journal remains at `0xFFD000–0xFFEFFF`, and the final stock
+metadata sector remains excluded. Message storage, settings, calibration,
+the existing codeplug and ID database retain their addresses and limits.
+
+Earlier P25 integration builds omitted the staging assignment, so INFO
+reported no managed-write support and CPS refused P25 programming even
+with the correct firmware version installed. The real-map host test now
+checks INFO, staging capacity, a 33-block managed transfer and boot recovery
+while preserving key-bank and message-region sentinel bytes. Hardware
+programming qualification remains pending. This assignment does not
+implement the future native format; see [the storage plan](codeplug-native.md).
 
 ---
 

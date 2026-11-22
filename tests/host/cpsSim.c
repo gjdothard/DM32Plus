@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The open-firmware CPS shim on a simulated 16 MB flash with the DM-1701 map, served on stdin / stdout, so host tools
 // (tools/cps_client.py --exec) can be tested without a radio. The debug link's frames on the same stream get VERSION
 // and the fast codeplug protocol (CODEPLUG, docs/spec/cps-fast.md; tools/cps_fast.py --exec):
@@ -23,6 +24,7 @@
 #include <unistd.h>
 #include "cps/cps_openfw.h"
 #include "cps/cps_fast.h"
+#include "radio/radio_programming.h"
 #include "debuglink/debuglink.h"
 #include "debuglink/debuglink_proto.h"
 #include "codeplug/codeplug.h"
@@ -359,6 +361,8 @@ int main(int argc, char **argv)
 		} else {
 			cps_feed(NULL, 0, millis());
 		}
+		// This flash-only simulator has no RF owner. Real firmware waits for the radio state machine.
+		if (radio_programming_requested()) radio_programming_ready();
 		cps_fast_tick(millis());
 	}
 	if (dump != NULL) {

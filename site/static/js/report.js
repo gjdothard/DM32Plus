@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // Bug reports for the web tools. Every failure message offers "Report a Problem": a zip with the session log
 // (diag.js), the browser's details and, if the user ticks it, their codeplug, to download and email. When the site
 // is built with an error reporting address (site.json "reports"), errors are also sent automatically with the log's
@@ -150,12 +151,11 @@ export function reportButton({ quiet = true } = {}) {
 	return button(t("report.button"), () => reportDialog(), { quiet });
 }
 
-// Where to get help after a failure: the community group and the GitHub issues (site.json community, repo)
+// Support follows the repository packaged with this site.
 export function helpLinks() {
 	const link = (href, icon, text) => h("a", { href, target: "_blank", rel: "noopener", class: "help-link" },
 		h("span", { class: `icon icon-${icon}`, "aria-hidden": "true" }), text);
-	const links = [site.community && link(site.community, "facebook", t("report.community")),
-		site.repo && link(`${site.repo}/issues/new/choose`, "github", t("report.issue"))].filter(Boolean);
+	const links = [site.repo && link(`${site.repo}/issues/new/choose`, "github", t("report.issue"))].filter(Boolean);
 	return links.length ? h("span", { class: "help-links" }, t("report.help_lead"), " ", ...links) : null;
 }
 

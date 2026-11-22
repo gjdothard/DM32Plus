@@ -1,7 +1,14 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # CPS protocol
+
+The legacy shim refuses codeplug writes while channel tags exist and refuses
+the managed EEPROM metadata sector at offset 0xE000. Reads and separately
+authorized calibration writes remain available. A mode-aware writer must map
+logical RX-only permission; changing the legacy stand-in cannot do so.
+See [tagged channel records](channel-modes.md).
 
 How a PC programs the radio over USB. Section 2 describes the open-firmware shim, which is built. Section 3 drafts a native
 protocol for later. The wire protocol the open-firmware tools speak is described in `open-firmware-cps.md`. This page says

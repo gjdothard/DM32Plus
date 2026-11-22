@@ -1,11 +1,15 @@
 {
-  "_license": "SPDX-License-Identifier: MIT",
+  "_license": "MIT",
   "_copyright": "Copyright (c) 2026 Garrett Dothard",
   "name": "DM32Plus",
   "prefix": "dm32plus",
   "repository": "gjdothard/DM32Plus",
   "board": "dm32",
+  "documentation": "docs/product/dm32",
+  "build_api": "/_firmware_build/v1/",
+  "build_origins": ["https://cps.pplan.net"],
+  "build_required": ["HOSTLINK", "DEBUGLINK", "CPS_OPENFW", "CPS_FAST", "STUB_ENTRY"],
   "brand": "DM32",
   "accent": "+",
-  "version": "1.0.0"
+  "version": "1.1.0"
 }

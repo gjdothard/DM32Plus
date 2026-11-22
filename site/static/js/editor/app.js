@@ -11,13 +11,15 @@ import { SerialStream, serialSupported, RFOUNDRY_USB, browserErrorKey, knownRadi
 import { CodeplugImage, IDDB_HEADER, REGIONS } from "../codeplug/image.js";
 import { channelsUsingTalkgroups, decode, encode, empty, remove, validate, newChannel, newContact, numberAll, assignNumbers } from "../codeplug/model.js";
 import { LIMITS, decodeGeneral } from "../codeplug/records.js";
-import { CpsSerial, TransportError, estimate, keepIdentity, IDENTITY, iddbRanges } from "../codeplug/transport.js";
+import { CpsSerial, TransportError, estimate, keepIdentity, iddbRanges } from "../codeplug/transport.js";
 import { FastError } from "../codeplug/fastlink.js";
 import { convert as convertDb, readHeader as dbHeader } from "../codeplug/iddb.js";
 import { convertIddb, iddbEnd } from "../codeplug/sources/output.js";
 import { convertOperatingTalkgroups } from "../codeplug/convert-talkgroups.js";
 import { FakeCpsRadio } from "../codeplug/fakecps.js";
-import { Grid } from "./grid.js";
+import product from "../product.js";
+import { Grid, stageEdits } from "./grid.js";
+import { CONTACT_VIEWS, contactView, contactViewFor, contactRows, contactColumns, contactEditError } from "./contact-views.js";
 import { History } from "./undo.js";
 import { DraftSaver, isUnusedDraft } from "./draft.js";
 import { keyboardTabs } from "./navigation.js";
@@ -29,9 +31,10 @@ import * as diag from "../diag.js";
 import { initReporting, reportedLine } from "../report.js";
 import { updateFor } from "../flasher/version.js";
 import { encryptionTab } from "./encryption.js";
+import { systemsTab, systemDialog, modeSettingsPart } from "./modesview.js";
 
 const CABLES = [0x0403, 0x1A86, 0x10C4, 0x067B].map((usbVendorId) => ({ usbVendorId }));
-const TABS = ["radio", "encryption", "channels", "zones", "contacts", "rxLists", "dtmfContacts", "aprs", "iddb", "problems"];
+const TABS = ["radio", "encryption", "channels", "systems", "zones", "contacts", "rxLists", "dtmfContacts", "aprs", "iddb", "problems"];
 const TABLE_MAX = { channels: LIMITS.channels, zones: LIMITS.zones, contacts: LIMITS.contacts, rxLists: LIMITS.rxLists, dtmfContacts: LIMITS.dtmfContacts, aprs: LIMITS.aprs };
 
 const S = {
@@ -48,6 +51,8 @@ const S = {
 	iddbChanged: false,
 	sim: location.hash.startsWith("#sim"),		// #sim-foreign: a radio still holding stock data in its settings area
 	filter: {},
+	contactView: "all",
+	presentation: {},
 };
 
 const root = document.getElementById("editor");
@@ -86,6 +91,8 @@ const messages = h("div", { class: "ed-messages", "aria-live": "polite" });
 // --- Model changes ---
 
 function load(model, name, { fromRadio = false, dirty = false, restored = false, started = true } = {}) {
+	rememberGrid();
+	S.grid = null;
 	S.model = model;
 	S.started = started;
 	S.fileName = name;
@@ -159,7 +166,7 @@ function say(text, kind = "info", { report = null } = {}) {
 // --- Rendering ---
 
 function problems() {
-	return validate(S.model, { bands: S.conn?.radio?.bands_hz || null });
+	return validate(S.model, { bands: S.conn?.radio?.bands_hz || null, features: S.conn?.probe?.features ?? null });
 }
 
 function refresh() {
@@ -215,7 +222,18 @@ function renderConnection() {
 	connectionBar.replaceChildren(h("span", {}, text), toggle);
 }
 
+function rememberGrid() {
+	if (S.grid) S.presentation[S.grid.presentationKey] = { filter: S.grid.g.filter, sort: S.grid.g.sort };
+}
+
+function showContacts(key) {
+	rememberGrid();
+	S.contactView = contactView(key).key;
+	show("contacts");
+}
+
 function show(tab) {
+	rememberGrid();
 	S.tab = tab;
 	S.grid = null;
 	refresh();
@@ -269,42 +287,80 @@ function renderView(p) {
 		}
 		return;
 	}
+	if (tab === "systems") return view.replaceChildren(systemsTab(api(), S.conn?.probe?.features ?? null));
 	if (tab === "iddb") return view.replaceChildren(extensions.iddbTab(api()));
 	if (tab === "problems") return view.replaceChildren(problemsTab(p));
 	// a table: keep the grid (focus, sort, selection) when only its rows changed
 	if (S.grid?.table === tab && S.grid.sharedTalkgroups === S.model.sharedTalkgroups) {
-		S.grid.g.setRows(S.model[tab]);
+		S.grid.g.setRows(tab === "contacts" ? contactRows(S.model, S.contactView) : S.model[tab]);
+		S.grid.contactNav?.update();
 		S.grid.update();
 		return;
 	}
+	const presentationKey = tab === "contacts" ? `contacts.${S.contactView}` : tab;
 	const allColumns = columns(tab, S.model, t);
+	const visibleColumns = tab === "contacts" ? contactColumns(allColumns, S.contactView, t) : allColumns;
 	const g = new Grid({
-		columns: tab === "channels" ? visibleChannelColumns(allColumns, channelColumns) : allColumns,
-		searchColumns: allColumns, rows: S.model[tab], t, empty: t(`editor.empty.${tab}`),
+		columns: tab === "channels" ? visibleChannelColumns(allColumns, channelColumns) : visibleColumns,
+		searchColumns: visibleColumns, rows: tab === "contacts" ? contactRows(S.model, S.contactView) : S.model[tab], t, empty: t(`editor.empty.${tab}`),
 		onChange: (row, col, value) => {
 			let err = null;
+			const previous = tab === "contacts" ? contactViewFor(row) : null;
 			change(t("editor.undo.edit"), () => {
 				err = col.set(row, value);
 				return err ? false : undefined;
 			});
+			if (!err && tab === "contacts" && previous !== contactViewFor(row)) contactMoved(row);
 			return err;
 		},
 		onSelect: () => S.grid?.update(),
 		onOpen: record => openRecord(tab, record),
 	});
-	g.filter = S.filter[tab] || "";
+	g.filter = S.presentation[presentationKey]?.filter ?? S.filter[presentationKey] ?? "";
+	g.sort = S.presentation[presentationKey]?.sort ?? null;
 	g.render();
 	const filter = h("input", { type: "search", class: "ed-filter", placeholder: t("editor.filter"), "aria-label": t("editor.filter"), value: g.filter,
 		oninput: (e) => {
-			S.filter[tab] = e.target.value;
+			S.filter[presentationKey] = e.target.value;
 			g.setFilter(e.target.value);
+			S.grid.update();
 		} });
 	const actions = h("div", { class: "ed-actions" });
 	const update = () => actions.replaceChildren(...tableActions(tab, g));
-	S.grid = { table: tab, g, filter, update, sharedTalkgroups: S.model.sharedTalkgroups };
+	const contactNav = tab === "contacts" ? contactNavigation() : null;
+	S.grid = { table: tab, g, filter, update, presentationKey, contactNav, sharedTalkgroups: S.model.sharedTalkgroups };
 	update();
 	const picker = tab === "channels" ? columnPicker(g, allColumns) : null;
-	view.replaceChildren(h("div", { class: "ed-bar" }, actions, h("div", { class: "ed-table-tools" }, picker, filter)), g.el);
+	if (tab === "contacts") {
+		g.el.id = "contact-table";
+		g.el.setAttribute("role", "tabpanel");
+		g.el.setAttribute("aria-labelledby", `contact-tab-${S.contactView}`);
+	}
+	view.replaceChildren(...(contactNav ? [contactNav] : []), h("div", { class: "ed-bar" }, actions, h("div", { class: "ed-table-tools" }, picker, filter)), g.el);
+}
+
+function contactNavigation() {
+	const nav = h("nav", { class: "ed-tabs ed-contact-tabs", role: "tablist", "aria-label": t("editor.contacts.pages") });
+	const summary = h("p", { class: "small muted", "aria-live": "polite" });
+	const panel = h("div", { class: "ed-contact-navigation" }, nav, summary);
+	panel.update = () => {
+		nav.replaceChildren(...CONTACT_VIEWS.map(({ key }) => h("button", {
+			type: "button", role: "tab", id: `contact-tab-${key}`, "data-contact-view": key,
+			"aria-controls": "contact-table", "aria-selected": String(S.contactView === key),
+			tabindex: S.contactView === key ? 0 : -1, onclick: () => showContacts(key),
+		}, t(`editor.contacts.${key}`), h("span", { class: "ed-count" }, String(contactRows(S.model, key).length)))));
+		summary.textContent = t("editor.contacts.capacity", { n: S.model.contacts.length, max: LIMITS.contacts });
+	};
+	keyboardTabs(nav, control => {
+		showContacts(control.dataset.contactView);
+		S.grid.contactNav.querySelector('[aria-selected="true"]')?.focus();
+	});
+	panel.update();
+	return panel;
+}
+
+function contactMoved(record) {
+	say(t("editor.contacts.moved", { name: record.name, page: t(`editor.contacts.${contactViewFor(record)}`) }), "ok");
 }
 
 function columnPicker(grid, all) {
@@ -357,14 +413,14 @@ function tableActions(tab, g) {
 	add.dataset.action = "add";
 	const out = [
 		// first, so it sits above the row checkboxes it acts on; not on a table with nothing it can set (zones, RX lists)
-		bulkColumns(tab, S.model, t).length ? button(sel.length ? t("editor.bulk_edit_n", { n: sel.length }) : t("editor.bulk_edit"), () => bulkSet(tab, g), { disabled: sel.length < 2 }) : null,
+		editableColumns(tab).length ? button(sel.length ? t("editor.bulk_edit_n", { n: sel.length }) : t("editor.bulk_edit"), () => bulkSet(tab, g), { disabled: sel.length < 2 }) : null,
 		add,
 		button(t("editor.duplicate"), () => duplicate(tab, g), { disabled: full || !g.targets().length }),
 		button(t("editor.delete"), () => del(tab, g), { disabled: !g.targets().length, danger: true }),
 		button(t("editor.move_up"), () => move(tab, g, -1), { disabled: !g.targets().length, quiet: true }),
 		button(t("editor.move_down"), () => move(tab, g, 1), { disabled: !g.targets().length, quiet: true }),
 	].filter(Boolean);
-	if (numbered) out.push(button(t("editor.renumber"), () => renumber(tab), { quiet: true }));
+	if (numbered) out.push(button(t(tab === "contacts" ? "editor.contacts.renumber" : "editor.renumber"), () => renumber(tab), { quiet: true }));
 	if (tab === "channels" && !S.model.sharedTalkgroups && S.model.channels.length)
 		out.push(button(t("editor.tg.convert"), convertTalkgroups));
 	out.push(...extensions.tableActions(tab, api()));
@@ -384,7 +440,7 @@ function blank(tab) {
 	};
 	switch (tab) {
 	case "channels": return newChannel({ name: n(t("editor.new.channel")) });
-	case "contacts": return newContact({ name: n(t("editor.new.contact")), id: 9 });
+	case "contacts": return newContact({ name: n(t("editor.new.contact")), id: 9, ...contactView(S.contactView).defaults });
 	case "zones": return { name: n(t("editor.new.zone")), channels: [] };
 	case "rxLists": return { number: null, name: n(t("editor.new.rx_list")), contacts: [] };
 	case "dtmfContacts": return { number: null, name: n(t("editor.new.dtmf")), code: "0" };
@@ -438,7 +494,7 @@ function move(tab, g, d) {
 			return;
 		}
 		// numbered records swap numbers with their neighbor in number order
-		const list = [...S.model[tab]].sort((a, b) => a.number - b.number);
+		const list = [...(tab === "contacts" ? g.shown() : S.model[tab])].sort((a, b) => a.number - b.number);
 		const idx = items.map((x) => list.indexOf(x)).sort((a, b) => (d < 0 ? a - b : b - a));
 		for (const i of idx) {
 			const j = i + d;
@@ -460,9 +516,14 @@ function renumber(tab) {
 	});
 }
 
+function editableColumns(tab) {
+	const all = bulkColumns(tab, S.model, t);
+	return tab === "contacts" ? contactColumns(all, S.contactView, t) : all;
+}
+
 function bulkSet(tab, g) {
 	const rows = g.selection();
-	const cols = bulkColumns(tab, S.model, t);
+	const cols = editableColumns(tab);
 	if (!cols.length) return;
 	const pickCol = h("select", {}, ...cols.map((c, i) => h("option", { value: String(i) }, c.label)));
 	const slot = h("div");
@@ -484,10 +545,17 @@ function bulkSet(tab, g) {
 	dialog(t("editor.bulk_edit_n", { n: rows.length }), [h("label", {}, t("editor.field"), pickCol), slot, errs], t("editor.apply"), (close) => {
 		const c = cols[pickCol.selectedIndex];
 		const v = c.type === "select" ? input._opts[input.selectedIndex][0] : c.type === "bool" ? input.value === "1" : input.value;
-		let err = null;
-		change(t("editor.undo.edit"), () => {
-			for (const r of rows) {
-				err = c.set(r, v);
+		let err;
+		if (tab === "contacts") {
+			const staged = stageEdits(rows, c, v);
+			err = staged.error;
+			if (!err) {
+				change(t("editor.undo.edit"), () => rows.forEach((row, i) => Object.assign(row, staged.copies[i])));
+				if (["type", "protocol"].includes(c.key)) say(t("editor.contacts.reclassified"), "ok");
+			}
+		} else change(t("editor.undo.edit"), () => {
+			for (const row of rows) {
+				err = c.set(row, v);
 				if (err) return false;
 			}
 		});
@@ -508,9 +576,11 @@ function problemText(problem) {
 
 function openRecord(tab, record, { creating = false, problem = null } = {}) {
 	const model = S.model;
+	if (tab === "systems") return systemDialog(api(), record, creating);
 	const title = creating ? t("editor.record.create", { name: record.name }) : t("editor.record.edit", { name: record.name });
 	const options = {
 		field: problem?.field, error: problem ? problemText(problem) : null,
+		validate: tab === "contacts" ? work => contactEditError(model, record, work, t) : undefined,
 		saveLabel: t(tab === "channels" ? "editor.form.save_channel" : "editor.save_record"),
 		onClose() {
 			if (model[tab].includes(record)) S.grid?.g.focusRow(record);
@@ -518,6 +588,7 @@ function openRecord(tab, record, { creating = false, problem = null } = {}) {
 		},
 	};
 	const commit = (work, contacts = []) => {
+		const previous = tab === "contacts" ? contactViewFor(record) : null;
 		change(t(creating ? "editor.undo.add" : "editor.undo.edit"), () => {
 			Object.assign(record, work);
 			if (creating) model[tab].push(record);
@@ -525,15 +596,16 @@ function openRecord(tab, record, { creating = false, problem = null } = {}) {
 			if (tab !== "zones") assignNumbers(model[tab], TABLE_MAX[tab]);
 			if (contacts.length) assignNumbers(model.contacts, LIMITS.contacts);
 			if (creating && S.grid?.table === tab) {
-				S.filter[tab] = "";
+				S.filter[S.grid.presentationKey] = "";
 				S.grid.filter.value = "";
 				S.grid.g.filter = "";
 			}
 		});
+		if (tab === "contacts" && !creating && previous !== contactViewFor(record)) contactMoved(record);
 	};
 	if (tab === "channels") {
 		const draftContacts = [];
-		formDialog(title, channelForm(model, t, draftContacts), record, t, work => {
+		formDialog(title, channelForm(model, t, draftContacts, { features: S.conn?.probe?.features ?? null }), record, t, work => {
 			const created = work.mode !== "dmr" ? [] : draftContacts.filter(contact => model.sharedTalkgroups ?
 				work.talkgroupRefs.includes(contact) : work.talkGroups.some(entry => entry.id === contact.id));
 			commit(work, created);
@@ -586,8 +658,10 @@ function radioTab() {
 			field("privateHang", t("editor.general.private_hang"), 3, t("editor.general.hang_help"), num(0, 255))),
 	];
 	const connected = h("div");
-	const panel = h("div", {}, ...parts, connected);
+	const modeParts = modeSettingsPart(api(), S.conn?.probe?.features ?? null);
+	const panel = h("div", {}, ...parts, ...modeParts, connected);
 	panel.update = () => {
+		for (const part of modeParts) part.update?.();
 		for (const [key, field] of fields) {
 			if (field.input !== document.activeElement && !field.err.textContent) field.input.value = S.model.general[key] ?? "";
 		}
@@ -614,7 +688,11 @@ function problemsTab(p) {
 		const what = x.item ? (x.item.number ? `${t(`editor.tab.${x.table}`)} ${x.item.number} · ${x.item.name}` : `${t(`editor.tab.${x.table}`)} · ${x.item.name}`) : t(`editor.tab.${x.table === "general" ? "radio" : x.table}`);
 		const go = button(t("editor.problems.show"), () => {
 			const tab = x.table === "general" ? "radio" : x.table;
-			show(tab);
+			if (tab === "contacts" && x.item) {
+				showContacts(contactViewFor(x.item));
+				S.grid.g.setFilter("");
+				S.grid.filter.value = "";
+			} else show(tab);
 			if (x.item) openRecord(tab, x.item, { problem: x });
 			else if (tab === "radio") radioView.showProblem(x.field, problemText(x));
 			else say(problemText(x), x.level === "error" ? "bad" : "warn");
@@ -703,8 +781,10 @@ async function connect() {
 			// #sim-compact: firmware that reads a format C ID database; &release=vYY.M: a radio that runs that release;
 			// &git_time=N: a build of a commit from that time (Unix seconds)
 			const hash = location.hash;
-			S.fake = S.fake || new FakeCpsRadio({ board: "DM-1701", image: CodeplugImage.blank().bytes, foreign: hash === "#sim-foreign",
-				features: hash.startsWith("#sim-compact") ? "FM,DMR,IDDB_COMPACT" : "FM,DMR", release: hash.match(/[#&]release=([\w.]+)/)?.[1],
+			const radio = S.radios.find((r) => r.id === product.board) || S.radios[0];
+			S.fake = S.fake || new FakeCpsRadio({ board: radio.codeplug.names[0], base: radio.codeplug.base,
+				end: radio.codeplug.end, image: CodeplugImage.blank().bytes, foreign: hash === "#sim-foreign",
+				features: hash.startsWith("#sim-compact") ? "FM,DMR,IDDB_COMPACT" : "FM,DMR", release: hash.match(/[#&]release=([\w.-]+)/)?.[1],
 				gitTime: Number(hash.match(/[#&]git_time=(\d+)/)?.[1]) || 0 });
 			stream = S.fake.stream();
 		} else {
@@ -1051,7 +1131,7 @@ async function planWrite() {
 		// (compared byte for byte: two plans can send the same number of bytes. The second is planned only when there
 		// is something to keep: each plan is a pass over every block's CRC)
 		const kept = keepIdentity(file, c.image);
-		const differs = IDENTITY.some(([a, b]) => kept.bytes.subarray(a, b).some((x, i) => x !== file.bytes[a + i]));
+		const differs = kept.bytes.some((x, i) => x !== file.bytes[i]);
 		const plans = { file: await c.transport.plan(file, c.image, { iddb }) };
 		plans.kept = differs ? await c.transport.plan(kept, c.image, { iddb }) : plans.file;
 		let keep = keepPref() && differs;
@@ -1224,7 +1304,8 @@ function api() {
 		t, h, button, notice, say, change, load, refresh, download, dialog, confirmDialog,
 		get fileName() { return S.fileName; },
 		get tab() { return S.tab; },
-		show,
+		show, showContacts,
+		get contactView() { return S.contactView; },
 		get radio() { return S.conn?.radio || null; },
 		// whether the connected radio reads a format C ID database; null without a radio
 		get compact() { return S.conn ? S.conn.transport.compact : null; },

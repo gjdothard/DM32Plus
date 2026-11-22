@@ -1,18 +1,25 @@
-# RadioFoundry
+<!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
-**DM32Plus offshoot:** see [DM32Plus setup, controls, and release instructions](docs/user/23-radios.md#dm32plus).
+# DM32Plus
+
+DM32Plus is an MIT-licensed offshoot of RadioFoundry. This repository publishes firmware for its product
+board and the browser CPS. Start with [setup, controls, and release channels](docs/user/23-radios.md#dm32plus),
+the [portable CPS](tools/offline_cps/README.md), or [GitHub Releases](https://github.com/gjdothard/DM32Plus/releases).
+The shared firmware architecture and other board references below come from RadioFoundry; their presence
+does not mean this fork publishes or verifies releases for every board.
 
 **Free, MIT-licensed firmware for affordable DMR radios.** One shared core runs the DMR stack, the UI, the codeplug and
 the host tools; each radio adds a thin board layer. It brings the FM and DMR features low-cost stock firmware leaves
 out, with a UI designed from first principles. Anyone can use it for anything, commercial products included.
 
-### 🌐 [radiofoundry.org](https://radiofoundry.org)
+### Installation and programming
 
-**The website is the recommended way to install RadioFoundry and to edit your radio's codeplug.** In a Chromium browser
-(Chrome, Edge), plug in the radio and use the [web installer](https://radiofoundry.org/flash/index.html) to back up,
-install, update and restore, and the [Codeplug Editor](https://radiofoundry.org/codeplug/index.html) for channels, zones,
-contacts and the DMR ID database. Nothing to install, and your files never leave your computer. The command line tools
-and the [manual steps](docs/user/02-installing.md) are for scripting and for browsers that can't talk to a radio.
+Use this project's site or [portable CPS](tools/offline_cps/README.md) in Chrome or Edge. The **Firmware** menu
+opens the installer and updater; the CPS edits channels, operating talkgroups, contacts, channel encryption
+assignments, and the DMR ID database. Codeplug editing runs locally. The
+[manual steps](docs/user/02-installing.md) cover backups, recovery, and command-line alternatives.
+The upstream project is [RadioFoundry](https://radiofoundry.org).
 
 **[Install](docs/user/02-installing.md)** · **[User manual](docs/user/README.md)** · **[Radios](#radios-and-status)** ·
 **[Features](#features)** · **[Developer docs](docs/dev/README.md)**
@@ -64,8 +71,9 @@ by the UI simulator (`make -C tests/host ui-gallery`).</sub>
 
 ● done&nbsp;&nbsp; ◐ partly, or only in the linked pull request so far&nbsp;&nbsp; ○ not yet
 
-- **Releases** carry firmware for the supported radios (without the codec), `rfoundry` for Windows, macOS and Linux,
-  and the user manual as a PDF. Nothing to build: install with the [web installer](https://radiofoundry.org/flash/index.html), or see [Installing](docs/user/02-installing.md).
+- **This fork's releases** carry product firmware without the codec, manifests, and checksums. Stable releases also
+  publish a matching website bundle. See [release artifacts](docs/dev/release.md#release-artifacts) and
+  [Installing](docs/user/02-installing.md). The portable CPS is packaged separately.
 - **What has been checked on the air**, per feature and per radio: [on-air coverage](docs/testing/on-air-coverage.md)
   and the [feature matrix](docs/feature-matrix.md#checked-on-each-radio). "Host-tested" means it works against
   simulated chips, not yet on air.
@@ -106,9 +114,9 @@ modems (HR_C5000, HR_C6000, HR_C7000) and four RF chips (AT1846S, BK4819, FD6818
 |---|---|---|
 | Air interface | ETSI DMR Tier II: simplex, repeater, MMDVM SFR (single frequency repeater), repeater roaming | Standalone SFR (repeater and user roles on a channel); ETSI Tier III trunking |
 | Text messages | ETSI IP text (the default; individual texts confirmed); Motorola TMS; ETSI short data in 7-bit, ISO 8859, UTF-8 and UTF-16; ETSI UDT text | Hytera text format |
-| Location | Motorola LRRP location answers and ARS registration; ETSI GPS Info in voice calls (the caller's position shown with distance and bearing, ours sent from the APRS position); APRS position, status and messages on FM (Bell 202 AFSK) and positions over DMR to an APRS gateway ID; KISS TNC on USB | NMEA from the radio's GPS receiver, ETSI UDT location reports, APRS receive and iGate on radios that can sample received audio |
+| Location | NMEA from a board-provided GPS receiver; Motorola LRRP requests and answers and ARS registration; ETSI GPS Info in voice calls; APRS position, status and messages on FM, DMR APRS positions, APRS receive and iGate where received audio can be sampled; KISS TNC | ETSI UDT location reports |
 | Signaling | call alert, radio check and emergency, each in the Motorola and ETSI forms; talker alias in all four ETSI formats | DTMF and 5-tone on FM |
-| Privacy and encryption | Motorola Basic Privacy, Anytone 16-bit Basic Privacy | ARC4 and AES-256 per the DMR Association interoperability profiles |
+| Privacy and encryption | Motorola and Anytone Basic Privacy; AES-256/OFB voice, persistent CPS key slots and channel bindings (host-tested; hardware interoperability untested) | ARC4 |
 | Programming | The Codeplug Editor on the web site: every RadioFoundry radio over USB or the programming cable, CSV and qdmr YAML import and export, DMR ID database and contacts from RadioID.net. qdmr, over its open-firmware codeplug protocol | an open, published native codeplug format with its own qdmr driver |
 | Hotspot and network | MMDVM modem protocol (MMDVMHost, Pi-Star, WPSD and the networks behind them); IP over DMR with the radio as a USB network adapter (confirmed data, SAP 3 compressed UDP headers, control station mode for dispatch software); HTTP status, Hamlib rigctld, KISS over TCP, APRS-IS, mDNS, TFTP and SNMPv2c on the USB link; two radios as one full duplex repeater (experimental, build switch; each half passes on air, one pair checked on the bench) | the split duplex host side (`tools/split_duplex_host.py` is a test host) |
 | Audio to a computer | | USRP over UDP (AllStarLink, DVSwitch), USB sound card with serial-line PTT ([usb-audio](docs/spec/usb-audio.md)) |
@@ -183,9 +191,9 @@ useful in commercial service and to hams alike.
 
 Any way you can:
 
-- **Test and report.** Run RadioFoundry on your radio and [report what breaks](https://github.com/radiofoundry/radiofoundry/issues/new?template=bug_report.yml). If the radio restarted,
+- **Test and report.** Run RadioFoundry on your radio and [report what breaks](https://github.com/gjdothard/DM32Plus/issues/new?template=bug_report.yml). If the radio restarted,
   include the crash log from **Settings > Advanced > Crash log** ([settings](docs/user/17-settings.md#crash-log)).
-- **Ask.** [Request a feature](https://github.com/radiofoundry/radiofoundry/issues/new?template=feature_request.yml) or [a radio](https://github.com/radiofoundry/radiofoundry/issues/new?template=radio_request.yml) you'd like supported.
+- **Ask.** [Request a feature](https://github.com/gjdothard/DM32Plus/issues/new?template=feature_request.yml) you'd like in this firmware.
 - **Contribute.** Send pull requests for code or docs ([contributing](docs/dev/contributing.md)).
 - **Donate or lend a radio.** This helps the most, especially older models that are hard to find now, because every
   port needs the hardware on the bench.

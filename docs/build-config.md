@@ -3,6 +3,36 @@
 
 # Build configuration
 
+## P25 integration switches
+
+`CONFIG_P25` selects the Phase 1 engines and derives `CONFIG_AIR`, `CONFIG_IMBE`
+and `CONFIG_MBE`. `CONFIG_P25_TRUNK` follows it unless explicitly disabled.
+`CONFIG_P25_UI` also follows P25. Disable it to omit the monitoring Home,
+recent talkgroups, persistent favorites and system pages while keeping the
+protocol engines. See [P25 monitoring](spec/p25-ui.md).
+P25 requires `CONFIG_DMR` for shared codeplug contacts; trunking requires P25.
+Set the protocol switches rather than overriding the derived implementation
+switches. Make and `core/config.h` reject inconsistent dependencies.
+
+P25 defaults off globally; a board can enable P25 and trunking in its full
+build. Channel mode, CPS programming and the subscriber path are connected.
+Hardware qualification remains pending. See the [subsystem spec](spec/p25.md)
+and [feature matrix](feature-matrix.md) for board defaults and status.
+
+`CONFIG_P25=n CONFIG_P25_TRUNK=n` excludes the protocol libraries.
+`CONFIG_P25=y CONFIG_P25_TRUNK=n` builds conventional P25 without the follower.
+`CONFIG_P25=y` also builds trunking. These are code selection controls;
+transmit permission still comes from channel/system policy and normal radio
+checks. They do not replace the CPS RX-only option.
+
+`CONFIG_RX_EXTENDED` enables a board's experimental receive-only tuning
+range. It defaults off globally. The board supplies the limits; the switch
+does not establish sensitivity or synthesizer lock. Channels received in a
+receive-only range cannot transmit, even with a transmit frequency in a
+normal band. Such a trunking control-channel list forces passive following:
+no registration, affiliation, requests or voice transmission. Overlapping
+normal transmit bands retain their existing permissions.
+
 Features that cost flash, and values that differ per radio, are chosen at build time. Defaults live in
 `config/features.mk`. A platform changes them for every radio on it in `platform/<p>/config.mk`, a board changes them
 in `boards/<board>/config.mk`, and the make command line overrides all of them. The Makefile reads the board's file
@@ -76,7 +106,7 @@ Each variant file starts with `## title:` and `## summary:` lines, and the comme
 left out; the site shows both. The lists are a draft for the project lead to settle.
 
 The firmware version (`RFOUNDRY_GIT`) is the commit plus `-dirty` when the tree differs from it (tracked changes, or
-untracked sources in the built directories). The release name (`RFOUNDRY_RELEASE`, for example `v26.11`) is the
+untracked sources in the built directories). The release name (`RFOUNDRY_RELEASE`, for example `v1.0.0`) is the
 release tag on that commit, empty for a dirty tree or an untagged commit; `make RELEASE=<tag>` sets it and `RELEASE=`
 leaves it out ([dev/release.md](dev/release.md#release-names)). Only the few files that use either are rebuilt when it
 changes.
@@ -104,7 +134,7 @@ below are for an STM32F4 radio.
 | `CONFIG_DMR_PRIVACY` | = DMR | basic privacy (Motorola / Anytone BP) on the voice path, `core/dmr/dmrPrivacy.c` (`docs/spec/dmr-voice.md` 5) |
 | `CONFIG_DMR_TALKGROUP_ENTRIES` | = DMR | Per-channel DMR operating entries with timeslot and talkgroup ID. Memory Home's encoder cycles through them |
 | `CONFIG_TALKGROUP_EDIT` | Channel editing and DMR operating entries | Add, reorder, and remove saved group contacts from the shared operating talkgroup pool on the radio |
-| `CONFIG_DMR_AES256` | = DMR_PRIVACY | AES-256/OFB voice, PI and late-entry MI signaling; needs DMR_PRIVACY; RAM session provisioning (`docs/spec/dmr-voice.md` 5.1) |
+| `CONFIG_DMR_AES256` | = DMR_PRIVACY | AES-256/OFB voice, PI and late-entry MI signaling; needs DMR_PRIVACY. Supports RAM sessions, persistent CPS key slots, and per-channel bindings ([voice specification](spec/dmr-voice.md#51-aes-256-sessions)) |
 | `CONFIG_DMR_TALKER_ALIAS` | = DMR | talker alias decode and our own alias TX (`docs/spec/dmr-voice.md` 3) |
 | `CONFIG_DMR_GPS` | = DMR | ETSI GPS Info in the embedded LC (FLCO 8): the caller's position on the receive screen (with distance and bearing when ours is known), in Recent and on the debug link; ours sent in the alias superframes when the position-in-DMR-calls setting under Tools > APRS is on and a position source has a fix (the APRS position: GPS, host, fixed; `docs/spec/dmr-voice.md`) |
 | `CONFIG_DMR_SMS` | = DMR | text messages: ETSI IP text (the default format) and ETSI defined short data, received (inbox, ETSI response) and sent (docs/spec/dmr-data.md 5). Includes the keypad composer even without `CONFIG_CHANNEL_EDIT`. |
@@ -226,6 +256,20 @@ make BOARD=<id> print-not-written       # what is not written yet
 [feature-matrix.md](feature-matrix.md) shows the result for every radio ("Built by default on each radio") and its
 notes give the reasons; a radio's hardware spec (`hardware-<id>.md`) holds the facts behind them. The switches off on
 most boards are `CONFIG_AUDIO_PROBE` (a bench diagnostic) and the ones that need a part the radio lacks.
+
+## P25 resource probe
+
+`make BOARD=<id> CONFIG_P25=y BUILD=build/p25-probe p25-resources` compiles a
+diagnostic object with the selected target ABI. Its `p25_bytes_*` symbol sizes
+report voice, engine, session, soft-modem and, with trunking enabled, follower
+state. The object is never linked into firmware. Use a separate `BUILD` for
+each switch combination. With P25 disabled it emits no size markers.
+
+These are individual type sizes, not a sum or a runtime allocation plan.
+Some state may share storage across modes. An enabled firmware link can discard
+unreferenced engines until channel integration calls them; its image size does
+not prove that an active P25 mode will fit. Check retained code, caller-owned
+state, task stacks and memory ownership before enabling the mode.
 
 ## Adding a feature
 

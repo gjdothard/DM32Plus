@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // FD6818 single-chip VHF/UHF transceiver: chip driver, independent of the board
 // (docs/spec/hardware-dm32.md 8). No datasheet exists; register values are the ones the working firmware uses.
 //
@@ -11,10 +12,18 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "config.h"
 #include "rf/rfbus/rfbus.h"
 
 
 typedef rfbus_regval_t fd6818_regval_t;
+
+#if CONFIG_DIAG
+typedef struct {
+	uint32_t expected_10hz, actual_10hz;
+	uint16_t band_a, band_b, state, power;
+} fd6818_readback_t;
+#endif
 
 // What differs between the boards' chip set-ups: the register tables, the 0x30 sequences and the band words. The
 // default set is fd6818_variant_default; a board with other tables defines its own and passes it to
@@ -135,6 +144,10 @@ void fd6818_attach(fd6818_t *dev, rfbus_t *bus);	// the default variant
 void fd6818_attach_variant(fd6818_t *dev, rfbus_t *bus, const fd6818_variant_t *variant);
 void fd6818_write(fd6818_t *dev, uint8_t reg, uint16_t val);
 uint16_t fd6818_read(fd6818_t *dev, uint8_t reg);
+#if CONFIG_DIAG
+// Read-only register snapshot; caller serializes against tuning and IRQ-driven RF writes.
+void fd6818_readback(fd6818_t *dev, fd6818_readback_t *out);
+#endif
 
 // --- Sequences ---
 

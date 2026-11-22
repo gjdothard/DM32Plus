@@ -14,6 +14,7 @@
 #include "sim/ui_sim.h"
 #include "ui/ui_app.h"
 #include "ui/ui_screens.h"
+#include "ui/ui_nav.h"
 #include "config.h"
 
 static int fails, flows_run;
@@ -31,6 +32,58 @@ typedef struct {
 #define TALK_BACK	"ok 7 3 down down down down down down down down down ok long:back quick:dual ctx 3 5 ok "	// on, and A 3 / B 5
 
 static const flow_t flows[] = {
+	{ "P25 conventional home identifies the mode", "p25-home", "", "screen=home shows=P25 hides=No_tone", 0, false },
+#if CONFIG_P25_UI
+	{ "P25 recent opens directly from home", "p25-trunk-home", "ctx", "screen=p25-recent", 1, false },
+	{ "P25 serving site name survives a voice grant", "p25-trunk-home p25-site:voice", "",
+	  "screen=home shows=North_Tower shows=1234 tx=0", 0, false },
+	{ "P25 searching identifies an unconfirmed candidate", "p25-trunk-home p25-site:hunt", "",
+	  "screen=home shows=Candidate hides=Site:_North_Tower tx=0", 0, false },
+	{ "P25 unknown site uses decoded IDs", "p25-trunk-home p25-site:unknown", "",
+	  "screen=home shows=Site_1_/_3 hides=North_Tower tx=0", 0, false },
+	{ "P25 mismatch never shows a configured name", "p25-trunk-home p25-site:mismatch", "",
+	  "screen=home shows=Site_mismatch hides=North_Tower tx=0", 0, false },
+	{ "P25 reload clears the stale site", "p25-trunk-home p25-site:voice", "p25-site:reload",
+	  "screen=home shows=Site_unavailable hides=North_Tower tx=0", 1, false },
+	{ "P25 details retain the complete site name", "p25-trunk-home p25-site:long", "quick 7 down",
+	  "screen=p25-system shows=North_Tower_West tx=0", 3, false },
+	{ "P25 Quick opens protocol controls", "p25-trunk-home", "quick", "screen=quick", 1, false },
+	{ "P25 Quick returns to recent", "p25-trunk-home ctx", "quick back", "screen=p25-recent", 2, false },
+	{ "P25 recent calls opens", "p25-trunk-home quick", "5", "screen=p25-recent", 1, false },
+	{ "P25 system details opens", "p25-trunk-home quick", "7", "screen=p25-system shows=Status", 1, false },
+	{ "P25 assigned talkgroups opens the shared picker", "p25-trunk-home quick", "4", "screen=p25-talkgroups shows=Charleston_NSA", 1, false },
+	{ "P25 assigned group changes target without transmitting", "p25-trunk-home quick 4", "down ok",
+	  "screen=home p25hold=2456 p25target=2456 tx=0", 2, false },
+	{ "P25 system decode details opens", "p25-trunk-home quick 7", "ctx", "screen=p25-system", 1, false },
+	{ "P25 receive hold returns home", "p25-trunk-home ctx", "ok", "screen=home p25hold=1234 p25listen=3 tx=0", 1, false },
+	{ "P25 favorites do not write during browsing", "p25-trunk-home quick", "6", "screen=p25-recent", 1, false },
+	{ "P25 favorite selection is receive only", "p25-trunk-home quick 5", "ctx back 2 3",
+	  "screen=quick p25favorites=1 p25listen=2 p25target=1234 tx=0", 4, true },
+	{ "P25 resume all releases the hold", "p25-trunk-home quick 3", "2 2",
+	  "screen=quick p25hold=0 p25listen=1 p25target=1234 tx=0", 2, false },
+	{ "P25 Listen picker opens explicitly", "p25-trunk-home quick", "2", "screen=p25-listen p25listen=1 tx=0", 1, false },
+	{ "P25 picker Back does not apply", "p25-trunk-home quick 2", "back", "screen=quick p25listen=1 tx=0", 1, false },
+	{ "P25 Programmed restores receive filter only", "p25-trunk-home quick 3 2", "1", "screen=quick p25listen=0 p25hold=0 p25target=1234 tx=0", 1, false },
+	{ "P25 Hold releases without changing TX", "p25-trunk-home quick 3", "3", "screen=quick p25listen=0 p25hold=0 p25target=1234 tx=0", 1, false },
+	{ "P25 receive hold uses the newest eligible group", "p25-trunk-home p25-case:private quick", "3", "screen=quick p25hold=2456 p25target=1234 tx=0", 1, false },
+	{ "P25 Hold empty explains refusal", "p25-trunk-home p25-case:empty quick", "3", "screen=quick toast=No_group_call_to_hold p25hold=0 tx=0", 1, false },
+	{ "P25 empty favorites remain reachable", "p25-trunk-home quick", "6", "screen=p25-recent shows=No_calls_or_favorites tx=0", 1, false },
+	{ "P25 empty favorites filter explains refusal", "p25-trunk-home quick 2", "3", "screen=p25-listen toast=Add_a_recent_talkgroup_first p25listen=1 tx=0", 1, false },
+	{ "P25 conventional Listen explains channel type", "p25-home quick", "2", "screen=quick toast=Select_a_P25_trunked_channel tx=0", 1, false },
+	{ "P25 conventional Hold explains channel type", "p25-home quick", "3", "screen=quick toast=Select_a_P25_trunked_channel tx=0", 1, false },
+	{ "P25 conventional assigned group still works", "p25-home quick 4", "down ok", "screen=home p25hold=2456 p25target=2456 tx=0", 2, false },
+	{ "P25 RX-only power explains permission", "p25-trunk-home quick", "1", "screen=quick toast=RX_only:_transmit_disabled tx=0", 1, false },
+	{ "P25 stale monitor cannot apply Hold", "p25-trunk-home quick p25-case:stale", "3", "screen=quick toast=P25_request_unavailable p25hold=0 tx=0", 1, false },
+	{ "P25 closed owner cannot apply filter", "p25-trunk-home quick 2 p25-case:closed", "1", "screen=p25-listen p25listen=1 tx=0", 1, false },
+	{ "P25 TX-time Hold is refused", "p25-trunk-home quick p25-case:tx", "3", "screen=quick toast=P25_request_unavailable p25hold=0 p25target=1234", 1, false },
+	{ "P25 TX-time filter is refused", "p25-trunk-home quick 2 p25-case:tx", "1", "screen=p25-listen toast=P25_request_unavailable p25listen=1 p25target=1234", 1, false },
+	{ "P25 TX-time operating group is refused", "p25-trunk-home quick 4 p25-case:tx", "down ok", "p25hold=0 p25target=1234", 2, false },
+
+	{ "P25 Details has its own shortcut", "p25-trunk-home quick", "8", "screen=p25-system shows=Valid_blocks tx=0", 1, false },
+	{ "P25 arrows share Quick focus", "p25-trunk-home quick", "down ok", "screen=p25-listen tx=0", 2, false },
+	{ "P25 Brightness uses the shared editor", "p25-trunk-home quick", "9 7 back", "screen=home tx=0", 3, false },
+
+#endif
 	{ "1 next channel", "", "up", "pos=4", 1, false },
 	{ "1 channel 12 by number", "", "1 2 ok", "pos=12 screen=home", 3, false },
 	// The status strip's USB word (#58): IP as a network adapter, with the link arrows once the computer has it up,
@@ -396,6 +449,13 @@ static const flow_t flows[] = {
 #endif
 	{ "12 into the VFO", "", "ok 4 up ok", "vfo=1 screen=home", 4, false },
 	{ "12 446.000 in the VFO", "ok 4 up ok", "4 4 6 0 0 0 ok", "freq=446000000", 7, false },
+	{ "VFO entry waits for confirmation", "vfokey", "4 4 6", "screen=home entry=446 freq=146520000", 3, false },
+	{ "VFO entry Back deletes", "vfokey 4 4 6", "back", "entry=44 freq=146520000", 1, false },
+	{ "VFO entry Back cancels the last digit", "vfokey 4", "back", "entry=none freq=146520000", 1, false },
+	{ "VFO entry timeout does not retune", "vfokey 4 4 6", "wait:11000", "entry=none freq=146520000", 0, false },
+	{ "Dual VFO typed digits are drawn on standard layouts", "quick:dual ctx 1 vfokey wait:3000", "4 4 6",
+	  "screen=home dual=1 entry=446 shows=446.", 3, false },
+	{ "VFO entry rejects an out of band prefix", "vfokey 4", "9", "entry=4 freq=146520000", 1, false },
 	{ "13 lock", "", "long:quick", "locked=1", 1, false },
 	{ "13 unlock", "long:quick", "long:quick", "locked=0", 1, false },
 	{ "14 GPS details", "", "ok 6 2", "screen=gps", 3, false },
@@ -791,6 +851,18 @@ static const flow_t flows_mono[] = {
 
 // DM-1701 key map only: the top side key, long waits
 static const flow_t flows_k[] = {
+#if CONFIG_P25_UI
+	{ "P25 knob selects the next assigned group", "p25-trunk-home", "enc+",
+	  "screen=home pos=3 p25hold=2456 p25target=2456 shows=2456 tx=0", 1, false },
+	{ "P25 knob wraps backward", "p25-trunk-home", "enc-",
+	  "screen=home pos=3 p25hold=2456 p25target=2456 tx=0", 1, false },
+	{ "P25 knob wraps forward", "p25-trunk-home enc+", "enc+",
+	  "screen=home pos=3 p25hold=1234 p25target=1234 tx=0", 1, false },
+	{ "P25 knob without configured groups changes channel", "p25-trunk-home p25-no-groups", "enc+",
+	  "screen=home pos=4 tx=0", 1, false },
+	{ "P25 conventional knob selects the next group", "p25-home", "enc+",
+	  "screen=home pos=3 p25hold=2456 p25target=2456 tx=0", 1, false },
+#endif
 	// Dual watch on the side keys: SK2 is A/B pressed, Dual watch held; P1 / P2 (zones) and the knob act on the
 	// selected channel
 	{ "11 dual watch: SK2 pressed is A/B", "quick 7 ctx 3 5 ok", "sk2", "dual=1 sel=B", 1, false },
@@ -1198,6 +1270,104 @@ static void crawl(const sim_geom_t *g, sim_map_t map, const char *mapname)
 	printf("# crawl [%s]: %d screens and states checked\n", mapname, screens);
 }
 
+#if CONFIG_P25_UI
+static unsigned p25_cuts;
+static char p25_cut_text[256];
+static void p25_fit(const char *src, const char *out)
+{
+	size_t n = strlen(out);
+	if (n && (unsigned char)out[n - 1] != 0x80) {
+		p25_cuts++;
+		size_t used = strlen(p25_cut_text);
+		snprintf(p25_cut_text + used, sizeof p25_cut_text - used, " [%s]", src);
+	}
+}
+
+static void check_p25_quick_layout(void)
+{
+	unsigned checked = 0;
+	for (int g = 0; g < sim_geom_count; g++) for (uint8_t language = 0; language < lang_count(); language++) {
+		if (!lang_built(language)) continue;
+		for (unsigned state = 0; state < 5; state++) for (int large = 0; large < 2; large++) {
+			char err[300], issues[SIM_LAYOUT_MAX][160];
+			sim_reset(&sim_geoms[g], SIM_MAP_K);
+			const char *setup = state == 0 ? "branded-home p25-trunk-home quick" :
+				state == 1 ? "branded-home p25-home p25-case:tx-capable quick" :
+				state == 2 ? "branded-home p25-trunk-home quick 3" : state == 3 ?
+				"branded-home p25-trunk-home p25-case:empty quick" : "branded-home p25-trunk-home p25-case:closed quick";
+			if (!sim_run(setup, err, sizeof err)) { printf("FAIL P25 layout setup: %s\n", err); fails++; continue; }
+			lang_set(language);
+			ui_apply_setting(UI_SET_LARGE_TEXT, large);
+			for (unsigned focus = 0; focus < UI_QUICK_TILES; focus++) {
+				ui_st.quick_focus = focus;
+				p25_cuts = 0; p25_cut_text[0] = '\0';
+				sim_set_fit_hook(p25_fit);
+				ui_app_draw();
+				sim_set_fit_hook(NULL);
+				int overlaps = sim_layout_issues(issues, SIM_LAYOUT_MAX);
+				checked++;
+				if (p25_cuts || overlaps) {
+					printf("FAIL P25 Quick layout [%s %s state %u large %d key %u]: %u cuts%s, %s\n",
+						sim_geoms[g].name, lang_code(language), state, large, focus + 1, p25_cuts, p25_cut_text, overlaps ? issues[0] : "no overlap");
+					fails++;
+				}
+			}
+		}
+	}
+	printf("# P25 Quick: %u translated/accessibility layouts checked\n", checked);
+}
+
+static void check_p25_quick_mapping(void)
+{
+	static const uint8_t expected[] = { QT_POWER, QT_P25_LISTEN, QT_P25_HOLD, QT_P25_TALK,
+		QT_P25_RECENT, QT_P25_FAVORITES, QT_P25_SYSTEM, QT_P25_DETAILS, QT_BRIGHTNESS };
+	static const char *const setups[] = { "p25-trunk-home", "p25-home", "p25-trunk-home p25-case:closed",
+		"p25-trunk-home p25-case:tx-capable", "p25-trunk-home p25-case:empty" };
+	for (int g = 0; g < sim_geom_count; g++) for (unsigned c = 0; c < 5; c++) {
+		char err[300], label[40], value[40];
+		sim_reset(&sim_geoms[g], SIM_MAP_K);
+		if (!sim_run(setups[c], err, sizeof err)) { printf("FAIL P25 fixture: %s\n", err); fails++; continue; }
+		ui_state_t state = {0};
+		for (int i = 0; i < UI_QUICK_TILES; i++) {
+			bool want = c == 2 ? i == 8 : i == 0 ? c == 3 :
+				c == 1 && (i == 1 || i == 2 || i == 5) ? false : c == 4 && i == 2 ? false : true;
+			bool available = ui_quick_tile(i, sim_view(), &state, label, sizeof label, value, sizeof value);
+			if (ui_quick_kind(i, sim_view()) != expected[i] || available != want || label[0] != '1' + i) {
+				printf("FAIL P25 tile %d [%s case %u]: available %d, expected %d\n", i + 1, sim_geoms[g].name, c, available, want);
+				fails++;
+			}
+		}
+	}
+	static const flow_t knob = { "P25 Quick encoder moves forward", "p25-trunk-home quick", "enc+ ok",
+		"screen=p25-listen tx=0", 2, false };
+	run_flow(&knob, sim_geom_find("160x120i5"), SIM_MAP_K, "P25 encoder");
+	static const flow_t few = { "P25 few-key long OK opens Quick", "p25-trunk-home", "long:ok down ok",
+		"screen=p25-listen tx=0", 3, false };
+	run_flow(&few, sim_geom_find("128x64"), SIM_MAP_F, "P25 few keys");
+}
+
+static void check_p25_selection_contrast(void)
+{
+	static const char *const scripts[] = {
+		"p25-trunk-home ctx expect:screen=p25-recent",
+		"p25-trunk-home quick 5 ctx back 6 expect:screen=p25-recent",
+	};
+	for (int g = 0; g < sim_geom_count; g++) {
+		for (size_t i = 0; i < sizeof scripts / sizeof scripts[0]; i++) {
+			char err[300], issues[SIM_LAYOUT_MAX][160];
+			sim_reset(&sim_geoms[g], SIM_MAP_K);
+			if (!sim_run(scripts[i], err, sizeof err)) {
+				printf("FAIL P25 selection [%s]: %s\n", sim_geoms[g].name, err);
+				fails++;
+			} else if (sim_layout_issues(issues, SIM_LAYOUT_MAX) != 0) {
+				printf("FAIL P25 selection [%s]: %s\n", sim_geoms[g].name, issues[0]);
+				fails++;
+			}
+		}
+	}
+}
+#endif
+
 // About (Settings > Advanced): every word readable at every display class (nothing shortened with an ellipsis, all
 // the way to the end), no status strip while idle, the strip back while transmitting
 static void about_checks(void)
@@ -1385,6 +1555,11 @@ int main(void)
 {
 	if (check_name_is_id() != 0)
 		return 1;
+#if CONFIG_P25_UI
+	check_p25_selection_contrast();
+	check_p25_quick_mapping();
+	check_p25_quick_layout();
+#endif
 #if CONFIG_DMR_SMS
 	{
 		// The cursor follows a draft past the visible rows, and a rejected key cannot change the last character.
@@ -1435,11 +1610,69 @@ int main(void)
 		"Tall color Home uses the branded card layout", "", "branded-home", "screen=home shows=RECENT_ACTIVITY", 1, false,
 	};
 	run_flow(&card_home, sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+	static const flow_t card_p25[] = {
+		{ "P25 conventional card keeps its actual mode", "branded-home p25-home", "",
+		  "screen=home mode=p25 shows=P25 hides=FM hides=No_tone", 0, false },
+		{ "P25 trunking card keeps its actual mode", "branded-home p25-trunk-home", "",
+		  "screen=home mode=p25 "
+#if CONFIG_P25_UI && CONFIG_UI_CARD_MENU
+		  "p25card=1 "
+#endif
+		  "shows=P25 shows=Charleston_NSA hides=FM hides=No_tone", 0, false },
+#if CONFIG_P25_UI
+		{ "P25 knob card shows its selected group and clears the stale caller", "branded-home p25-trunk-home", "enc+",
+		  "screen=home shows=2456 shows=Security hides=567890 p25target=2456 tx=0", 1, false },
+#endif
+	};
+	for (size_t i = 0; i < sizeof card_p25 / sizeof card_p25[0]; i++)
+		run_flow(&card_p25[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
 	static const flow_t card_dual = {
 		"Tall color Dual Watch shows the per-channel state",
 		"", "branded-home quick 3 ctx 3 2 ok wait:3000", "screen=home shows=IDLE shows=RECENT_ACTIVITY", 6, false,
 	};
 	run_flow(&card_dual, sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+	static const flow_t card_vfo[] = {
+		{ "VFO entry keeps its card and typed digits", "branded-home vfokey wait:3000", "4 4 6",
+		  "screen=home homecard=1 entrycard=1 entry=446 shows=446. shows=RECENT_ACTIVITY freq=146520000", 3, false },
+		{ "VFO card entry retains all decimal digits", "branded-home vfokey", "4 4 6 0 0 6 2 5",
+		  "screen=home entrycard=1 entry=44600625 shows=446.00625 freq=146520000", 8, false },
+		{ "VFO entry OK tunes and keeps Home", "branded-home vfokey 4 4 6", "ok",
+		  "screen=home homecard=1 entry=none freq=446000000", 1, false },
+		{ "DMR VFO entry keeps its card", "branded-home vfokey quick 4 back wait:3000", "4 4 6",
+		  "screen=home homecard=1 entrycard=1 entry=446 mode=dmr freq=146520000", 3, false },
+		{ "Split VFO card exposes its TX frequency", "branded-home vfokey quick 5 up ok back wait:3000", "",
+		  "homecard=1 shows=TX_147.120 freq=146520000 txfreq=147120000", 0, false },
+		{ "Dual VFO B entry keeps both cards", "branded-home quick:dual ctx 1 vfokey wait:3000", "4 4 6",
+		  "screen=home dual=1 sel=B homecard=1 entrycard=1 entry=446 shows=COUNTY_DMR", 3, false },
+		{ "Dual VFO B hash confirms instead of opening actions", "branded-home quick:dual ctx 1 vfokey 4 4 6", "ctx",
+		  "screen=home dual=1 sel=B entry=none freq=446000000", 1, false },
+		{ "Dual VFO B entry survives a receiver hop", "branded-home quick:dual ctx 1 vfokey 4 4 6", "tune:a ctx",
+		  "screen=home dual=1 sel=B entry=none freq=446000000", 1, false },
+		{ "Dual VFO A entry keeps both cards", "branded-home vfokey quick:dual wait:3000", "4 4 6",
+		  "screen=home dual=1 sel=A homecard=1 entrycard=1 entry=446", 3, false },
+	};
+	for (size_t i = 0; i < sizeof card_vfo / sizeof card_vfo[0]; i++)
+		run_flow(&card_vfo[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "Tall color");
+	static const flow_t p25_dual[] = {
+		{ "P25 card displays the dual-watch refusal", "branded-home p25-home", "dualkey",
+		  "dual=0 scanning=0 shows=No_dual_watch_on_P25", 1, false },
+		{ "P25 conventional cannot start dual watch", "p25-home", "dualkey",
+		  "dual=0 scanning=0 toast=Dual_watch_unavailable_for_P25", 1, false },
+		{ "P25 trunked cannot start dual watch", "p25-trunk-home", "dualkey",
+		  "dual=0 scanning=0 toast=Dual_watch_unavailable_for_P25", 1, false },
+		{ "P25 cannot replace B in the picker", "quick:dual ctx 3 p25-channel:5", "5 ok",
+		  "dual=1 bpos=4 toast=Dual_watch_unavailable_for_P25", 2, false },
+		{ "P25 B edit stops an active watch", "quick:dual ctx 3 5 ok", "p25-channel:5,trunk wait:1000",
+		  "dual=0 scanning=0 toast=Dual_watch_unavailable_for_P25", 0, false },
+		{ "P25 A edit stops an active watch", "quick:dual", "p25-channel:3 wait:1000",
+		  "dual=0 scanning=0 toast=Dual_watch_unavailable_for_P25", 0, false },
+		{ "Saved P25 B cannot resume a watch", "quick:dual ctx 3 5 ok p25-channel:5,trunk", "reboot wait:1000",
+		  "dual=0 scanning=0", 0, false },
+		{ "P25 debug-link pair is refused", "p25-home", "dldual:5 wait:1000",
+		  "dual=0 scanning=0", 0, false },
+	};
+	for (size_t i = 0; i < sizeof p25_dual / sizeof p25_dual[0]; i++)
+		run_flow(&p25_dual[i], sim_geom_find("240x320i10x5"), SIM_MAP_K, "P25 dual watch");
 	static const flow_t card_quick[] = {
 		{ "Tall color DMR Quick Controls", "", "branded-home quick", "screen=quick shows=Quick_Controls shows=GPS", 1, false },
 		{ "Tall color FM Quick Controls", "", "branded-home down quick 4 up", "screen=quick sq=6 shows=Quick_Controls", 4, false },

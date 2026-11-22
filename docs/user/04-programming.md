@@ -3,8 +3,17 @@
 
 # Programming the Radio
 
+Experimental P25 builds can operate preconfigured conventional and Phase 1
+trunked P25 channels within the radio's supported bands.
+The home screen shows P25. P25 settings editors are still being integrated.
+Codeplugs containing tagged channels currently allow reads and backups, but
+refuse legacy CPS and raw codeplug writes to protect mode-specific permissions.
+Keep a backup before using experimental codeplugs. Channel Receive only and
+system listen-only also block automatic trunked signaling. Hardware qualification
+and mode-aware editing remain pending.
+
 The codeplug holds the channels, zones, contacts, RX group lists, the DMR ID database and your DMR ID. Edit it with the
-**Codeplug Editor** on the project's web site, [radiofoundry.org](https://radiofoundry.org/codeplug/index.html). It runs
+**Codeplug Editor** in this project's site or [portable CPS](../../tools/offline_cps/README.md). It runs
 in a Chromium-based browser (Chrome, Edge, Opera), needs nothing installed, and works with every RadioFoundry radio,
 over USB or over the programming cable. qdmr, the free codeplug editor, is an alternative.
 
@@ -14,13 +23,15 @@ over USB or over the programming cable. qdmr, the free codeplug editor, is an al
 | [qdmr](https://github.com/hmatuschek/qdmr) | Windows, macOS, Linux | Your existing qdmr codeplugs, and scripting. Needs a radio qdmr's driver can reach ([qdmr](#programming-with-qdmr)) |
 | `tools/cps_client.py` and TFTP | A terminal | Raw backups and scripts ([Backups](#backups)) |
 
-All of them use the same codeplug format and the radio's own codeplug interface, so a codeplug written by one reads
-back in the others. How each radio is wired for this is in the [Radio reference](23-radios.md#programming).
+They share the base codeplug layout. Shared operating talkgroups and channel encryption assignments require
+compatible firmware and an editor that preserves those extensions. How each radio connects is in the
+[Radio reference](23-radios.md#programming).
 
 ## The Codeplug Editor
 
-Open **Codeplug Editor** in the site's menu. It reads and writes the radio from the browser. Nothing is sent to a
-server: files, the codeplug and your RadioID API key stay on your computer.
+Open **Codeplug Editor** in the site's menu. It reads and writes the radio from the browser. Codeplug editing
+and file conversion run locally. A RadioID API key is sent only to RadioID.net; optional error reports can
+include a codeplug only when you choose to attach it.
 
 On a fresh visit, choose **Read from Radio**, **Open File**, or **Create codeplug**. A saved working draft opens
 directly in the editor. The header's theme control applies to the workspace and its dialogs. Firmware installation
@@ -82,6 +93,7 @@ TFTP ([USB network](15-usb-network.md#programming-over-the-network)).
 | Tab | Holds |
 |---|---|
 | Radio | DMR ID, radio name (callsign), boot text, group and private call hang times |
+| Encryption | Persistent AES key slots and the radio default; needs a compatible connected radio. Key values are excluded from files and drafts |
 | Channels | Every channel. The pencil button opens the full form: FM, DMR, scan and power, location, single frequency repeater |
 | Zones | Zones and their channels |
 | Contacts | Talkgroups and private-call contacts |
@@ -93,6 +105,34 @@ TFTP ([USB network](15-usb-network.md#programming-over-the-network)).
 Choose **Add** to create a record in its editor. **Save** adds it to the codeplug; canceling leaves the codeplug
 unchanged. The pencil beside a record opens its editor again. A new channel and any talkgroups created with it
 can be undone together.
+
+In **Systems**, Edit opens a tabbed form. Choose a section for system identity, radio settings,
+control channels, sites, or the channel plan. Tables use the full panel width; on a small screen,
+scroll the table sideways to reach every column. Switching sections keeps your edits.
+Save checks every section and opens one with an error if correction is needed. Cancel asks before
+discarding changes.
+
+Contacts has **All**, **DMR TG**, **P25 TG**, **Private Calls (PC)**, and **Shared TG** subpages.
+Shared groups apply to both DMR and P25. Existing all-call contacts remain accessible in All;
+DTMF contacts have their own page. Every subpage uses the same shared contact capacity.
+
+Add uses the current subpage's protocol and call type. P25 groups omit the DMR timeslot field;
+private calls show Unit ID and protocol. Each subpage remembers its search and sort. Switching
+subpages clears selection, and bulk actions affect only visible selected records.
+**Renumber all contacts** always applies to the whole digital contact table.
+
+Changing a contact's protocol or call type moves it to the matching subpage. Undo restores the
+previous classification. Remove incompatible channel or RX-list assignments before changing it.
+**Add from RadioID.net** is available in All and Private Calls; imported contacts appear in
+Private Calls. File exports continue to include the whole codeplug.
+
+For a DMR channel, the full form also holds **Operating talkgroups** and **Encryption**. Assign saved group contacts
+and order them for the channel knob. **Channels > Convert Operating Talkgroups** converts legacy assignments
+to shared saved contacts; review the counts and any conversion warning before writing. See
+[operating talkgroups](09-dmr.md#choosing-a-talk-target) and [privacy](09-dmr.md#privacy).
+
+Set the channel's key-slot assignment under **Advanced > Encryption**. Provision the key itself in the
+workspace's **Encryption** tab before using that slot.
 
 The channel table starts with the common fields. Open **Columns** to show additional fields; the browser remembers
 your choice. The channel name and edit controls stay visible while scrolling horizontally. Filtering includes
@@ -202,11 +242,12 @@ qdmr read back what they wrote, but RadioFoundry doesn't act on those parts.
 Changes made on the radio (a channel saved with hold **OK**, a permanent talk target) are written to the same
 codeplug, so the next read shows them.
 
-The codeplug can't set these yet:
+These settings are stored separately from the base codeplug:
 
-- Privacy keys ([DMR](09-dmr.md#privacy)).
+- Privacy key values. The CPS **Encryption** tab programs persistent AES slots directly on the connected radio;
+  channel slot assignments are saved in the codeplug ([DMR](09-dmr.md#privacy)).
 - RadioFoundry's own settings ([Settings](17-settings.md)): they are kept separately from the codeplug. The codeplug's
-  quick key assignments are ignored.
+  side-key assignments are the exception: they are shared with the codeplug.
 - Emergency, ARS and text message format.
 - SFR settings, in qdmr. The Codeplug Editor sets them on each channel.
 
@@ -237,3 +278,33 @@ To carry a stock codeplug over while you install, see [Moving from the stock fir
 - Writes are refused while the radio's settings area holds another firmware's data. See "Settings are not kept" in
   [Troubleshooting](20-troubleshooting.md#settings-are-not-kept).
 - The calibration area accepts writes only to its own bytes. Don't edit calibration with a CPS.
+
+## P25 programming
+
+The editor offers **P25** and **P25 Trunking** channel modes for Phase 1.
+Conventional channels have RX/TX NAC and squelch fields. Use **Systems** to
+enter trunked-system identity, control channels, optional sites and channel
+plans. Select that system on each trunked channel. The current firmware
+supports eight systems. Phase 2 voice is not supported.
+
+**RX Only** remains the channel transmit permission. On a trunked channel it
+also prevents registration, affiliation and service requests. New trunked
+channels start RX only, and new systems start **Never (listen only)**. To
+transmit, the channel and its system must both permit it, and all normal
+frequency and transmit checks still apply. Listen-only systems never send
+automatic signaling. The **Radio** tab has a P25 unit ID; blank inherits the
+DMR ID. A system may override that ID.
+
+Save P25 codeplugs as binary backups. Channel CSV and qdmr YAML cannot
+represent the permission and system records; the editor refuses these
+operations while those records are present. Other CSV tables remain usable.
+Existing inline DMR talkgroup assignments are migrated to the shared pool
+when P25 is first saved. Unknown occupied storage or insufficient capacity
+is reported instead of overwritten. Keep the original backup.
+
+Writing P25 requires firmware advertising managed staged programming in
+fast-protocol INFO. Older firmware is refused before a write; there is no
+legacy-write fallback. The radio stops active calls before the commit and
+reloads the resulting permissions before resuming. Keep radio identity also
+preserves the radio-wide P25 unit ID. This path is verified with synthetic
+flash and host simulations; radio interoperability remains untested.

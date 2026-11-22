@@ -10,7 +10,8 @@ the forms in `.github/ISSUE_TEMPLATE/` (bug, feature, new radio), and pull reque
 ## Branches and pull requests
 
 All changes reach `main` through a pull request. Nobody pushes to `main` directly. For now every pull request goes
-from a feature branch into `main`; there are no release or develop branches.
+from a feature branch into `main`. The product's `Development` and `Testing` branches publish beta and
+release-candidate firmware through the [product release workflow](release.md#release-names).
 
 ### Repository members
 
@@ -76,8 +77,8 @@ The short version:
 - Don't open, copy or paraphrase GPL or non-commercial firmware, vendor SDKs or disassembly while writing code
   for this repository. If you have read them, write specs (facts, not code) and let someone else implement.
 - Never add the AMBE codec, a stock firmware image, a bootloader key or a memory dump to the repository.
-- Every file carries an SPDX header (`SPDX-License-Identifier: MIT` and the copyright line, in the style of its
-  neighbors). `reuse lint` must not report your files (the whole tree doesn't pass yet, [CI](ci.md)).
+- Every file carries an SPDX header (the `MIT` license identifier and the copyright line, in the style of its
+  neighbors). `reuse lint` must pass ([CI](ci.md)). Formats without comments use `REUSE.toml` annotations.
 - Test vectors come from standards or from your own captures.
 
 The checks, all in `tools/ci.sh`: `tools/license_grep.sh` (markers of foreign code), `reuse lint` (when installed),

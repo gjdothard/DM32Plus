@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # RadioFoundry User Manual
 
@@ -7,13 +8,15 @@ How to install RadioFoundry and use it on the radio. The chapters describe what 
 and display, and what has been checked on each. Each release also carries this manual as a PDF, built from these files
 (`tools/build_manual.sh`, in file name order).
 
-Start on the web site, [radiofoundry.org](https://radiofoundry.org): the **web installer** installs, updates, backs up
+Start on this project's site or in the [portable CPS](../../tools/offline_cps/README.md): the **web installer** installs, updates, backs up
 and restores a radio, and the **Codeplug Editor** edits channels, zones and contacts. Both run in a Chromium browser.
 The chapters below name the command line tools as alternatives.
 
-<img src="../ux/screens/160x120i5/home_dmr.png" width="200" alt="Home screen on a DMR channel">
-<img src="../ux/screens/160x120i5/quick_dmr.png" width="200" alt="Quick settings">
-<img src="../ux/screens/160x120i5/hub.png" width="200" alt="The hub">
+<img src="../ux/screens/240x320i10x5/home_dmr.png" width="220" alt="Card Home screen on a DMR channel">
+<img src="../ux/screens/240x320i10x5/quick_dmr.png" width="220" alt="DMR Quick Controls on the card layout">
+<img src="../ux/screens/240x320i10x5/hub.png" width="220" alt="The nine-entry card Main Menu">
+
+These show the card layout. The chapters also cover the standard Hub and smaller displays.
 
 ## Reading order
 
@@ -26,11 +29,15 @@ The chapters below name the command line tools as alternatives.
 
 ### Use the radio
 
+- [P25 monitoring and talkgroups](p25.md): shared Talkgroups editor, protocol filtering and group selection
+
 5. [Keys and navigation](05-keys-and-navigation.md): the five key rules, Find, temporary changes, key lock
 6. [The Home screen](06-home-screen.md): what each region shows, receiving, transmitting
 7. [Channels, zones and the VFO](07-channels-zones-vfo.md)
 8. [FM](08-fm.md): squelch, monitor, tones, bandwidth, VOX, touch tones
 9. [DMR](09-dmr.md): talk targets, replying, Recent, contacts, timeslot and color code, privacy, roaming
+
+[P25 monitoring](p25.md): talkgroups, Hold, persistent favorites and system details.
 10. [Messages, call alert and radio check](10-messages-and-signaling.md)
 11. [Emergency](11-emergency.md)
 12. [Scan and dual watch](12-scan.md)
@@ -67,12 +74,12 @@ Keys are named by their job. [Key roles](23-radios.md#key-roles) shows which key
 | Quick settings | **\*** |
 | Open the menu (hub) | **OK** |
 | Act on the last caller | **#** |
-| Recent calls | **OK**, **3** |
+| Recent calls | **OK**, **6** on the card Main Menu; **OK**, **3** on the standard Hub |
 | Talk to another talkgroup or ID | Hold **#** |
-| Choose who to talk to | **Talk target** (DMR), or **\***, **8** |
+| Choose who to talk to | **Talk target** (DMR), or **\***, **4** on the Memory card grid (**8** on the standard grid) |
 | Monitor | Hold **Monitor** |
-| Dual watch on / off | Hold **Talk target**, or **\***, **7** |
-| Scan on / off | **OK**, **6**, **1** |
+| Dual watch on / off | Hold **Talk target**, or **\***, **3** on the Memory card grid (**7** on the standard grid) |
+| Scan on / off | Card Main Menu: **OK**, **5**, select Start/Stop scan. Standard Hub: **OK**, **6**, **1** |
 | Undo temporary changes | **Back** on Home |
 | Save changes to the channel | Hold **OK** |
 | Back to Home | Hold **Back** |

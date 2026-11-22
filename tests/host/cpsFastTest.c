@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The fast codeplug protocol (core/cps/cps_fast.c, docs/spec/cps-fast.md) on a simulated flash with the DM-1701's
 // layout: the LZ4 encoder and streaming decoder against a reference decoder and a second encoder, blank blocks, CRC
 // sums and DIFF, READ windows, the range refusals, direct and staged writes, the session time-out, power cuts all
@@ -8,9 +9,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include "cps/cps_fast.h"
+#include "radio/radio_programming.h"
 #include "cps/cps_lz4.h"
 #include "cps/cps_openfw.h"
 #include "codeplug/codeplug.h"
+#include "codeplug/codeplug_tag.h"
+#include "codeplug/codeplug_kv.h"
 #include "settings/settings.h"
 #include "storage/storage.h"
 #include "net/tftp_codeplug.h"
@@ -428,7 +432,7 @@ static void test_info_and_reads(void)
 
 	boot(&dm1701_map, true);
 	CHECK(op(CPSF_OP_INFO) == DL_ST_OK && rep_len == 27);
-	CHECK(rep[1] == CPSF_VERSION && rep[2] == 3 && g16(&rep[3]) == BLOCK && rep[5] == CPSF_SUMS_MAX);
+	CHECK(rep[1] == CPSF_VERSION && rep[2] == 7 && g16(&rep[3]) == BLOCK && rep[5] == CPSF_SUMS_MAX);
 	CHECK(rep[6] == CPSF_DATA_MAX && g16(&rep[7]) == CPSF_READ_MAX);
 	CHECK(g32(&rep[9]) == 0x10000u && g32(&rep[13]) == 0x20000u && g32(&rep[17]) == 0x1C0000u && g32(&rep[21]) == 0);
 	CHECK(g16(&rep[25]) == 63);	// 256 KB of staging: the record and 63 slots
@@ -896,6 +900,74 @@ static void test_bad_records(void)
 	printf("# boot records: a changed slot, a protected block, the good one, TFTP leaves ours\n");
 }
 
+static void test_mode_guard(void)
+{
+	boot(&dm1701_map, true);
+	channel_t c = { .name = "Tagged", .mode = RADIO_MODE_FM, .rx_hz = 145500000, .tx_hz = 145500000,
+		.timeslot = 1, .power = CODEPLUG_POWER_DEFAULT };
+	CHECK(codeplug_set_channel(1, &c));
+	codeplug_tag_t tag = { .kind = CODEPLUG_KIND_P25, .system = CODEPLUG_SYSTEM_NONE, .flags = CODEPLUG_TAG_BASE_OWN };
+	CHECK(codeplug_tag_write(1, c.name, &tag, NULL, 0));
+	CHECK(begin(CPSF_MODE_DIRECT) == DL_ST_REFUSED);
+	CHECK(begin(CPSF_MODE_STAGED) == DL_ST_REFUSED);
+	const char *msg = NULL;
+	CHECK(tftp_codeplug_file.open_write(0, &msg) != TFTP_OK);
+	CHECK(codeplug_tag_remove(1));
+	CHECK(begin(CPSF_MODE_DIRECT) == DL_ST_OK);
+	uint8_t blank[BLOCK]; memset(blank, 0xFF, sizeof blank);
+	CHECK(write_block(CODEPLUG_KV_ADDR, blank, 61) == DL_ST_REFUSED);
+	CHECK(op(CPSF_OP_ABORT) == DL_ST_OK);
+}
+
+static void test_managed_write(void)
+{
+	static uint8_t old[BLOCK], wanted[BLOCK];
+	boot(&dm1701_map, true);
+	channel_t ch = { .name = "P25", .rx_hz = 453100000, .tx_hz = 458100000, .mode = RADIO_MODE_DMR, .rx_only = true };
+	CHECK(codeplug_set_channel(10, &ch));
+	codeplug_tag_t tag = { .kind = CODEPLUG_KIND_P25, .system = CODEPLUG_SYSTEM_NONE, .flags = CODEPLUG_TAG_TX };
+	CHECK(codeplug_tag_write(10, ch.name, &tag, NULL, 0));
+	memcpy(old, sim_flash_data + CODEPLUG_KV_ADDR, BLOCK);
+	tag.flags = 0;
+	CHECK(codeplug_tag_write(10, ch.name, &tag, NULL, 0));
+	memcpy(wanted, sim_flash_data + CODEPLUG_KV_ADDR, BLOCK);
+	memcpy(sim_flash_data + CODEPLUG_KV_ADDR, old, BLOCK);
+	codeplug_kv_changed();
+	CHECK(begin(CPSF_MODE_DIRECT | CPSF_MODE_AWARE) == DL_ST_BAD_ARG);
+	CHECK(begin(CPSF_MODE_STAGED | CPSF_MODE_AWARE) == DL_ST_OK);
+	CHECK(write_block(CODEPLUG_KV_ADDR, wanted, 61) == DL_ST_OK);
+	CHECK(!memcmp(old, sim_flash_data + CODEPLUG_KV_ADDR, BLOCK));
+	CHECK(op(CPSF_OP_COMMIT) == DL_ST_BUSY && radio_programming_requested());
+	CHECK(!memcmp(old, sim_flash_data + CODEPLUG_KV_ADDR, BLOCK));
+	radio_programming_ready(); // simulated RF-owner acknowledgment; the real owner has its own state-machine test
+	CHECK(op(CPSF_OP_COMMIT) == DL_ST_OK && g32(sim_flash_data + STAGING + 4) == 2);
+	CHECK(tick_until_done(20) && !radio_programming_requested());
+	CHECK(!memcmp(wanted, sim_flash_data + CODEPLUG_KV_ADDR, BLOCK));
+	CHECK(codeplug_tagged_channel(10, &ch) && ch.kind == CODEPLUG_KIND_P25 && ch.rx_only);
+
+	CHECK(begin(CPSF_MODE_STAGED | CPSF_MODE_AWARE) == DL_ST_OK);
+	CHECK(write_block(CODEPLUG_KV_ADDR, old, 61) == DL_ST_OK);
+	CHECK(op(CPSF_OP_COMMIT) == DL_ST_BUSY);
+	radio_programming_ready(); CHECK(op(CPSF_OP_COMMIT) == DL_ST_OK);
+	sim_flash_bad_range(CODEPLUG_KV_ADDR, BLOCK);
+	cps_fast_tick(++now);
+	CHECK(state() == CPSF_ST_FAILED && radio_programming_requested());
+	storage_init(); CHECK(!cps_fast_resume() && radio_programming_requested());
+	sim_flash_bad_range(0, 0);
+	storage_init();
+	sim_flash_data[STAGING + BLOCK] ^= 1;
+	CHECK(!cps_fast_resume() && radio_programming_requested());
+	CHECK(g32(sim_flash_data + STAGING) == STORAGE_STAGE_MAGIC_CPSF);
+	sim_flash_data[STAGING + BLOCK] ^= 1;
+	storage_init(); CHECK(cps_fast_resume() && !radio_programming_requested());
+	CHECK(!memcmp(old, sim_flash_data + CODEPLUG_KV_ADDR, BLOCK));
+	CHECK(codeplug_tagged_channel(10, &ch) && !ch.rx_only);
+	CHECK(begin(CPSF_MODE_STAGED | CPSF_MODE_AWARE) == DL_ST_OK);
+	CHECK(write_block(CODEPLUG_KV_ADDR, wanted, 61) == DL_ST_OK);
+	CHECK(op(CPSF_OP_COMMIT) == DL_ST_BUSY);
+	CHECK(op(CPSF_OP_ABORT) == DL_ST_OK && !radio_programming_requested());
+}
+
 int main(void)
 {
 	setvbuf(stdout, NULL, _IONBF, 0);	// the lines before a crash
@@ -907,6 +979,8 @@ int main(void)
 	test_staged_write();
 	test_power_cuts();
 	test_bad_records();
+	test_mode_guard();
+	test_managed_write();
 	CHECK(sim_flash_violations() == 0);
 	sim_flash_free();
 	printf("# cpsFastTest: %d checks, %s\n", checks, failures ? "FAILED" : "PASSED");

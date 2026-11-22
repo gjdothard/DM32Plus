@@ -9,6 +9,7 @@
 #include "board.h"
 #include "ui_nav.h"
 #include "ui_svc.h"
+#include "ui_p25.h"
 #include "fmt.h"
 #if CONFIG_CONTACT_POSITION || CONFIG_DMR_ARS
 #include "dmr/call/dmr_lc.h"
@@ -3552,6 +3553,8 @@ static const ui_scr_def_t discard_screen = {
 };
 #endif
 
+#endif // CONFIG_CHANNEL_LIST
+
 #if CONFIG_CHANNEL_EDIT || CONFIG_DMR_SMS
 // ======================= Text entry: keypad letters (ui.md 2.1) =======================
 // Phone keypad: in ABC / abc, 2-9 cycle their letters, the digit, then the letters in the other case (ABC: A B C 2 a b
@@ -3804,6 +3807,7 @@ static const ui_scr_def_t sms_text_screen = {
 #endif
 #endif
 
+#if CONFIG_CHANNEL_LIST
 #if CONFIG_CHANNEL_EDIT
 #if CONFIG_CONTACT_EDIT
 // ======================= The contact editor (ui.md 2.4) =======================
@@ -6920,7 +6924,7 @@ static void picker_item(uint16_t i, ui_item_t *it)
 	if (ui_frame()->arg == 1 && i < n_picks) {
 		codeplug_talkgroup_t entry;
 		codeplug_talkgroup_at(ui_view()->channel_number, (uint8_t)i, &entry);
-		if (!entry.id) {
+		if (!entry.id || (ui_view()->ch.mode == RADIO_MODE_P25 && entry.id > 0xFFFFu)) {
 			str_copy(it->label, sizeof it->label, TR("Not set"));
 			it->flags |= UI_ITEM_DIM;
 			return;
@@ -6932,7 +6936,8 @@ static void picker_item(uint16_t i, ui_item_t *it)
 			str_copy(target.name, sizeof target.name, contact.name);
 		ui_sb_target(it->label, sizeof it->label, &target);
 		it->flags |= UI_ITEM_PREVIEW;	// keep the leading TG ID when a long contact name needs ellipsis
-		str_copy(it->value, sizeof it->value, entry.timeslot == 2 ? "TS2" : entry.timeslot == 1 ? "TS1" : TR("Channel's"));
+		if (ui_view()->ch.mode != RADIO_MODE_P25)
+			str_copy(it->value, sizeof it->value, entry.timeslot == 2 ? "TS2" : entry.timeslot == 1 ? "TS1" : TR("Channel's"));
 		return;
 	}
 #endif
@@ -6981,6 +6986,15 @@ static void picker_select(uint16_t i, bool hold)
 #if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
 	if (ui_frame()->arg == 1) {
 		if (i < n_picks) {
+#if CONFIG_P25_UI
+			if (ui_view()->ch.mode == RADIO_MODE_P25) {
+				codeplug_talkgroup_t entry;
+				codeplug_talkgroup_at(ui_view()->channel_number, (uint8_t)i, &entry);
+				if (entry.id && entry.id <= 0xFFFFu &&
+				    ui_svc_p25_command(ui_view()->channel_number, P25_MON_SELECT, (uint16_t)entry.id)) ui_go_home();
+				return;
+			}
+#endif
 			radio_req_dmr_talkgroup_select((uint8_t)i);
 			ui_pop();
 		}
@@ -7012,6 +7026,14 @@ static const ui_scr_def_t picker_screen = {
 	.count = picker_count, .item = picker_item, .select = picker_select, .context = picker_context,
 	.target = picker_target, .enter = picker_enter, .title = picker_title,
 };
+#if CONFIG_P25_UI
+static const ui_scr_def_t p25_talkgroups_screen = {
+	.name = "p25-talkgroups", .flags = SF_LIST | SF_FIELD, .prefix = TRN("Talkgroups"),
+	.hint = TRN("OK choose  Back cancel"),
+	.count = picker_count, .item = picker_item, .select = picker_select,
+	.enter = picker_enter, .body = picker_title,
+};
+#endif
 
 // ======================= Scan: what to do with the channel that stopped it =======================
 
@@ -7380,6 +7402,11 @@ static const ui_scr_def_t operating_tg_move_screen = {
 #endif
 
 const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
+#if CONFIG_P25_UI
+	[SCR_P25_LISTEN] = &ui_p25_listen_screen, [SCR_P25_RECENT] = &ui_p25_recent_screen,
+	[SCR_P25_SYSTEM] = &ui_p25_system_screen,
+	[SCR_P25_TALKGROUPS] = &p25_talkgroups_screen,
+#endif
 	[SCR_HOME] = &home_screen, [SCR_QUICK] = &quick_screen, [SCR_HUB] = &hub_screen,
 #if CONFIG_UI_CARD_MENU
 	[SCR_MENU_SECTION] = &menu_section_screen,

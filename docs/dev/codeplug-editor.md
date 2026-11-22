@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # The Codeplug Editor
 
@@ -16,7 +17,6 @@ use it too. Both are plain ES modules that also run in Node. The user's view is 
 | `codeplug/fields.js` | Field encodings: BCD frequencies, IDs and tones, 0xFF-padded names, 24-bit locations |
 | `codeplug/records.js` | Each record decoded into a plain object and encoded back. An encoder writes only the fields it owns, so vendor bytes survive an edit |
 | `codeplug/model.js` | The editing model. References are the records themselves, so a delete or renumber can't leave one pointing at the wrong record. `encode()` rewrites only changed records: an unedited codeplug round-trips byte for byte. `validate()` returns the Problems list |
-| `codeplug/iddb.js` | The DMR ID database, format N (7.5): area 1, then area 2 up to the radio's end |
 | `codeplug/csv.js` | Tables as CSV (RFC 4180): fixed English headers, references by name, import matched by number then name |
 | `codeplug/yaml.js` | The YAML subset qdmr writes: block and flow maps and lists, quoted values, `!default` tags, comments. Anchors are refused |
 | `codeplug/qdmr.js` | qdmr YAML to the model and back ([qdmr-yaml.md](../spec/qdmr-yaml.md)), with notes on what each side can't hold |
@@ -27,14 +27,24 @@ use it too. Both are plain ES modules that also run in Node. The user's view is 
 | `codeplug/iddb.js` | The DMR ID database in format N and format C ([iddb-compact.md](../spec/iddb-compact.md)): write, read, convert, size |
 | `codeplug/sources/` | Contacts sources: `radioid.js` (RadioID.net's `user.csv` and API), `regions.js` (generated region names), `output.js` (users to the ID database or contacts) |
 | `editor/app.js` | The page: tabs, the file menu, radio read and write, the draft |
+| `editor/contact-views.js` | Contact subpage classification, creation defaults, columns, and assignment checks; views keep the shared contact objects |
 | `editor/grid.js`, `views.js` | The table (in-place edit, sort, filter, selection, keyboard) and each record kind's columns, form and membership editor |
 | `editor/undo.js` | Snapshots of every table's order and every record's fields |
 | `editor/files.js` | What an opened file holds (codeplug image, backup bundle, `codeplug.bin`), and the draft in IndexedDB |
 | `editor/extensions.js`, `parts.js` | Optional parts register their Save items, table actions, text file openers and DMR ID Database views. `parts.js` lists them, so a part is added without touching `app.js` |
 | `editor/csvpart.js`, `qdmrpart.js`, `contactspart.js` | The CSV, qdmr YAML and RadioID parts |
+| `codeplug/talkgroups.js`, `talkgroup-pool.js`, `convert-talkgroups.js` | Legacy assignments, recoverable shared contact-reference banks, and the one-time conversion to shared operating talkgroups |
+| `codeplug/aeskeys.js`, `channelkeys.js` | Radio key-slot operations and codeplug channel bindings; key bytes are excluded from codeplug files |
+| `editor/encryption.js` | Key-slot provisioning, radio default, and connection sharing with the workspace |
+| `editor/draft.js`, `unsaved.js`, `navigation.js` | Draft save status, guards for unsaved work, and keyboard tab navigation |
+
+The first-use screen offers radio read, file open, or codeplug creation. A working draft restores the workspace.
+The header theme applies to tables and dialogs. Channel columns are selectable and remembered locally.
+Add and Edit open record forms; channel and membership dialogs confirm before discarding edits.
+The Problems view opens the affected record and field.
 
 Add `#sim` to the page's address to read and write a simulated radio (`fakecps.js`), `#sim-compact` for one that
-reads format C ID databases. Append `&release=vYY.M` for a radio that runs that release, or `&git_time=N` for a build
+reads format C ID databases. Append `&release=v1.0.0` for a radio that runs that release, or `&git_time=N` for a build
 of a commit from that time, which brings up the update notice when `releases.json` lists a newer one.
 
 After a read, the radio is offered the newest release for its board from `releases.json` when that is newer
@@ -71,7 +81,7 @@ radio on it is swapped, so before every read and write the page asks `who(radios
 copies the radio's name, DMR ID and boot text (`IDENTITY`) into the image it writes, for one codeplug written to
 several radios.
 
-A browser can't reach the radio's UDP port or its http server (see USB network mode above), so for a radio in USB
+A browser can't reach the radio's UDP port or its HTTP server ([USB network mode](../user/15-usb-network.md)), so for a radio in USB
 network mode the editor saves `codeplug.bin` for `tftp put` instead.
 
 A radio that lists `CPS_FAST` in its features is read and written with the fast protocol (`fastlink.js`) on the

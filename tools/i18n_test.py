@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """Tests of tools/i18n.py (docs/dev/translating.md): a string with no usable translation is left out of the generated
 table, so the radio shows its English; a string whose English changed a little keeps its translation; the check lists
 every string still to do."""
@@ -8,6 +9,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import i18n  # noqa: E402
@@ -36,6 +38,33 @@ msgstr "中"
 
 
 class Generate(unittest.TestCase):
+    def test_synced_catalog_keeps_copyright_notices(self):
+        path = os.path.join(self.dir.name, "xx.po")
+        headers, entries, refs = i18n.synced(path, [("Done", ["core/ui/x.c"])])
+        i18n.write_po(path, headers, entries, refs)
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("# Copyright (c) 2026 The RadioFoundry Authors\n", text)
+        self.assertIn("# Copyright (c) 2026 Garrett Dothard\n", text)
+
+    def test_catalog_on_another_drive(self):
+        path = os.path.join(self.dir.name, "xx.po")
+        with patch.object(i18n.os.path, "relpath", side_effect=ValueError("different drives")):
+            headers, entries = i18n.read_po(path)
+            keys, built = i18n.tables()
+        self.assertEqual(headers["Language"], "xx")
+        self.assertIn(("Done", "Hecho", False), entries)
+        self.assertEqual(i18n.lookup(keys, built[0][4], built[0][5], b"Done"), b"Hecho")
+
+    def test_catalog_error_on_another_drive_names_the_file(self):
+        path = os.path.join(self.dir.name, "bad.po")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("msgstr \"orphan\"\n")
+        with patch.object(i18n.os.path, "relpath", side_effect=ValueError("different drives")):
+            with self.assertRaises(i18n.I18nError) as error:
+                i18n.read_po(path)
+        self.assertIn(os.path.abspath(path) + ":1:", str(error.exception))
+
     def test_source_references_use_forward_slashes(self):
         self.assertTrue(all("\\" not in path for path in i18n.source_files()))
 

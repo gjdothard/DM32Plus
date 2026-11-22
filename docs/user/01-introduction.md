@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Introduction
 
@@ -8,9 +9,10 @@ thin board layer underneath.
 
 This manual describes what RadioFoundry does on every radio. What differs between radios (the keys, power levels,
 battery, power switch, display, missing hardware and test status) is in the [Radio reference](23-radios.md). The
-screenshots are 160 x 120. Other radios show the same screens, laid out for their display.
+screenshots primarily show the tall card layout. Menus and Quick Controls can use different
+numbers between layouts; use the labels and the key hints shown on your display.
 
-<img src="../ux/screens/160x120i5/home_dmr.png" width="200" alt="Home screen on a DMR channel">
+<img src="../ux/screens/240x320i10x5/home_dmr.png" width="200" alt="Home screen on a DMR channel">
 
 ## Reading order
 

@@ -20,6 +20,21 @@ and what has been checked on it.
 
 [Planned radios](#planned-radios) lists the radios that aren't built yet.
 
+## Experimental DM-32UV receive range
+
+The full build includes conventional P25 Phase 1 and Phase 1 trunking.
+It also allows experimental reception from 16 to 999.999990 MHz, including
+the 740–850 MHz region. Program an RX frequency in the CPS and select the
+channel mode or trunking system as usual. Keep Receive only selected for
+monitoring channels. Firmware also blocks transmission whenever the RX
+frequency is outside the normal 136–174 and 400–480 MHz transmit bands.
+Trunking systems with extended-band control channels follow passively.
+
+Reception across this range is unverified; the antenna, filters and receiver
+may prevent useful reception. P25 Phase 2 and encrypted voice are not
+supported. This build enables owner testing; it does not establish reception
+of a particular public-safety system.
+
 ## Key roles
 
 The manual names keys by the job they do. Each radio puts those jobs on its own keys:
@@ -377,17 +392,19 @@ Installing: [Moving from stock DM-32UV firmware](19-moving-from-stock-dm32.md).
 
 ### DM32Plus
 
-DM32Plus reserves 512 KiB for future conversation history. If your caller-name database exceeds the new
+DM32Plus reserves 512 KiB for persistent conversation history. Eligible blank storage is prepared automatically;
+unknown contents are preserved. See [message history](10-messages-and-signaling.md#reading-messages).
+If your caller-name database exceeds the new
 CPS limit, keep a copy before upgrading and rebuild it with fewer regions or shorter text in **DMR ID
 Database**. The limit applies to caller-name lookups. Channels, talkgroups, and saved contacts have their
 own records.
 
 The DM32Plus offshoot publishes its firmware on [GitHub Releases](https://github.com/gjdothard/DM32Plus/releases).
 
-1. Open the portable CPS with `Start CPS.cmd` using Chrome or Edge, then choose **Install DM32Plus**
-   or **Upgrade to DM32Plus**. See the [portable CPS instructions](../../tools/offline_cps/README.md).
+1. Open the portable CPS with `Start CPS.cmd` using Chrome or Edge, then open **Firmware** and choose **Install DM32+**
+   or **Upgrade to DM32+**. See the [portable CPS instructions](../../tools/offline_cps/README.md).
 2. Choose a **Release channel**. **Development** checks for the newest published Development prerelease.
-   **Testing** checks for the newest published release candidate, identified by an `RC` prefix.
+   **Testing** checks for the newest published release candidate, with a `-rc.N` version suffix.
    **Stable** checks for the newest published stable release. **Bundled (offline)** uses the image
    included in the CPS package.
 3. Review the target version before proceeding. If the installer was open when a new release appeared,

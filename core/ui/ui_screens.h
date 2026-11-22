@@ -140,6 +140,7 @@ enum {
 	QT_ZONE_SCAN, QT_GPS,
 	QT_TO_VFO,		// on a channel, in place of QT_MODE: copy the channel to the VFO
 	QT_SPLIT,		// in the VFO, in place of QT_MONITOR (FM) / QT_PRIVACY (DMR): the TX frequency or offset
+	QT_P25_LISTEN, QT_P25_HOLD, QT_P25_TALK, QT_P25_RECENT, QT_P25_FAVORITES, QT_P25_SYSTEM, QT_P25_DETAILS,
 
 };
 // The tile kind at position 0..8 (keys 1..9) for this channel or the VFO
@@ -247,6 +248,17 @@ void ui_draw_home_dual(const radio_view_t *v, const ui_state_t *s);
 #endif
 void ui_draw_quick(const radio_view_t *v, const ui_state_t *s);
 bool ui_card_layout(const ui_state_t *s);
+// Shared card surfaces for protocol pages and the existing Home/menu renderers.
+#define UI_CARD_INK RGB565(5, 9, 14)
+#define UI_CARD_SURFACE RGB565(16, 30, 41)
+#define UI_CARD_SELECTED RGB565(18, 54, 65)
+#define UI_CARD_EDGE RGB565(48, 70, 83)
+#if CONFIG_DUAL_WATCH
+int ui_draw_card_begin(const ui_state_t *s, const char *title);
+#endif
+#if CONFIG_UI_CARD_MENU
+void ui_draw_card_footer(const ui_state_t *s, const char *left, const char *right);
+#endif
 void ui_local_time(char out[6], uint32_t utc_minute);
 #if CONFIG_UI_CARD_MENU
 #if CONFIG_GPS_SKY

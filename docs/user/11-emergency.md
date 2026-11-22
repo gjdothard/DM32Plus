@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Emergency
 
@@ -11,7 +12,7 @@ to, it opens the emergency screen and plays an alert tone (a warble of about 1 s
 vibrates four times, unless **Settings > Sound > Vibrate** is off. The screen shows EMERGENCY and the station's name or
 ID.
 
-<img src="../ux/screens/160x120i5/emergency.png" width="200" alt="An emergency received">
+<img src="../ux/screens/240x320i10x5/emergency.png" width="200" alt="An emergency received">
 
 | Key | Does |
 |---|---|

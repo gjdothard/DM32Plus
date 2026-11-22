@@ -1,11 +1,14 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # CPS, Codeplug and Settings
 
 A radio is programmed three ways: the [Codeplug Editor](codeplug-editor.md) in the browser (the recommended way, over
 the debug link's fast codeplug protocol, [cps-fast.md](../spec/cps-fast.md)), qdmr through a shim that speaks the
 open-firmware CPS protocol qdmr already supports, and `tools/cps_client.py` for scripts. All three use the codeplug
-layout qdmr writes. Users: [Programming the radio](../user/04-programming.md).
+base layout qdmr writes. Current firmware also uses extensions for shared operating talkgroups and channel
+encryption bindings; key values live separately in settings. An older editor must preserve those extension
+bytes to retain them. Users: [Programming the radio](../user/04-programming.md).
 
 ## The CPS shim
 

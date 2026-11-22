@@ -138,12 +138,12 @@ static const hal_power_t fake_power = { .led = p_led, .battery_mv = p_battery_mv
 static bool a_start(audio_block_cb_t cb, void *ctx) { (void)cb; (void)ctx; return true; }
 static void a_stop(void) {}
 static void a_pcm(bool on) { (void)on; }
-static const hal_audio_t fake_audio = { a_start, a_stop, a_pcm };
+static const hal_audio_t fake_audio = { .start = a_start, .stop = a_stop, .speaker_pcm = a_pcm };
 static bool v_present(void) { return true; }
 static void v_reset(void) {}
 static void v_encode(const int16_t *pcm, uint8_t *bits) { (void)pcm; memset(bits, 0, VOCODER_BITS); }
 static void v_decode(const uint8_t *bits, int16_t *pcm) { (void)bits; memset(pcm, 0, VOCODER_FRAME_SAMPLES * 2); }
-static const hal_vocoder_t fake_vocoder = { v_present, v_reset, v_encode, v_decode, NULL, NULL, NULL, NULL };
+static const hal_vocoder_t fake_vocoder = { .present = v_present, .reset = v_reset, .encode = v_encode, .decode = v_decode };
 
 // A band table with the air band and the broadcast band: RX-only bands below the VHF transmit band
 static const band_t bands[] = {
@@ -151,6 +151,7 @@ static const band_t bands[] = {
 	{ 400000000, 480000000, true },
 	{ 108000000, 136000000, false },
 	{ 65000000, 108000000, false },
+	{ 16000000, 999999990, false },
 };
 static const char *const power_names[] = { "L", "M", "H" };
 
@@ -158,7 +159,7 @@ const board_t board = {
 	.name = "fake-am",
 	.caps = CAP_AM_RX | CAP_BCAST_FM | CAP_DMR,
 	.bands = bands,
-	.band_count = 4,
+	.band_count = sizeof(bands) / sizeof(bands[0]),
 	.bcast = &fake_bcast,
 	.power_count = 3,
 	.power_names = power_names,
@@ -662,6 +663,25 @@ static void test_bcast_vfo(void)
 	CHECK(sm.view.am && sm.view.ch.mode == RADIO_MODE_FM);
 }
 
+static void test_extended_receive_only(void)
+{
+	static const uint32_t frequencies[] = {16000000, 300000000, 500000000, 740000000, 850000000, 870000000, 999999990};
+	for (unsigned i = 0; i < sizeof(frequencies) / sizeof(frequencies[0]); i++) {
+		for (unsigned mode = RADIO_MODE_FM; mode <= RADIO_MODE_DMR; mode++) {
+			start();
+			channel_t *ch = &chans[sm.view.channel_number];
+			ch->rx_hz = frequencies[i]; ch->tx_hz = 446000000; ch->rx_only = false; ch->mode = mode;
+			req(RREQ_RELOAD, 0); run(100);
+			CHECK(hw.rx_hz == frequencies[i] && board_receive_only(frequencies[i]));
+			ptt(true);
+			CHECK(sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_RX_ONLY && hw.tx_calls == 0);
+			ptt(false);
+			CHECK(!radio_sm_hotspot_freq_ok(frequencies[i], 446000000));
+		}
+	}
+	CHECK(!board_receive_only(146520000) && !board_receive_only(446000000));
+}
+
 int main(void)
 {
 	test_helpers();
@@ -674,6 +694,7 @@ int main(void)
 	test_bcast_dead();
 	test_bcast_step();
 	test_bcast_vfo();
+	test_extended_receive_only();
 	printf("# radioListenBandsTest: %d checks, %s\n", checks, failures ? "FAILED" : "PASSED");
 	return failures != 0;
 }

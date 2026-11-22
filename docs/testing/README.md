@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Testing
 
@@ -17,6 +18,10 @@ repeatable and skips cleanly what it can't reach. What each level is for and whe
 | MD-380 first hardware test | an MD-380 / MD-390 / RT3 on USB, a dummy load, an SDR or signal generator | step by step | `docs/testing/md380-bringup.md` |
 
 ## 1. The release gate: `tools/ci.sh`
+
+For this fork's release gate, pass `--board <product-board-id>` as described in [CI](../dev/ci.md).
+The commands below also expose the shared tree's optional multi-board checks; running without a board
+filter is broader than this fork's firmware release scope.
 
 ```
 tools/ci.sh                    # everything below

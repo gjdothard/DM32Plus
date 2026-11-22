@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 # Dual watch
 
 Design for dual watch on Home ([#96](https://github.com/radiofoundry/radiofoundry/issues/96)). Built with
@@ -20,6 +21,7 @@ or the VFO: dual watch is two frequencies, not the two timeslots of one DMR freq
 - Each channel keeps its changes for now (power, squelch, width, tones, timeslot, color code, talk target, hear all)
   while the receiver goes back and forth. A changed channel loses its changes when it is replaced or the watch stops.
 - **Only the user stops it** (section 5).
+- Selecting a P25 channel ends it. P25 cannot participate in either pane, including a restored watch.
 - A radio with one receiver (every radio today) alternates between A and B, so a call on one can be missed while it
   is on the other. Home doesn't say so: the mode in the strip implies it, and the user guide has the caveat. A radio
   with two receivers (`ui_svc_receivers()` > 1, `ui_svc_dual_rx(pane)`) hears both at once (section 3.1). No radio
@@ -27,7 +29,8 @@ or the VFO: dual watch is two frequencies, not the two timeslots of one DMR freq
   would be the first.
 - What the radio core does with the pair (any zone or the VFO, PTT, retunes) is in
   [radio-features.md 2.1](../spec/radio-features.md#21-dual-watch). The UI refuses only a channel the radio can't
-  read, or the same channel twice: "Can't watch that channel: pick another".
+  read, a tagged channel, or the same channel twice: "Can't watch that channel: pick another".
+  P25 conventional or trunked in either pane is refused with "Dual watch unavailable for P25".
 
 ## 2. Turning it on and off
 
@@ -132,7 +135,7 @@ Every screen in every class is in the gallery (`docs/ux/screens/*/home_dual*.png
 | Zone keys (Next / Previous zone, the DM-1701's P1 / P2; Up / Down set to Zone in Settings › Keys) | The selected channel goes to the next / previous zone, on its first channel that isn't the other one ("A zone: Simplex"). A zone with no such channel is passed over. From the VFO: the zone the radio was last on. The knob still steps the channel |
 | Home zone key | The selected channel goes to the first zone, the same way |
 | **Monitor** (held) | Opens the squelch on the selected channel: the receiver goes there and the watch waits while the key is held. On a DMR channel a press is digital monitor, as without dual watch |
-| **#** | Dual watch actions: **1** Talk on B (or A), **2** Change A, **3** Change B, **4** Caller (the last caller and how long ago; OK opens their actions; dim until a call was heard), **5** Stop, stay on A (or B). Change A and B open the picker |
+| **#** | Confirms VFO frequency entry while digits are being typed. Otherwise, Dual watch actions: **1** Talk on B (or A), **2** Change A, **3** Change B, **4** Caller (the last caller and how long ago; OK opens their actions; dim until a call was heard), **5** Stop, stay on A (or B). Change A and B open the picker |
 | **\*** | Quick settings of the selected channel |
 | **VFO** key | The selected channel becomes its own VFO ("A: VFO"); again, back to the channel it was ("Back to channels"). Each channel has its own VFO: with the other channel on one, this one gets the second |
 | Copy to VFO | The selected channel is copied into its own VFO, which becomes the selected channel. With the other channel on a VFO, the copy goes to the second; the other's frequency doesn't change |
@@ -150,26 +153,18 @@ back ("Talking on A"). **#** **1**, the A/B key or Left / Right go back at once 
 
 <img src="screens/240x320/home_dual_talk_back.png" width="200" alt="Talk back on B">
 
-### 4.1 Per radio
+### 4.1 Board keys and layout
 
-SK2 held is Dual watch on every radio, and the DM-1801 Pro's A/B key is A/B (press) and Dual watch (hold). A press of SK2
-is A/B on every radio (the DB25-D PRO's tone key too), so the pair is on one key; the talk target picker stays on
-hold #. Every side key can take A/B or Dual watch in Settings › Keys (press or hold).
-
-| Radio | Switch A / B | Start / stop |
-|---|---|---|
-| DM-1701 | **SK2** (a press), `#` **1** | `*` `7`, or hold SK2 |
-| DM-1801 Pro | The **A/B** key, **Left** / **Right** | Hold **A/B**, `*` `7`, or hold SK2 (zones: hold Left / Right, or Zones) |
-| DM-32UV | **Left** / **Right** | `*` `7`, or hold SK2 |
-| MD-380 | `#` **1**, or a side key set to A/B | `*` `7`, or hold SK2 |
-| DB25-D PRO (no number keys) | A side key set to A/B | Hold the tone key, or a side key set to Dual watch |
-| Radios planned (GD-77 family, MD-UV380, MD-9600) | Not decided: A/B on a side key or mic key | |
+The [radio reference](../user/23-radios.md#dual-watch-on-each-radio) lists physical keys and defaults.
+Assignable keys can take A/B or Dual watch in Settings > Keys. Quick Controls uses **3** for Dual
+on the Memory card grid and **7** on the standard grid. Use the tile label on other grids.
+The talk target picker remains available by holding **#**.
 
 ## 5. Rules
 
 - Dual watch is a kind of scan to the radio: starting it stops a zone scan, and a zone scan (Tools › Scan, the Scan
   key) stops it.
-- Only the user stops it: Back twice, `*` `7`, hold SK2, the Dual watch key, # 5, a zone scan, or a scan stop over the
+- Only the user stops it: Back twice, the Quick **Dual** control, an assigned Dual watch key, # 5, a zone scan, or a scan stop over the
   debug link (`rfoundry_debug.py radio scan stop`). Everything else keeps it going:
 
   | Event | Dual watch |

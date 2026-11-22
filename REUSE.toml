@@ -1,8 +1,15 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Garrett Dothard
 version = 1
 
 [[annotations]]
 path = ["docs/**", "*.md", "AUTHORS", ".gitignore", "REUSE.toml"]
 SPDX-FileCopyrightText = "2026 The RadioFoundry Authors"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = ["docs/ux/screens/*/p25*.png", "docs/ux/screens/*/home_p25*.png"]
+SPDX-FileCopyrightText = ["2026 The RadioFoundry Authors", "2026 Garrett Dothard"]
 SPDX-License-Identifier = "MIT"
 
 [[annotations]]
@@ -18,4 +25,13 @@ SPDX-License-Identifier = "MIT"
 [[annotations]]
 path = ["stub/*.bin"]
 SPDX-FileCopyrightText = "2026 The RadioFoundry Authors"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = [".gitmodules", "codecs/.gitignore", "codecs/README.md", "boot/README.md", "stub/*.md",
+        "core/net/http_assets/**", "tools/ci-runner/proxy/allow", "boards/*/product.json",
+        "tools/rfoundry/rfoundry/codec_maps/**/*.json", "tools/rfoundry/rfoundry/codec_maps/README.md",
+        "tools/rfoundry/rfoundry/registry.json", "tools/rfoundry/tests/codecmap_vectors.json", "site/data/screens.json",
+        "site/i18n/en.json", "site/i18n/es.json", "site/i18n/it.json"]
+SPDX-FileCopyrightText = ["2026 The RadioFoundry Authors", "2026 Garrett Dothard"]
 SPDX-License-Identifier = "MIT"

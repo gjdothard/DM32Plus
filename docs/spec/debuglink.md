@@ -1,8 +1,28 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 Garrett Dothard -->
-<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # USB debug link
+
+With `CONFIG_P25` and `CONFIG_DIAG`, the core view adds `p25.tuned_hz`
+and `p25.tuned` (requested frequency and tune admission), `p25.chunks`,
+`p25.symbols`, `p25.syncs`, `p25.locks`, `p25.rejects`, `p25.frames`,
+`p25.blocks` and `p25.crc_fail`. The radio task publishes a snapshot without
+exposing its loaned workspace to the host. Counters describe the software
+path; frames are framer deliveries, not proof of valid control data. Trunk
+blocks count accepted blocks; control state 2 also requires system identity
+acceptance. Counters can wrap or reset with a new session.
+
+The core view reports `mode=p25` for selected conventional or trunked P25 and
+`mode=unsupported` for parked tagged channels. With `CONFIG_P25`, it also
+reports `p25.active` (the owner acquired its providers and workspace) and
+`p25.rx` (the engine has an active receive call). These are software state,
+not measurements of RF emissions or audio quality.
+With `CONFIG_P25_TRUNK`, `p25.trunk.state`, `p25.trunk.reg` and
+`p25.trunk.req` expose the published follower states. See
+[trunked channel operation](p25-trunking.md) for their meanings.
+With `CONFIG_CPS_FAST`, `programming=1` means the radio task has stopped its
+RF owners for managed programming. Zero means that hold is inactive. This
+software flag does not establish absence of measured emissions.
 
 A small framed protocol on the radio's host port (USB CDC-ACM on radios with USB, a UART otherwise) for bench
 automation: read the
@@ -342,6 +362,12 @@ short. Each request takes a fresh snapshot
 | 24 | `air` | the data TX queue ([dmr-data.md](dmr-data.md) 12): `airq.built airq.depth` (packets queued, the one being sent included) `airq.bytes` (their octets with record headers and padding) `airq.high airq.high_bytes` (the most of each since start) `airq.capacity` (`CONFIG_DMR_AIR_QUEUE_BYTES`) `airq.queued airq.full` (refused: no room) `airq.sent airq.failed airq.gave_up` (the service never took it) `airq.aged` (queued too long) `airq.other` (no DMR ID, too long for a list, canceled) `airq.waits` (ticks the oldest packet waited for the service); `airq.chained` (packets that went in the transmission of the one before them); `data.tx_guarded` (lists held back by the guard) `data.tx_guard_ms data.tx_chain` (the spacing in force, op 11 of 3.12) `ip.chains` (transmissions with more than one IP packet) `ip.chained` (the packets after the first in them); zone sharing ([zone-share.md](zone-share.md)): `zs.built zs.offers` (0 off, 1 ask) `zs.send_state` (0 idle, 1 sending, 2 sent, 3 failed) `zs.offer_pending zs.offer_src zs.rx_messages zs.rx_bad zs.rx_busy zs.rx_off zs.offered zs.rate_limited zs.expired zs.sends zs.sent zs.send_failed zs.requests zs.refusals zs.last_refusal`. Built without the queue: `airq.built=0`; without zone sharing: `zs.built=0` |
 | 25 | `net_svc` | the radio's UDP services on the USB network link: with mDNS `mdns.state mdns.name mdns.queries mdns.answered mdns.sent mdns.busy mdns.conflicts mdns.bad` (`mdns.md` 5), with TFTP `tftp.state tftp.reads tftp.writes tftp.errors tftp.timeouts tftp.retransmits tftp.last_size tftp.blksize tftp.write_allowed` (`tftp.md` 6); `net_svc.built=0` without either |
 | 26 | `net_link` | the host link's MTUs ([usb-network.md](usb-network.md) 3.2), with the IP gateway: `net.mtu` (the link's, DHCP option 26) `net.air_mtu` (one transmission's) and the drops `net.air_too_big net.frag_needed net.up_too_big`; `CONFIG_NET_PPP` builds `ppp.running ppp.ip_up ppp.lcp ppp.ipcp` (RFC 1661 state numbers, 9 = opened) `ppp.rx_frames ppp.tx_frames ppp.rx_errors ppp.mru ppp.peer_mru` ([ppp.md](ppp.md)); `net_link.built=0` without either |
+
+Section 27, `p25`, contains the bounded [P25 monitoring view](p25-ui.md):
+`p25.ui active channel flags listen held_tg tx_target groups group_index`, decoded `wacn sysid rfss site nac`,
+`refused cc_hz voice_hz blocks crc_fail recent favorites`, and the newest
+`tg src last_ms` when history is nonempty. `voice_hz` is the actual tuned
+frequency, including when on control. `p25.ui=0` means monitoring is disabled.
 
 With Motorola TMS built, `dmr_data` includes an atomic snapshot of the newest private ACK-shaped UDP 4007
 packet addressed to us. `data.tms_ack_meta` is ten comma-separated decimal fields: serial, receive time (ms),

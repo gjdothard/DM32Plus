@@ -12,7 +12,7 @@
 # channel name; text is anti-aliased, and lists and labels are one size up (9x18)
 CONFIG_FONT_XL ?= y
 CONFIG_FONT_AA ?= y
-CONFIG_FONT_BIG ?= y
+CONFIG_FONT_BIG ?= $(CONFIG_FONT_AA)
 CONFIG_MESSAGE_JOURNAL ?= $(if $(filter y,$(CONFIG_DMR_SMS)),y,n)
 CONFIG_UI_CARD_MENU ?= $(if $(and $(filter y,$(CONFIG_UI_COLOR)),$(filter y,$(CONFIG_DUAL_WATCH))),y,n)
 # The bezel hides the panel's edges, in panel pixels: text 6 px from the left or right edge was still clipped on the
@@ -30,6 +30,9 @@ BOARD_UNSUPPORTED += NAND_STORAGE	# the data flash is SPI NOR, GD25Q128 class (d
 # What the hardware can do but this radio's driver or glue doesn't yet (docs/build-config.md, "Unsupported, not
 # written, unconfirmed"): off by default, and off in ci's maximal configuration too
 CONFIG_RTC ?= y
+CONFIG_P25 ?= $(CONFIG_DMR)
+CONFIG_P25_TRUNK ?= $(CONFIG_P25)
+CONFIG_RX_EXTENDED ?= y
 
 BOARD_NOT_WRITTEN += VOX	# no hal_power_t.mic_level hook yet
 BOARD_NOT_WRITTEN += AUDIO_PROBE	# no board.audio_tap yet

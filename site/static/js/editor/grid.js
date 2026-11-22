@@ -151,7 +151,7 @@ export class Grid {
 	}
 
 	selection() {
-		return this.rows.filter((r) => this.selected.has(r));
+		return this.shown().filter((r) => this.selected.has(r));
 	}
 
 	// The rows an action applies to: the selection, or the focused row
@@ -278,4 +278,19 @@ export class Grid {
 		const err = this.onChange(row, c, value);
 		return err || null;
 	}
+}
+
+// Validate the whole batch on copies so one refused row cannot leave a partial edit.
+export function stageEdits(rows, column, value) {
+	const copies = rows.map(row => {
+		const copy = { ...row };
+		for (const key of Object.keys(copy)) if (Array.isArray(copy[key])) copy[key] = copy[key].slice();
+		return copy;
+	});
+	for (const copy of copies) {
+		if (typeof column.readOnly === "function" ? column.readOnly(copy) : column.readOnly) continue;
+		const error = column.set(copy, value);
+		if (error) return { error };
+	}
+	return { copies };
 }

@@ -1,9 +1,16 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 # Task flows
 
 Step-by-step flows for the 26 most frequent or most important tasks, with press counts per radio class. Keys use the logical names from `information-architecture.md`; the reference mapping is `SELECT` = green/Menu, `BACK` = red/Back, `QUICK` = `*`, `CONTEXT` = `#`, `TALK_TARGET` = SK2, `MONITOR` = SK1.
 
 ## Radio classes
+
+The numbered routes below describe the standard Hub and Quick grid. The card layout uses different
+numbers for several destinations; see [Keys and navigation](../user/05-keys-and-navigation.md).
+Executable flows select mode-dependent Quick controls by name and separately check the numbered grids
+([UI simulator](../spec/ui.md#7-host-simulator-and-tests)). Voice-prompt feedback below is a design
+target; recorded speech is not implemented.
 
 | Class | Example radios | Input | Display |
 |---|---|---|---|
@@ -31,7 +38,9 @@ Numbered, so a digit picks directly:
 6. Position (request or show)
 7. Save as contact
 8. Speak status
-9. Save to channel (shown only when the channel has temporary changes)
+9. Last position (when built)
+
+Save to channel follows at the next available number when temporary changes exist.
 
 ---
 

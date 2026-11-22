@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // DMR voice glue (core/dmr/ambe/ambeVoice.c) against a fake audio driver and a fake vocoder
 #include <stdio.h>
 #include <string.h>
@@ -17,7 +18,11 @@ static int starts, stops, speaker_on, speaker_calls;
 static bool fake_start(audio_block_cb_t c, void *ctx) { (void)ctx; cb = c; starts++; return true; }
 static void fake_stop(void) { stops++; cb = NULL; }
 static void fake_speaker(bool on) { speaker_on = on; speaker_calls++; }
-static const hal_audio_t audio = { fake_start, fake_stop, fake_speaker };
+static bool tail_pending;
+static bool fake_pending(void) { return tail_pending; }
+static const hal_audio_t audio = {
+	.start = fake_start, .stop = fake_stop, .speaker_pcm = fake_speaker, .spk_pending = fake_pending
+};
 
 // Vocoder: encode copies the low bit of the first 49 samples; decode writes the bits into samples 0..48 and a frame
 // marker into sample 159
@@ -37,7 +42,7 @@ static void fake_decode(const uint8_t bits[VOCODER_BITS], int16_t pcm[VOCODER_FR
 		pcm[i] = bits[i];
 	pcm[159] = 1000;
 }
-static const hal_vocoder_t vocoder = { fake_present, fake_reset, fake_encode, fake_decode, NULL, NULL, NULL, NULL };
+static const hal_vocoder_t vocoder = { .present = fake_present, .reset = fake_reset, .encode = fake_encode, .decode = fake_decode };
 
 // A vocoder with encode options, built as the AMBE+2 hosts are: set_options keeps the flags word, and each frame is
 // two codec calls (two halves) that both pass it. Every call's flags are recorded
@@ -170,6 +175,10 @@ static void testRx(void)
 	s->end(s->ctx);
 	block();
 	CHECK(spkIs(bits[6]) && speaker_on, "drains after end");
+	tail_pending = true;
+	block();
+	CHECK(spkSilent() && speaker_on, "provider tail must keep the route on");
+	tail_pending = false;
 	block();
 	CHECK(spkSilent() && !speaker_on, "speaker off once drained");
 

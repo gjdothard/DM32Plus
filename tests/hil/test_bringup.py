@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 Garrett Dothard
 """Bring-up mode without a radio (bringup_plugin.py, tools/bringup.py): a fake radio that lacks a feature, run
 through pytest with this directory's conftest. A required test that skips on it fails the bring-up run; the same
 test only skips in a plain run; an excused skip and an optional test's skip stay skips; a run that finds no radio
@@ -358,6 +359,24 @@ def test_check_rejects_a_bad_seed_and_an_unknown_feature(tmp_path):
                  "test_fake.py::test_keyed: marks feature fake_tx, which tests/hil/features.toml doesn't have",
                  "feature fake_ok has more than one capability gate"):
         assert want in text, text
+
+
+def test_check_rejects_two_features_for_one_switch(tmp_path):
+    t = fake_tree(tmp_path)
+    features = FAKE_TOML + '''
+[feature.fake_fast]
+switch = "CPS_FAST"
+spec = "docs/spec/cps-fast.md"
+
+[feature.fake_managed]
+switch = "CPS_FAST"
+spec = "docs/spec/cps-fast.md"
+'''
+    (t / "features.toml").write_text(features)
+    out = bringup("--features", str(t / "features.toml"), "--results", str(t / "results"),
+                  "check", *collect_args(t))
+    assert out.returncode != 0
+    assert "switch CPS_FAST has more than one entry: fake_fast, fake_managed" in out.stdout + out.stderr
 
 
 def test_the_lock_follows_the_port(tmp_path):

@@ -86,13 +86,19 @@ On the standard Hub, **OK**, **6** opens Tools. On the dark card layout, **OK** 
 |---|---|
 | **1** | Radio, with Quick Controls and the complete Channels list |
 | **2** | Messages |
-| **3** | Contacts |
+| **3** | Contacts & Talkgroups |
 | **4** | Zones / Channels |
 | **5** | Scan controls. Select **Start scan** to begin |
 | **6** | Activity / Logs, which opens Recent calls |
-| **7** | GPS / APRS, with Position and APRS |
+| **7** | GPS, APRS, and Data, with Position, APRS, and ARS & LRRP |
 | **8** | Tools & Utilities |
 | **9** | Settings |
+
+<img src="../ux/screens/240x320i10x5/hub.png" width="220" alt="Current card Main Menu">
+<img src="../ux/screens/240x320i10x5/radio_menu.png" width="220" alt="Radio submenu with Quick Controls and Channels">
+
+The [firmware screenshot index](../ux/screens/README.md) shows the implemented layouts for the common
+workflows, including pickers, confirmations, and utility pages.
 
 On the card layout, **Activity / Logs** shows callers as cards, with their call direction, target, and age.
 **PTT** talks to the focused call's target. **#** opens its actions.
@@ -114,7 +120,7 @@ In long lists (Contacts, Channels, a zone's channels) the number keys filter the
 keypad spells words. **2** is ABC, **3** is DEF, and so on to **9** (WXYZ). Each key narrows the list to names with a
 word that starts with those letters. **Back** deletes the last key typed, then leaves the list.
 
-<img src="../ux/screens/160x120i5/hub.png" width="200" alt="The hub">
+<img src="../ux/screens/240x320i10x5/hub.png" width="200" alt="The hub">
 
 ## Find
 
@@ -141,8 +147,8 @@ Then:
 
 Settings also answer to other names. For example, "promiscuous" finds Digital monitor and "TOT" finds TX timeout.
 
-<img src="../ux/screens/160x120i5/find_name.png" width="200" alt="Find, matching a name">
-<img src="../ux/screens/160x120i5/find_number.png" width="200" alt="Find, matching a number">
+<img src="../ux/screens/240x320i10x5/find_name.png" width="200" alt="Find, matching a name">
+<img src="../ux/screens/240x320i10x5/find_number.png" width="200" alt="Find, matching a number">
 
 ## Temporary and permanent changes
 
@@ -169,7 +175,7 @@ In menus holding **\*** doesn't lock, so a slow press can't lock the keys in the
 
 **Settings > Privacy > Auto lock** locks the keys by itself after a time without a key press.
 
-<img src="../ux/screens/160x120i5/home_locked.png" width="200" alt="Home with the keys locked">
+<img src="../ux/screens/240x320i10x5/home_locked.png" width="200" alt="Home with the keys locked">
 
 ## Toasts and banners
 

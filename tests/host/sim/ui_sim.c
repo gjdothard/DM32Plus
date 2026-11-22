@@ -52,6 +52,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ui_sim.h"
+#include "codeplug/codeplug_tag.h"
+#include "ui/ui_p25.h"
 // The board is changed at run time here (display, key map): this file defines it writable, the UI sees it const
 #define board board_as_declared
 #include "board.h"
@@ -587,6 +589,8 @@ uint16_t codeplug_channel_count(void)
 	return top;
 }
 
+bool codeplug_radio_channel(uint16_t number, channel_t *out) { return codeplug_channel(number, out); }
+
 bool codeplug_channel(uint16_t number, channel_t *out)
 {
 	const channel_t *e = sim_edit(number);
@@ -824,6 +828,13 @@ void radio_req_dmr_talkgroup_select(uint8_t index) { (void)index; }
 
 bool codeplug_contact_find(uint32_t id, bool group, contact_t *out)
 {
+#if CONFIG_P25_UI
+	if (view.ch.mode == RADIO_MODE_P25 && group && (id == 1234 || id == 2456)) {
+		*out = (contact_t){ .id = id, .type = CONTACT_GROUP };
+		strcpy(out->name, id == 1234 ? "Operations" : "Security");
+		return true;
+	}
+#endif
 	for (uint16_t ref = 1; ref <= CODEPLUG_CONTACTS_MAX; ref++) {
 		if (codeplug_contact(ref, out) && out->id == id && (out->type != CONTACT_PRIVATE) == group)
 			return true;
@@ -834,6 +845,12 @@ bool codeplug_contact_find(uint32_t id, bool group, contact_t *out)
 uint8_t codeplug_talkgroup_at(uint16_t channel, uint8_t index, codeplug_talkgroup_t *out)
 {
 	*out = (codeplug_talkgroup_t){0};
+#if CONFIG_P25_UI
+	if (channel == 3 && sim_view()->ch.mode == RADIO_MODE_P25) {
+		if (index < 2) *out = (codeplug_talkgroup_t){ .id = index ? 2456 : 1234 };
+		return 2;
+	}
+#endif
 #if CONFIG_TALKGROUP_EDIT
 	if (sim_tg_pool && channel == 3) {
 		contact_t contact;
@@ -847,6 +864,13 @@ uint8_t codeplug_talkgroup_at(uint16_t channel, uint8_t index, codeplug_talkgrou
 	(void)index;
 	return 0;
 }
+#if CONFIG_P25
+bool codeplug_contact_find_protocol(uint32_t id, bool group, uint8_t protocol, contact_t *out)
+{
+	(void)protocol;
+	return codeplug_contact_find(id, group, out);
+}
+#endif
 #endif
 
 #if CONFIG_CONTACT_EDIT
@@ -934,6 +958,63 @@ static const char *contact_name(uint32_t id, bool group)
 
 static radio_view_t view;
 static uint32_t serial;
+#if CONFIG_P25_UI
+static p25_monitor_t p25_monitor;
+#if CONFIG_P25_TRUNK
+static uint8_t p25_site_fixture;
+uint8_t ui_svc_p25_site(const p25_monitor_t *m, char *out, size_t cap)
+{
+	if (cap) out[0] = '\0';
+	if (!p25_site_fixture) return P25_SITE_UNKNOWN;
+	if (p25_site_fixture == 4) return P25_SITE_MISMATCH;
+	if (p25_site_fixture == 5) return P25_SITE_UNAVAILABLE;
+	if (p25_site_fixture != 3 && cap) snprintf(out, cap, "%s", p25_site_fixture == 6 ? "North Tower West" : "North Tower");
+	return m->state >= 2 ? P25_SITE_CONFIRMED : P25_SITE_CANDIDATE;
+}
+#endif
+bool ui_svc_p25_view(p25_monitor_t *out) { *out = p25_monitor; return (out->flags & P25_MON_ACTIVE) != 0; }
+bool ui_svc_p25_command(uint16_t channel, uint8_t op, uint16_t tg)
+{
+	if (channel != view.channel_number || channel != p25_monitor.channel ||
+	    !(p25_monitor.flags & P25_MON_ACTIVE) || view.state == RS_TX) return false;
+	if (op != P25_MON_STEP && op != P25_MON_SELECT && !(p25_monitor.flags & P25_MON_TRUNK)) return false;
+	if (op == P25_MON_STEP) {
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+		if (!view.talkgroup_count || !(int16_t)tg) return false;
+		int count = view.talkgroup_count;
+		view.talkgroup_index = (uint8_t)((view.talkgroup_index + (int16_t)tg % count + count) % count);
+		tg = view.talkgroup_index ? 2456 : 1234;
+		op = P25_MON_SELECT;
+#else
+		return false;
+#endif
+	}
+	switch (op) {
+	case P25_MON_ALL: p25_monitor.listen = P25_LISTEN_ALL; p25_monitor.held_tg = 0; break;
+	case P25_MON_PROGRAMMED: p25_monitor.listen = P25_LISTEN_PROGRAMMED; p25_monitor.held_tg = 0; break;
+	case P25_MON_FAVORITES: if (!p25_monitor.favorite_count) return false; p25_monitor.listen = P25_LISTEN_FAVORITES; break;
+	case P25_MON_HOLD: if (!tg) return false; p25_monitor.listen = P25_LISTEN_HOLD; p25_monitor.held_tg = tg; break;
+	case P25_MON_SELECT:
+		if (!tg) return false;
+		p25_monitor.listen = P25_LISTEN_HOLD; p25_monitor.held_tg = tg; p25_monitor.tx_target = tg;
+		p25_monitor.flags &= (uint8_t)~(P25_MON_RX | P25_MON_ENC);
+		p25_monitor.state = 2; p25_monitor.tuned_hz = p25_monitor.cc_hz;
+		view.state = RS_IDLE; view.p25_rx = false;
+		break;
+	case P25_MON_ADD:
+		if (p25_monitor.favorite_count >= P25_MONITOR_FAVORITES) return false;
+		p25_monitor.favorites[p25_monitor.favorite_count++] = tg; break;
+	case P25_MON_REMOVE:
+		for (unsigned i = 0; i < p25_monitor.favorite_count; i++) if (p25_monitor.favorites[i] == tg) {
+			memmove(&p25_monitor.favorites[i], &p25_monitor.favorites[i + 1], (--p25_monitor.favorite_count - i) * sizeof(uint16_t)); break;
+		}
+		break;
+	default: return false;
+	}
+	serial++;
+	return true;
+}
+#endif
 static channel_t ch_saved;	// the channel as stored (temporary changes are on view.ch)
 static uint32_t temp_target;	// temporary talk target (0 = channel default)
 static bool temp_private;
@@ -1668,7 +1749,9 @@ bool ui_svc_dual(const ui_dual_ref_t ref[2], uint8_t sel)
 	for (int i = 0; i < 2; i++) {
 		if (!ref[i].vfo) {
 			zone_t z;
-			if (!codeplug_zone(ref[i].zone, &z) || ref[i].pos >= z.count)
+			channel_t ch;
+			if (!codeplug_zone(ref[i].zone, &z) || ref[i].pos >= z.count ||
+			    !codeplug_radio_channel(z.channels[ref[i].pos], &ch) || ch.kind != CODEPLUG_KIND_NONE)
 				return false;
 		}
 		if (!sim_same(&sim_dual[i], &ref[i]))
@@ -2157,6 +2240,12 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	gfx_invalidate();
 	ui_layout_init();
 	memset(&view, 0, sizeof view);
+#if CONFIG_P25_UI
+	memset(&p25_monitor, 0, sizeof p25_monitor);
+#if CONFIG_P25_TRUNK
+	p25_site_fixture = 0;
+#endif
+#endif
 	memset(&sim_rec, 0, sizeof sim_rec);
 	vfo_mode = RADIO_MODE_FM;	// a fresh VFO
 	vfo_cc = vfo_ts = 1;
@@ -2403,7 +2492,18 @@ static bool check(const char *kv, char *err, size_t len)
 	else if (strcmp(key, "vfo") == 0) snprintf(got, sizeof got, "%u", view.vfo);
 	else if (strcmp(key, "freq") == 0) snprintf(got, sizeof got, "%u", (unsigned)view.ch.rx_hz);
 	else if (strcmp(key, "txfreq") == 0) snprintf(got, sizeof got, "%u", (unsigned)view.ch.tx_hz);
-	else if (strcmp(key, "mode") == 0) snprintf(got, sizeof got, "%s", view.ch.mode == RADIO_MODE_DMR ? "dmr" : "fm");
+	else if (strcmp(key, "homecard") == 0) snprintf(got, sizeof got, "%u", gfx_get_pixel(3, 58) == UI_CARD_SELECTED ||
+		gfx_get_pixel(3, 58) == UI_CARD_SURFACE);
+	else if (strcmp(key, "entrycard") == 0) snprintf(got, sizeof got, "%u", gfx_get_pixel(8,
+		ui_st.dual.on && ui_st.dual.sel ? 167 : 99) == ui_col.warn);
+	else if (strcmp(key, "mode") == 0) snprintf(got, sizeof got, "%s", view.ch.mode == RADIO_MODE_P25 ? "p25" : view.ch.mode == RADIO_MODE_DMR ? "dmr" : "fm");
+#if CONFIG_P25_UI
+	else if (strcmp(key, "p25hold") == 0) snprintf(got, sizeof got, "%u", p25_monitor.held_tg);
+	else if (strcmp(key, "p25target") == 0) snprintf(got, sizeof got, "%lu", (unsigned long)p25_monitor.tx_target);
+	else if (strcmp(key, "p25listen") == 0) snprintf(got, sizeof got, "%u", p25_monitor.listen);
+	else if (strcmp(key, "p25favorites") == 0) snprintf(got, sizeof got, "%u", p25_monitor.favorite_count);
+	else if (strcmp(key, "p25card") == 0) snprintf(got, sizeof got, "%u", gfx_get_pixel(6, 96) == UI_CARD_SURFACE);
+#endif
 	else if (strcmp(key, "tx") == 0) snprintf(got, sizeof got, "%u", (unsigned)sim_rec.tx_count);
 	else if (strcmp(key, "txid") == 0) snprintf(got, sizeof got, "%u", (unsigned)sim_rec.tx_id);
 	else if (strcmp(key, "txpriv") == 0) snprintf(got, sizeof got, "%u", sim_rec.tx_private);
@@ -2626,6 +2726,91 @@ static bool run_token(char *t, char *err, size_t len)
 	}
 	if (strcmp(t, "wait") == 0) {
 		advance(arg != NULL ? (uint32_t)atoi(arg) : 1000u);
+		return true;
+	}
+#if CONFIG_P25_UI
+	if (strcmp(t, "p25-case") == 0 && arg) {
+		if (!strcmp(arg, "empty")) p25_monitor.recent_count = 0;
+		else if (!strcmp(arg, "private")) { p25_monitor.recent[0].tg = 0; p25_monitor.recent[0].flags = P25_MON_UNIT; }
+		else if (!strcmp(arg, "stale")) p25_monitor.channel++;
+		else if (!strcmp(arg, "closed")) p25_monitor.flags = 0;
+		else if (!strcmp(arg, "tx")) view.state = RS_TX;
+		else if (!strcmp(arg, "tx-capable")) { view.ch.rx_only = false; p25_monitor.flags &= (uint8_t)~P25_MON_RX_ONLY; }
+		else return false;
+		serial++; advance(200); return true;
+	}
+#endif
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+	if (strcmp(t, "p25-no-groups") == 0) {
+		view.talkgroup_count = 0;
+		return true;
+	}
+#endif
+	if (strcmp(t, "p25-channel") == 0 && arg != NULL) {
+		channel_t ch;
+		uint16_t number = (uint16_t)atoi(arg);
+		if (!codeplug_channel(number, &ch)) return false;
+		ch.kind = strstr(arg, ",trunk") ? CODEPLUG_KIND_P25_TRUNK : CODEPLUG_KIND_P25;
+		ch.mode = RADIO_MODE_P25;
+		if (!ui_svc_write_channel(number, &ch)) return false;
+		sim_rec.codeplug_writes--;
+		sim_cp_serial++;
+		return true;
+	}
+#if CONFIG_P25_UI && CONFIG_P25_TRUNK
+	if (strcmp(t, "p25-site") == 0 && arg) {
+		const char *state = arg;
+		p25_site_fixture = !strcmp(state, "unknown") ? 3 : !strcmp(state, "mismatch") ? 4 :
+			!strcmp(state, "reload") ? 5 : !strcmp(state, "long") ? 6 : 1;
+		p25_monitor.rfss = 1; p25_monitor.site = 3;
+		p25_monitor.state = !strcmp(state, "hunt") ? 1 : !strcmp(state, "voice") ? 3 : 2;
+		if (p25_monitor.state != 3) {
+			p25_monitor.flags &= (uint8_t)~P25_MON_RX;
+			p25_monitor.tuned_hz = p25_monitor.cc_hz;
+			view.state = RS_IDLE; view.p25_rx = false;
+		}
+		if (p25_monitor.state == 1) p25_monitor.rfss = p25_monitor.site = 0xFF;
+		serial++; advance(200); return true;
+	}
+#endif
+	if (strcmp(t, "p25-home") == 0 || strcmp(t, "p25-trunk-home") == 0) {
+		view.ch.mode = RADIO_MODE_P25;
+		view.ch.kind = strcmp(t, "p25-home") == 0 ? CODEPLUG_KIND_P25 : CODEPLUG_KIND_P25_TRUNK;
+		view.ch.bw = RADIO_BW_12K5;
+		strcpy(view.ch.name, strcmp(t, "p25-home") == 0 ? "P25 Ops" : "Charleston NSA");
+		if (strcmp(t, "p25-trunk-home") == 0)
+			view.ch.rx_hz = 773656250;
+		view.ch.rx_only = true;
+		if (!ui_svc_write_channel(view.channel_number, &view.ch)) return false;
+		sim_rec.codeplug_writes--;
+		view.scan = 0;
+#if CONFIG_P25_UI
+		memset(&p25_monitor, 0, sizeof p25_monitor);
+		p25_monitor.channel = view.channel_number;
+		p25_monitor.tx_target = 1234;
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+		view.talkgroup_count = 2; view.talkgroup_index = 0;
+#endif
+		p25_monitor.flags = P25_MON_ACTIVE | P25_MON_RX_ONLY;
+		p25_monitor.nac = 0x293; p25_monitor.sysid = 0xFFFF; p25_monitor.wacn = 0xFFFFFFFF;
+		p25_monitor.rfss = p25_monitor.site = 0xFF;
+		p25_monitor.tuned_hz = view.ch.rx_hz;
+		if (strcmp(t, "p25-trunk-home") == 0) {
+			view.ch.rx_hz = 380075000;
+			strcpy(view.ch.name, "Charleston NSA");
+			p25_monitor.flags |= P25_MON_TRUNK | P25_MON_RX;
+			view.state = RS_RX; view.p25_active = view.p25_rx = true;
+			view.rssi_dbm = -72;
+			p25_monitor.cc_hz = 380075000; p25_monitor.tuned_hz = 380725000;
+			p25_monitor.state = 3; p25_monitor.listen = P25_LISTEN_ALL;
+			p25_monitor.recent_count = 2;
+			p25_monitor.recent[0] = (p25_monitor_call_t){ .tg = 1234, .src = 567890, .hz = 380725000, .ms = now_ms };
+			p25_monitor.recent[1] = (p25_monitor_call_t){ .tg = 2456, .src = 567891, .hz = 381237500, .ms = now_ms - 10000 };
+			p25_monitor.blocks = 3619; p25_monitor.crc_fail = 8;
+		}
+#endif
+		serial++;
+		advance(200);
 		return true;
 	}
 #if CONFIG_TALKGROUP_EDIT

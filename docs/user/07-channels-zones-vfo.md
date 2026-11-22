@@ -3,7 +3,7 @@
 
 # Channels, Zones and the VFO
 
-A **channel** is a saved frequency with its mode (FM or DMR) and settings. A **zone** is a named list of channels.
+A **channel** is a saved frequency with its mode (FM, DMR or P25 where supported) and settings. A **zone** is a named list of channels.
 The **VFO** tunes any frequency by hand. Channels and zones come from the codeplug ([Programming the radio](04-programming.md)).
 
 On displays with the card layout, Home gives the selected channel the larger card. Dual Watch shows A
@@ -13,13 +13,16 @@ ID, timeslot, and color code. Recent calls start with the letter of the channel 
 
 ## Changing the channel
 
+P25 channels show **P25** on Home, including the card layout. This identifies
+the selected channel mode; it does not confirm a control-channel lock.
+
 - Turn the channel knob, or press **Up** or **Down** on Home, to step through the zone's channels.
 - Type the channel's position on Home and press **OK**. For example, **1**, **2**, **OK** goes to channel 12 of the
   zone.
 - Type letters of the channel's name on Home (see [Find](05-keys-and-navigation.md#find)) and press **OK** on it.
 - Press **OK**, **4** (Zones), focus the zone and press **#**. The zone's channels open. Focus one and press **OK**.
 
-<img src="../ux/screens/160x120i5/zone_channels.png" width="200" alt="A zone's channels">
+<img src="../ux/screens/240x320i10x5/zone_channels.png" width="200" alt="A zone's channels">
 
 Changing the channel ends temporary changes, the reply window, digital monitor and a scan.
 
@@ -31,7 +34,7 @@ Changing the channel ends temporary changes, the reply window, digital monitor a
   **OK**. The radio switches to it and returns to Home.
 - Or type the zone's name on Home. Find lists zones too.
 
-<img src="../ux/screens/160x120i5/zones.png" width="200" alt="Zones: the VFO and the zones">
+<img src="../ux/screens/240x320i10x5/zones.png" width="200" alt="Zones and Channels cards with channel counts">
 
 The Zones list shows the VFO first, then every zone with its number of channels. Type letters to filter it.
 
@@ -55,7 +58,7 @@ also put it in zones (**Zones** row, [Editing a channel](#editing-a-channel)).
 A zone's list (**OK**, **4**, focus the zone, **#**) also edits the zone. Each change is saved at once: there is
 nothing to save or discard. On a radio without **#**, hold **OK** wherever this section says **#**.
 
-<img src="../ux/screens/160x120i5/zone_actions.png" width="200" alt="Channel actions in a zone">
+<img src="../ux/screens/240x320i10x5/zone_actions.png" width="200" alt="Channel actions in a zone">
 
 - **Add channel** (the first row) lists every channel the zone doesn't hold. Type letters or digits to filter it and
   press **OK** on one. It goes after the channel you are on, or at the end of a zone you are not using.
@@ -79,7 +82,7 @@ nothing to save or discard. On a radio without **#**, hold **OK** wherever this 
   | 3 | Share zone to... | sends the zone to another radio or a talkgroup ([Sharing a zone](#sharing-a-zone)) |
   | 4 | Delete zone | asks first, with "No, keep it" focused. The zone's channels stay in Channels |
 
-<img src="../ux/screens/160x120i5/zone_options.png" width="200" alt="Zone options">
+<img src="../ux/screens/240x320i10x5/zone_options.png" width="200" alt="Zone options">
 
 Moving, adding and removing keep the radio on its channel. Removing the channel you are on moves the radio to the
 next channel in the zone. A zone holds a channel once, and the radio refuses a channel past the zone's size ("Zone
@@ -110,7 +113,7 @@ group lists and privacy keys are never sent.
 **Receive:** **Settings > Connections > Accept zone shares** is **On** at first. Nothing is imported until you
 say so. Set it to **Off** to ignore what others send.
 
-<img src="../ux/screens/160x120i5/zone_offer.png" width="200" alt="Zone Share Received: Import, Preview, Reject">
+<img src="../ux/screens/240x320i10x5/zone_offer.png" width="200" alt="Zone Share Received: Import, Preview, Reject">
 
 1. A banner says "Zone from ...". It stays until you press **#** to open it or **Back** to hide it. The offer also waits under **Tools > Zones/Chs Received** for 10 minutes. The screen is titled **Zone Share Received**, or **Channel Share Received** for one channel.
 2. The offer shows the zone's name, its channels, the sender and how many channels are outside your radio's bands.
@@ -135,7 +138,7 @@ At most 6 offers an hour are shown, one at a time. The format is in [zone-share.
 row ends with the RX frequency and the talkgroup (DMR) or FM. A long name stays whole and the row shortens the rest:
 "TG" goes first, then the frequency. The channel you are on is marked. Type letters to filter the list.
 
-<img src="../ux/screens/160x120i5/channels.png" width="200" alt="Channels: every channel by number">
+<img src="../ux/screens/240x320i10x5/channels.png" width="200" alt="Channels: every channel by number">
 
 - **OK** on a channel opens its settings, where you can change them (below).
 - **#** in the list goes to the channel: in the current zone if it holds it, otherwise in the first zone that does.
@@ -148,7 +151,7 @@ The channel's page lists every setting: name, mode, RX and TX frequency, power, 
 VOX on FM, or color code, timeslot, TX contact, RX group list, own ID, direct mode, talk permit beeps and talker
 alias on DMR, then TX time-out, scan, battery saver and the zones that hold it. The list scrolls.
 
-<img src="../ux/screens/160x120i5/channel.png" width="200" alt="A channel's settings">
+<img src="../ux/screens/240x320i10x5/channel.png" width="200" alt="A channel's settings">
 
 Focus a row and press **OK**:
 
@@ -162,7 +165,7 @@ Focus a row and press **OK**:
 | Name | opens text entry (below) |
 | TX contact, RX group list | opens the list of contacts or group lists; type letters to find one |
 
-<img src="../ux/screens/160x120i5/channel_power.png" width="200" alt="Picking the power level with the knob">
+<img src="../ux/screens/240x320i10x5/channel_power.png" width="200" alt="Picking the power level with the knob">
 
 A changed row is marked until you save. **Hold OK** anywhere on the page to save, or pick the **Save** row. The radio
 writes the channel in the background and says "Saved channel 3". **Back** with unsaved changes asks whether to
@@ -191,7 +194,7 @@ up to 16 characters.
 On a radio without a keypad, Up / Down change the last character, **OK** adds another, and holding **OK** keeps the
 name.
 
-<img src="../ux/screens/160x120i5/channel_name.png" width="200" alt="Typing a channel name">
+<img src="../ux/screens/240x320i10x5/channel_name.png" width="200" alt="Typing a channel name">
 
 ### New channel from current settings
 
@@ -217,7 +220,7 @@ restart.
 1. **OK**, **4** (Zones). The VFO is the first row.
 2. Press **OK**. Home shows the frequency large, and the radio says "VFO: type a frequency".
 
-<img src="../ux/screens/160x120i5/home_vfo.png" width="200" alt="Home in the VFO">
+<img src="../ux/screens/240x320i10x5/home_vfo.png" width="200" alt="Home in the VFO">
 
 ### Copy a channel to the VFO
 
@@ -246,6 +249,9 @@ key "Copy to VFO", on a press or a hold.
 On Home in the VFO, type the frequency digits from the hundreds of MHz down, without a decimal point. The radio shows
 what you typed as you go.
 
+On the card layout, the frequency is edited in place in an amber field. Dual Watch keeps the other card visible.
+The radio keeps its current frequency until you confirm with **OK** or **#**.
+
 | Keys | Frequency |
 |---|---|
 | **4** **4** **6** **0** **0** **0** | 446.000 MHz |
@@ -259,7 +265,7 @@ what you typed as you go.
   depend on the radio ([Radio reference](23-radios.md)).
 - Up to eight digits (10 Hz). After 10 s without a key, the entry is dropped.
 
-<img src="../ux/screens/160x120i5/home_vfo_entry.png" width="200" alt="Typing a VFO frequency">
+<img src="../ux/screens/240x320i10x5/home_vfo_entry.png" width="200" alt="Typing a VFO frequency">
 
 ### Stepping
 
@@ -272,7 +278,7 @@ broadcast band. The step is in the status strip.
 In the VFO, **\***, **5** (**\***, **6** in the DMR VFO) is **TX freq** (the split): TX against RX, "Off" or the offset ("+600k",
 "-5M").
 
-<img src="../ux/screens/160x120i5/quick_vfo_split.png" width="200" alt="Typing a TX frequency in TX freq">
+<img src="../ux/screens/240x320i10x5/quick_vfo_split.png" width="200" alt="Typing a TX frequency in TX freq">
 
 - **Up** and **Down** step through the band's usual offsets, at once. **Up** goes +, **Down** goes -, the most common
   first, and stop at the last one:
@@ -294,7 +300,7 @@ In the VFO, **\***, **5** (**\***, **6** in the DMR VFO) is **TX freq** (the spl
   power on displays without that row. While you transmit, the large frequency turns red and shows the TX frequency
   (on DMR, the call screen has a "TX" line).
 
-<img src="../ux/screens/160x120i5/home_vfo_dmr_tx.png" width="200" alt="Transmitting from a split DMR VFO">
+<img src="../ux/screens/240x320i10x5/home_vfo_dmr_tx.png" width="200" alt="Transmitting from a split DMR VFO">
 
 ### DMR in the VFO
 
@@ -307,7 +313,7 @@ DMR ones:
 | **3** | Color | Sets the color code, 0 to 15 (1 at first). Type it or use **Up** and **Down**, then **OK** |
 | **8** | Talk to | Picks or types the talk target, a talkgroup or a person. Both **OK** and holding **OK** keep it for the VFO |
 
-<img src="../ux/screens/160x120i5/quick_vfo_dmr.png" width="200" alt="Quick settings in the DMR VFO">
+<img src="../ux/screens/240x320i10x5/quick_vfo_dmr.png" width="200" alt="Quick settings in the DMR VFO">
 
 - Pick the color code and timeslot of the repeater or the simplex frequency you use. The radio talks to talkgroup 9 until
   you pick another target, with your own DMR ID.
@@ -317,7 +323,7 @@ DMR ones:
   **Back** doesn't undo them.
 - The DMR VFO sends data messages and can start an emergency, as a DMR channel does. It sends no talker alias.
 
-<img src="../ux/screens/160x120i5/home_vfo_dmr.png" width="200" alt="Home in the DMR VFO">
+<img src="../ux/screens/240x320i10x5/home_vfo_dmr.png" width="200" alt="Home in the DMR VFO">
 
 ### Leaving the VFO
 

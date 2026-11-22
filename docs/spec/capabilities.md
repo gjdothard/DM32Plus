@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Garrett Dothard -->
 
 # Capabilities
 
@@ -24,9 +25,12 @@ areas and says nothing about menus, screens or keys: the UI is designed in `docs
 |---|---|---|
 | Tier II voice, direct mode and through repeaters, color code and slot per channel, talk groups, private calls, late entry, talker alias | `DMR`, `DMR_TALKER_ALIAS` | [dmr-voice.md](dmr-voice.md) |
 | Basic Privacy | `DMR_PRIVACY` | [dmr-voice.md](dmr-voice.md) |
+| AES-256/OFB voice, persistent key slots, and per-channel bindings; hardware interoperability untested | `DMR_AES256` | [dmr-voice.md](dmr-voice.md) |
+| Shared operating talkgroups, contact editing, and per-channel assignment | `DMR_TALKGROUP_ENTRIES`, `TALKGROUP_EDIT`, `CONTACT_EDIT` | [dmr-voice.md](dmr-voice.md) |
 | Text messages, call alert, radio check, ARS, LRRP, confirmed data, compressed headers | `DMR_SMS`, `DMR_SIGNALING`, `DMR_ARS`, `DMR_LRRP`, `DMR_CONFIRMED`, `DMR_UDP_COMPRESS` | [dmr-data.md](dmr-data.md) |
 | Emergency alarm, emergency call, hot mic | `DMR_EMERGENCY` | [dmr-emergency.md](dmr-emergency.md) |
-| Repeater roaming by position | `DMR_ROAMING` | [dmr-roaming.md](dmr-roaming.md) |
+| Repeater roaming by signal strength and idle beacon surveys | `DMR_ROAMING` | [dmr-roaming.md](dmr-roaming.md) |
+| Persistent incoming messages and outgoing send results, with conversation browsing | `MESSAGE_JOURNAL` | [message-journal.md](message-journal.md) |
 | ETSI GPS information | `DMR_GPS` | [dmr-data.md](dmr-data.md) |
 | IP over DMR, USB network adapter, TCP services, mDNS, TFTP, SNMP, PPP, USRP | `DMR_IP_GATEWAY`, `USB_NETWORK`, `NET_*`, `MDNS`, `TFTP`, `SNMP` | [usb-network.md](usb-network.md) and the pages it links |
 
@@ -44,6 +48,7 @@ areas and says nothing about menus, screens or keys: the UI is designed in `docs
 | Zones and channels, VFO, scan, dual watch, channel, zone and contact editors, key assignment | `VFO`, `SCAN`, `DUAL_WATCH`, `CHANNEL_LIST`, `CHANNEL_EDIT`, `ZONE_EDIT`, `CONTACT_EDIT`, `KEY_ASSIGN` | [ui.md](ui.md) |
 | Power levels, TX time-out, battery saver, battery display, calibration | `BATTERY_SAVE` | [radio-features.md](radio-features.md) |
 | GPS receiver, fixed position | `GPS` | [radio-features.md](radio-features.md) |
+| Retained UTC clock with GPS synchronization | `RTC` | [radio-features.md](radio-features.md#56-time-of-day) |
 | Settings menu, color themes, fonts | `UI_SETTINGS`, `UI_COLOR`, `FONT_*` | [ui.md](ui.md) |
 
 ## Programming, update and diagnostics
@@ -57,5 +62,5 @@ areas and says nothing about menus, screens or keys: the UI is designed in `docs
 ## Not built
 
 - Trunking (Capacity Plus, Connect Plus, Tier III): not built.
-- Encryption beyond Basic Privacy (ARC4, AES).
+- ARC4 voice encryption.
 - DTMF decode and stored DTMF codes ([radio-features.md](radio-features.md)).

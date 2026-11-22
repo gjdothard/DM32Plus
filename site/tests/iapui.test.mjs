@@ -37,7 +37,7 @@ class El {
 }
 const strings = readFileSync(fileURLToPath(new URL("../i18n/en.json", import.meta.url)), "utf8");
 globalThis.Node = El;
-globalThis.document = { createElement: (t) => new El(t), body: new El("body"), getElementById: (id) => (id === "i18n" ? { textContent: strings } : null) };
+globalThis.document = { documentElement: { lang: "en" }, createElement: (t) => new El(t), body: new El("body"), getElementById: (id) => (id === "i18n" ? { textContent: strings } : null) };
 
 const { makeStockRoutes } = await import("../static/js/flasher/iapui.js");
 

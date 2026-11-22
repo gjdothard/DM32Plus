@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 Garrett Dothard
 // The fast codeplug protocol (docs/spec/cps-fast.md): the debug link's CODEPLUG command, 4 KB blocks compared by
 // CRC-32 and moved as LZ4 streams. transport.js uses it when the radio lists CPS_FAST; the open-firmware CPS stays the
 // way for everything else. Addresses are image addresses, as in transport.js: the radio adds its base.
@@ -94,7 +95,7 @@ export class FastLink {
 		}
 		if (d.length < 26 || d[0] !== 1) return null;
 		this.limits = {
-			version: d[0], staging: !!(d[1] & 1), writable: !!(d[1] & 2), block: u16le(d, 2), sums: d[4], data: d[5],
+			version: d[0], staging: !!(d[1] & 1), writable: !!(d[1] & 2), managed: !!(d[1] & 4), block: u16le(d, 2), sums: d[4], data: d[5],
 			read: u16le(d, 6), eeSize: u32le(d, 8), flashStart: u32le(d, 12), end: u32le(d, 16), base: u32le(d, 20),
 			stageMax: u16le(d, 24),
 		};
@@ -137,8 +138,9 @@ export class FastLink {
 		throw new FastError("read", "changing", 0);
 	}
 
-	async begin(staged) {
-		const d = await this.op("begin", [OP.BEGIN, staged ? 1 : 0]);
+	async begin(staged, managed = false) {
+		if (managed && (!staged || !this.limits.managed)) throw new FastError("managed", "unsupported");
+		const d = await this.op("begin", [OP.BEGIN, (staged ? 1 : 0) | (managed ? 0x80 : 0)]);
 		return u16le(d, 0);
 	}
 

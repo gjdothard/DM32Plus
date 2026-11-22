@@ -132,7 +132,7 @@ static struct {
 static bool a_start(audio_block_cb_t cb, void *ctx) { aud.cb = cb; aud.ctx = ctx; aud.started = true; aud.starts++; return true; }
 static void a_stop(void) { aud.started = false; aud.stops++; }
 static void a_pcm(bool on) { aud.pcm = on; }
-static const hal_audio_t fake_audio = { a_start, a_stop, a_pcm };
+static const hal_audio_t fake_audio = { .start = a_start, .stop = a_stop, .speaker_pcm = a_pcm };
 
 static bool codec_present;
 static bool v_present(void) { return codec_present; }
@@ -141,8 +141,8 @@ static void v_encode(const int16_t *pcm, uint8_t *bits) { (void)pcm; memset(bits
 static void v_decode(const uint8_t *bits, int16_t *pcm) { (void)bits; memset(pcm, 0, VOCODER_FRAME_SAMPLES * 2); }
 static uint32_t v_options(void) { return VOCODER_OPT_NOISE_REDUCTION | VOCODER_OPT_TONE_FRAMES | VOCODER_OPT_AGC; }
 static void v_set_options(uint32_t opts) { (void)opts; }
-static const hal_vocoder_t fake_vocoder = { v_present, v_reset, v_encode, v_decode, NULL, v_options, v_set_options,
-					    NULL };
+static const hal_vocoder_t fake_vocoder = { .present = v_present, .reset = v_reset, .encode = v_encode, .decode = v_decode,
+	.options = v_options, .set_options = v_set_options };
 static const char *codec_profile;
 static const char *v_profile(void) { return codec_profile; }
 static uint8_t p_mic(void) { return 0; }
@@ -610,6 +610,7 @@ static void test_squelch(void)
 static void test_tx(void)
 {
 	setup_codeplug();
+	chans[5].tx_hz = 146520000;	// a valid split TX frequency cannot enable a receive-only RX band
 	start();
 	signal(10, true);
 	poll_for(50);
@@ -651,7 +652,7 @@ static void test_tx(void)
 	req(RREQ_CH_STEP, 1);
 	CHECK(sm.view.channel_number == 5 && sm.view.power == 0);
 	req(RREQ_PTT, 1);
-	CHECK(sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_BAND && hw.tx_calls == 1);
+	CHECK(sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_RX_ONLY && hw.tx_calls == 1);
 	req(RREQ_PTT, 0);
 }
 
@@ -720,7 +721,7 @@ static void test_vfo(void)
 	req(RREQ_VFO_SET, 520000000);		// out of every band: refused
 	CHECK(sm.view.ch.rx_hz == 108000000);
 	req(RREQ_PTT, 1);			// receive-only band
-	CHECK(sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_BAND && hw.tx_calls == 0);
+	CHECK(sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_RX_ONLY && hw.tx_calls == 0);
 	req(RREQ_PTT, 0);
 	req(RREQ_VFO_SET, 446000000);
 	req(RREQ_PTT, 1);
@@ -3817,7 +3818,7 @@ static void test_soft_volume(void)
 	CHECK(debuglink_is_feature_op(DL_OP_VOLUME));	// the dispatcher routes it here
 	// VERSION's codec=: a codec stopped for a stub upload (present() false) still reports its profile from flash
 	{
-		const hal_vocoder_t pv = { v_present, v_reset, v_encode, v_decode, v_profile, NULL, NULL, NULL };
+		const hal_vocoder_t pv = { .present = v_present, .reset = v_reset, .encode = v_encode, .decode = v_decode, .profile = v_profile };
 		bool was = codec_present;
 		CHECK(strcmp(debuglink_codec_id(NULL), "none") == 0);
 		codec_present = false;

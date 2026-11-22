@@ -893,8 +893,172 @@
    "needs": [
     "DMR_SMS"
    ]
+  },
+  "message_conversations": {
+   "group": "messages",
+   "needs": [
+    "MESSAGE_JOURNAL",
+    "UI_CARD_MENU"
+   ]
+  },
+  "message_thread": {
+   "group": "messages",
+   "needs": [
+    "MESSAGE_JOURNAL",
+    "UI_CARD_MENU"
+   ]
+  },
+  "message_thread_older": {
+   "group": "messages",
+   "needs": [
+    "MESSAGE_JOURNAL",
+    "UI_CARD_MENU"
+   ]
+  },
+  "settings_keys": {
+   "group": "settings",
+   "needs": [
+    "UI_CARD_MENU",
+    "KEY_ASSIGN"
+   ]
+  },
+  "language": {
+   "group": "settings",
+   "needs": [
+    "UI_CARD_MENU",
+    "UI_SETTINGS"
+   ]
+  },
+  "home_p25": {
+   "group": "home",
+   "needs": [
+    "P25"
+   ]
+  },
+  "home_p25_trunk": {
+   "group": "home",
+   "needs": [
+    "P25_TRUNK"
+   ]
+  },
+  "p25_decode": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_favorites": {
+   "group": "channels",
+   "needs": [
+    "P25_UI",
+    "P25_TRUNK"
+   ]
+  },
+  "p25_hold": {
+   "group": "channels",
+   "needs": [
+    "P25_UI",
+    "P25_TRUNK"
+   ]
+  },
+  "p25_listen": {
+   "group": "channels",
+   "needs": [
+    "P25_UI",
+    "P25_TRUNK"
+   ]
+  },
+  "p25_recent": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_selected": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_system": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_talkgroups": {
+   "group": "channels",
+   "needs": [
+    "P25_UI",
+    "DMR_TALKGROUP_ENTRIES"
+   ]
+  },
+  "home_p25_control": {
+   "group": "home",
+   "needs": [
+    "P25_TRUNK"
+   ]
+  },
+  "home_p25_search": {
+   "group": "home",
+   "needs": [
+    "P25_TRUNK"
+   ]
+  },
+  "home_p25_unknown": {
+   "group": "home",
+   "needs": [
+    "P25_TRUNK"
+   ]
+  },
+  "home_p25_mismatch": {
+   "group": "home",
+   "needs": [
+    "P25_TRUNK"
+   ]
+  },
+  "dual_p25_refused": {
+   "group": "home",
+   "needs": [
+    "P25",
+    "DUAL_WATCH"
+   ]
+  },
+  "home_dual_vfo_entry": {
+   "group": "home",
+   "needs": [
+    "DUAL_WATCH",
+    "VFO"
+   ]
+  },
+  "p25_quick": {
+   "group": "channels",
+   "needs": [
+    "P25_UI",
+    "P25_TRUNK"
+   ]
+  },
+  "p25_quick_conventional": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_quick_empty": {
+   "group": "channels",
+   "needs": [
+    "P25_UI",
+    "P25_TRUNK"
+   ]
+  },
+  "p25_quick_tx": {
+   "group": "channels",
+   "needs": [
+    "P25_UI",
+    "P25_TRUNK"
+   ]
   }
  },
  "_copyright": "Copyright (c) 2026 Garrett Dothard",
- "_license": "SPDX-License-Identifier: MIT"
+ "_license": "MIT"
 }
