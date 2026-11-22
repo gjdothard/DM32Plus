@@ -3,50 +3,77 @@
 
 # DM32Plus
 
-DM32Plus is an MIT-licensed offshoot of RadioFoundry. This repository publishes firmware for its product
-board and the browser CPS. Start with [setup, controls, and release channels](docs/user/23-radios.md#dm32plus),
-the [portable CPS](tools/offline_cps/README.md), or [GitHub Releases](https://github.com/gjdothard/DM32Plus/releases).
-The shared firmware architecture and other board references below come from RadioFoundry; their presence
-does not mean this fork publishes or verifies releases for every board.
+**DM32Plus (DM32+) is MIT-licensed firmware and a browser-based CPS for the Baofeng DM-32UV.**
+Built on [RadioFoundry](https://radiofoundry.org), it adds a card-based interface, FM and DMR operation,
+P25 Phase 1 conventional and trunked operation, persistent DMR conversations, and integrated programming and updates.
+Commercial use is permitted under the [MIT license](LICENSE).
 
-**Free, MIT-licensed firmware for affordable DMR radios.** One shared core runs the DMR stack, the UI, the codeplug and
-the host tools; each radio adds a thin board layer. It brings the FM and DMR features low-cost stock firmware leaves
-out, with a UI designed from first principles. Anyone can use it for anything, commercial products included.
+This fork publishes firmware for the DM-32UV. The shared core and other board references inherited from
+RadioFoundry remain in the tree; they are not a promise of DM32Plus releases or hardware verification for those radios.
 
 ### Installation and programming
 
-Use this project's site or [portable CPS](tools/offline_cps/README.md) in Chrome or Edge. The **Firmware** menu
-opens the installer and updater; the CPS edits channels, operating talkgroups, contacts, channel encryption
-assignments, and the DMR ID database. Codeplug editing runs locally. The
-[manual steps](docs/user/02-installing.md) cover backups, recovery, and command-line alternatives.
-The upstream project is [RadioFoundry](https://radiofoundry.org).
+1. Open [DM32Plus CPS](https://cps.pplan.net/) in desktop Chrome or Edge.
+2. Follow the [DM32+ installation guide](docs/product/dm32/user/02-installing.md) to back up the radio and install or update firmware.
+3. Use the [CPS programming guide](docs/product/dm32/user/04-programming.md) to read the radio, edit channels and contacts, and write the codeplug.
 
-**[Install](docs/user/02-installing.md)** · **[User manual](docs/user/README.md)** · **[Radios](#radios-and-status)** ·
+The radio connects through its USB-to-serial **programming cable**. It has no native USB data connection;
+DFU/Zadig instructions for other boards do not apply. Only one CPS, installer, or serial tool can use its port at a time.
+Disconnect that session before opening another.
+
+Codeplug editing runs locally in the browser. CPS includes FM, DMR and P25 channels; protocol-filtered group and
+private contacts; assigned operating talkgroups; trunked systems and named sites; zones; channel encryption
+assignments; and the DMR ID database. File import/export and saved browser drafts support editing away from the radio.
+Export a codeplug file for a separate backup.
+
+The [portable CPS](tools/offline_cps/README.md) runs on Windows 10/11 x64 without installing Python.
+It supports offline editing and programming; online release downloads, contact downloads and custom firmware builds require internet access.
+See its guide for packaging, local firmware files and cable-driver requirements.
+
+### Releases and channels
+
+| Channel | Firmware source | Use |
+|---|---|---|
+| Stable | Final `vMAJOR.MINOR.PATCH` tags on `main` | Normal installation; [latest stable release](https://github.com/gjdothard/DM32Plus/releases/latest) |
+| Development | `Development`, published as `-beta.N` | New changes before release-candidate testing |
+| Testing | `Testing`, published as `-rc.N` | Release candidates; [Testing CPS](https://testing.cps.pplan.net/) |
+| Bundled (offline) | Firmware included in a portable CPS package | Installation without an online release download |
+
+Check the target version shown by the installer before proceeding. GitHub releases carry firmware without the
+AMBE codec, manifests and checksums; stable releases also publish the matching CPS website bundle.
+The release workflow packages the command-line flasher and the user manual. The portable CPS is packaged separately.
+[Release details](docs/dev/release.md) describe artifacts and version naming.
+
+**[Install](docs/product/dm32/user/02-installing.md)** · **[DM32+ guide](docs/product/dm32/user/README.md)** · **[Radios](#radios-and-status)** ·
 **[Features](#features)** · **[Developer docs](docs/dev/README.md)**
 
 <p>
-<img src="docs/ux/screens/240x320i10x5/boot.png" width="200" alt="Boot screen">
-<img src="docs/ux/screens/240x320i10x5/home_dual_two_rx.png" width="200" alt="Dual watch with both channels receiving">
-<img src="docs/ux/screens/240x320i10x5/tools.png" width="200" alt="Tools: scan, position, hotspot, USB network, repeater, roaming, APRS">
-<img src="docs/ux/screens/240x320i10x5/zone_offer.png" width="200" alt="A zone shared by another radio, offered for import">
+<img src="docs/ux/screens/240x320i10x5/home_dmr.png" width="200" alt="DMR card Home">
+<img src="docs/ux/screens/240x320i10x5/hub.png" width="200" alt="Numbered Main Menu cards">
+<img src="docs/ux/screens/240x320i10x5/message_thread.png" width="200" alt="Incoming and outgoing message conversation">
+<img src="docs/ux/screens/240x320i10x5/settings.png" width="200" alt="Settings categories">
 </p>
 <p>
-<img src="docs/ux/screens/160x120i5/rx_group.png" width="200" alt="A group call with the caller's name and location">
-<img src="docs/ux/screens/160x120i5/message_view.png" width="200" alt="A text message with quick replies">
-<img src="docs/ux/screens/160x120i5/zone_offer_preview.png" width="200" alt="Previewing a shared zone's channels">
-<img src="docs/ux/screens/160x120i5/emergency.png" width="200" alt="An emergency call">
+<img src="docs/ux/screens/240x320i10x5/home_p25_trunk.png" width="200" alt="P25 trunked Home with site status">
+<img src="docs/ux/screens/240x320i10x5/p25_quick.png" width="200" alt="P25 Quick Actions on a trunked RX-only channel">
+<img src="docs/ux/screens/240x320i10x5/p25_quick_conventional.png" width="200" alt="P25 conventional Quick Actions with capability feedback">
+<img src="docs/ux/screens/240x320i10x5/p25_listen.png" width="200" alt="Receive-only P25 Listen picker">
 </p>
-<p>
-<img src="docs/ux/screens/128x64/home_fm.png" width="200" alt="Home screen on an FM channel">
-<img src="docs/ux/screens/128x64/tx.png" width="200" alt="Transmitting">
-<img src="docs/ux/screens/128x64/contacts.png" width="200" alt="Contacts">
-<img src="docs/ux/screens/128x64/zones.png" width="200" alt="Zones">
-</p>
-
-<sub>Top to bottom: DM-32UV (240x320 color), DM-1701 (160x120 color) and DM-1801 Pro (128x64 mono) screens, rendered
-by the UI simulator (`make -C tests/host ui-gallery`).</sub>
+<sub>Native UI simulator captures with synthetic data at the DM-32UV's 240x320 resolution and display insets.
+The shared UI also supports smaller color and monochrome displays, large text, and English, Spanish and Italian.</sub>
 
 ## Radios and status
+
+DM32Plus targets the **Baofeng DM-32UV**. The owner radio-tested the Testing snapshot promoted to `main` for
+`v1.1.0`. That acceptance check does not establish interoperability for every protocol, system or optional feature.
+The [product guide](docs/product/dm32/user/README.md), [bring-up record](docs/testing/dm32-bringup.md),
+[on-air coverage](docs/testing/on-air-coverage.md) and [feature matrix](docs/feature-matrix.md) distinguish
+implemented features, recorded hardware checks and remaining work.
+
+<details>
+<summary>Shared RadioFoundry board registry and recorded status</summary>
+
+These generated entries include upstream ports and plans, not just this fork's release target.
 
 <!-- generated: tools/boards.py docs radios; edit boards/*/board.toml [status] and docs/spec/radios.md -->
 | Radio | Builds | Host tests | On the radio | Support |
@@ -71,6 +98,8 @@ by the UI simulator (`make -C tests/host ui-gallery`).</sub>
 
 ● done&nbsp;&nbsp; ◐ partly, or only in the linked pull request so far&nbsp;&nbsp; ○ not yet
 
+</details>
+
 - **This fork's releases** carry product firmware without the codec, manifests, and checksums. Stable releases also
   publish a matching website bundle. See [release artifacts](docs/dev/release.md#release-artifacts) and
   [Installing](docs/user/02-installing.md). The portable CPS is packaged separately.
@@ -87,51 +116,86 @@ by the UI simulator (`make -C tests/host ui-gallery`).</sub>
 | Feature | What it does |
 |---|---|
 | **DMR voice** | Group and private calls, talker alias, basic privacy ([dmr-voice](docs/spec/dmr-voice.md)) |
-| **DMR data** | Text messages, wireless zone & channel sharing, ARS, LRRP, call alert, radio check ([dmr-data](docs/spec/dmr-data.md), [zone-share](docs/spec/zone-share.md)) |
+| **P25 Phase 1** | Conventional and trunked C4FM operation; programmed talkgroups, named sites, receive filters, recent calls, favorites and diagnostics ([P25 guide](docs/user/p25.md)) |
+| **DMR conversations** | Incoming and outgoing threads, full-message bubbles, replies, delivery results and persistent history when archive storage is active ([messages](docs/product/dm32/user/10-messages-and-signaling.md)) |
+| **DMR data** | Wireless zone & channel sharing, ARS, LRRP, call alert, radio check ([dmr-data](docs/spec/dmr-data.md), [zone-share](docs/spec/zone-share.md)) |
 | **Emergency** | Alarm, emergency call with hot mic, alerts ([dmr-emergency](docs/spec/dmr-emergency.md)) |
-| **FM** | CTCSS/DCS, roger beep, 1750 Hz burst ([radio-features](docs/spec/radio-features.md)) |
-| **Dual watch, scan, VFO** | Two channels at once; zone, VFO and dual watch scan that stops for DMR calls in progress; any frequency by hand in FM or DMR ([radio-features](docs/spec/radio-features.md)) |
+| **FM and receive modes** | CTCSS/DCS, manual DTMF transmit, roger beep, 1750 Hz burst; air-band AM and broadcast FM reception are included but lack recorded on-air verification ([radio-features](docs/spec/radio-features.md), [product scope](docs/product/dm32/user/README.md#firmware-scope)) |
+| **Dual watch, scan, VFO** | Alternates between two channels on this single-receiver radio; zone and VFO scanning; FM and DMR VFO. P25 Scan and Dual Watch are unavailable ([channels guide](docs/product/dm32/user/07-channels-zones-vfo.md)) |
 | **Roaming** | Moves to the strongest repeater of a zone, surveying sites during idle beacons ([dmr-roaming](docs/spec/dmr-roaming.md)) |
 | **APRS** | Position, status and messages on FM, positions over DMR to an APRS gateway, KISS TNC ([aprs](docs/spec/aprs.md)) |
-| **Hotspot** | The radio is an MMDVM modem over USB, including MMDVM single frequency repeating ([mmdvm-protocol](docs/spec/mmdvm-protocol.md), [sfr](docs/spec/sfr.md)) |
-| **USB network** | The radio is a USB network adapter that routes IP over DMR, with a status page, rigctld, KISS over TCP, APRS-IS, mDNS, TFTP and SNMP on the link ([usb-network](docs/spec/usb-network.md), [tcp-services](docs/spec/tcp-services.md)) |
+| **Hotspot** | MMDVM DMR modem over the programming cable, including MMDVM single frequency repeating ([host connections](docs/product/dm32/user/14-hotspot.md), [sfr](docs/spec/sfr.md)) |
+| **Serial networking** | PPP over the programming cable, with build-dependent DMR/IP and host services. Native USB network adapter mode belongs to other boards ([host connections](docs/product/dm32/user/14-hotspot.md)) |
 | **Split duplex repeater** | Experimental: two radios on one MMDVM host as a full duplex repeater ([split-duplex](docs/spec/split-duplex.md)) |
-| **Programming** | The Codeplug Editor on the web site, or qdmr ([cps-protocol](docs/spec/cps-protocol.md)) |
-| **UI** | Designed from first principles, the same on a 128x64 mono LCD or a 240x320 color panel, keypad or knob, with press budgets checked by the host tests ([principles](docs/ux/principles.md), [screens](docs/ux/screens/)) |
+| **Programming** | Browser CPS with channel, talkgroup, contact, zone, system and site editors; file import/export; DMR ID database; firmware installation and recovery ([programming](docs/product/dm32/user/04-programming.md)) |
+| **UI and settings** | Card Home, numbered menus and Quick Actions, caller cards, conversation views, adjustable text size, themes, assignable keys, saved settings and retained hardware time ([keys](docs/product/dm32/user/05-keys-and-navigation.md), [settings](docs/product/dm32/user/17-settings.md)) |
 
 What each radio supports is in the [feature matrix](docs/feature-matrix.md). Every feature that costs flash has a
 build switch ([build-config](docs/build-config.md)).
 
+### P25 listening and transmit selection
+
+**Quick Actions** keeps the same positions on conventional, trunked and RX-only channels:
+**1 Power · 2 Listen · 3 Hold · 4 Talk to · 5 Recent · 6 Favorites · 7 System · 8 Details · 9 Brightness**.
+
+- **Listen** chooses Programmed groups, All talkgroups or Favorites only. It changes reception without changing the TX target.
+- **Hold** holds the newest eligible received group; press it again to return to Programmed groups. It leaves the TX target unchanged.
+- **Talk to** chooses an assigned operating group and changes both receive selection and the selected TX target. It never enables transmission on an RX-only channel.
+
+Listen, Hold and system Favorites require trunking; they remain available on trunked RX-only channels.
+Conventional channels retain assigned-group selection and diagnostics, with explanations for unavailable actions.
+Favorites persist across power cycles; temporary listening selections reset when the channel or codeplug reloads.
+See [Monitoring P25](docs/user/p25.md) for controls and persistence details.
+
+P25 Phase 2, encrypted P25 voice and LSM/CQPSK are not supported. The full build also includes experimental
+extended-band reception from **16 to 999.999990 MHz**; reception across that range is unverified and depends on
+the antenna and receiver hardware. Transmission remains restricted to the normal **136–174 and 400–480 MHz** bands
+and the channel/system permissions. See the [receive-range notes](docs/user/23-radios.md#experimental-dm-32uv-receive-range).
+
+### Messages and time
+
+Saved private and talkgroup conversations include incoming text, outgoing text and send results. Open a thread
+to read full messages, scroll its history or reply. History survives restarts when the reserved archive is active;
+unknown existing storage is preserved rather than overwritten. Message text is stored in plaintext.
+The four-message live inbox remains a volatile fallback when history is unavailable.
+
+The status clock and message timestamps use valid GPS or retained hardware time, displayed with the saved UTC offset.
+Messages without a captured time show `--:--`. See [messages](docs/user/10-messages-and-signaling.md#reading-messages)
+and [settings](docs/product/dm32/user/17-settings.md).
+
 ## Interoperability
 
-**Across hardware.** One core runs on every radio, and never checks which radio it's on. A board file picks the chips
-and describes the bands, power levels, screen and keys. Today that's two MCUs (STM32F405, C-SKY CK803S), three DMR
-modems (HR_C5000, HR_C6000, HR_C7000) and four RF chips (AT1846S, BK4819, FD6818, SKY72310) under the same code.
+**Across hardware.** The shared core uses board and HAL interfaces rather than radio-specific conditionals.
+Board files describe chips, bands, power levels, display and keys. See the [architecture](docs/dev/architecture.md)
+and [hardware registry](docs/spec/radios.md) for implemented platforms and planned ports.
 
-**With the radios and software people already have.** We support the formats other radios use:
+**With other radios and software.** The shared stack implements the formats below. Hardware and build defaults
+determine availability; implementation is not a claim of interoperability testing with every vendor.
 
-| Area | Supported now | Planned |
+| Area | Supported now | Limits or remaining work |
 |---|---|---|
-| Air interface | ETSI DMR Tier II: simplex, repeater, MMDVM SFR (single frequency repeater), repeater roaming | Standalone SFR (repeater and user roles on a channel); ETSI Tier III trunking |
+| Air interface | ETSI DMR Tier II: simplex, repeater, MMDVM SFR, standalone single-frequency repeater/user roles, repeater roaming | Repeater modes have additional setup and hardware-verification limits; ETSI Tier III is not implemented |
+| P25 | Phase 1 C4FM, conventional and trunked channels, passive RX-only following and permission-gated transmit paths | Phase 2, encrypted voice and LSM/CQPSK are not supported |
 | Text messages | ETSI IP text (the default; individual texts confirmed); Motorola TMS; ETSI short data in 7-bit, ISO 8859, UTF-8 and UTF-16; ETSI UDT text | Hytera text format |
 | Location | NMEA from a board-provided GPS receiver; Motorola LRRP requests and answers and ARS registration; ETSI GPS Info in voice calls; APRS position, status and messages on FM, DMR APRS positions, APRS receive and iGate where received audio can be sampled; KISS TNC | ETSI UDT location reports |
-| Signaling | call alert, radio check and emergency, each in the Motorola and ETSI forms; talker alias in all four ETSI formats | DTMF and 5-tone on FM |
+| Signaling | Call alert, radio check and emergency in Motorola and ETSI forms; talker alias in all four ETSI formats; manual DTMF transmit on FM | Stored DTMF codes, DTMF decode and 5-tone signaling |
 | Privacy and encryption | Motorola and Anytone Basic Privacy; AES-256/OFB voice, persistent CPS key slots and channel bindings (host-tested; hardware interoperability untested) | ARC4 |
-| Programming | The Codeplug Editor on the web site: every RadioFoundry radio over USB or the programming cable, CSV and qdmr YAML import and export, DMR ID database and contacts from RadioID.net. qdmr, over its open-firmware codeplug protocol | an open, published native codeplug format with its own qdmr driver |
-| Hotspot and network | MMDVM modem protocol (MMDVMHost, Pi-Star, WPSD and the networks behind them); IP over DMR with the radio as a USB network adapter (confirmed data, SAP 3 compressed UDP headers, control station mode for dispatch software); HTTP status, Hamlib rigctld, KISS over TCP, APRS-IS, mDNS, TFTP and SNMPv2c on the USB link; two radios as one full duplex repeater (experimental, build switch; each half passes on air, one pair checked on the bench) | the split duplex host side (`tools/split_duplex_host.py` is a test host) |
-| Audio to a computer | | USRP over UDP (AllStarLink, DVSwitch), USB sound card with serial-line PTT ([usb-audio](docs/spec/usb-audio.md)) |
+| Programming | Browser CPS over the programming cable; CSV and qdmr YAML import/export; DMR ID database and contacts from RadioID.net. Direct qdmr programming is not supported on this product; use file interchange or the documented migration tool | A dedicated native qdmr driver |
+| Hotspot and network | MMDVM modem protocol; PPP over serial for this product; build-dependent IP over DMR, HTTP status, Hamlib rigctld, KISS over TCP, APRS-IS, mDNS, TFTP and SNMPv2c. Split duplex remains experimental | Production split duplex host integration (`tools/split_duplex_host.py` is a test host) |
+| Audio to a computer | Build-dependent USRP over UDP for AllStarLink/DVSwitch bridges ([spec](docs/spec/usb-audio.md)) | USB sound card with serial-line PTT; this product has no native USB data connection |
 
-"Supported now" means built and passing its tests; [Radios and status](#radios-and-status) says what is checked on air.
+"Supported now" describes implemented paths with automated coverage; [Radios and status](#radios-and-status) links recorded hardware checks.
 Every format is specified in [docs/spec](docs/spec), so other projects can implement the same thing.
 
 ## The AMBE codec
 
-DMR voice needs DVSI's proprietary AMBE+2 vocoder. RadioFoundry never ships it, in this repository or in any binary.
+DMR voice needs DVSI's proprietary AMBE+2 vocoder. DM32Plus does not ship it in the repository or release images.
 
 Each radio runs the codec from its own stock firmware. [rfoundry](tools/rfoundry/README.md) takes it from the stock
-firmware file you downloaded, on your machine, checks that file by SHA-256 and writes the codec with RadioFoundry. If the radio
-already holds the right codec, it writes only RadioFoundry's own sectors. Without a codec the firmware runs FM only. Details
-and supported stock files: [the codec](docs/dev/codec.md).
+firmware file you provide, on your machine, and validates the supported file and codec. When the right codec is already
+installed and can be verified, the updater preserves it. A supported local stock file or saved codec backup is needed
+when preservation cannot be established. DMR data does not need the voice codec; P25 uses its own IMBE path.
+Follow the [product installation guide](docs/product/dm32/user/02-installing.md) and [codec documentation](docs/dev/codec.md).
 
 ## Building
 
@@ -140,9 +204,9 @@ radios).
 
 ```
 tools/boards.py list        # the board ids
-make BOARD=dm1701           # one board's image; there is no default board
+make BOARD=dm32            # this product's image; there is no default board
 make -C tests/host          # host tests
-tools/ci.sh                 # everything a pull request must pass
+tools/ci.sh --board dm32    # local product validation
 ```
 
 Toolchains, make targets and each radio's flashing route: [building](docs/dev/building.md).
@@ -151,6 +215,8 @@ Toolchains, make targets and each radio's flashing route: [building](docs/dev/bu
 
 | | |
 |---|---|
+| [DM32+ firmware guide](docs/product/dm32/user/README.md) | Product installation, CPS, controls, conversations, settings and recovery |
+| [P25 guide](docs/user/p25.md) | Conventional/trunked operation, group selection, receive filters, site names and diagnostics |
 | [User manual](docs/user/README.md) | Installing, keys and screens, FM, DMR, messages, hotspot, settings, troubleshooting (also a PDF in each release) |
 | [Developer docs](docs/dev/README.md) | Architecture, building, adding a radio, testing, the debug link, CPS, the codec, contributing, releases |
 | [Specs](docs/spec/README.md), [UX](docs/ux/), [Testing](docs/testing/README.md) | Behavior, hardware and protocols; UI design; test procedures. Everything: [docs/README.md](docs/README.md) |
@@ -162,11 +228,14 @@ Toolchains, make targets and each radio's flashing route: [building](docs/dev/bu
 | Unit | Single pieces (error correction, encoders, the settings format) against answers from the standards or real radios |
 | Software in the loop | The real firmware code, built for the host, runs whole features (calls, messages, codeplug writes) against simulated chips |
 | UI simulator | Draws the real screens at every display size, walks the menus with scripted keys, and renders every screenshot here |
-| Hardware in the loop | The same kind of scripts against a radio on USB over the [debug link](docs/spec/debuglink.md), with an SDR bench as the other station ([tests/hil](tests/hil/README.md)) |
+| Hardware in the loop | Scripts against the radio over the [debug link](docs/spec/debuglink.md), using its programming cable or board-provided USB, with explicit opt-in for RF tests ([tests/hil](tests/hil/README.md)) |
 
-`tools/ci.sh` builds every radio with each feature switch on and off, checks that every image fits, and runs the
-license and clean-room checks. CI runs the host tests (also under ASan and UBSan) and every default build on each
-push, and the full matrix nightly ([CI](docs/dev/ci.md), [testing](docs/dev/testing.md)).
+Local `tools/ci.sh` runs host, registry, documentation, translation, website and licensing checks, plus selected
+firmware builds and static task-stack checks. Board and matrix options control the build scope.
+PR checks select jobs from changed paths; product firmware jobs target this fork's release board.
+Development and Testing pushes publish their own prereleases, and stable tags run release gates and packaging.
+Some push/nightly jobs are opt-in repository settings, so a skipped job is not evidence of a test run.
+See [CI](docs/dev/ci.md), [testing](docs/dev/testing.md) and the [release checklist](docs/dev/release.md#checklist).
 
 ## FAQ
 
@@ -191,7 +260,7 @@ useful in commercial service and to hams alike.
 
 Any way you can:
 
-- **Test and report.** Run RadioFoundry on your radio and [report what breaks](https://github.com/gjdothard/DM32Plus/issues/new?template=bug_report.yml). If the radio restarted,
+- **Test and report.** Run DM32Plus on the supported product and [report what breaks](https://github.com/gjdothard/DM32Plus/issues/new?template=bug_report.yml). Include the version, release channel, channel mode and steps to reproduce. If the radio restarted,
   include the crash log from **Settings > Advanced > Crash log** ([settings](docs/user/17-settings.md#crash-log)).
 - **Ask.** [Request a feature](https://github.com/gjdothard/DM32Plus/issues/new?template=feature_request.yml) you'd like in this firmware.
 - **Contribute.** Send pull requests for code or docs ([contributing](docs/dev/contributing.md)).
@@ -200,14 +269,15 @@ Any way you can:
 
 **Was this project AI-generated?**
 
-No. This project is the result of thousands of hours of combined human effort from several contributors, spent on
-radio teardowns, reverse engineering, software architecture, and testing. AI was used as a pair programmer to speed up
-support for additional radios and to make the project's ambitious scope possible and sustainable.
+DM32Plus builds on RadioFoundry and its contributors' work. AI tools assist development, documentation and
+automated checks. Human review and radio testing remain separate from host simulation; test results and known
+limits should be reported with each change.
 
 ## Clean room and licensing
 
-RadioFoundry is MIT licensed ([LICENSE](LICENSE)) and a clean-room project: code is written from prose specs, datasheets and
-public standards, independent of earlier radio firmwares. No GPL code, no non-commercial code, no vendor SDKs. The
+DM32Plus and its RadioFoundry foundation are MIT licensed ([LICENSE](LICENSE)) and developed under clean-room rules.
+Code is written from prose specs, datasheets and public standards, independent of earlier radio firmwares.
+No GPL code, non-commercial code or restrictively licensed vendor SDKs are used. The
 rules and checks: [docs/CLEANROOM.md](docs/CLEANROOM.md). Third-party code in `third_party/` (FreeRTOS, TinyUSB, ST's
 HAL and CMSIS) keeps its own permissive license ([LICENSES/](LICENSES/)).
 
@@ -236,7 +306,8 @@ of `core/`, put anything that costs flash behind a `CONFIG_` switch, and make su
 
 | Path | What |
 |---|---|
-| `core/` | Radio-independent code: DMR stack (`core/dmr`), radio state machine (`core/radio`), UI (`core/ui`), hotspot, host link, codeplug, settings, CPS, debug link |
+| `core/` | Shared FM/DMR/P25 code, air framing and voice paths, radio state machine, UI, messages, hotspot, networking, codeplug, settings, CPS and debug link |
+| `site/` | Browser CPS, firmware installer, product documentation and translated website |
 | `hal/` | Interfaces the core uses (modem, RF, audio, codec, flash, display, input), and the `board_t` descriptor |
 | `drivers/` | Chip drivers shared across radios |
 | `platform/` | Per-SoC startup, clocks, interrupts and RTOS glue (`stm32f4`, `hrc7000`) |
