@@ -8,6 +8,11 @@ SPDX-FileCopyrightText = "2026 The RadioFoundry Authors"
 SPDX-License-Identifier = "MIT"
 
 [[annotations]]
+path = ["docs/ux/screens/*/p25*.png", "docs/ux/screens/*/home_p25*.png"]
+SPDX-FileCopyrightText = ["2026 The RadioFoundry Authors", "2026 Garrett Dothard"]
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
 path = ["platform/stm32f4/stm32f4xx_hal_conf.h"]
 SPDX-FileCopyrightText = "2017 STMicroelectronics"
 SPDX-License-Identifier = "BSD-3-Clause"
@@ -26,6 +31,7 @@ SPDX-License-Identifier = "MIT"
 path = [".gitmodules", "codecs/.gitignore", "codecs/README.md", "boot/README.md", "stub/*.md",
         "core/net/http_assets/**", "tools/ci-runner/proxy/allow", "boards/*/product.json",
         "tools/rfoundry/rfoundry/codec_maps/**/*.json", "tools/rfoundry/rfoundry/codec_maps/README.md",
-        "tools/rfoundry/rfoundry/registry.json", "tools/rfoundry/tests/codecmap_vectors.json"]
+        "tools/rfoundry/rfoundry/registry.json", "tools/rfoundry/tests/codecmap_vectors.json", "site/data/screens.json",
+        "site/i18n/en.json", "site/i18n/es.json", "site/i18n/it.json"]
 SPDX-FileCopyrightText = ["2026 The RadioFoundry Authors", "2026 Garrett Dothard"]
 SPDX-License-Identifier = "MIT"

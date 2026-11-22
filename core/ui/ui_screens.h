@@ -140,6 +140,7 @@ enum {
 	QT_ZONE_SCAN, QT_GPS,
 	QT_TO_VFO,		// on a channel, in place of QT_MODE: copy the channel to the VFO
 	QT_SPLIT,		// in the VFO, in place of QT_MONITOR (FM) / QT_PRIVACY (DMR): the TX frequency or offset
+	QT_P25_LISTEN, QT_P25_HOLD, QT_P25_TALK, QT_P25_RECENT, QT_P25_FAVORITES, QT_P25_SYSTEM, QT_P25_DETAILS,
 
 };
 // The tile kind at position 0..8 (keys 1..9) for this channel or the VFO

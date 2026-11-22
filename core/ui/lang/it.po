@@ -21,7 +21,7 @@ msgstr "Loader PC collegato"
 msgid "Power-cycle to exit"
 msgstr "Riavvia per uscire"
 
-#: core/ui/fmt.c core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/fmt.c core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_p25.c core/ui/ui_screens.c
 msgid "Off"
 msgstr "No"
 
@@ -313,7 +313,7 @@ msgstr "Color code: non in questa build"
 msgid "FM only: this is a DMR channel"
 msgstr "Solo FM: questo è un canale DMR"
 
-#: core/ui/ui_app.c core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/ui_app.c core/ui/ui_menus.c core/ui/ui_p25.c core/ui/ui_screens.c
 msgid "Not in this build"
 msgstr "Non incluso in questa versione"
 
@@ -3309,7 +3309,7 @@ msgstr "Parla a"
 msgid "{PTT once  OK use  Hold OK set|OK use  Hold OK set}"
 msgstr "{PTT una volta  OK usa  Tieni OK imposta|OK usa  Tieni OK imposta}"
 
-#: core/ui/ui_menus.c core/ui/ui_p25.c core/ui/ui_screens.c
+#: core/ui/ui_menus.c core/ui/ui_screens.c
 msgid "Talkgroups"
 msgstr "Gruppi"
 
@@ -3529,45 +3529,149 @@ msgstr "Destinazione TX"
 msgid "Programmed target"
 msgstr "Destinazione programmata"
 
-#: core/ui/ui_p25.c
-msgid "* P25"
-msgstr "* P25"
+#: core/ui/ui_p25.c core/ui/ui_screens.c
+msgid "* Quick"
+msgstr "* Rapido"
 
 #: core/ui/ui_p25.c
 msgid "# Recent"
 msgstr "# Recenti"
 
 #: core/ui/ui_p25.c
-msgid "Recent calls"
-msgstr "Chiamate recenti"
+msgid "{Listen: receive filter only|Listen: RX only}"
+msgstr "{Ascolto: solo filtro RX|Ascolto: solo RX}"
 
 #: core/ui/ui_p25.c
-msgid "Hold last talkgroup"
-msgstr "Mantieni ultimo gruppo"
+msgid "{Hold: RX only; OK release|OK release: RX}"
+msgstr "{Blocca: solo RX; OK rilascia|OK rilascia: RX}"
 
 #: core/ui/ui_p25.c
-msgid "System details"
-msgstr "Dettagli sistema"
+msgid "{Hold: RX only; OK last group|OK hold: RX only}"
+msgstr "{Blocca: RX; OK ultimo gruppo|OK blocca: RX}"
 
 #: core/ui/ui_p25.c
-msgid "Favorite list"
-msgstr "Elenco preferiti"
+msgid "{Talk to: receive + TX group|Group: RX + TX}"
+msgstr "{Parla: gruppo RX + TX|Gruppo: RX + TX}"
+
+#: core/ui/ui_p25.c
+msgid "{OK hold  # favorite: RX only|OK hold: RX only}"
+msgstr "{OK blocca  # preferito: solo RX|OK blocca: RX}"
+
+#: core/ui/ui_p25.c
+msgid "{Saved receive groups|RX favorites}"
+msgstr "{Gruppi di ricezione salvati|Preferiti RX}"
+
+#: core/ui/ui_p25.c
+msgid "{System identity and signal|System status}"
+msgstr "{Identità e segnale del sistema|Stato del sistema}"
+
+#: core/ui/ui_p25.c
+msgid "{Decode counters and last skip|Decode details}"
+msgstr "{Contatori e ultimo scarto|Dati di ricezione}"
+
+#: core/ui/ui_p25.c core/ui/ui_screens.c
+msgid "OK choose  Back"
+msgstr "OK scegli  Indietro"
+
+#: core/ui/ui_p25.c
+msgid "RX only: transmit disabled"
+msgstr "Solo RX: TX disattivata"
+
+#: core/ui/ui_p25.c
+msgid "Channel TX permissions apply"
+msgstr "Permessi TX del canale"
+
+#: core/ui/ui_p25.c
+msgid "TX target"
+msgstr "Destinazione TX"
+
+#: core/ui/ui_p25.c
+msgid "{Power|Pwr}"
+msgstr "{Potenza|Pot.}"
+
+#: core/ui/ui_p25.c
+msgid "{Listen|RX}"
+msgstr "{Ascolta|RX}"
+
+#: core/ui/ui_p25.c
+msgid "{Hold|Hld}"
+msgstr "{Mantieni|Blocca}"
+
+#: core/ui/ui_p25.c core/ui/ui_screens.c
+msgid "{Talk to|Talk}"
+msgstr "{Parla con|Parla}"
+
+#: core/ui/ui_p25.c
+msgid "{Recent|Calls}"
+msgstr "{Recenti|Ult.}"
+
+#: core/ui/ui_p25.c
+msgid "{Favorites|Favs}"
+msgstr "{Preferiti|Pref.}"
+
+#: core/ui/ui_p25.c
+msgid "{System|Sys}"
+msgstr "{Sistema|Sist.}"
+
+#: core/ui/ui_p25.c
+msgid "{Details|Info}"
+msgstr "{Dettagli|Info}"
+
+#: core/ui/ui_p25.c
+msgid "{Unavailable|--}"
+msgstr "{Non disponibile|--}"
+
+#: core/ui/ui_p25.c
+msgid "{Trunked only|Trunk}"
+msgstr "{Solo trunking|Trunk}"
+
+#: core/ui/ui_p25.c
+msgid "{Hold active|Hold}"
+msgstr "{Blocco attivo|Blocco}"
+
+#: core/ui/ui_p25.c
+msgid "{All groups|All}"
+msgstr "{Tutti i gruppi|Tutti}"
+
+#: core/ui/ui_p25.c
+msgid "{Favorites only|Favs}"
+msgstr "{Solo preferiti|Pref.}"
+
+#: core/ui/ui_p25.c
+msgid "{Programmed|Prog}"
+msgstr "{Programmati|Prog.}"
+
+#: core/ui/ui_p25.c
+msgid "{No calls|None}"
+msgstr "{Nessuna chiamata|Nessuna}"
+
+#: core/ui/ui_p25.c
+msgid "Decode"
+msgstr "Decod."
 
 #: core/ui/ui_p25.c
 msgid "Select a P25 trunked channel"
 msgstr "Seleziona un canale trunking P25"
 
 #: core/ui/ui_p25.c
-msgid "Add a recent talkgroup first"
-msgstr "Aggiungi prima un gruppo recente"
-
-#: core/ui/ui_p25.c
 msgid "No group call to hold"
 msgstr "Nessuna chiamata di gruppo da mantenere"
 
 #: core/ui/ui_p25.c
+msgid "Add a recent talkgroup first"
+msgstr "Aggiungi prima un gruppo recente"
+
+#: core/ui/ui_p25.c
 msgid "Favorite list full"
 msgstr "Elenco preferiti pieno"
+
+#: core/ui/ui_p25.c
+msgid "Favorite list"
+msgstr "Elenco preferiti"
+
+#: core/ui/ui_p25.c
+msgid "Recent calls"
+msgstr "Chiamate recenti"
 
 #: core/ui/ui_p25.c
 msgid "No calls or favorites"
@@ -3618,8 +3722,12 @@ msgid "Missing channel plan"
 msgstr "Piano canali mancante"
 
 #: core/ui/ui_p25.c
-msgid "P25 listening"
-msgstr "Ascolto P25"
+msgid "Listen: receive only"
+msgstr "Ascolto: solo RX"
+
+#: core/ui/ui_p25.c
+msgid "TX target unchanged"
+msgstr "Destinazione TX invariata"
 
 #: core/ui/ui_p25.c
 msgid "P25 system"
@@ -4014,10 +4122,6 @@ msgid "RECENT ACTIVITY"
 msgstr "ATTIVITÀ RECENTE"
 
 #: core/ui/ui_screens.c
-msgid "* Quick"
-msgstr "* Rapido"
-
-#: core/ui/ui_screens.c
 msgid "# Actions"
 msgstr "# Azioni"
 
@@ -4122,10 +4226,6 @@ msgid "{Privacy|Priv}"
 msgstr "{Privacy|Priv}"
 
 #: core/ui/ui_screens.c
-msgid "{Talk to|Talk}"
-msgstr "{Parla a|Parla}"
-
-#: core/ui/ui_screens.c
 msgid "{Copy to VFO|To VFO}"
 msgstr "{Copia su VFO|Su VFO}"
 
@@ -4168,6 +4268,10 @@ msgstr "1-9 cambia  Tieni OK salva"
 #: core/ui/ui_screens.c
 msgid "0 All settings  Hold OK save"
 msgstr "0 Tutte impost.  Tieni OK salva"
+
+#: core/ui/ui_screens.c
+msgid "Quick Actions"
+msgstr "Azioni rapide"
 
 #: core/ui/ui_screens.c
 msgid "Offset"

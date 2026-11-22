@@ -2258,8 +2258,8 @@
   "editor.problem.talkgroup_protocol": "Un gruppo assegnato usa un protocollo diverso da quello del canale.",
   "screen.p25_decode": "Dettagli di decodifica P25",
   "screen.p25_favorites": "Gruppi preferiti P25",
-  "screen.p25_hold": "Blocco gruppo P25",
-  "screen.p25_listen": "Controlli di ascolto P25",
+  "screen.p25_hold": "Blocco in ricezione P25; destinazione TX invariata",
+  "screen.p25_listen": "Selettore del filtro di ricezione P25",
   "screen.p25_recent": "Chiamate recenti P25",
   "screen.p25_selected": "Gruppo di chiamata P25 selezionato",
   "screen.p25_system": "Dettagli del sistema P25",
@@ -2286,5 +2286,9 @@
   "editor.contacts.moved": "{name} ora si trova in {page}. Annulla ripristina la classificazione precedente.",
   "editor.contacts.reclassified": "Contatti aggiornati. Le sottopagine riflettono la nuova classificazione; Annulla la ripristina.",
   "editor.contacts.assigned": "Rimuovi o sostituisci le assegnazioni dei contatti incompatibili prima di cambiare classificazione: {channels}",
-  "editor.contacts.rx_list": "Rimuovi questo contatto dagli elenchi dei gruppi RX prima di cambiarne il tipo di chiamata."
+  "editor.contacts.rx_list": "Rimuovi questo contatto dagli elenchi dei gruppi RX prima di cambiarne il tipo di chiamata.",
+  "screen.p25_quick": "Azioni rapide P25 su un canale trunking di sola ricezione",
+  "screen.p25_quick_conventional": "Azioni rapide P25 su un canale convenzionale",
+  "screen.p25_quick_empty": "Azioni rapide P25 senza gruppi recenti",
+  "screen.p25_quick_tx": "Azioni rapide P25 con permessi TX del canale"
 }

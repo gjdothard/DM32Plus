@@ -300,6 +300,27 @@ int main(void)
 	CHECK(radio_p25_monitor(&monitor) && monitor.recent_count == 1 && monitor.recent[0].tg == 2);
 	radio_p25_mem_t *owner = (radio_p25_mem_t *)pool;
 	CHECK(owner->trunk.cfg.talk_group == 1 && owner->work.engine.cfg.tx_lc.tgid == 1);
+	// Quick receive actions retain the independently assigned TX target and permissions.
+	CHECK(radio_p25_monitor_command(P25_MON_PROGRAMMED, 0));
+	CHECK(radio_p25_poll(NULL));
+	CHECK(radio_p25_monitor(&monitor) && monitor.listen == P25_LISTEN_PROGRAMMED && monitor.held_tg == 0);
+	CHECK(monitor.tx_target == 1 && (monitor.flags & P25_MON_RX_ONLY));
+	radio_req_t receive = { .type = RREQ_P25_MONITOR, .arg2 = P25_MON_HOLD,
+		.arg = (int32_t)((uint32_t)(sm.view.channel_number + 1) << 16 | 9u) };
+	radio_sm_request(&sm, &receive, hal_millis());
+	CHECK(radio_p25_poll(NULL));
+	CHECK(radio_p25_monitor(&monitor) && monitor.listen == P25_LISTEN_PROGRAMMED);
+	receive.arg = (int32_t)((uint32_t)sm.view.channel_number << 16 | 9u);
+	uint8_t prior_state = sm.view.state;
+	sm.view.state = RS_TX;
+	radio_sm_request(&sm, &receive, hal_millis());
+	CHECK(radio_p25_poll(NULL));
+	CHECK(radio_p25_monitor(&monitor) && monitor.listen == P25_LISTEN_PROGRAMMED && monitor.tx_target == 1);
+	sm.view.state = prior_state;
+	radio_sm_request(&sm, &receive, hal_millis());
+	CHECK(radio_p25_poll(NULL));
+	CHECK(radio_p25_monitor(&monitor) && monitor.held_tg == 9 && monitor.tx_target == 1);
+	CHECK(key_calls == 0 && starts == 0 && !keyed);
 	CHECK(radio_p25_monitor_command(P25_MON_ALL, 0));
 	CHECK(radio_p25_end());
 	CHECK(!radio_p25_monitor(&monitor) && monitor.flags == 0 && monitor.recent_count == 0);

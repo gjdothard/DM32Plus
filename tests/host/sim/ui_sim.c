@@ -975,7 +975,9 @@ uint8_t ui_svc_p25_site(const p25_monitor_t *m, char *out, size_t cap)
 bool ui_svc_p25_view(p25_monitor_t *out) { *out = p25_monitor; return (out->flags & P25_MON_ACTIVE) != 0; }
 bool ui_svc_p25_command(uint16_t channel, uint8_t op, uint16_t tg)
 {
-	if (channel != view.channel_number || !(p25_monitor.flags & P25_MON_ACTIVE)) return false;
+	if (channel != view.channel_number || channel != p25_monitor.channel ||
+	    !(p25_monitor.flags & P25_MON_ACTIVE) || view.state == RS_TX) return false;
+	if (op != P25_MON_STEP && op != P25_MON_SELECT && !(p25_monitor.flags & P25_MON_TRUNK)) return false;
 	if (op == P25_MON_STEP) {
 #if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
 		if (!view.talkgroup_count || !(int16_t)tg) return false;
@@ -2726,6 +2728,18 @@ static bool run_token(char *t, char *err, size_t len)
 		advance(arg != NULL ? (uint32_t)atoi(arg) : 1000u);
 		return true;
 	}
+#if CONFIG_P25_UI
+	if (strcmp(t, "p25-case") == 0 && arg) {
+		if (!strcmp(arg, "empty")) p25_monitor.recent_count = 0;
+		else if (!strcmp(arg, "private")) { p25_monitor.recent[0].tg = 0; p25_monitor.recent[0].flags = P25_MON_UNIT; }
+		else if (!strcmp(arg, "stale")) p25_monitor.channel++;
+		else if (!strcmp(arg, "closed")) p25_monitor.flags = 0;
+		else if (!strcmp(arg, "tx")) view.state = RS_TX;
+		else if (!strcmp(arg, "tx-capable")) { view.ch.rx_only = false; p25_monitor.flags &= (uint8_t)~P25_MON_RX_ONLY; }
+		else return false;
+		serial++; advance(200); return true;
+	}
+#endif
 #if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
 	if (strcmp(t, "p25-no-groups") == 0) {
 		view.talkgroup_count = 0;

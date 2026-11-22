@@ -1160,10 +1160,6 @@ bool ui_home_key(const input_event_t *ev)
 	if (ev->gesture == GESTURE_LONG) {
 		if (ev->action == ACT_SELECT) {
 			if (!has_quick_key) {
-#if CONFIG_P25_UI
-				if (view->ch.mode == RADIO_MODE_P25) ui_push(SCR_P25_LISTEN, 0);
-				else
-#endif
 				ui_push(SCR_QUICK, 0);	// few-key boards: long SELECT is QUICK
 			} else
 				ui_try_save_channel();
@@ -1217,12 +1213,6 @@ bool ui_home_key(const input_event_t *ev)
 		dirty = true;
 		return true;
 	case ACT_QUICK:
-#if CONFIG_P25_UI
-		if (view->ch.mode == RADIO_MODE_P25) {
-			ui_push(SCR_P25_LISTEN, 0);
-			return true;
-		}
-#endif
 		ui_push(SCR_QUICK, 0);
 		return true;
 	case ACT_CONTEXT:
@@ -1396,6 +1386,9 @@ static void quick_activate(int tile)
 	char label[20], value[12];
 	ui_st.quick_focus = (uint8_t)tile;
 	uint8_t kind = ui_quick_kind(tile, view);
+#if CONFIG_P25_UI
+	if (view->ch.mode == RADIO_MODE_P25 && ui_p25_quick_activate(kind)) { dirty = true; return; }
+#endif
 	if (!ui_quick_tile(tile, view, &ui_st, label, sizeof label, value, sizeof value)) {
 		quick_unavailable(kind);
 		return;
@@ -2351,17 +2344,6 @@ void ui_app_key(const input_event_t *ev)
 	const ui_scr_def_t *d = ui_scr[stack[sp].scr];
 	if (ev->action == ACT_QUICK && ev->gesture == GESTURE_PRESS && stack[sp].scr != SCR_QUICK &&
 			stack[sp].scr != SCR_DIAG && stack[sp].scr != SCR_HOME && !typing) {
-#if CONFIG_P25_UI
-		if (view->ch.mode == RADIO_MODE_P25) {
-			if (stack[sp].scr == SCR_P25_LISTEN) { ui_pop(); return; }
-			for (unsigned i = sp; i > 0; i--) if (stack[i].scr == SCR_P25_LISTEN) {
-				while (sp > i) ui_pop();
-				return;
-			}
-			ui_push(SCR_P25_LISTEN, 0);
-			return;
-		}
-#endif
 		ui_push(SCR_QUICK, 0);
 		return;
 	}

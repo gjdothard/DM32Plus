@@ -2258,8 +2258,8 @@
   "editor.problem.talkgroup_protocol": "Un grupo asignado tiene un protocolo diferente al de este canal.",
   "screen.p25_decode": "Detalles de decodificación P25",
   "screen.p25_favorites": "Grupos favoritos P25",
-  "screen.p25_hold": "Retención de grupo P25",
-  "screen.p25_listen": "Controles de recepción P25",
+  "screen.p25_hold": "Retención de recepción P25; destino TX sin cambios",
+  "screen.p25_listen": "Selector de filtro de recepción P25",
   "screen.p25_recent": "Llamadas recientes P25",
   "screen.p25_selected": "Grupo de conversación P25 seleccionado",
   "screen.p25_system": "Detalles del sistema P25",
@@ -2286,5 +2286,9 @@
   "editor.contacts.moved": "{name} ahora está en {page}. Deshacer restaura la clasificación anterior.",
   "editor.contacts.reclassified": "Contactos actualizados. Sus subpáginas reflejan la nueva clasificación; Deshacer la restaura.",
   "editor.contacts.assigned": "Elimine o reemplace las asignaciones de contactos incompatibles antes de cambiar la clasificación: {channels}",
-  "editor.contacts.rx_list": "Elimine este contacto de las listas de grupos RX antes de cambiar su tipo de llamada."
+  "editor.contacts.rx_list": "Elimine este contacto de las listas de grupos RX antes de cambiar su tipo de llamada.",
+  "screen.p25_quick": "Acciones rápidas P25 en un canal troncal de solo recepción",
+  "screen.p25_quick_conventional": "Acciones rápidas P25 en un canal convencional",
+  "screen.p25_quick_empty": "Acciones rápidas P25 sin grupos recientes",
+  "screen.p25_quick_tx": "Acciones rápidas P25 con permisos TX del canal"
 }

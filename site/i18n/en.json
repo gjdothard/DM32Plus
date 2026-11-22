@@ -2258,8 +2258,8 @@
   "editor.problem.talkgroup_protocol": "A talkgroup assignment has a different protocol from this channel.",
   "screen.p25_decode": "P25 decoding details",
   "screen.p25_favorites": "P25 favorite groups",
-  "screen.p25_hold": "P25 group hold",
-  "screen.p25_listen": "P25 listening controls",
+  "screen.p25_hold": "P25 receive hold; TX target unchanged",
+  "screen.p25_listen": "P25 receive-only filter picker",
   "screen.p25_recent": "P25 recent calls",
   "screen.p25_selected": "P25 selected talkgroup",
   "screen.p25_system": "P25 system details",
@@ -2286,5 +2286,9 @@
   "editor.contacts.moved": "{name} is now in {page}. Undo restores the previous classification.",
   "editor.contacts.reclassified": "Contacts updated. Their subpages reflect the new classification; Undo restores it.",
   "editor.contacts.assigned": "Remove or replace incompatible contact assignments before changing classification: {channels}",
-  "editor.contacts.rx_list": "Remove this contact from RX group lists before changing its call type."
+  "editor.contacts.rx_list": "Remove this contact from RX group lists before changing its call type.",
+  "screen.p25_quick": "P25 Quick Actions on a trunked RX-only channel",
+  "screen.p25_quick_conventional": "P25 Quick Actions on a conventional channel",
+  "screen.p25_quick_empty": "P25 Quick Actions without recent groups",
+  "screen.p25_quick_tx": "P25 Quick Actions with channel TX permissions"
 }

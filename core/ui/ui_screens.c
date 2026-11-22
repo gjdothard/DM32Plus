@@ -3149,6 +3149,15 @@ uint8_t ui_quick_kind(int pos, const radio_view_t *v)
 	};
 	if (pos < 0 || pos >= UI_QUICK_TILES)
 		return QT_POWER;
+#if CONFIG_P25_UI
+	if (v->ch.mode == RADIO_MODE_P25) {
+		static const uint8_t p25[UI_QUICK_TILES] = {
+			QT_POWER, QT_P25_LISTEN, QT_P25_HOLD, QT_P25_TALK, QT_P25_RECENT,
+			QT_P25_FAVORITES, QT_P25_SYSTEM, QT_P25_DETAILS, QT_BRIGHTNESS,
+		};
+		return p25[pos];
+	}
+#endif
 	if ((board.home_brand || CONFIG_DMR_TALKGROUP_ENTRIES) && gfx_width() >= 220 && !v->vfo) {
 		static const uint8_t wide_fm[UI_QUICK_TILES] = {
 			QT_POWER, QT_ZONE_SCAN, QT_SCAN, QT_SQUELCH, QT_TONE, QT_SPLIT, QT_MONITOR, QT_BANDWIDTH, QT_GPS,
@@ -3171,7 +3180,7 @@ static bool feat(uint32_t f)
 	return (ui_svc_features() & f) != 0;
 }
 
-bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *label, size_t label_len,
+static bool __attribute__((noinline)) quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *label, size_t label_len,
 	char *value, size_t value_len)
 {
 	// The whole word, and an abbreviation of 6 characters at most for a tile (font.h alternates), so a tile's name
@@ -3197,6 +3206,7 @@ bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *l
 		[QT_ZONE_SCAN] = TRN("Scan"), [QT_GPS] = "GPS",
 	};
 	uint8_t kind = ui_quick_kind(tile, v);
+
 	bool editing = s->quick_edit && s->quick_focus == tile;
 	sbuf_t b;
 	sb_init(&b, label, label_len);
@@ -3323,6 +3333,21 @@ bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *l
 	}
 }
 
+bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *label, size_t label_len,
+	char *value, size_t value_len)
+{
+#if CONFIG_P25_UI
+	// Keep the monitor snapshot off the shared controls' larger stack frame.
+	uint8_t kind = ui_quick_kind(tile, v);
+	if (v->ch.mode == RADIO_MODE_P25 && kind != QT_BRIGHTNESS) {
+		if (label_len) { label[0] = (char)('1' + tile); if (label_len > 1) label[1] = '\0'; }
+		return ui_p25_quick_tile(kind, label_len > 1 ? label + 1 : label, label_len > 1 ? label_len - 1 : 0,
+			value, value_len);
+	}
+#endif
+	return quick_tile(tile, v, s, label, label_len, value, value_len);
+}
+
 static uint16_t quick_list_focus;
 static const radio_view_t *quick_v;
 static const ui_state_t *quick_s;
@@ -3369,6 +3394,9 @@ static void __attribute__((noinline)) draw_quick_list(const radio_view_t *v, con
 	ui_list_t l = { .prefix = TR("Quick"), .name = v->vfo ? "VFO" : v->ch.name,
 		.count = UI_QUICK_TILES, .focus = quick_list_focus, .top = &top, .item = quick_list_item,
 		.hint = split_hint != NULL ? split_hint : TR("1-9 change  Hold OK save") };
+#if CONFIG_P25_UI
+	if (v->ch.mode == RADIO_MODE_P25) l.hint = ui_p25_quick_hint(ui_quick_kind(s->quick_focus, v));
+#endif
 	ui_draw_list(v, s, &l);
 }
 
@@ -3384,7 +3412,7 @@ static void __attribute__((noinline)) draw_quick_tiles(const radio_view_t *v, co
 	// Title row keeps the state pill (P2)
 	int top = ui_draw_top(v, s, TR("Quick"), name);
 	int bottom = h;
-	if (s->toast != NULL || split_hint != NULL || h >= UI_TALL_PX)
+	if (s->toast != NULL || split_hint != NULL || h >= UI_TALL_PX || (CONFIG_P25_UI && v->ch.mode == RADIO_MODE_P25))
 		bottom = L->hint_y;
 	int gh = bottom - top;
 	const font_t *lf = L->small;
@@ -3397,7 +3425,7 @@ static void __attribute__((noinline)) draw_quick_tiles(const radio_view_t *v, co
 		int cx = i % 3, cy = i / 3;
 		int x0 = w * cx / 3, x1 = w * (cx + 1) / 3 - (cx == 2 ? 1 : 0);
 		int y0 = top + gh * cy / 3, y1 = top + gh * (cy + 1) / 3 - (cy == 2 ? 1 : 0);
-		char value[12], fit[12];	// label: "5" and the name's alternates
+		char value[32], fit[16];	// label: "5" and the name's alternates
 		bool ok = ui_quick_tile(i, v, s, label, sizeof label, value, sizeof value);
 		bool focus = i == s->quick_focus;
 		color_t fg = ok ? ui_col.fg : ui_col.line, bg = ui_col.bg;
@@ -3423,8 +3451,7 @@ static void __attribute__((noinline)) draw_quick_tiles(const radio_view_t *v, co
 			sb_chr(&vb, '<');
 			sb_str(&vb, value);
 			sb_chr(&vb, '>');
-			memcpy(value, tmp, sizeof value - 1);
-			value[sizeof value - 1] = 0;
+			str_copy(value, sizeof value, tmp);
 		}
 		const font_t *tf = vf;	// a value too wide for the tile ("<D023N>") drops to the label font
 		if (gfx_text_width(tf, value) > x1 - x0 - 3)
@@ -3438,6 +3465,10 @@ static void __attribute__((noinline)) draw_quick_tiles(const radio_view_t *v, co
 	ui_draw_banner(s);
 	if (s->toast != NULL)
 		ui_draw_hint(s->toast, true);
+#if CONFIG_P25_UI
+	else if (v->ch.mode == RADIO_MODE_P25)
+		ui_draw_hint(ui_p25_quick_hint(ui_quick_kind(s->quick_focus, v)), false);
+#endif
 	else if (split_hint != NULL)
 		ui_draw_hint(quick_split_hint(v, s, label, sizeof label), false);	// the tiles used label
 	else if (h >= UI_TALL_PX)
@@ -3450,9 +3481,20 @@ static void __attribute__((noinline)) draw_quick_cards(const radio_view_t *v, co
 	const font_t *meta = &font_6x12;
 	const font_t *value_font = ui_layout.small;
 	int width = gfx_width(), top = 57, bottom = ui_layout.hint_y - 4;
-	char label[40], value[16], fit[32];
+	char label[40], value[32], fit[32];
 	card_header(s, 24);
 	const char *title = TR("Quick Controls");
+#if CONFIG_P25_UI
+	bool p25 = v->ch.mode == RADIO_MODE_P25;
+	if (p25) {
+		title = TR("Quick Actions");
+		ui_p25_quick_context(label, sizeof label, true);
+		gfx_text_fit(meta, label, width - 10, fit, sizeof fit);
+		gfx_text(meta, 5, top, fit, ui_col.warn);
+		top += 18;
+		bottom -= 30;
+	}
+#endif
 	gfx_text(value_font, 5, 29, title, ui_col.focus);
 	const char *mode = mode_word(v);
 	gfx_text(meta, width - 5 - gfx_text_width(meta, mode), 33, mode, ui_col.fg);
@@ -3485,15 +3527,28 @@ static void __attribute__((noinline)) draw_quick_cards(const radio_view_t *v, co
 			gfx_text(meta, x + w - 5 - meta->w, value_y, ">", edge);
 		}
 	}
+#if CONFIG_P25_UI
+	if (p25) {
+		const char *help = ui_p25_quick_hint(ui_quick_kind(s->quick_focus, v));
+		gfx_text_fit(meta, help, width - 10, fit, sizeof fit);
+		gfx_text(meta, 5, bottom + 4, fit, ui_col.focus);
+		ui_p25_quick_context(label, sizeof label, false);
+		gfx_text_fit(meta, label, width - 10, fit, sizeof fit);
+		gfx_text(meta, 5, bottom + 18, fit, ui_col.dim);
+	}
+#endif
 	ui_draw_banner(s);
 	const char *hint = quick_split_hint(v, s, label, sizeof label);
 	if (s->toast || hint) {
 		ui_draw_hint(s->toast ? s->toast : hint, s->toast != NULL);
 	} else {
 		const char *keys = TR("0 All settings  Hold OK save");
-		gfx_hline(0, bottom + 2, width, CARD_EDGE);
+#if CONFIG_P25_UI
+		if (p25) keys = TR("OK choose  Back");
+#endif
+		gfx_hline(0, ui_layout.hint_y - 2, width, CARD_EDGE);
 		gfx_text_fit(meta, keys, width - 10, fit, sizeof fit);
-		gfx_text(meta, (width - gfx_text_width(meta, fit)) / 2, bottom + 7, fit, ui_col.dim);
+		gfx_text(meta, (width - gfx_text_width(meta, fit)) / 2, ui_layout.hint_y + 3, fit, ui_col.dim);
 	}
 }
 #endif
