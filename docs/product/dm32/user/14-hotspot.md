@@ -27,9 +27,20 @@ Browser CPS and PPP cannot own the same serial port at the same time.
 The [PPP specification](../../../spec/ppp.md) describes setup and the services carried over that link.
 USB-network instructions for CDC-NCM adapters, USB mode switching, and native-USB discovery do not apply to this radio.
 
+## Host audio
+
+USRP audio over UDP for bridges such as AllStarLink or DVSwitch is build-dependent. It uses an IP connection
+such as serial PPP, not a USB sound device. See the [host-audio specification](../../../spec/usb-audio.md)
+for configuration and limits.
+
 ## Advanced repeater modes
 
-Single-frequency repeater behavior and split duplex operation have additional configuration and hardware requirements.
+Standalone single-frequency repeater roles are implemented: a configured DMR channel can repeat from one TDMA
+slot to the other on the same frequency without a computer host. User roles are also available. This experimental
+path is separate from MMDVM SFR, where a host controls repeating. Review the codeplug role, inbound slot, and
+framing before use. End-to-end hardware reliability is not established merely by enabling the role.
+
+Split duplex operation has separate configuration and hardware requirements.
 They are not the same as a simplex hotspot. Consult the [SFR specification](../../../spec/sfr.md),
 [split-duplex specification](../../../spec/split-duplex.md), and
 [hardware verification record](../../../testing/dm32-bringup.md) before experimenting.

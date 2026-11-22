@@ -18,6 +18,7 @@ Use **Install** in the header for firmware and **CPS** for channels, contacts, a
 ## Use the firmware
 
 - [Channels, calls, and scanning](07-channels-zones-vfo.md): FM, DMR, VFO, zones, talkgroups, scan, and dual watch.
+- [P25 Phase 1](08-p25.md): conventional and trunked C4FM, listening controls, assigned groups, sites, and diagnostics.
 - [Messages](10-messages-and-signaling.md): conversations, replies, delivery results, call alert, and radio check.
 - [GPS, APRS, and data](13-aprs.md): position, beacons, ARS, and LRRP.
 - [Hotspot and host connections](14-hotspot.md): the programming cable, DMR modem mode, and serial networking.
@@ -29,12 +30,23 @@ Use **Install** in the header for firmware and **CPS** for channels, contacts, a
 The host connection uses the USB-to-serial **programming cable**. The radio does not provide a native USB data connection.
 USB network adapter mode and DFU/Zadig driver instructions do not apply to this release.
 Custom selections use this project's build service; the original upstream build service is not used.
+P25 Phase 2, encrypted P25 voice, and LSM/CQPSK are unsupported. P25 Scan and Dual Watch are unavailable.
 VOX is not available in the current board implementation. Air band AM and broadcast FM receive are included,
 but their on-air verification is not recorded in the feature matrix.
 
 Features present in a build are not all verified on air. The [bring-up record](../../../testing/dm32-bringup.md)
 records hardware checks and remaining work. The [shared specifications](../../../spec/README.md) remain in the
 source repository for contributors; they describe more hardware and configurations than this product guide.
+
+## Release and verification
+
+The Stable, Testing, and Development channels identify different release tracks; review the version before installing.
+[GitHub Releases](https://github.com/gjdothard/DM32Plus/releases) lists firmware assets and release notes.
+Use the matching website bundle and firmware when packaging CPS. A portable Windows CPS is a separate download
+when provided; the firmware image or command-line flasher is not that package.
+
+The screenshots in this guide come from the native UI simulator with synthetic data. They show implemented
+screens, not live reception or proof of hardware verification. Features can be absent from custom builds.
 
 ## Support
 

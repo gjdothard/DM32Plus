@@ -26,9 +26,10 @@ the firmware needs for its settings. Preparation is separate from ordinary codep
 |---|---|
 | Radio | DMR ID, radio name, boot text, and call hang times |
 | Encryption | Persistent AES key slots and the radio default on a compatible connected radio |
-| Channels | FM/DMR frequencies, power, tones, timeslot, color code, contacts, and channel options |
+| Channels | FM/DMR/P25 frequencies, power, mode parameters, contacts, talkgroup assignments, and permissions |
+| Systems | P25 trunked identities, control channels, named sites, and channel plans |
 | Zones | Channel collections and their order |
-| Contacts | Saved group and private-call destinations |
+| Contacts | Saved group and private-call destinations with DMR, P25, or combined protocol selection |
 | RX Group Lists | Additional talkgroups a DMR channel receives |
 | DTMF Contacts | Stored tone sequences |
 | APRS | Codeplug APRS configurations |
@@ -38,10 +39,21 @@ the firmware needs for its settings. Preparation is separate from ordinary codep
 The **Convert Operating Talkgroups** action derives shared operating talkgroups from channel contacts and receive groups.
 Review the conversion before accepting it. Shared talkgroups need firmware and editors that preserve this extension.
 
+## Contacts and channel talkgroups
+
+The contact **Protocol** field selects DMR, P25, or DMR and P25. Channel pickers show compatible entries.
+Names and IDs can differ between protocols, including contacts with the same numeric ID.
+In a channel's **Talkgroups** tab, use **Add** or **Create and assign**, then reorder or remove assignments.
+Editing a shared contact affects every channel using it; removing one assignment does not delete the contact.
+DMR assignments may override timeslot. P25 uses decimal group IDs from 1 to 65535 and ignores timeslot overrides;
+the first assignment is its initial TX target. Write the codeplug after editing.
+
 ## Files and drafts
 
 **New** starts a codeplug. **Open File** identifies supported images and imports. **Save** offers the supported file formats,
 including the codeplug image, CSV, and qdmr YAML. Review import warnings: formats can differ in capacity and supported fields.
+Direct radio programming with qdmr is unsupported on this product; use file interchange or the
+[migration reference](../../../user/19-moving-from-stock-dm32.md). P25 records require binary backups, as described below.
 
 CPS keeps a working draft in this browser. A restored-draft notice identifies it when you return. Download a file for a
 durable backup; a browser draft can disappear when browser storage is cleared. Use **Undo** and **Redo** while editing.
@@ -51,6 +63,15 @@ durable backup; a browser draft can disappear when browser storage is cleared. U
 AES key values are written through the live radio connection. They are excluded from codeplug exports, saved drafts,
 and ordinary reports. Keep your own secure record of keys you need to restore. Selecting a slot does not recover its secret value.
 Check the radio default and each channel's encryption assignment before writing.
+
+## Portable Windows CPS
+
+When a release offers a portable offline CPS ZIP, extract the entire package and run **Start CPS.cmd**.
+It starts the bundled site on loopback; no Python installation is needed. Use Chrome or Edge for serial programming.
+Core editing and programming work offline with the included resources. Online ID downloads, changed-feature
+firmware builds, and external links need internet access. Keep the same extracted package location and browser
+profile for drafts, and download durable backups. Download channels and separate packaging are described in
+[Install or update](02-installing.md#choose-firmware).
 
 ## Connection ownership and privacy
 
@@ -64,7 +85,9 @@ The editor offers **P25** and **P25 Trunking** channel modes for Phase 1.
 Conventional channels have RX/TX NAC and squelch fields. Use **Systems** to
 enter trunked-system identity, control channels, optional sites and channel
 plans. Select that system on each trunked channel. The current firmware
-supports eight systems. Phase 2 voice is not supported.
+supports eight systems. Optional site names have up to 16 printable Latin-1 characters; match the broadcast
+RFSS/site IDs and assign each control channel to its site group. Phase 2 voice is not supported.
+See [P25 operation](08-p25.md) after programming.
 
 **RX Only** remains the channel transmit permission. On a trunked channel it
 also prevents registration, affiliation and service requests. New trunked
@@ -85,8 +108,9 @@ Writing P25 requires firmware advertising managed staged programming in
 fast-protocol INFO. Older firmware is refused before a write; there is no
 legacy-write fallback. The radio stops active calls before the commit and
 reloads the resulting permissions before resuming. Keep radio identity also
-preserves the radio-wide P25 unit ID. This path is verified with synthetic
-flash and host simulations; radio interoperability remains untested.
+preserves the radio-wide P25 unit ID. Host tests check this path with synthetic flash and simulations. Consult the
+[bring-up record](../../../testing/dm32-bringup.md) for recorded hardware checks;
+a successful transfer does not establish live-system interoperability.
 
 If CPS reports that managed P25 transfers are unavailable after an update,
 disconnect and reconnect to refresh the capability check. The initial

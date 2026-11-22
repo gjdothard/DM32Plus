@@ -15,7 +15,8 @@ such as Chrome or Edge, and the DM-32UV programming cable. Close stock CPS, term
 The installer checks the image and its manifest before writing. Use DM32+ release files intended for this radio.
 The AMBE voice codec is not distributed in the release image. Follow the installer when it asks to preserve the
 codec from the radio or extract it from a supported stock firmware file. File processing runs on your computer.
-Without a usable codec, analog FM and DMR data can work, but DMR voice cannot.
+Without a usable AMBE codec, analog FM and DMR data can work, but DMR voice cannot.
+P25 Phase 1 uses the firmware's separate IMBE path; this AMBE requirement concerns DMR voice.
 
 ## Choose firmware
 
@@ -27,7 +28,12 @@ Without a usable codec, analog FM and DMR data can work, but DMR voice cannot.
 | Testing | A release candidate intended for testing |
 
 Online channels need an internet connection. A channel with no matching published image is unavailable.
-Semantic release tags use forms such as `v1.0.0`, `v1.0.0-dev.1`, and `v1.0.0-rc.1`.
+Stable v1.1.0 is published on [GitHub Releases](https://github.com/gjdothard/DM32Plus/releases/tag/v1.1.0).
+Semantic release tags use forms such as `v1.1.0`, `v1.1.0-dev.1`, and `v1.1.0-rc.1`.
+The configured [Stable CPS](https://cps.pplan.net/) and [Testing CPS](https://testing.cps.pplan.net/)
+are separate sites. Check the release channel and version shown before writing. A release asset does not
+by itself prove that a particular public site has updated. Portable Windows CPS packages are separate assets
+when offered; do not treat a firmware `.bin` or the command-line flasher `.exe` as the offline CPS.
 Choose **Full** to use the published product image. To change what is included, choose a preset or **Custom** and
 select the features before continuing. Dependencies follow your choices: turning off a feature also turns off its dependents.
 Programming and recovery remain enabled so CPS can still connect and update the radio.

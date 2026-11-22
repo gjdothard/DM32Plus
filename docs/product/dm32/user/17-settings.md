@@ -35,6 +35,14 @@ Assign side-key roles under **Keys** and check them after importing a codeplug. 
 channels, zones, or talk targets; the channel knob remains a channel control.
 See [Keys and menus](05-keys-and-navigation.md) for the current card-menu shortcuts.
 
+## Display and accessibility
+
+Use **Display** for text size, brightness, backlight behavior, theme/highlight color, and language.
+English is the fallback for a missing translation. Spanish and Italian catalogs exist; the languages available
+on the radio depend on the selected firmware build. A dimmed language requires a build that includes it.
+Sound feedback and key assignments can also help adapt operation. Preview the current screen and footer hints
+after changing text size or language. Site language and radio language are separate choices.
+
 ## Clock and messages
 
 Set **Location > UTC offset** in 15-minute steps. GPS or valid retained hardware time supplies the clock.

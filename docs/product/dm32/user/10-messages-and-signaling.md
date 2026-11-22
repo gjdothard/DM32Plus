@@ -16,12 +16,15 @@ Private-message replies address the sender; group-message replies address the ta
 <img src="../../../ux/screens/240x320i10x5/message_thread.png" width="220" alt="Incoming and outgoing conversation bubbles">
 <img src="../../../ux/screens/240x320i10x5/message_thread_older.png" width="220" alt="Older messages in a conversation">
 
-The current firmware includes persistent message history. Stored incoming and outgoing messages survive a restart;
+The current full build includes persistent message history when the archive is active. Stored incoming and outgoing messages survive a restart;
 outgoing entries include the send result. Times use GPS or valid hardware time and the saved UTC offset.
 Entries without a captured time show `--:--`. The archive stores message text in plaintext.
 
 A received-message banner can be opened with **#** while it is visible. Live inbox storage is separate from the archive
-and holds only the latest messages in memory. If history is unavailable, that inbox is cleared when power is removed.
+and holds only the latest four messages in memory. If history is unavailable or disabled in a custom build,
+that volatile inbox is cleared when power is removed. Unrecognized archive data is preserved instead of overwritten;
+archive refusal falls back to the live inbox. Save a report if history stops recording. Codeplug exports do not
+back up the message archive.
 
 ## Write and send
 

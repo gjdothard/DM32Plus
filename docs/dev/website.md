@@ -20,7 +20,9 @@ a codeplug ([Installing](../user/02-installing.md)); this page is for people who
 
 Product metadata selects a documentation source directory with `documentation`. Its `user/` pages are published at
 `/docs/user/`, retaining the public manual and installer-help URLs. The product guide describes the current release,
-card menus, and serial-cable workflows. The `/docs` index and chapter navigation list only those selected pages.
+card menus, serial-cable workflows, mode-specific operation, and recorded verification limits.
+Keep the overview, installer help, chapter links, homepage copy, and screenshot captions consistent when refreshing it.
+Use native simulator images with synthetic data; their presence does not establish hardware verification. The `/docs` index and chapter navigation list only those selected pages.
 Shared engineering specifications, historical test notes, and other radio ports remain in the source repository.
 Links from the guide to those references open the corresponding file in this project's repository.
 They are not published as additional chapters in the product manual.
@@ -140,9 +142,9 @@ Nothing on the site is copied by hand. Each page reads its source at build time:
 | Feature names, help, dependencies | `config/features.mk` (the comment above each switch, the `needs` checks) |
 | Feature groups, titles, flash cost, notes | The tables in [feature-matrix.md](../feature-matrix.md) |
 | Variants and why each leaves a feature out | `config/variants/<id>.mk` ([build-config.md](../build-config.md)) |
-| Screenshots | `docs/ux/screens/<gallery>/` (`make -C tests/host ui-gallery`), six per radio page in two rows of three: the first of `featured` in `site/data/screens.json` the radio has. The Screenshots page (`/screenshots/`) shows every screen each radio's build has, a section per board, under the `groups` headings of `screens.json`, in its order. The home page's carousel lists its screens in `site/templates/home.html`, from every gallery, one height. Every page shows the scaled copies ([Screenshot copies](#screenshot-copies)) |
+| Screenshots | `docs/ux/screens/<gallery>/` (`make -C tests/host ui-gallery`), six per radio page in two rows of three: the first of `featured` in `site/data/screens.json` the radio has. The Screenshots page (`/screenshots/`) shows every screen each radio's build has, a section per board, under the `groups` headings of `screens.json`, in its order. The product home page's carousel selects native simulator screens in `site/templates/home.html`, including P25 and conversations, at one height. Every page shows the scaled copies ([Screenshot copies](#screenshot-copies)) |
 | Flash layout, codec profiles, stock files, key hashes | The board registry (`tools/rfoundry/rfoundry/registry.json`, read through `boards.py`) and `stockfw.py`, exported to `data/flash-boards.json` |
-| Documentation | Every Markdown file under `docs/` |
+| Documentation | The selected product's `documentation` directory; all of `docs/` only in shared builds without a product |
 | Firmware images | Release manifests and images (`--firmware`; the workflow downloads the newest release) |
 
 The build fails when a source doesn't parse, and warns (an error with `--strict`) when a feature has no row in the
@@ -293,7 +295,9 @@ language's tree. Links between pages use `{{home}}` (templates) or `HOME` (`flas
 visitor's language. With one language there is no switcher and no alternate links.
 
 A translated documentation page goes in `docs/i18n/<code>/<path under docs>`. Pages without one are shown in
-English with a notice, the text marked `lang="en"`.
+English with a notice, the text marked `lang="en"`. Product translations retain the source path below `docs/`,
+so a product chapter uses `docs/i18n/<code>/product/<product-id>/user/<chapter>.md`.
+Catalog translations cover navigation and tool text separately; changing a catalog does not translate guide prose.
 
 ### Plurals, numbers and dates
 
