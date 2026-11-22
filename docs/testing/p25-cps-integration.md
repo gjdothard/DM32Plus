@@ -33,8 +33,8 @@ name lookup by protocol. Contact edits in CPS refresh the binding; a contact
 renamed or given a new ID on the radio needs its scope restored in CPS if it
 has no current protocol-specific assignments from which to infer it.
 
-Paired firmware must load shared P25 assignments. Its P25 listening menu opens
-the shared talkgroup picker. Selection changes both receive hold and transmit
+Paired firmware must load shared P25 assignments. Its P25 Quick Actions page opens
+the shared talkgroup picker through **4 Talk to**. Selection changes both receive hold and transmit
 target while preserving Receive Only and system listen-only permissions.
 Recent-call Hold and favorites remain receive-only. Host tests cover editor
 visibility, ordered assignment round trips and invalid P25 group rejection.

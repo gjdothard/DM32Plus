@@ -289,7 +289,7 @@ static void __attribute__((noinline)) home_card(const radio_view_t *v, const ui_
 	// Keep the call snapshot off the shared status bar's deepest stack path.
 	ui_draw_card_begin(s, NULL);
 	home_card_body(v, s);
-	ui_draw_card_footer(s, TR("* P25"), TR("# Recent"));
+	ui_draw_card_footer(s, TR("* Quick"), TR("# Recent"));
 	if (s->toast || s->locked || v->state == RS_TX_DENIED) ui_draw_bottom(s, TR("OK Menu  # Recent"));
 }
 #endif
@@ -302,52 +302,145 @@ void ui_p25_home(const radio_view_t *v, const ui_state_t *s)
 	home_standard(v, s);
 }
 
-static void command(const p25_monitor_t *m, uint8_t op, uint16_t tg)
+static bool command(const p25_monitor_t *m, uint8_t op, uint16_t tg)
 {
-	if (!ui_svc_p25_command(m->channel, op, tg)) ui_toast(TR("P25 request unavailable"));
+	bool ok = ui_svc_p25_command(m->channel, op, tg);
+	if (!ok) ui_toast(TR("P25 request unavailable"));
 	ui_dirty();
+	return ok;
 }
 
-static uint16_t listen_count(void) {
-#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
-	return 8;
-#else
-	return 7;
-#endif
+static uint16_t last_group(const p25_monitor_t *m)
+{
+	for (unsigned i = 0; i < m->recent_count; i++)
+		if (m->recent[i].tg && !(m->recent[i].flags & P25_MON_UNIT)) return m->recent[i].tg;
+	return 0;
 }
+
+const char *ui_p25_quick_hint(uint8_t kind)
+{
+	switch (kind) {
+	case QT_P25_LISTEN: return TR(TEXT_ALT_OPEN "Listen: receive filter only" TEXT_ALT_NEXT "Listen: RX only" TEXT_ALT_CLOSE);
+	case QT_P25_HOLD: {
+		p25_monitor_t m;
+		return snapshot(&m) && m.listen == P25_LISTEN_HOLD ?
+			TR(TEXT_ALT_OPEN "Hold: RX only; OK release" TEXT_ALT_NEXT "OK release: RX" TEXT_ALT_CLOSE) : TR(TEXT_ALT_OPEN "Hold: RX only; OK last group" TEXT_ALT_NEXT "OK hold: RX only" TEXT_ALT_CLOSE);
+	}
+	case QT_P25_TALK: return TR(TEXT_ALT_OPEN "Talk to: receive + TX group" TEXT_ALT_NEXT "Group: RX + TX" TEXT_ALT_CLOSE);
+	case QT_P25_RECENT: return TR(TEXT_ALT_OPEN "OK hold  # favorite: RX only" TEXT_ALT_NEXT "OK hold: RX only" TEXT_ALT_CLOSE);
+	case QT_P25_FAVORITES: return TR(TEXT_ALT_OPEN "Saved receive groups" TEXT_ALT_NEXT "RX favorites" TEXT_ALT_CLOSE);
+	case QT_P25_SYSTEM: return TR(TEXT_ALT_OPEN "System identity and signal" TEXT_ALT_NEXT "System status" TEXT_ALT_CLOSE);
+	case QT_P25_DETAILS: return TR(TEXT_ALT_OPEN "Decode counters and last skip" TEXT_ALT_NEXT "Decode details" TEXT_ALT_CLOSE);
+	default: return TR("OK choose  Back");
+	}
+}
+
+void ui_p25_quick_context(char *text, size_t cap, bool permission)
+{
+	p25_monitor_t m;
+	if (!snapshot(&m)) { str_copy(text, cap, TR("P25 unavailable")); return; }
+	if (permission) {
+		str_copy(text, cap, (m.flags & P25_MON_RX_ONLY) || ui_view()->ch.rx_only ?
+			TR("RX only: transmit disabled") : TR("Channel TX permissions apply"));
+	} else {
+		sbuf_t b;
+		sb_init(&b, text, cap); sb_str(&b, TR("TX target")); sb_chr(&b, ' ');
+		char target[24];
+		tx_text(target, sizeof target, &m); sb_str(&b, target);
+	}
+}
+
+bool ui_p25_quick_tile(uint8_t kind, char *label, size_t label_len, char *value, size_t value_len)
+{
+	const char *name = kind == QT_POWER ? TR(TEXT_ALT_OPEN "Power" TEXT_ALT_NEXT "Pwr" TEXT_ALT_CLOSE) : kind == QT_P25_LISTEN ? TR(TEXT_ALT_OPEN "Listen" TEXT_ALT_NEXT "RX" TEXT_ALT_CLOSE) :
+		kind == QT_P25_HOLD ? TR(TEXT_ALT_OPEN "Hold" TEXT_ALT_NEXT "Hld" TEXT_ALT_CLOSE) : kind == QT_P25_TALK ? TR(TEXT_ALT_OPEN "Talk to" TEXT_ALT_NEXT "Talk" TEXT_ALT_CLOSE) :
+		kind == QT_P25_RECENT ? TR(TEXT_ALT_OPEN "Recent" TEXT_ALT_NEXT "Calls" TEXT_ALT_CLOSE) : kind == QT_P25_FAVORITES ? TR(TEXT_ALT_OPEN "Favorites" TEXT_ALT_NEXT "Favs" TEXT_ALT_CLOSE) :
+		kind == QT_P25_SYSTEM ? TR(TEXT_ALT_OPEN "System" TEXT_ALT_NEXT "Sys" TEXT_ALT_CLOSE) : TR(TEXT_ALT_OPEN "Details" TEXT_ALT_NEXT "Info" TEXT_ALT_CLOSE);
+	str_copy(label, label_len, name);
+	p25_monitor_t m;
+	if (!snapshot(&m)) { str_copy(value, value_len, TR(TEXT_ALT_OPEN "Unavailable" TEXT_ALT_NEXT "--" TEXT_ALT_CLOSE)); return false; }
+	bool trunk = (m.flags & P25_MON_TRUNK) != 0;
+	if (!trunk && (kind == QT_P25_LISTEN || kind == QT_P25_HOLD || kind == QT_P25_FAVORITES)) {
+		str_copy(value, value_len, TR(TEXT_ALT_OPEN "Trunked only" TEXT_ALT_NEXT "Trunk" TEXT_ALT_CLOSE)); return false;
+	}
+	sbuf_t b;
+	sb_init(&b, value, value_len);
+	switch (kind) {
+	case QT_POWER:
+		if ((m.flags & P25_MON_RX_ONLY) || ui_view()->ch.rx_only) { sb_str(&b, TR("RX only")); return false; }
+		sb_str(&b, ui_power_name(ui_view()->power)); return true;
+	case QT_P25_LISTEN:
+		sb_str(&b, m.listen == P25_LISTEN_HOLD ? TR(TEXT_ALT_OPEN "Hold active" TEXT_ALT_NEXT "Hold" TEXT_ALT_CLOSE) : m.listen == P25_LISTEN_ALL ? TR(TEXT_ALT_OPEN "All groups" TEXT_ALT_NEXT "All" TEXT_ALT_CLOSE) :
+			m.listen == P25_LISTEN_FAVORITES ? TR(TEXT_ALT_OPEN "Favorites only" TEXT_ALT_NEXT "Favs" TEXT_ALT_CLOSE) : TR(TEXT_ALT_OPEN "Programmed" TEXT_ALT_NEXT "Prog" TEXT_ALT_CLOSE)); return true;
+	case QT_P25_HOLD:
+		if (m.listen == P25_LISTEN_HOLD) group_text(value, value_len, m.held_tg);
+		else sb_str(&b, last_group(&m) ? TR("Off") : TR(TEXT_ALT_OPEN "No calls" TEXT_ALT_NEXT "None" TEXT_ALT_CLOSE));
+		return m.listen == P25_LISTEN_HOLD || last_group(&m) != 0;
+	case QT_P25_TALK:
+		tx_text(value, value_len, &m);
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+		return true;
+#else
+		return false;
+#endif
+	case QT_P25_RECENT: sb_u32(&b, m.recent_count, 1); return true;
+	case QT_P25_FAVORITES: sb_u32(&b, m.favorite_count, 1); return true;
+	case QT_P25_SYSTEM: sb_str(&b, TR("Status")); return true;
+	default: sb_str(&b, TR("Decode")); return true;
+	}
+}
+
+bool ui_p25_quick_activate(uint8_t kind)
+{
+	if (kind == QT_BRIGHTNESS) return false;
+	p25_monitor_t m;
+	if (!snapshot(&m)) { ui_toast(TR("P25 request unavailable")); return true; }
+	if (kind == QT_POWER) {
+		if (!(m.flags & P25_MON_RX_ONLY) && !ui_view()->ch.rx_only) return false;
+		ui_toast(TR("RX only: transmit disabled")); return true;
+	}
+	if (kind == QT_P25_TALK) {
+#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
+		ui_push(SCR_P25_TALKGROUPS, 1);
+#else
+		ui_toast(TR("Not in this build"));
+#endif
+		return true;
+	}
+	if (kind == QT_P25_RECENT) { ui_push(SCR_P25_RECENT, 0); return true; }
+	if (kind == QT_P25_SYSTEM || kind == QT_P25_DETAILS) {
+		ui_push(SCR_P25_SYSTEM, kind == QT_P25_DETAILS); return true;
+	}
+	if (!(m.flags & P25_MON_TRUNK)) { ui_toast(TR("Select a P25 trunked channel")); return true; }
+	if (kind == QT_P25_FAVORITES) { ui_push(SCR_P25_RECENT, 1); return true; }
+	if (kind == QT_P25_LISTEN) { ui_push(SCR_P25_LISTEN, 0); return true; }
+	if (kind == QT_P25_HOLD) {
+		uint16_t tg = last_group(&m);
+		if (m.listen != P25_LISTEN_HOLD && !tg) ui_toast(TR("No group call to hold"));
+		else command(&m, m.listen == P25_LISTEN_HOLD ? P25_MON_PROGRAMMED : P25_MON_HOLD,
+			m.listen == P25_LISTEN_HOLD ? 0 : tg);
+	}
+	return true;
+}
+
+static uint16_t listen_count(void) { return 3; }
 static void listen_item(uint16_t i, ui_item_t *it)
 {
-	static const char *const labels[] = { TRN("Recent calls"), TRN("All talkgroups"), TRN("Favorites only"),
-		TRN("Hold last talkgroup"), TRN("Programmed groups"), TRN("System details"), TRN("Favorite list"), TRN("Talkgroups") };
+	static const char *const labels[] = { TRN("Programmed groups"), TRN("All talkgroups"), TRN("Favorites only") };
 	p25_monitor_t m;
-	bool ok = snapshot(&m);
+	bool ok = snapshot(&m) && (m.flags & P25_MON_TRUNK);
 	item_num_set(it, i + 1);
 	str_copy(it->label, sizeof it->label, tr(labels[i]));
-	if (!ok || (i > 0 && i < 5 && !(m.flags & P25_MON_TRUNK))) it->flags |= UI_ITEM_DIM;
-	if (i == 1 && m.listen == P25_LISTEN_ALL) str_copy(it->value, sizeof it->value, TR("On"));
-	if (i == 2 && m.listen == P25_LISTEN_FAVORITES) str_copy(it->value, sizeof it->value, TR("On"));
-	if (i == 3 && m.listen == P25_LISTEN_HOLD) group_text(it->value, sizeof it->value, m.held_tg);
+	if (!ok || (i == 2 && !m.favorite_count)) it->flags |= UI_ITEM_DIM;
+	if (ok && m.listen == i) str_copy(it->value, sizeof it->value, TR("On"));
 }
 static void listen_select(uint16_t i, bool hold)
 {
 	(void)hold;
 	p25_monitor_t m;
-	if (i == 7) {
-#if CONFIG_DMR && CONFIG_DMR_TALKGROUP_ENTRIES
-		ui_push(SCR_P25_TALKGROUPS, 1);
-#else
-		ui_toast(TR("P25 request unavailable"));
-#endif
-		return;
-	}
-	if (i == 0 || i == 6) { ui_push(SCR_P25_RECENT, i == 6); return; }
-	if (i == 5) { ui_push(SCR_P25_SYSTEM, 0); return; }
 	if (!snapshot(&m) || !(m.flags & P25_MON_TRUNK)) { ui_toast(TR("Select a P25 trunked channel")); return; }
 	if (i == 2 && !m.favorite_count) { ui_toast(TR("Add a recent talkgroup first")); return; }
-	if (i == 3 && (!m.recent_count || !m.recent[0].tg)) { ui_toast(TR("No group call to hold")); return; }
-	command(&m, i == 1 ? P25_MON_ALL : i == 2 ? P25_MON_FAVORITES : i == 3 ? P25_MON_HOLD : P25_MON_PROGRAMMED,
-		i == 3 ? m.recent[0].tg : 0);
-	if (i == 3) ui_go_home();
+	if (command(&m, i == 0 ? P25_MON_PROGRAMMED : i == 1 ? P25_MON_ALL : P25_MON_FAVORITES, 0)) ui_pop();
 }
 
 static uint16_t recent_count(void)
@@ -381,8 +474,7 @@ static void recent_select(uint16_t i, bool hold)
 	if (!snapshot(&m) || i >= (ui_frame()->arg ? m.favorite_count : m.recent_count)) return;
 	uint16_t tg = ui_frame()->arg ? m.favorites[i] : m.recent[i].tg;
 	if (!(m.flags & P25_MON_TRUNK) || !tg) { ui_toast(TR("No group call to hold")); return; }
-	command(&m, P25_MON_HOLD, tg);
-	ui_go_home();
+	if (command(&m, P25_MON_HOLD, tg)) ui_go_home();
 }
 static void recent_context(uint16_t i)
 {
@@ -505,7 +597,8 @@ static void system_context(uint16_t i)
 }
 
 const ui_scr_def_t ui_p25_listen_screen = {
-	.name = "p25-listen", .flags = SF_LIST | SF_NUMBERED | SF_FIELD, .prefix = TRN("P25 listening"),
+	.name = "p25-listen", .flags = SF_LIST | SF_NUMBERED | SF_FIELD, .prefix = TRN("Listen: receive only"),
+	.hint = TRN("TX target unchanged"),
 	.count = listen_count, .item = listen_item, .select = listen_select,
 };
 const ui_scr_def_t ui_p25_recent_screen = {

@@ -950,19 +950,22 @@
   "p25_favorites": {
    "group": "channels",
    "needs": [
-    "P25_UI"
+    "P25_UI",
+    "P25_TRUNK"
    ]
   },
   "p25_hold": {
    "group": "channels",
    "needs": [
-    "P25_UI"
+    "P25_UI",
+    "P25_TRUNK"
    ]
   },
   "p25_listen": {
    "group": "channels",
    "needs": [
-    "P25_UI"
+    "P25_UI",
+    "P25_TRUNK"
    ]
   },
   "p25_recent": {
@@ -986,7 +989,8 @@
   "p25_talkgroups": {
    "group": "channels",
    "needs": [
-    "P25_UI"
+    "P25_UI",
+    "DMR_TALKGROUP_ENTRIES"
    ]
   },
   "home_p25_control": {
@@ -1025,6 +1029,33 @@
    "needs": [
     "DUAL_WATCH",
     "VFO"
+   ]
+  },
+  "p25_quick": {
+   "group": "channels",
+   "needs": [
+    "P25_UI",
+    "P25_TRUNK"
+   ]
+  },
+  "p25_quick_conventional": {
+   "group": "channels",
+   "needs": [
+    "P25_UI"
+   ]
+  },
+  "p25_quick_empty": {
+   "group": "channels",
+   "needs": [
+    "P25_UI",
+    "P25_TRUNK"
+   ]
+  },
+  "p25_quick_tx": {
+   "group": "channels",
+   "needs": [
+    "P25_UI",
+    "P25_TRUNK"
    ]
   }
  },

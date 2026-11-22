@@ -148,7 +148,7 @@ scrolling, numbered shortcuts (`SF_NUMBERED`), T9 filtering (`SF_FILTER`), and t
 | Screen | Name | Reached by |
 |---|---|---|
 | Home | `home` | start, long BACK from anywhere |
-| Quick settings | `quick` | QUICK (`*`), or long SELECT on a radio without a QUICK key |
+| Quick settings / P25 Quick Actions | `quick` | QUICK (`*`), or long SELECT on a radio without a QUICK key; P25 actions and capability states are specified in [P25 UI](p25-ui.md#quick-actions) |
 | Hub | `hub` | SELECT on Home: 1 Contacts, 2 Messages, 3 Recent, 4 Zones, 5 Channels, 6 Tools, 7 Settings (0 Last caller on a radio without CONTEXT) |
 | Find | `find` | a digit on Home |
 | Actions | `actions` | CONTEXT (`#`) on a person, a talkgroup, the last caller, a message |

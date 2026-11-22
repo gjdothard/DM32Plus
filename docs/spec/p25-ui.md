@@ -56,6 +56,44 @@ configured, Home names that target; while transmitting, the call card shows
 the transmit destination rather than the last received group. A receive Hold
 never silently changes the transmit destination.
 
+## Quick Actions
+
+P25 uses the shared Quick grid, numbered shortcuts, focus navigation and
+brightness editor. Positions stay fixed across channel types and display sizes.
+Small displays use the shared numbered list. Quick on Home and the few-key
+long-OK fallback open `quick`. Back returns to the previous screen; Context
+on Home still opens Recent. Long OK retains the shared channel-save behavior.
+
+| Key | Action | Effect |
+|---|---|---|
+| 1 | Power | Shared power cycle; unavailable on an RX-only channel or system |
+| 2 | Listen | Explicit `p25-listen` picker: Programmed groups, All talkgroups, Favorites only |
+| 3 | Hold | Hold the newest eligible received group; when active, release to Programmed groups |
+| 4 | Talk to | Assigned operating group: changes receive selection and TX target together |
+| 5 | Recent | Existing received-call list; OK holds, Context adds/removes a favorite |
+| 6 | Favorites | Existing persistent system favorites and management |
+| 7 | System | Status, site, identity, permissions and signal |
+| 8 | Details | Existing decoding detail view: tuned frequency, counters and last skip |
+| 9 | Bright | Shared brightness editor |
+
+Listen and Hold change reception only. Neither changes the TX target. An
+active Hold appears in both tiles. A private call is never eligible for Hold;
+the action finds the newest eligible group in the bounded history. No eligible
+group gives an explicit refusal. Favorites only requires a saved favorite.
+Picker Back leaves the filter unchanged. Successful selection returns to Quick.
+
+The focused-action help distinguishes receive filters and holds from the combined
+receive/TX operating group. Tall card screens show TX target and channel TX
+permission separately. A receive Hold does not imply an RX-only channel.
+
+Trunked RX-only channels retain Listen, Hold and favorites. Conventional channels
+dim those actions with a trunked-channel reason, independently of TX permission.
+Conventional assigned-group selection, Recent and diagnostics remain available.
+An empty favorite list can still be opened. Positions never become Scan or Dual
+Watch. An unavailable owner dims owner-dependent actions and refuses requests;
+brightness remains available. The existing owner/service layer retains channel
+binding, TX-time refusals, settings invalidation and persistence.
+
 ## Persistent favorites
 
 Four favorites are stored per trunked system under key `0x1E00 + system`.
@@ -80,7 +118,7 @@ Tall color screens use the same card status bar, surfaces, fonts and footer
 helpers as the existing Home and menus. The P25 call card separates the group
 ID, name and source; recent entries use two rows. A host pixel check verifies
 that P25 Home actually uses the card surface. Small and monochrome displays
-retain the standard layout. Context opens Recent; Quick opens listening.
+retain the standard layout. Context opens Recent; Quick opens the shared `quick` screen with P25 actions.
 
 Trunked card Home centers reception and signal icons between P25 TRUNK and
 RX only. Linked squares mean acquired control, a speaker means a voice grant
@@ -127,7 +165,7 @@ The current count/index reuse the shared published radio view; the UI does not
 read the decoder loan. The selected idle group and name use the shared Home
 card and standard layouts. No configured groups means ordinary channel stepping.
 
-The listening menu also opens the existing operating-talkgroup picker. P25
+Quick action 4 opens the existing operating-talkgroup picker. P25
 uses the shared channel assignments, names and ordering; timeslot labels are
 omitted. The channel name appears above the assignments, separately from the
 page title. Recent and favorite selections use inverse text on monochrome

@@ -56,8 +56,10 @@ def test_p25_dual_watch_refused(radio):
 @pytest.mark.feature("p25_ui")
 def test_p25_talkgroup_knob(radio):
     initial = radio.link.view(["core", "p25", "link"])
-    if initial.get("mode") != "p25" or not int(initial.get("p25.flags", "0")) & 16:
-        skip("state", "select an effectively receive-only P25 channel for the knob check")
+    # Restoring the original receive filter uses the trunk-only Listen picker.
+    flags = int(initial.get("p25.flags", "0"))
+    if initial.get("mode") != "p25" or flags & 18 != 18:
+        skip("state", "select an effectively receive-only P25 trunked channel for the knob check")
     count = int(initial.get("p25.groups", "0"))
     if count < 2 or initial.get("p25.listen") not in ("0", "1"):
         skip("state", "configure at least two groups and use Programmed or All listening")
@@ -87,8 +89,11 @@ def test_p25_talkgroup_knob(radio):
                            sections=("p25",), what="original P25 target")
         radio.link.key_hold("quick", 250)
         radio.link.wait_keys_idle()
-        radio.wait_for(lambda v: v.get("ui.screen") == "p25-listen", sections=("link",), what="P25 controls")
-        radio.link.key_hold("5" if initial["p25.listen"] == "0" else "2", 250)
+        radio.wait_for(lambda v: v.get("ui.screen") == "quick", sections=("link",), what="P25 Quick Actions")
+        radio.link.key_hold("2", 250)
+        radio.link.wait_keys_idle()
+        radio.wait_for(lambda v: v.get("ui.screen") == "p25-listen", sections=("link",), what="P25 Listen picker")
+        radio.link.key_hold("1" if initial["p25.listen"] == "0" else "2", 250)
         radio.link.wait_keys_idle()
         radio.wait_for(lambda v: v.get("p25.listen") == initial["p25.listen"],
                        sections=("p25",), what="original P25 listening mode")
@@ -115,14 +120,23 @@ def test_p25_monitor_pages(radio):
     try:
         radio.go_home()
         press("quick")
-        screen("p25-listen")
+        screen("quick")
         if "DMR_TALKGROUP_POOL" in radio.link.version().get("features", "").split(","):
-            press("8")
+            press("4")
             screen("p25-talkgroups")
             radio.go_home()
             press("quick")
+            screen("quick")
+        if int(radio.link.view(["p25"]).get("p25.flags", "0")) & 2:
+            press("2")
             screen("p25-listen")
-        press("6")
+            press("back")
+            screen("quick")
+            press("6")
+            screen("p25-recent")
+            press("back")
+            screen("quick")
+        press("7")
         screen("p25-system")
         press("context")
         radio.wait_for(lambda v: v.get("ui.count") == "4", sections=("link",), what="P25 decode details")
@@ -131,8 +145,8 @@ def test_p25_monitor_pages(radio):
         screen("p25-recent")
         radio.go_home()
         press("quick")
-        screen("p25-listen")
-        press("7")
+        screen("quick")
+        press("5")
         screen("p25-recent")
     finally:
         radio.go_home()

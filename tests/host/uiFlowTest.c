@@ -14,6 +14,7 @@
 #include "sim/ui_sim.h"
 #include "ui/ui_app.h"
 #include "ui/ui_screens.h"
+#include "ui/ui_nav.h"
 #include "config.h"
 
 static int fails, flows_run;
@@ -44,22 +45,44 @@ static const flow_t flows[] = {
 	  "screen=home shows=Site_mismatch hides=North_Tower tx=0", 0, false },
 	{ "P25 reload clears the stale site", "p25-trunk-home p25-site:voice", "p25-site:reload",
 	  "screen=home shows=Site_unavailable hides=North_Tower tx=0", 1, false },
-	{ "P25 details retain the complete site name", "p25-trunk-home p25-site:long", "quick 6 down",
+	{ "P25 details retain the complete site name", "p25-trunk-home p25-site:long", "quick 7 down",
 	  "screen=p25-system shows=North_Tower_West tx=0", 3, false },
-	{ "P25 Quick opens protocol controls", "p25-trunk-home", "quick", "screen=p25-listen", 1, false },
+	{ "P25 Quick opens protocol controls", "p25-trunk-home", "quick", "screen=quick", 1, false },
 	{ "P25 Quick returns to recent", "p25-trunk-home ctx", "quick back", "screen=p25-recent", 2, false },
-	{ "P25 recent calls opens", "p25-trunk-home quick", "ok", "screen=p25-recent", 1, false },
-	{ "P25 system details opens", "p25-trunk-home quick", "6", "screen=p25-system shows=Status", 1, false },
-	{ "P25 assigned talkgroups opens the shared picker", "p25-trunk-home quick", "8", "screen=p25-talkgroups shows=Charleston_NSA", 1, false },
-	{ "P25 assigned group changes target without transmitting", "p25-trunk-home quick 8", "down ok",
+	{ "P25 recent calls opens", "p25-trunk-home quick", "5", "screen=p25-recent", 1, false },
+	{ "P25 system details opens", "p25-trunk-home quick", "7", "screen=p25-system shows=Status", 1, false },
+	{ "P25 assigned talkgroups opens the shared picker", "p25-trunk-home quick", "4", "screen=p25-talkgroups shows=Charleston_NSA", 1, false },
+	{ "P25 assigned group changes target without transmitting", "p25-trunk-home quick 4", "down ok",
 	  "screen=home p25hold=2456 p25target=2456 tx=0", 2, false },
-	{ "P25 system decode details opens", "p25-trunk-home quick 6", "ctx", "screen=p25-system", 1, false },
+	{ "P25 system decode details opens", "p25-trunk-home quick 7", "ctx", "screen=p25-system", 1, false },
 	{ "P25 receive hold returns home", "p25-trunk-home ctx", "ok", "screen=home p25hold=1234 p25listen=3 tx=0", 1, false },
-	{ "P25 favorites do not write during browsing", "p25-trunk-home quick", "7", "screen=p25-recent", 1, false },
-	{ "P25 favorite selection is receive only", "p25-trunk-home quick ok", "ctx back 3",
-	  "screen=p25-listen p25favorites=1 p25listen=2 tx=0", 3, true },
-	{ "P25 resume all releases the hold", "p25-trunk-home quick 4 quick", "2",
-	  "screen=p25-listen p25hold=0 p25listen=1 tx=0", 1, false },
+	{ "P25 favorites do not write during browsing", "p25-trunk-home quick", "6", "screen=p25-recent", 1, false },
+	{ "P25 favorite selection is receive only", "p25-trunk-home quick 5", "ctx back 2 3",
+	  "screen=quick p25favorites=1 p25listen=2 p25target=1234 tx=0", 4, true },
+	{ "P25 resume all releases the hold", "p25-trunk-home quick 3", "2 2",
+	  "screen=quick p25hold=0 p25listen=1 p25target=1234 tx=0", 2, false },
+	{ "P25 Listen picker opens explicitly", "p25-trunk-home quick", "2", "screen=p25-listen p25listen=1 tx=0", 1, false },
+	{ "P25 picker Back does not apply", "p25-trunk-home quick 2", "back", "screen=quick p25listen=1 tx=0", 1, false },
+	{ "P25 Programmed restores receive filter only", "p25-trunk-home quick 3 2", "1", "screen=quick p25listen=0 p25hold=0 p25target=1234 tx=0", 1, false },
+	{ "P25 Hold releases without changing TX", "p25-trunk-home quick 3", "3", "screen=quick p25listen=0 p25hold=0 p25target=1234 tx=0", 1, false },
+	{ "P25 receive hold uses the newest eligible group", "p25-trunk-home p25-case:private quick", "3", "screen=quick p25hold=2456 p25target=1234 tx=0", 1, false },
+	{ "P25 Hold empty explains refusal", "p25-trunk-home p25-case:empty quick", "3", "screen=quick toast=No_group_call_to_hold p25hold=0 tx=0", 1, false },
+	{ "P25 empty favorites remain reachable", "p25-trunk-home quick", "6", "screen=p25-recent shows=No_calls_or_favorites tx=0", 1, false },
+	{ "P25 empty favorites filter explains refusal", "p25-trunk-home quick 2", "3", "screen=p25-listen toast=Add_a_recent_talkgroup_first p25listen=1 tx=0", 1, false },
+	{ "P25 conventional Listen explains channel type", "p25-home quick", "2", "screen=quick toast=Select_a_P25_trunked_channel tx=0", 1, false },
+	{ "P25 conventional Hold explains channel type", "p25-home quick", "3", "screen=quick toast=Select_a_P25_trunked_channel tx=0", 1, false },
+	{ "P25 conventional assigned group still works", "p25-home quick 4", "down ok", "screen=home p25hold=2456 p25target=2456 tx=0", 2, false },
+	{ "P25 RX-only power explains permission", "p25-trunk-home quick", "1", "screen=quick toast=RX_only:_transmit_disabled tx=0", 1, false },
+	{ "P25 stale monitor cannot apply Hold", "p25-trunk-home quick p25-case:stale", "3", "screen=quick toast=P25_request_unavailable p25hold=0 tx=0", 1, false },
+	{ "P25 closed owner cannot apply filter", "p25-trunk-home quick 2 p25-case:closed", "1", "screen=p25-listen p25listen=1 tx=0", 1, false },
+	{ "P25 TX-time Hold is refused", "p25-trunk-home quick p25-case:tx", "3", "screen=quick toast=P25_request_unavailable p25hold=0 p25target=1234", 1, false },
+	{ "P25 TX-time filter is refused", "p25-trunk-home quick 2 p25-case:tx", "1", "screen=p25-listen toast=P25_request_unavailable p25listen=1 p25target=1234", 1, false },
+	{ "P25 TX-time operating group is refused", "p25-trunk-home quick 4 p25-case:tx", "down ok", "p25hold=0 p25target=1234", 2, false },
+
+	{ "P25 Details has its own shortcut", "p25-trunk-home quick", "8", "screen=p25-system shows=Valid_blocks tx=0", 1, false },
+	{ "P25 arrows share Quick focus", "p25-trunk-home quick", "down ok", "screen=p25-listen tx=0", 2, false },
+	{ "P25 Brightness uses the shared editor", "p25-trunk-home quick", "9 7 back", "screen=home tx=0", 3, false },
+
 #endif
 	{ "1 next channel", "", "up", "pos=4", 1, false },
 	{ "1 channel 12 by number", "", "1 2 ok", "pos=12 screen=home", 3, false },
@@ -1248,11 +1271,86 @@ static void crawl(const sim_geom_t *g, sim_map_t map, const char *mapname)
 }
 
 #if CONFIG_P25_UI
+static unsigned p25_cuts;
+static char p25_cut_text[256];
+static void p25_fit(const char *src, const char *out)
+{
+	size_t n = strlen(out);
+	if (n && (unsigned char)out[n - 1] != 0x80) {
+		p25_cuts++;
+		size_t used = strlen(p25_cut_text);
+		snprintf(p25_cut_text + used, sizeof p25_cut_text - used, " [%s]", src);
+	}
+}
+
+static void check_p25_quick_layout(void)
+{
+	unsigned checked = 0;
+	for (int g = 0; g < sim_geom_count; g++) for (uint8_t language = 0; language < lang_count(); language++) {
+		if (!lang_built(language)) continue;
+		for (unsigned state = 0; state < 5; state++) for (int large = 0; large < 2; large++) {
+			char err[300], issues[SIM_LAYOUT_MAX][160];
+			sim_reset(&sim_geoms[g], SIM_MAP_K);
+			const char *setup = state == 0 ? "branded-home p25-trunk-home quick" :
+				state == 1 ? "branded-home p25-home p25-case:tx-capable quick" :
+				state == 2 ? "branded-home p25-trunk-home quick 3" : state == 3 ?
+				"branded-home p25-trunk-home p25-case:empty quick" : "branded-home p25-trunk-home p25-case:closed quick";
+			if (!sim_run(setup, err, sizeof err)) { printf("FAIL P25 layout setup: %s\n", err); fails++; continue; }
+			lang_set(language);
+			ui_apply_setting(UI_SET_LARGE_TEXT, large);
+			for (unsigned focus = 0; focus < UI_QUICK_TILES; focus++) {
+				ui_st.quick_focus = focus;
+				p25_cuts = 0; p25_cut_text[0] = '\0';
+				sim_set_fit_hook(p25_fit);
+				ui_app_draw();
+				sim_set_fit_hook(NULL);
+				int overlaps = sim_layout_issues(issues, SIM_LAYOUT_MAX);
+				checked++;
+				if (p25_cuts || overlaps) {
+					printf("FAIL P25 Quick layout [%s %s state %u large %d key %u]: %u cuts%s, %s\n",
+						sim_geoms[g].name, lang_code(language), state, large, focus + 1, p25_cuts, p25_cut_text, overlaps ? issues[0] : "no overlap");
+					fails++;
+				}
+			}
+		}
+	}
+	printf("# P25 Quick: %u translated/accessibility layouts checked\n", checked);
+}
+
+static void check_p25_quick_mapping(void)
+{
+	static const uint8_t expected[] = { QT_POWER, QT_P25_LISTEN, QT_P25_HOLD, QT_P25_TALK,
+		QT_P25_RECENT, QT_P25_FAVORITES, QT_P25_SYSTEM, QT_P25_DETAILS, QT_BRIGHTNESS };
+	static const char *const setups[] = { "p25-trunk-home", "p25-home", "p25-trunk-home p25-case:closed",
+		"p25-trunk-home p25-case:tx-capable", "p25-trunk-home p25-case:empty" };
+	for (int g = 0; g < sim_geom_count; g++) for (unsigned c = 0; c < 5; c++) {
+		char err[300], label[40], value[40];
+		sim_reset(&sim_geoms[g], SIM_MAP_K);
+		if (!sim_run(setups[c], err, sizeof err)) { printf("FAIL P25 fixture: %s\n", err); fails++; continue; }
+		ui_state_t state = {0};
+		for (int i = 0; i < UI_QUICK_TILES; i++) {
+			bool want = c == 2 ? i == 8 : i == 0 ? c == 3 :
+				c == 1 && (i == 1 || i == 2 || i == 5) ? false : c == 4 && i == 2 ? false : true;
+			bool available = ui_quick_tile(i, sim_view(), &state, label, sizeof label, value, sizeof value);
+			if (ui_quick_kind(i, sim_view()) != expected[i] || available != want || label[0] != '1' + i) {
+				printf("FAIL P25 tile %d [%s case %u]: available %d, expected %d\n", i + 1, sim_geoms[g].name, c, available, want);
+				fails++;
+			}
+		}
+	}
+	static const flow_t knob = { "P25 Quick encoder moves forward", "p25-trunk-home quick", "enc+ ok",
+		"screen=p25-listen tx=0", 2, false };
+	run_flow(&knob, sim_geom_find("160x120i5"), SIM_MAP_K, "P25 encoder");
+	static const flow_t few = { "P25 few-key long OK opens Quick", "p25-trunk-home", "long:ok down ok",
+		"screen=p25-listen tx=0", 3, false };
+	run_flow(&few, sim_geom_find("128x64"), SIM_MAP_F, "P25 few keys");
+}
+
 static void check_p25_selection_contrast(void)
 {
 	static const char *const scripts[] = {
 		"p25-trunk-home ctx expect:screen=p25-recent",
-		"p25-trunk-home quick ok ctx back 7 expect:screen=p25-recent",
+		"p25-trunk-home quick 5 ctx back 6 expect:screen=p25-recent",
 	};
 	for (int g = 0; g < sim_geom_count; g++) {
 		for (size_t i = 0; i < sizeof scripts / sizeof scripts[0]; i++) {
@@ -1459,6 +1557,8 @@ int main(void)
 		return 1;
 #if CONFIG_P25_UI
 	check_p25_selection_contrast();
+	check_p25_quick_mapping();
+	check_p25_quick_layout();
 #endif
 #if CONFIG_DMR_SMS
 	{
