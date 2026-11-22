@@ -22,7 +22,7 @@ The footer shows the actions available on the current screen.
 | Hold **\*** | Lock or unlock the keys |
 | **#** | Actions for the focused item; on Home, actions for the current or last caller |
 | Hold **#** | Open the DMR talk target picker |
-| **Up / Down**, channel knob | Move through items; on Home, change channel or VFO frequency unless reassigned |
+| **Up / Down**, channel knob | Move through items; on Home, the knob steps assigned talkgroups when present, otherwise channels or VFO frequency; Up/Down follow their setting |
 | Number keys | Open a numbered card, filter a list, or enter a value as the screen indicates |
 | **PTT** | Transmit; in a target list, call the focused target |
 
@@ -44,6 +44,12 @@ The first two assignable side keys also move focus left and right in Quick Contr
 | **9** | Settings |
 
 Choose the card by number or move the focus and press **OK**. Main Menu numbers differ from the older list-style Hub.
+
+## Mode-specific Quick Controls
+
+FM and DMR offer their own operating controls. P25 uses a fixed nine-action map: Power, Listen, Hold, Talk to,
+Recent, Favorites, System, Details, and Bright. [P25 Phase 1](08-p25.md#quick-controls) explains each action
+and the receive-only behavior of Listen and Hold. Unavailable actions explain their requirements.
 
 ## Temporary changes
 

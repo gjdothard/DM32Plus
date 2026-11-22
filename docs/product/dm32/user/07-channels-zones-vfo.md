@@ -12,15 +12,15 @@ Channel cards show the number, name, mode, and operating details. Digits filter 
 Use its actions to edit membership, rename it, or share it. Deleting a zone asks for confirmation.
 Sharing uses DMR data; check the destination and channel before sending.
 
-On Home, the knob changes channel. The Up/Down behavior can be reassigned in **Settings > Keys**.
+On Home, the knob steps assigned operating talkgroups when available, otherwise channels. The Up/Down behavior can be reassigned in **Settings > Keys**.
 Use the channel editor for saved RX/TX frequencies, power, FM tones, and DMR parameters.
 Leaving an edited channel offers to save or discard changes.
 
 ## P25
 
-P25 channels show **P25** on Home, including the card layout. This identifies
-the selected channel mode; it does not confirm a control-channel lock.
-Use CPS to edit P25 channel and system settings.
+Conventional and trunked Phase 1 C4FM channels have their own Home and Quick Controls.
+See [P25 Phase 1](08-p25.md) for receive filters, Hold, Talk to, sites, and transmit permissions.
+P25 channels are skipped by Scan and cannot be used in either Dual Watch pane.
 
 ## FM
 
@@ -37,7 +37,11 @@ Hold **#** on a DMR channel to choose a talkgroup or ID. The selected talk targe
 **#** on Home opens actions for the current or last caller. **Main Menu > Activity / Logs** opens Recent calls;
 select a call to inspect it, and use its actions or **PTT** to call back.
 
-**Contacts & Talkgroups** keeps saved destinations and operating talkgroups. RX group lists add groups a channel receives.
+**Contacts & Talkgroups** keeps saved destinations and operating talkgroups. Use contact actions to create, edit,
+or delete entries, and the channel talkgroup page to add, create and assign, reorder, or remove assignments.
+Shared assignments refer to saved contacts; editing a shared contact can affect several channels. Review those uses
+before changing or deleting it. Each DMR assignment can carry a timeslot override.
+RX group lists add groups a channel receives.
 Digital monitor broadens which DMR groups you hear. It does not change the channel's transmit destination.
 
 Basic privacy and AES assignments must match the other radios. Configure persistent AES slots through
@@ -53,6 +57,10 @@ Selecting a memory channel leaves the VFO.
 An FM channel or VFO frequency in the air band (108 to below 137 MHz) selects AM receive;
 65 to below 108 MHz selects broadcast FM receive. These bands are receive only. The current build includes these paths,
 but their hardware verification is not recorded; do not treat an enabled setting as proof of successful reception.
+
+The experimental receive setting extends tuning to **16–999.999990 MHz**. Reception across this range is unverified
+and depends on RF hardware and mode. It does not extend TX: transmission remains limited to **136–174 MHz**
+and **400–480 MHz**, with the channel and other transmit permissions still enforced.
 
 ## Scan
 

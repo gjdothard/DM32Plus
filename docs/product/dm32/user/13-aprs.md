@@ -48,5 +48,6 @@ and the next check or GPS status. A next-check time is an estimate.
 
 ## Computer connections
 
+APRS and these DMR data services are separate from P25 operation; P25 channels cannot start APRS.
 Host data services use the programming cable. See [Hotspot and host connections](14-hotspot.md).
 The shared [APRS specification](../../../spec/aprs.md) documents protocol details and advanced configuration.

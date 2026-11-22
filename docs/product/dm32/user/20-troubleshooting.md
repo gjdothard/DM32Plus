@@ -27,6 +27,20 @@ Confirm the installer reported a usable AMBE codec. An image installed without t
 Check that privacy type, key, and slot assignments match the other station.
 If FM works and DMR voice does not, include the installer's codec result in your report.
 
+## P25 does not follow calls
+
+Confirm Phase 1 C4FM, the channel mode, NAC, system identity, control frequencies, site assignments, and channel plans.
+Use **Quick > System / Details** to distinguish acquisition from decoded control and voice activity.
+A Candidate site is not yet confirmed; Site mismatch calls for checking RFSS/site IDs and control grouping.
+Last skip can refer to an earlier unsupported or encrypted call. Phase 2, encryption, and LSM/CQPSK are unsupported.
+
+Check Listen, Hold, and assignments if only some groups are heard. Listen/Hold do not change the TX target.
+RX Only and system Never remain authoritative; changing a target cannot enable transmission.
+P25 Scan and Dual Watch are unavailable. See [P25 Phase 1](08-p25.md).
+
+If a P25 write reports missing managed-transfer support, reconnect after updating firmware.
+Early 1.1.0 RC images lacked the staging reserve; save a binary backup and install a corrected image.
+
 ## Messages do not arrive
 
 Check both DMR IDs and channel parameters, then the outgoing message format under **Settings > Connections**.
